@@ -82,7 +82,11 @@ async function walletSummary() {
   if (!(ecs.hasBase && ecs.hasBase())) return { depositPaid: depositPaid(), settlement: null }
   const res = await ecs.get(`/api/meoo-mp-training?hostId=${encodeURIComponent(accountId())}`)
   if (res && res.deposit) applyDeposit(res.deposit)
-  return { depositPaid: depositPaid(), settlement: (res && res.settlement) || null }
+  return {
+    depositPaid: depositPaid(),
+    settlement: (res && res.settlement) || null,
+    payouts: Array.isArray(res && res.myPayouts) ? res.myPayouts : [],
+  }
 }
 
 async function refundDeposit() {

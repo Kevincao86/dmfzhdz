@@ -91,6 +91,7 @@ export default function WalletPage() {
   const [idBack, setIdBack] = useState('')
   const [licenseImage, setLicenseImage] = useState('')
   const [orders, setOrders] = useState<SettleOrder[]>([])
+  const [payouts, setPayouts] = useState<Array<{ id: string; net: number; status: string; createdAt: string; paidAt: string }>>([])
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(true)
@@ -119,6 +120,7 @@ export default function WalletPage() {
       setQuote((training.settlement as Quote) || null)
       setAccount((training.profile as BoundAccount) || null)
       setOrders(rows)
+      setPayouts(Array.isArray(training.myPayouts) ? (training.myPayouts as Array<{ id: string; net: number; status: string; createdAt: string; paidAt: string }>) : [])
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
     } finally {
@@ -371,6 +373,25 @@ export default function WalletPage() {
             {busy === 'withdraw' ? '提现中' : '提现'}
           </button>
         </div>
+        {payouts.length ? (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm font-semibold text-[var(--shell-text)]">提现记录</p>
+            {payouts.map((row) => (
+              <div key={row.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                <div>
+                  <p className="font-medium text-[var(--shell-text)]">¥{Number(row.net || 0).toFixed(2)}</p>
+                  <p className="text-xs text-[var(--shell-muted)]">
+                    申请 {String(row.createdAt || '').slice(0, 16).replace('T', ' ')}
+                    {row.paidAt ? ` · 打款 ${String(row.paidAt).slice(0, 16).replace('T', ' ')}` : ''}
+                  </p>
+                </div>
+                <span className={row.status === 'paid' ? 'text-emerald-700' : 'text-amber-700'}>
+                  {row.status === 'paid' ? '已打款' : '待打款'}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {!orders.length ? <p className="mt-3 text-sm text-[var(--shell-muted)]">还没有报名订单</p> : null}
         <div className="mt-3 space-y-2">
           {orders.map((order) => (

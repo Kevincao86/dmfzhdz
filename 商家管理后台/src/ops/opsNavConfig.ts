@@ -61,6 +61,23 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
     entries: [{ kind: 'leaf', to: '/', label: '首页看板', icon: LayoutDashboard, permission: 'home' }],
   },
   {
+    id: 'withdrawals',
+    label: '提现申请',
+    entries: [
+      {
+        kind: 'parent',
+        id: 'withdraw-hub',
+        label: '提现申请',
+        icon: Wallet,
+        children: [
+          { kind: 'leaf', to: '/training-payouts', label: '课时费', icon: GraduationCap, permission: 'platform_decor' },
+          { kind: 'leaf', to: '/distribution?tab=withdraw&owner=affiliate', label: '推广员', icon: Share2, permission: 'distribution' },
+          { kind: 'leaf', to: '/distribution?tab=withdraw&owner=partner', label: '分销', icon: Users, permission: 'distribution' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'customer',
     label: '客户与财务',
     entries: [
@@ -115,13 +132,6 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
         to: '/training-review',
         label: '培训审核',
         icon: GraduationCap,
-        permission: 'platform_decor',
-      },
-      {
-        kind: 'leaf',
-        to: '/training-payouts',
-        label: '课时费提现',
-        icon: CreditCard,
         permission: 'platform_decor',
       },
       {

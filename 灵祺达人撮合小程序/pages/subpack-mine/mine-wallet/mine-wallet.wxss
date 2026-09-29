@@ -9,4 +9,15 @@
 .wl-hint { display: block; margin-top: 8rpx; font-size: 22rpx; line-height: 1.5; color: #8b8499; }
 .wl-btn { flex-shrink: 0; padding: 0 24rpx; height: 64rpx; line-height: 64rpx; border-radius: 16rpx; background: #5b2dcc; color: #fff; font-size: 26rpx; font-weight: 600; }
 .wl-btn--ghost { background: #fff; color: #5b2dcc; border: 1rpx solid #d9d0ee; }
+.wl-btn--block { display: block; width: 100%; margin-top: 24rpx; height: 80rpx; line-height: 80rpx; text-align: center; box-sizing: border-box; }
+.wl-rules { margin-top: 20rpx; padding: 20rpx; border-radius: 16rpx; background: #f7f6fb; }
+.wl-rules-title { display: block; font-size: 28rpx; font-weight: 700; color: #1f1a2e; }
+.wl-rule { margin-top: 16rpx; }
+.wl-rule-k { display: block; font-size: 26rpx; font-weight: 700; color: #1f1a2e; }
+.wl-rule-v { display: block; margin-top: 4rpx; font-size: 24rpx; line-height: 1.6; color: #3d3650; }
+.wl-payouts { margin-top: 20rpx; }
+.wl-payout { margin-top: 12rpx; padding-top: 12rpx; border-top: 1rpx solid #efeaf8; }
+.wl-payout-net { font-size: 28rpx; font-weight: 700; color: #1f1a2e; }
+.wl-payout-status { margin-left: 12rpx; font-size: 24rpx; color: #b45309; }
+.wl-payout-status--paid { color: #047857; }
 .wl-go { display: block; margin-top: 16rpx; font-size: 26rpx; font-weight: 600; color: #5b2dcc; }

@@ -400,6 +400,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : [],
       deposit: trainingDepositView(hostId),
       settlement: trainingWithdrawQuote(hostId),
+      myPayouts: hostId
+        ? listTrainingPayouts()
+            .filter((row) => row.hostId === hostId.trim())
+            .map((row) => ({
+              id: row.id,
+              net: row.net,
+              payable: row.payable,
+              commission: row.commission,
+              tax: row.tax,
+              kind: row.kind,
+              status: row.status,
+              createdAt: row.createdAt,
+              paidAt: row.paidAt,
+            }))
+        : [],
     })
     return
   }

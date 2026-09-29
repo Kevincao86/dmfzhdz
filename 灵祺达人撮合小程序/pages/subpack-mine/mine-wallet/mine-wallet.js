@@ -18,6 +18,7 @@ Page({
     commissionLabel: '0',
     taxLabel: '0',
     accountBound: false,
+    payouts: [],
   },
   onLoad() {
     prepareMineSubPage(this)
@@ -56,6 +57,14 @@ Page({
         netLabel: Number(quote.net || 0).toFixed(2),
         commissionLabel: Number(quote.commission || 0).toFixed(2),
         taxLabel: Number(quote.tax || 0).toFixed(2),
+        payouts: (summary.payouts || []).map((row) => ({
+          id: row.id,
+          net: Number(row.net || 0).toFixed(2),
+          status: row.status === 'paid' ? 'paid' : 'pending',
+          statusText: row.status === 'paid' ? '已打款' : '待打款',
+          createdAt: String(row.createdAt || '').slice(0, 16).replace('T', ' '),
+          paidAt: row.paidAt ? String(row.paidAt).slice(0, 16).replace('T', ' ') : '',
+        })),
       })
     } catch (e) {
       this.setData({ loading: false, err: String((e && e.message) || '加载失败').slice(0, 24) })
@@ -90,7 +99,7 @@ Page({
   onWithdraw() {
     wx.showModal({
       title: '提现到绑定账户',
-      content: `可提现 ¥${this.data.netLabel}，已扣佣金 ¥${this.data.commissionLabel}、个税 ¥${this.data.taxLabel}。`,
+      content: `可提现 ¥${this.data.netLabel}（已扣佣金 ¥${this.data.commissionLabel}、个税 ¥${this.data.taxLabel}）。每笔结算只能提现 1 次。每天 00:00–23:59 可发起，提交后 1–3 个工作日到账。`,
       confirmText: '确认提现',
       success: async (res) => {
         if (!res.confirm) return

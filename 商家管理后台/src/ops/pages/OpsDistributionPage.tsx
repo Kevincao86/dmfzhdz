@@ -1,5 +1,6 @@
 import { Loader2, Percent, RefreshCw, Save } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { cn } from '../../cn'
 import {
   effectiveAffiliateRates,
@@ -296,9 +297,48 @@ function CommissionOverrideModal({
   )
 }
 
+function exportWithdrawCsv(
+  rows: Array<{
+    id: string
+    ownerLabel: string
+    ownerType: string
+    amountCents: number
+    channel: string
+    status: string
+    createdAt: string
+    paidAt?: string
+  }>,
+) {
+  const header = ['申请人', '类型', '金额', '渠道', '状态', '申请时间', '打款时间', '单号']
+  const lines = [header.join(',')]
+  rows.forEach((row) => {
+    const cells = [
+      row.ownerLabel,
+      row.ownerType === 'partner_tenant' ? '分销' : '推广员',
+      yuanFromCents(row.amountCents),
+      row.channel,
+      withdrawStatusLabel(row.status),
+      String(row.createdAt || '').slice(0, 16).replace('T', ' '),
+      row.paidAt ? String(row.paidAt).slice(0, 16).replace('T', ' ') : '',
+      row.id,
+    ]
+    lines.push(cells.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+  })
+  const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `提现申请-${rows[0]?.ownerType === 'partner_tenant' ? '分销' : '推广员'}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function OpsDistributionPage() {
   const { canEdit } = useOpsModuleEdit('distribution')
-  const [tab, setTab] = useState<TabId>('policy')
+  const [searchParams] = useSearchParams()
+  const owner = searchParams.get('owner')
+  const withdrawOnly = owner === 'affiliate' || owner === 'partner'
+  const [tab, setTab] = useState<TabId>(searchParams.get('tab') === 'withdraw' ? 'withdraw' : 'policy')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [policy, setPolicy] = useState<RegistryDistributionPolicy>(mergeDistributionPolicy(null))
@@ -348,6 +388,20 @@ export default function OpsDistributionPage() {
     void reload()
   }, [reload])
 
+  useEffect(() => {
+    if (searchParams.get('tab') === 'withdraw') setTab('withdraw')
+  }, [searchParams])
+
+  const shownWithdraws = useMemo(
+    () =>
+      withdrawRequests.filter((row) => {
+        if (owner === 'affiliate') return row.ownerType === 'individual_affiliate'
+        if (owner === 'partner') return row.ownerType === 'partner_tenant'
+        return true
+      }),
+    [withdrawRequests, owner],
+  )
+
   const activePartner = useMemo(
     () => partners.find((p) => p.partnerTenantId === activePartnerId),
     [partners, activePartnerId],
@@ -392,12 +446,24 @@ export default function OpsDistributionPage() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-white">
             <Percent className="h-7 w-7 text-indigo-400" />
-            渠道分销
+            {owner === 'affiliate' ? '推广员提现' : owner === 'partner' ? '分销提现' : '渠道分销'}
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-slate-400">
-            P1 提现审核 · P2 结算批次 · 单个/批量调整个人分销员与服务商（代理商）佣金比例。数据写入注册表扩展字段。
+            {withdrawOnly
+              ? '审核通过后导出名单打款，再标记已付。网页端和小程序读同一份申请状态。'
+              : 'P1 提现审核 · P2 结算批次 · 单个/批量调整个人分销员与服务商（代理商）佣金比例。数据写入注册表扩展字段。'}
           </p>
         </div>
+        {tab === 'withdraw' ? (
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 disabled:opacity-50"
+            disabled={!shownWithdraws.length}
+            onClick={() => exportWithdrawCsv(shownWithdraws)}
+          >
+            导出当前列表
+          </button>
+        ) : null}
         <button
           type="button"
           className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300"
@@ -412,7 +478,7 @@ export default function OpsDistributionPage() {
         <p className="rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">{err}</p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 border-b border-[var(--ops-border)] pb-2">
+      {withdrawOnly ? null : <div className="flex flex-wrap gap-2 border-b border-[var(--ops-border)] pb-2">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -426,7 +492,7 @@ export default function OpsDistributionPage() {
             {t.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-slate-400">
@@ -772,7 +838,7 @@ export default function OpsDistributionPage() {
               </tr>
             </thead>
             <tbody>
-              {withdrawRequests.map((w) => (
+              {shownWithdraws.map((w) => (
                 <tr key={w.id} className="border-t border-slate-800">
                   <td className="p-2 text-white">{w.ownerLabel}</td>
                   <td className="p-2">¥{yuanFromCents(w.amountCents)}</td>
@@ -806,7 +872,7 @@ export default function OpsDistributionPage() {
               ))}
             </tbody>
           </table>
-          {!withdrawRequests.length ? <p className="p-6 text-center text-slate-500">暂无提现申请。推广员在每月 10–15 日提交后将出现在此。</p> : null}
+          {!shownWithdraws.length ? <p className="p-6 text-center text-slate-500">暂无提现申请。提交后网页端和小程序会显示同一状态。</p> : null}
         </div>
       ) : null}
 
