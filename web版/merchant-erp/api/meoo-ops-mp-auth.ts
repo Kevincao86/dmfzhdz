@@ -795,9 +795,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         !includeOnly &&
         Array.isArray(payload.mpRecruitmentOrders)
       ) {
-        payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForHallList(
-          payload.mpRecruitmentOrders as RegistryMpRecruitmentOrder[],
-        )
+        const orders = payload.mpRecruitmentOrders as RegistryMpRecruitmentOrder[]
+        if (includeAllPrOwned) {
+          // 我的发单已按 PR 归属筛过。大厅瘦身会拿掉 lingqiPrId / prParticipantKey，
+          // 客户端会把这些单再判成别人的，开环单（群码写在同一份 meta 里）也会一起消失。
+          payload.mpRecruitmentOrders = orders.map((raw) => {
+            const o: RegistryMpRecruitmentOrder = { ...raw }
+            for (const key of ['groupQrImage', 'editGroupQrImage', 'coverImage'] as const) {
+              const value = String(o[key] || '')
+              if (value.startsWith('data:') && value.length > 256) delete o[key]
+            }
+            if (o.mpPublishMeta && typeof o.mpPublishMeta === 'object') {
+              const meta = { ...o.mpPublishMeta }
+              for (const key of ['groupQrImage', 'editGroupQrImage', 'coverImage']) {
+                const value = String(meta[key] || '')
+                if (value.startsWith('data:') && value.length > 256) delete meta[key]
+              }
+              o.mpPublishMeta = meta
+            }
+            return o
+          })
+        } else {
+          payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForHallList(orders)
+        }
       }
       sendJson(res, 200, { ok: true, ...payload })
       return
