@@ -210,24 +210,25 @@ export default function TalentLocalLifeEvalPage() {
         ))}
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <div className="surface-card rounded-xl border p-6 text-center">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="mx-auto h-16 w-16 rounded-full object-cover" />
-            ) : (
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-violet-100 text-xl font-bold text-violet-700">
-                {letterOf(nickname || accountId)}
-              </div>
-            )}
-            <p className="mt-3 text-lg font-bold">{nickname || '未填写昵称'}</p>
+      <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <div className="surface-card flex items-center gap-5 rounded-xl border p-6 text-left">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-20 w-20 shrink-0 rounded-full object-cover" />
+          ) : (
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-violet-100 text-2xl font-bold text-violet-700">
+              {letterOf(nickname || accountId)}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-lg font-bold">{nickname || '未填写昵称'}</p>
             <p className="mt-1 text-sm text-[var(--shell-muted)]">
               {meta.accountLabel} {accountId || '未填写'}
             </p>
             <p className="mt-1 text-sm text-[var(--shell-muted)]">{basis || '按已填写的昵称和账号分析'}</p>
           </div>
+        </div>
 
-          <div className="surface-card rounded-xl border p-6 text-center">
+        <div className="surface-card rounded-xl border p-6 text-center">
             <div className="relative mx-auto h-44 w-44">
               <div
                 className="absolute inset-2 rounded-full blur-md"
@@ -312,10 +313,10 @@ export default function TalentLocalLifeEvalPage() {
                   : `达人信息评估 · ${TALENT_EVAL_POINTS}积分`}
             </button>
           </div>
-        </div>
+      </div>
 
-        <div className="space-y-4">
-          <div className="surface-card rounded-xl border p-5">
+      <div className="space-y-4">
+          <div className="surface-card rounded-xl border p-6">
             {score ? (
               <div className="grid gap-6 sm:grid-cols-2">
                 <div>
@@ -351,9 +352,9 @@ export default function TalentLocalLifeEvalPage() {
           {score?.situations?.length ? (
             <div className="surface-card rounded-xl border p-5 text-left">
               <p className="text-xs tracking-wide text-[var(--shell-muted)]">达人现状</p>
-              <div className="mt-3 grid gap-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {score.situations.map((row, index) => (
-                  <div key={row.name} className="eval-plate">
+                  <div key={row.name} className="eval-plate eval-plate--stack">
                     <span className="eval-plate-no">{String(index + 1).padStart(2, '0')}</span>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{row.name}</p>
@@ -368,9 +369,9 @@ export default function TalentLocalLifeEvalPage() {
           {advice?.sections?.length ? (
             <div className="surface-card rounded-xl border p-5">
               <p className="text-xs tracking-wide text-[var(--shell-muted)]">分析与提升方案</p>
-              <div className="mt-3 grid gap-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {advice.sections.map((row, index) => (
-                  <div key={row.name} className="eval-plate">
+                  <div key={row.name} className="eval-plate eval-plate--stack">
                     <span className="eval-plate-no">{String(index + 1).padStart(2, '0')}</span>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{row.name}</p>
@@ -385,7 +386,7 @@ export default function TalentLocalLifeEvalPage() {
           {grade ? (
             <div className="surface-card rounded-xl border p-5 text-left">
               <p className="text-xs tracking-wide text-[var(--shell-muted)]">评级释义</p>
-              <div className="mt-3 grid gap-3">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {DOUYIN_SCORE_GRADES.map((row) => (
                   <div key={row.key} className={`eval-plate ${row.key === grade.key ? 'eval-plate--on' : ''}`}>
                     <span className="eval-plate-no">{row.range}</span>
@@ -399,7 +400,6 @@ export default function TalentLocalLifeEvalPage() {
             </div>
           ) : null}
         </div>
-      </div>
 
       <style>{`
         @keyframes talent-eval-spin { to { transform: rotate(360deg); } }
@@ -434,6 +434,11 @@ export default function TalentLocalLifeEvalPage() {
           border-radius: 1rem;
           background: #f6f3ee;
           padding: 0.9rem 1rem;
+        }
+        .eval-plate--stack {
+          grid-template-columns: 1fr;
+          gap: 0.35rem;
+          min-height: 100%;
         }
         .eval-plate--on {
           background: #efeaf8;

@@ -1,4 +1,4 @@
-<view class="xingxuan-page page-shell {{lqThemeClass}} xingxuan-page--dock">
+<view class="xingxuan-page page-shell {{lqThemeClass}}">
   <view class="plats">
     <view
       wx:for="{{platforms}}"
@@ -12,7 +12,7 @@
     </view>
   </view>
 
-  <view class="eval-split">
+  <view class="eval-top">
     <view class="eval-left">
       <view class="xingxuan-card ident">
         <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
@@ -22,7 +22,8 @@
         <text class="did" wx:if="{{basis}}">{{basis}}</text>
         <text class="did" wx:else>按已填写的昵称和账号分析</text>
       </view>
-
+    </view>
+    <view class="eval-right">
       <view class="xingxuan-card hero">
         <view class="ring-stage">
           <view class="ring-halo {{evaluating ? 'ring-halo--on' : ''}}"></view>
@@ -37,16 +38,18 @@
           <text class="grade-label grade-label--{{gradeKey}}">{{gradeLabel}}</text>
           <text class="grade-note">{{gradeNote}}</text>
         </view>
-        <view class="levels" wx:if="{{scoreReady}}">
-          <text class="level-title">{{levelTitle}}</text>
-          <text class="level">{{levelALabel}} {{videoLevel}}</text>
-          <text class="level">{{levelBLabel}} {{liveLevel}}</text>
-        </view>
+        <view
+          class="btn-main {{!canEval || evaluating || advising ? 'btn--off' : ''}}"
+          hover-class="btn-main--hover"
+          bindtap="onEvaluate"
+        >{{evaluating ? '评估中…' : (scoreReady ? reevalCostText : evalCostText)}}</view>
       </view>
     </view>
+  </view>
 
-    <view class="eval-right">
-      <view class="xingxuan-card gains" wx:if="{{showGains}}">
+  <view class="eval-bottom">
+    <view class="xingxuan-card gains" wx:if="{{showGains}}">
+      <view class="gain-row">
         <view class="gain">
           <text class="gain-k">预计提升曝光</text>
           <text class="gain-v">{{exposureText}}</text>
@@ -56,12 +59,22 @@
           <text class="gain-v">{{salesText}}</text>
         </view>
       </view>
-      <view class="xingxuan-card gains" wx:else>
-        <text class="need">完成评估后，这里显示预计提升的曝光和带货金额</text>
-      </view>
+    </view>
+    <view class="xingxuan-card gains" wx:else>
+      <text class="need">完成评估后，这里显示预计提升的曝光和带货金额</text>
+    </view>
+    <view
+      class="btn-sub {{!scoreReady || evaluating || advising ? 'btn--off' : ''}}"
+      hover-class="btn-sub--hover"
+      bindtap="onAdvise"
+    >{{advising ? '分析中…' : adviceCostText}}</view>
+    <text class="err" wx:if="{{err}}">{{err}}</text>
+    <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写{{nickLabel}}或{{accountLabel}}</text>
+    <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
 
-      <view class="xingxuan-card advice" wx:if="{{scoreReady && situations.length}}">
-        <text class="advice-title">达人现状</text>
+    <view class="xingxuan-card advice" wx:if="{{scoreReady && situations.length}}">
+      <text class="advice-title">达人现状</text>
+      <view class="plate-grid">
         <view class="plate" wx:for="{{situations}}" wx:key="name">
           <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
           <view class="plate-body">
@@ -70,9 +83,11 @@
           </view>
         </view>
       </view>
+    </view>
 
-      <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
-        <text class="advice-title">分析与提升方案</text>
+    <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
+      <text class="advice-title">分析与提升方案</text>
+      <view class="plate-grid">
         <view class="plate" wx:for="{{sections}}" wx:key="name">
           <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
           <view class="plate-body">
@@ -82,22 +97,6 @@
         </view>
       </view>
     </view>
-  </view>
-
-  <view class="eval-dock">
-    <view
-      class="btn-main {{!canEval || evaluating || advising ? 'btn--off' : ''}}"
-      hover-class="btn-main--hover"
-      bindtap="onEvaluate"
-    >{{evaluating ? '评估中…' : (scoreReady ? reevalCostText : evalCostText)}}</view>
-    <view
-      class="btn-sub {{!scoreReady || evaluating || advising ? 'btn--off' : ''}}"
-      hover-class="btn-sub--hover"
-      bindtap="onAdvise"
-    >{{advising ? '分析中…' : adviceCostText}}</view>
-    <text class="err" wx:if="{{err}}">{{err}}</text>
-    <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写{{nickLabel}}或{{accountLabel}}</text>
-    <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
   </view>
 
   <view class="eval-tab-bar">

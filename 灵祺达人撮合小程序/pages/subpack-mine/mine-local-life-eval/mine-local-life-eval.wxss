@@ -7,11 +7,41 @@
   padding: 8rpx 24rpx 4rpx;
 }
 
-.eval-split {
+.eval-top {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 16rpx;
-  padding: 0 16rpx 24rpx;
+  padding: 0 16rpx;
+}
+
+.eval-bottom {
+  padding: 8rpx 16rpx 24rpx;
+}
+
+.gain-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.gain-row .gain {
+  flex: 1;
+  min-width: 0;
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.plate-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.plate-grid .plate {
+  width: calc(50% - 6rpx);
+  box-sizing: border-box;
+  margin-top: 0;
+  flex-direction: column;
 }
 
 .eval-left {
@@ -41,17 +71,21 @@
 }
 
 .eval-left .ring-stage,
-.eval-left .ring {
+.eval-left .ring,
+.eval-right .ring-stage,
+.eval-right .ring {
   width: 200rpx;
   height: 200rpx;
 }
 
-.eval-left .ring-hole {
+.eval-left .ring-hole,
+.eval-right .ring-hole {
   width: 148rpx;
   height: 148rpx;
 }
 
-.eval-left .score {
+.eval-left .score,
+.eval-right .score {
   font-size: 56rpx;
 }
 
@@ -64,8 +98,7 @@
 }
 
 .gain + .gain {
-  border-top: 2rpx solid #efeaf8;
-  margin-top: 8rpx;
+  margin-top: 0;
 }
 
 .gain-k {
