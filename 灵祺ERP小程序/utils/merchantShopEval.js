@@ -1,142 +1,90 @@
+const EVAL_BLOCK_NAMES = ['商品信息', '运营节奏', '品牌视觉', '流量分布', 'GEO 投喂', '财务明晰']
+const LEVEL_A_BLOCKS = ['品牌视觉', '流量分布', 'GEO 投喂']
+const LEVEL_B_BLOCKS = ['商品信息', '运营节奏', '财务明晰']
+
+function evalBlocks(weights) {
+  return EVAL_BLOCK_NAMES.map((name, index) => ({ name, weight: weights[index] }))
+}
+
 const PLATFORM_SPECS = {
   douyin: {
     id: 'douyin',
     name: '抖音来客',
     scope: 'single',
-    scene: '按抖音来客单门店打分。看这家店资料能不能被搜到、套餐能不能挂到店、内容能不能带到核销。',
-    blocks: [
-      { name: '资料可信', weight: 20 },
-      { name: '套餐竞争力', weight: 25 },
-      { name: '内容种草', weight: 20 },
-      { name: '到店路径', weight: 20 },
-      { name: '履约口碑', weight: 15 },
-    ],
+    scene: '按抖音来客打分。六项都是商家 ERP 里的功能：商品信息、运营节奏、品牌视觉、流量分布、GEO 投喂、财务明晰。',
+    blocks: evalBlocks([20, 15, 15, 15, 15, 20]),
     risk: 20,
-    riskNote: '虚假营业时间、价格和核销不符、套图冒充实拍',
+    riskNote: '套餐价格和核销对不上、把未完善的功能写成已经在用',
     levelA: '可被搜到',
     levelB: '可被核销',
-    levelABlocks: ['资料可信', '内容种草'],
-    levelBBlocks: ['套餐竞争力', '到店路径'],
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
   },
   meituan: {
     id: 'meituan',
     name: '美团点评',
     scope: 'single',
-    scene: '按美团点评单门店打分。资料和套餐权重大于内容，核心是这家店能被搜到、能核销。',
-    blocks: [
-      { name: '资料可信', weight: 25 },
-      { name: '套餐竞争力', weight: 25 },
-      { name: '内容种草', weight: 15 },
-      { name: '到店路径', weight: 20 },
-      { name: '履约口碑', weight: 15 },
-    ],
+    scene: '按美团点评打分。商品信息和财务明晰权重大于视觉和 GEO。六项名称不变。',
+    blocks: evalBlocks([25, 15, 10, 15, 10, 25]),
     risk: 20,
-    riskNote: '刷评、水军、营业时间与真实不符',
+    riskNote: '套餐价格和核销对不上、把未完善的功能写成已经在用',
     levelA: '可被搜到',
     levelB: '可被核销',
-    levelABlocks: ['资料可信', '内容种草'],
-    levelBBlocks: ['套餐竞争力', '到店路径'],
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
   },
   xiaohongshu: {
     id: 'xiaohongshu',
     name: '小红书',
     scope: 'single',
-    scene: '按小红书单门店打分。笔记能不能被搜到、被相信，再引导到这家店或团购。',
-    blocks: [
-      { name: '资料可信', weight: 15 },
-      { name: '套餐竞争力', weight: 15 },
-      { name: '内容种草', weight: 35 },
-      { name: '到店路径', weight: 20 },
-      { name: '履约口碑', weight: 15 },
-    ],
+    scene: '按小红书打分。品牌视觉和运营节奏权重大于商品信息和财务。六项名称不变。',
+    blocks: evalBlocks([15, 20, 20, 15, 15, 15]),
     risk: 20,
-    riskNote: '营销号感、虚假种草、地址对不上 POI',
+    riskNote: '视觉和门店对不上、把未完善的功能写成已经在用',
     levelA: '可被搜到',
     levelB: '可被核销',
-    levelABlocks: ['资料可信', '内容种草'],
-    levelBBlocks: ['套餐竞争力', '到店路径'],
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
   },
   kuaishou: {
     id: 'kuaishou',
     name: '快手团购',
     scope: 'single',
-    scene: '按快手团购单门店打分。老铁信任和直播/短视频挂载要能落到这家店核销。',
-    blocks: [
-      { name: '资料可信', weight: 20 },
-      { name: '套餐竞争力', weight: 25 },
-      { name: '内容种草', weight: 20 },
-      { name: '到店路径', weight: 20 },
-      { name: '履约口碑', weight: 15 },
-    ],
+    scene: '按快手团购打分。六项都是商家 ERP 里的功能，权重与抖音来客相同。',
+    blocks: evalBlocks([20, 15, 15, 15, 15, 20]),
     risk: 20,
-    riskNote: '标题党、挂车和门店无关、价格与核销不符',
+    riskNote: '挂载和门店无关、价格和核销不符、把未完善的功能写成已经在用',
     levelA: '可被搜到',
     levelB: '可被核销',
-    levelABlocks: ['资料可信', '内容种草'],
-    levelBBlocks: ['套餐竞争力', '到店路径'],
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
   },
 }
 
 const CHAIN_OVERLAYS = {
   douyin: {
-    scene: '按抖音来客连锁品牌打分。看各店资料是否统一、套餐能否统筹挂载、内容能否带到各店核销。',
-    blocks: [
-      { name: '品牌一致性', weight: 25 },
-      { name: '套餐统筹', weight: 20 },
-      { name: '内容种草', weight: 15 },
-      { name: '分店覆盖', weight: 25 },
-      { name: '履约口碑', weight: 15 },
-    ],
-    riskNote: '各店资料互相打架、同套餐不同价、分店漏挂载、套图冒充实拍',
+    scene: '按抖音来客连锁品牌打分。六项名称与单店相同，多看各店商品、视觉、流量和财务是否统一。看不出统一的项记为未完善。',
+    riskNote: '各店套餐不同价、把未完善写成各店已经统一',
     levelA: '品牌可被搜到',
     levelB: '分店可核销',
-    levelABlocks: ['品牌一致性', '内容种草'],
-    levelBBlocks: ['套餐统筹', '分店覆盖'],
   },
   meituan: {
-    scene: '按美团点评连锁品牌打分。资料和套餐在各店是否统一，分店是否都能被搜到、能核销。',
-    blocks: [
-      { name: '品牌一致性', weight: 25 },
-      { name: '套餐统筹', weight: 25 },
-      { name: '内容种草', weight: 10 },
-      { name: '分店覆盖', weight: 25 },
-      { name: '履约口碑', weight: 15 },
-    ],
-    riskNote: '各店评分口径不一、刷评、分店营业时间与真实不符',
+    scene: '按美团点评连锁品牌打分。六项名称与单店相同，商品和财务权重更高，并看各店是否统一。',
+    riskNote: '各店套餐不同价、把未完善写成各店已经统一',
     levelA: '品牌可被搜到',
     levelB: '分店可核销',
-    levelABlocks: ['品牌一致性', '内容种草'],
-    levelBBlocks: ['套餐统筹', '分店覆盖'],
   },
   xiaohongshu: {
-    scene: '按小红书连锁品牌打分。笔记是不是品牌一致、能不能被相信，再引导到各店或团购。',
-    blocks: [
-      { name: '品牌一致性', weight: 20 },
-      { name: '套餐统筹', weight: 15 },
-      { name: '内容种草', weight: 30 },
-      { name: '分店覆盖', weight: 20 },
-      { name: '履约口碑', weight: 15 },
-    ],
-    riskNote: '营销号感、虚假种草、分店 POI 对不上、各店笔记口径打架',
+    scene: '按小红书连锁品牌打分。六项名称与单店相同，视觉和运营权重更高，并看各店是否统一。',
+    riskNote: '各店视觉口径打架、把未完善写成各店已经统一',
     levelA: '品牌可被搜到',
     levelB: '分店可核销',
-    levelABlocks: ['品牌一致性', '内容种草'],
-    levelBBlocks: ['套餐统筹', '分店覆盖'],
   },
   kuaishou: {
-    scene: '按快手团购连锁品牌打分。老铁信任和直播/短视频挂载要能落到各店核销。',
-    blocks: [
-      { name: '品牌一致性', weight: 25 },
-      { name: '套餐统筹', weight: 20 },
-      { name: '内容种草', weight: 15 },
-      { name: '分店覆盖', weight: 25 },
-      { name: '履约口碑', weight: 15 },
-    ],
-    riskNote: '标题党、挂车和分店无关、同套餐不同价、分店漏挂',
+    scene: '按快手团购连锁品牌打分。六项名称与单店相同，多看各店是否统一。',
+    riskNote: '挂载和分店无关、同套餐不同价、把未完善写成各店已经统一',
     levelA: '品牌可被搜到',
     levelB: '分店可核销',
-    levelABlocks: ['品牌一致性', '内容种草'],
-    levelBBlocks: ['套餐统筹', '分店覆盖'],
   },
 }
 
@@ -148,17 +96,17 @@ const SHOP_EVAL_PLATFORMS = [
 ]
 
 const SHOP_EVAL_GRADES_SINGLE = [
-  { key: 'ready', range: '85~100', label: '经营稳健', note: '资料和套餐齐，顾客能搜到、能到店核销' },
-  { key: 'tune', range: '70~84', label: '转化偏弱', note: '店能被看见，内容和到店转化还不够稳' },
-  { key: 'fill', range: '55~69', label: '资料偏薄', note: '地址、套餐或挂载还不齐，获客能力有限' },
-  { key: 'build', range: '＜55', label: '形象未立', note: '还没形成能被搜到、能核销的对外形象' },
+  { key: 'ready', range: '85~100', label: '经营稳健', note: '六项功能里，商品和已经接上的经营动作比较齐' },
+  { key: 'tune', range: '70~84', label: '转化偏弱', note: '店能被看见，运营、流量或财务还没接上' },
+  { key: 'fill', range: '55~69', label: '资料偏薄', note: '多项功能还是未完善，获客动作有限' },
+  { key: 'build', range: '＜55', label: '形象未立', note: '功能大多未完善，还没形成可经营的闭环' },
 ]
 
 const SHOP_EVAL_GRADES_CHAIN = [
-  { key: 'ready', range: '85~100', label: '品牌成型', note: '各店资料和套餐统一，品牌能被搜到、分店能核销' },
-  { key: 'tune', range: '70~84', label: '协同不足', note: '品牌能见客，分店之间资料或转化还不齐' },
-  { key: 'fill', range: '55~69', label: '分店偏散', note: '多家店还没统一资料、套餐或挂载' },
-  { key: 'build', range: '＜55', label: '品牌未立', note: '连锁还没形成统一可核销的对外形象' },
+  { key: 'ready', range: '85~100', label: '品牌成型', note: '六项功能在各店比较统一，分店能被看见、能核销' },
+  { key: 'tune', range: '70~84', label: '协同不足', note: '品牌能见客，分店之间功能还没对齐' },
+  { key: 'fill', range: '55~69', label: '分店偏散', note: '多家店的商品、视觉或财务还没统一' },
+  { key: 'build', range: '＜55', label: '品牌未立', note: '连锁功能大多未完善，还没形成统一形象' },
 ]
 
 const SHOP_EVAL_GRADES = SHOP_EVAL_GRADES_SINGLE
@@ -247,6 +195,22 @@ function shopFacts(spec, row) {
     `营业时间：${filledOr(row.businessHours, '未填写')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
+    functionCoverage(row),
+  ].join('\n')
+}
+
+function functionCoverage(row) {
+  const offer = [row.offerName, row.offerPrice].filter(Boolean).join(' ')
+  const product = offer
+    ? `商品信息：已有套餐 ${offer}。商品库和菜单图文本次未接入，不要写成图文已齐。`
+    : '商品信息：未完善。没有套餐名称和价格。'
+  return [
+    product,
+    '运营节奏：未完善。活动中心、达人招募、AI 运营方案、评价管理本次未接入。',
+    '品牌视觉：未完善。店铺装修和 AI 视觉工坊本次未接入。',
+    '流量分布：未完善。店铺分析、投流、线索本次未接入。',
+    'GEO 投喂：未完善。GEO 运营优化和知识库本次未接入。',
+    '财务明晰：未完善。财务对账和报税管理本次未接入。',
   ].join('\n')
 }
 
@@ -259,13 +223,14 @@ function scoreSystem(spec) {
     spec.scope === 'chain'
       ? '这是给商家看的连锁品牌体检，用「你」来写。不要声称读到了平台官方后台或官方等级。'
       : '这是给商家看的单门店体检，用「你」来写。不要声称读到了平台官方后台或官方等级。',
-    '只根据已填写的门店资料分析。未填写的销量、核销额、GMV、评价数不要编造。',
-    '不要写「公开资料不足」「仅供参考」「不是官方」「弱预估」这类提示句。没填的项写成未填写即可。',
+    '只根据下面列出的功能完成度打分。标成「未完善」的功能，points 必须在 0 到 20，不要编造成已经在用。',
+    '商品信息如果只有套餐名称或价格，points 不要超过 55。',
+    '不要写「公开资料不足」「仅供参考」「不是官方」「弱预估」这类提示句。',
     '只输出一个 JSON 对象，不要 Markdown。键名必须用英文双引号，最后一项后面不要逗号。',
-    `blocks 为数组，每项含 name、points。points 为 0 到 100 的整数。name 必须是：${names}。`,
+    `blocks 为数组，必须正好 6 项，每项含 name、points。points 为 0 到 100 的整数。name 必须是：${names}。`,
     `risk 为 0 到 ${spec.risk} 的整数，表示风险扣分。扣分依据：${spec.riskNote}。没有实锤不要乱扣。`,
     `同时输出 score，为 0 到 100 的整数，按这些权重合成后再扣 risk：${weights}。`,
-    `situations 为 4 到 5 项，每项含 name、now。now 不超过 40 字，只写现状不要写建议。name 只能从这些板块里选：${names}。`,
+    `situations 必须正好 6 项，顺序与 blocks 一致。每项含 name、now。now 不超过 40 字，只写现状。未完善的项，now 以「未完善」开头。`,
     'exposureLift 为整改后预计多出来的被搜到/展示百分比，整数 8 到 60，不要写百分号。',
     'verifyLift 为整改后预计每月多带来的核销金额，单位元的整数。按已填套餐价格估算增量，没有价格不要编造当前已成交额。',
   ].join('')
@@ -275,16 +240,16 @@ function adviceSystem(spec) {
   return [
     '你是豆包。这是商家自己看的门店体检，按现状写给商家的改法，用「你」来写。',
     spec.scope === 'chain'
-      ? '对象是连锁品牌。建议要能落到各店统一资料、统一套餐、补齐漏挂分店，不要只写一家店。'
-      : '对象是单门店。建议要落到这家店的资料、套餐、内容和挂载。',
+      ? '对象是连锁品牌。建议要落到各店把同一项功能补齐、对齐，不要把未完善写成已经统一。'
+      : '对象是单门店。建议要落到这家店对应的 ERP 功能，未完善的项写去哪里补。',
     '不要编造销量、核销额、GMV。未在资料里出现的数字不要写进来。',
     '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
     '只输出一个 JSON 对象，不要 Markdown。',
     '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
-    '字段：sections 为 4 到 5 项。每项含 name、finding、adjust、soon。',
-    'name 与现状里的板块一致，不超过 8 个字。',
+    '字段：sections 必须正好 6 项。每项含 name、finding、adjust、soon。',
+    'name 必须与六项打分完全一致：商品信息、运营节奏、品牌视觉、流量分布、GEO 投喂、财务明晰。',
     'finding 是分析结果：这个板块现在卡在哪里、原因是什么，60 到 100 字。',
-    'adjust 是怎么调整：改店铺、套餐、内容或挂载里的哪一项，改完应看到什么，80 到 160 字。',
+    'adjust 是怎么调整：去对应的 ERP 功能里补哪一项，改完应看到什么，80 到 160 字。',
     'soon 是近期要做：近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，80 到 160 字。',
   ].join('')
 }
@@ -419,7 +384,7 @@ function mapSituations(rows) {
       }
     })
     .filter((row) => row.name && row.now)
-    .slice(0, 5)
+    .slice(0, 6)
 }
 
 function mapSuggestions(rows) {
@@ -437,7 +402,7 @@ function mapSuggestions(rows) {
       }
     })
     .filter((row) => row.name && (row.finding || row.adjust || row.soon))
-    .slice(0, 5)
+    .slice(0, 6)
 }
 
 function ownerId() {
