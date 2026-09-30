@@ -68,6 +68,10 @@ async function askText(system: string, user: string) {
 
 const EVAL_TABS: StorePlatformTab[] = ['douyin', 'kuaishou', 'meituan', 'xiaohongshu']
 
+function readBoundEvalPlatforms(): ShopEvalPlatformId[] {
+  return SHOP_EVAL_PLATFORMS.map((item) => item.id).filter((id) => Boolean(storeTabToken(id)))
+}
+
 function blankSignals(): ShopEvalSignals {
   return {
     productTotal: 0,
@@ -196,8 +200,11 @@ function useRiseCount(target: number, play: boolean) {
 export default function MerchantShopEvalPanel() {
   const { plan } = useMembership()
   const navigate = useNavigate()
-  const [platformId, setPlatformId] = useState<ShopEvalPlatformId>('douyin')
-  const [input, setInput] = useState<ShopEvalInput>({ platformId: 'douyin' })
+  const [boundIds, setBoundIds] = useState<ShopEvalPlatformId[]>(readBoundEvalPlatforms)
+  const [platformId, setPlatformId] = useState<ShopEvalPlatformId>(() => readBoundEvalPlatforms()[0] || 'douyin')
+  const [input, setInput] = useState<ShopEvalInput>(() => ({
+    platformId: readBoundEvalPlatforms()[0] || 'douyin',
+  }))
   const [score, setScore] = useState<ShopEvalScore | null>(null)
   const [advice, setAdvice] = useState<ShopEvalAdvice | null>(null)
   const [evaluating, setEvaluating] = useState(false)
@@ -209,7 +216,8 @@ export default function MerchantShopEvalPanel() {
   const signalsRef = useRef<ShopEvalSignals | null>(null)
   const scope = shopEvalScopeOf(input)
   const meta = platformShopEvalMeta(platformId, scope)
-  const canEval = Boolean(String(input.storeName || '').trim())
+  const platformBound = boundIds.includes(platformId)
+  const canEval = platformBound && Boolean(String(input.storeName || '').trim())
   const paid = plan !== 'free'
   const grade = score ? shopEvalGrade(score.score, scope) : null
   const grades = shopEvalGrades(scope)
@@ -227,8 +235,20 @@ export default function MerchantShopEvalPanel() {
   }, [])
 
   useEffect(() => {
+    const sync = () => {
+      const next = readBoundEvalPlatforms()
+      setBoundIds(next)
+      setPlatformId((cur) => (next.includes(cur) ? cur : next[0] || cur))
+    }
+    sync()
+    window.addEventListener('focus', sync)
+    return () => window.removeEventListener('focus', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!platformBound) return
     void loadStore(platformId)
-  }, [platformId, loadStore])
+  }, [platformId, platformBound, loadStore])
 
   useEffect(() => {
     signalsRef.current = null
@@ -311,26 +331,35 @@ export default function MerchantShopEvalPanel() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {SHOP_EVAL_PLATFORMS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setPlatformId(p.id)}
-              className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-xs font-medium ${
-                platformId === p.id
-                  ? 'bg-[#1E3A5F] text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <MerchantPlatformIcon
-                platformId={p.id}
-                name={p.name}
-                size="sm"
-                className="!h-5 !w-5 rounded-md bg-white p-0.5 shadow-none"
-              />
-              {p.name}
-            </button>
-          ))}
+          {SHOP_EVAL_PLATFORMS.map((p) => {
+            const bound = boundIds.includes(p.id)
+            return (
+              <button
+                key={p.id}
+                type="button"
+                disabled={!bound}
+                title={bound ? p.name : `${p.name}尚未绑定`}
+                onClick={() => {
+                  if (bound) setPlatformId(p.id)
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-xs font-medium ${
+                  !bound
+                    ? 'cursor-not-allowed bg-slate-100 text-slate-400'
+                    : platformId === p.id
+                      ? 'bg-[#1E3A5F] text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <MerchantPlatformIcon
+                  platformId={p.id}
+                  name={p.name}
+                  size="sm"
+                  className={`!h-5 !w-5 rounded-md bg-white p-0.5 shadow-none ${bound ? '' : 'grayscale opacity-40'}`}
+                />
+                {p.name}
+              </button>
+            )
+          })}
         </div>
       </div>
 

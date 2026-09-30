@@ -16,11 +16,14 @@ const PLATFORM_ICONS = {
   kuaishou: '/images/platforms/kuaishou-local.png',
 }
 
-const PLATFORMS = (evalApi.SHOP_EVAL_PLATFORMS || []).map((p) => ({
-  id: p.id,
-  name: p.name,
-  icon: PLATFORM_ICONS[p.id] || '',
-}))
+function platformRows() {
+  return (evalApi.SHOP_EVAL_PLATFORMS || []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    icon: PLATFORM_ICONS[p.id] || '',
+    bound: Boolean(readPlatformToken(p.id)),
+  }))
+}
 
 const storage = {
   getItem(key) {
@@ -218,7 +221,7 @@ async function askText(system, user) {
 
 Page({
   data: {
-    platforms: PLATFORMS,
+    platforms: platformRows(),
     grades: evalApi.SHOP_EVAL_GRADES,
     platformId: 'douyin',
     storeName: '',
@@ -259,7 +262,14 @@ Page({
       if (api.goLogin) api.goLogin()
       return
     }
-    void this.loadStore()
+    const rows = platformRows()
+    let platformId = this.data.platformId
+    if (!rows.some((p) => p.id === platformId && p.bound)) {
+      const hit = rows.find((p) => p.bound)
+      if (hit) platformId = hit.id
+    }
+    this.setData({ platforms: rows, platformId })
+    void this.loadStore(platformId)
   },
 
   onUnload() {
@@ -267,8 +277,9 @@ Page({
     this.stopGains()
   },
 
-  async loadStore() {
-    const platformId = this.data.platformId
+  async loadStore(forcedId) {
+    const platformId = forcedId || this.data.platformId
+    if (!readPlatformToken(platformId)) return
     let items = []
     let total = 0
     try {
@@ -297,7 +308,7 @@ Page({
       grades: evalApi.shopEvalGrades(scope),
       avatarLetter: letterOf(displayName),
       basis: evalApi.describeShopEvalBasis(input),
-      canEval: Boolean(input.storeName),
+      canEval: Boolean(readPlatformToken(platformId) && input.storeName),
       scoreReady: Boolean(score),
       displayScore: score ? score.score : 0,
       searchLevel: score ? score.searchLevel : '',
@@ -321,11 +332,12 @@ Page({
 
   onPlatform(e) {
     const id = e.currentTarget.dataset.id
-    if (!id || id === this.data.platformId) return
+    const row = (this.data.platforms || []).find((p) => p.id === id)
+    if (!row || !row.bound || id === this.data.platformId) return
     this.stopTick()
     this._signals = null
     this.setData({ platformId: id })
-    void this.loadStore()
+    void this.loadStore(id)
   },
 
   stopTick() {

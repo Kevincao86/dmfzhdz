@@ -54,6 +54,19 @@
   font-weight: 700;
 }
 
+.plat--off {
+  background: #eef2f6;
+  border-color: #e2e8f0;
+}
+
+.plat--off .plat-name {
+  color: #94a3b8;
+}
+
+.plat--off .plat-logo {
+  opacity: 0.35;
+}
+
 .eval-top {
   display: flex;
   align-items: stretch;

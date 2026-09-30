@@ -3,7 +3,7 @@
     <view
       wx:for="{{platforms}}"
       wx:key="id"
-      class="plat {{platformId === item.id ? 'plat--on' : ''}}"
+      class="plat {{item.bound ? '' : 'plat--off'}} {{item.bound && platformId === item.id ? 'plat--on' : ''}}"
       data-id="{{item.id}}"
       bindtap="onPlatform"
     >
