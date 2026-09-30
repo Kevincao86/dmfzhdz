@@ -1,6 +1,6 @@
 const userProfile = require('../utils/userProfile.js')
 const identityTheme = require('../utils/identityTheme.js')
-const { getTabList } = require('../utils/tabBarConfig.js')
+const { getTabList, promptMembershipUpgrade } = require('../utils/tabBarConfig.js')
 const chatBadgeWatcher = require('../utils/chatBadgeWatcher.js')
 
 Component({
@@ -34,7 +34,11 @@ Component({
       const lqThemeClass = identityTheme.themeClass(identity)
       const cur = this.data.list || []
       const same =
-        cur.length === list.length && cur.every((item, i) => item.pagePath === list[i].pagePath)
+        cur.length === list.length &&
+        cur.every(
+          (item, i) =>
+            item.pagePath === list[i].pagePath && item.upgradeFeature === list[i].upgradeFeature,
+        )
       const patch = {}
       if (this.data.lqThemeClass !== lqThemeClass) patch.lqThemeClass = lqThemeClass
       if (!same || this.data.hasCenterFab !== hasCenterFab) {
@@ -48,6 +52,10 @@ Component({
       const item = this.data.list[idx]
       if (!item) return
       if (item.navigate) {
+        if (item.upgradeFeature) {
+          promptMembershipUpgrade(item.upgradeFeature)
+          return
+        }
         wx.navigateTo({ url: item.pagePath })
         return
       }

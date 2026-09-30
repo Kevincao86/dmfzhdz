@@ -1,5 +1,5 @@
-import { useEffect, useState, type ComponentType } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, type ComponentType, type MouseEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   BadgeCheck,
   Bell,
@@ -20,6 +20,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { getAccount } from '../lib/mpSession'
+import { readAccountPrFeatureAccess } from '../lib/prFeatureAccess'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
@@ -36,6 +37,15 @@ type MenuEntry = {
   desc?: string
   hot?: boolean
   group: 'quick' | 'deal' | 'money' | 'tools' | 'help'
+  /** 未开通时入口仍显示，点击提示升级 */
+  upgrade?: 'analysis' | 'courses'
+}
+
+const ADVANCED_PLANS = new Set(['pro', 'flagship', 'enterprise'])
+
+function promptUpgradeMembership(navigate: (to: string) => void, feature: string) {
+  const ok = window.confirm(`${feature}需更高会员档位，请升级至专业版后使用。`)
+  if (ok) navigate('/profile/membership')
 }
 
 const BIZ_SECTIONS = [
@@ -85,6 +95,7 @@ import {
 import { isDecorVideoMedia, type RegistryPlatformDecorItem } from '@merchant/lib/platformDecorTypes'
 
 export default function ProfilePage() {
+  const navigate = useNavigate()
   const acc = getAccount()
   const workId = getWorkIdentity()
   const isPr = workId === 'pr'
@@ -154,7 +165,21 @@ export default function ProfilePage() {
    * 避免错误构建/旧 dist 漏打包导致线上「我的推广」消失）。
    * 顺序：资料和接单 → 钱和订单 → 讲师课程 → 数据 → 帮助。
    */
+  const talentAccess = readAccountPrFeatureAccess(acc)
+  const analysisUnlocked = talentAccess.talentEval || talentAccess.talentAdvice
+  const coursesUnlocked = ADVANCED_PLANS.has(String(acc?.mpMembershipPlan || ''))
   const showTalentAnalysis = !isPr && workId !== 'shoot' && workId !== 'edit'
+
+  function onMenuClick(event: MouseEvent, item: MenuEntry) {
+    if (item.upgrade === 'analysis' && !analysisUnlocked) {
+      event.preventDefault()
+      promptUpgradeMembership(navigate, '达人账号分析')
+    }
+    if (item.upgrade === 'courses' && !coursesUnlocked) {
+      event.preventDefault()
+      promptUpgradeMembership(navigate, '我的课程')
+    }
+  }
   const menuItems: MenuEntry[] = [
     {
       to: profileLink,
@@ -169,6 +194,7 @@ export default function ProfilePage() {
             label: '达人账号分析',
             desc: '抖音平台评分与整改，其他平台开放中',
             group: 'quick' as const,
+            upgrade: 'analysis' as const,
           },
         ]
       : []),
@@ -277,6 +303,7 @@ export default function ProfilePage() {
       label: '我的课程',
       desc: '发布、编辑和结算自己的培训',
       group: 'tools',
+      upgrade: 'courses',
     },
     {
       to: '/profile/analytics',
@@ -355,6 +382,7 @@ export default function ProfilePage() {
                 <Link
                   key={item.to}
                   to={item.to}
+                  onClick={(event) => onMenuClick(event, item)}
                   className="surface-card relative flex flex-col items-start gap-3 rounded-2xl border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   {item.hot ? (
@@ -389,6 +417,7 @@ export default function ProfilePage() {
                   <Link
                     key={item.to}
                     to={item.to}
+                    onClick={(event) => onMenuClick(event, item)}
                     className="surface-card relative flex flex-col items-start gap-3 rounded-2xl border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-md"
                   >
                     {item.hot ? (

@@ -24,6 +24,7 @@ const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const training = require('../../utils/mpTraining.js')
+const { promptMembershipUpgrade } = require('../../utils/tabBarConfig.js')
 
 const MY_ORDERS_MENU = {
   key: 'myOrders',
@@ -587,7 +588,7 @@ Page({
       acct,
       identity,
     )
-    if (this._lecturerApproved) menus = injectMyCoursesMenu(menus)
+    menus = injectMyCoursesMenu(menus)
     const { quickMenus, bizMenus, bizGroups } = splitWorkbenchMenus(menus, identity)
     const planId = mpMembershipUi.readMembershipPlanId(acct, identity, member, prProfile)
     const membershipPlanLabel = mpMembershipUi.planLabel(planId)
@@ -1018,6 +1019,10 @@ Page({
       return
     }
     if (!this.ensureWxLoggedIn()) return
+    if (key === 'myCourses' && !training.isAdvancedMember()) {
+      promptMembershipUpgrade('我的课程')
+      return
+    }
     wx.navigateTo({ url })
   },
   goEditProfile() {

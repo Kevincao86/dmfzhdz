@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getAccount } from '../lib/mpSession'
 import { readAccountPrFeatureAccess } from '../lib/prFeatureAccess'
 import { readMember } from '../lib/mpSync/talentMember'
@@ -30,7 +31,13 @@ function letterOf(name: string) {
   return s ? s.slice(0, 1) : '达'
 }
 
+function promptUpgradeMembership(navigate: (to: string) => void) {
+  const ok = window.confirm('达人账号分析需更高会员档位，请升级至专业版后使用。')
+  if (ok) navigate('/profile/membership')
+}
+
 export default function TalentLocalLifeEvalPage() {
+  const navigate = useNavigate()
   const member = readMember()
   const [platformId, setPlatformId] = useState<(typeof PLATFORMS)[number]['id']>('douyin')
   const prof = member?.platformProfiles?.[platformId]
@@ -111,7 +118,11 @@ export default function TalentLocalLifeEvalPage() {
   }, [score, animateScore])
 
   async function onEvaluate() {
-    if (!canRunEval || !canEval || evaluating || advising) return
+    if (!canRunEval) {
+      promptUpgradeMembership(navigate)
+      return
+    }
+    if (!canEval || evaluating || advising) return
     setEvaluating(true)
     setErr('')
     try {
@@ -129,7 +140,11 @@ export default function TalentLocalLifeEvalPage() {
   }
 
   async function onAdvise() {
-    if (!canRunAdvice || !score || evaluating || advising) return
+    if (!canRunAdvice) {
+      promptUpgradeMembership(navigate)
+      return
+    }
+    if (!score || evaluating || advising) return
     setAdvising(true)
     setErr('')
     try {
@@ -280,17 +295,11 @@ export default function TalentLocalLifeEvalPage() {
         </div>
       ) : null}
 
-      {!canRunEval ? (
-        <p className="text-center text-sm text-[var(--shell-muted)]">当前档位未开通达人账号评估</p>
-      ) : null}
-      {!canRunAdvice ? (
-        <p className="text-center text-sm text-[var(--shell-muted)]">当前档位未开通达人账号分析</p>
-      ) : null}
       <div className="flex flex-col gap-3">
         <button
           type="button"
           className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-          disabled={!canRunEval || !canEval || evaluating || advising}
+          disabled={(canRunEval && !canEval) || evaluating || advising}
           onClick={() => void onEvaluate()}
         >
           {evaluating
@@ -302,7 +311,7 @@ export default function TalentLocalLifeEvalPage() {
         <button
           type="button"
           className="rounded-xl border border-violet-300 bg-white px-4 py-3 text-sm font-medium text-violet-700 disabled:opacity-50"
-          disabled={!canRunAdvice || !score || evaluating || advising}
+          disabled={(canRunAdvice && !score) || evaluating || advising}
           onClick={() => void onAdvise()}
         >
           {advising ? '分析中…' : `分析整改 · ${TALENT_ADVICE_POINTS}积分`}

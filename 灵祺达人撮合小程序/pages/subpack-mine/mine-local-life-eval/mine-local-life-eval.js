@@ -3,7 +3,7 @@ const talentMember = require('../../../utils/talentMember.js')
 const wxAccount = require('../../../utils/wxAccount.js')
 const evalApi = require('../../../utils/talentLocalLifeEval.js')
 const userProfile = require('../../../utils/userProfile.js')
-const { getTabList } = require('../../../utils/tabBarConfig.js')
+const { getTabList, promptMembershipUpgrade } = require('../../../utils/tabBarConfig.js')
 const { syncPageIdentity } = require('../../../utils/pageIdentityChrome.js')
 
 function letterOf(name) {
@@ -202,7 +202,7 @@ Page({
 
   async onEvaluate() {
     if (!prFeatureAccess.canUseAddonPerm(null, 'talentEval')) {
-      wx.showToast({ title: '当前档位未开通达人账号评估', icon: 'none' })
+      promptMembershipUpgrade('达人账号分析')
       return
     }
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
@@ -235,7 +235,7 @@ Page({
 
   async onAdvise() {
     if (!prFeatureAccess.canUseAddonPerm(null, 'talentAdvice')) {
-      wx.showToast({ title: '当前档位未开通达人账号分析', icon: 'none' })
+      promptMembershipUpgrade('达人账号分析')
       return
     }
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
