@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMembership } from '../context/MembershipContext'
-import { MEMBERSHIP_UPGRADE_HREF } from '../lib/membershipPlan'
+import { useMembership } from '../../context/MembershipContext'
+import { MEMBERSHIP_UPGRADE_HREF } from '../../lib/membershipPlan'
 import {
   adviseShop,
   describeShopEvalBasis,
@@ -17,9 +17,9 @@ import {
   type ShopEvalInput,
   type ShopEvalPlatformId,
   type ShopEvalScore,
-} from '../lib/merchantShopEval'
-import { postAiChat } from '../services/ai/aiClient'
-import { fetchStoresForPlatform, type StorePlatformTab } from '../services/merchantStoresApi'
+} from '../../lib/merchantShopEval'
+import { postAiChat } from '../../services/ai/aiClient'
+import { fetchStoresForPlatform, type StorePlatformTab } from '../../services/merchantStoresApi'
 
 const storage = {
   getItem: (key: string) => {
