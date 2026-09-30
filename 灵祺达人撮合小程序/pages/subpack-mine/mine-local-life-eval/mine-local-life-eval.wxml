@@ -38,6 +38,11 @@
           <text class="grade-label grade-label--{{gradeKey}}">{{gradeLabel}}</text>
           <text class="grade-note">{{gradeNote}}</text>
         </view>
+        <view class="levels" wx:if="{{scoreReady}}">
+          <text class="level-title">{{levelTitle}}</text>
+          <text class="level">{{levelALabel}} {{videoLevel}}</text>
+          <text class="level">{{levelBLabel}} {{liveLevel}}</text>
+        </view>
         <view
           class="btn-main {{!canEval || evaluating || advising ? 'btn--off' : ''}}"
           hover-class="btn-main--hover"
@@ -93,6 +98,19 @@
           <view class="plate-body">
             <text class="plate-name">{{item.name}}</text>
             <text class="plate-line">{{item.next}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="xingxuan-card advice" wx:if="{{showGrade}}">
+      <text class="advice-title">评级释义</text>
+      <view class="plate-grid">
+        <view class="plate {{gradeKey === item.key ? 'plate--on' : ''}}" wx:for="{{grades}}" wx:key="key">
+          <text class="plate-no">{{item.range}}</text>
+          <view class="plate-body">
+            <text class="plate-name">{{item.label}}</text>
+            <text class="plate-line">{{item.note}}</text>
           </view>
         </view>
       </view>
