@@ -99,6 +99,7 @@ list_scopes() {
   video_rule_links      达人小程序与星选短视频审核增加平台官方规则链接页
   talent_local_life_eval 达人小程序与星选：抖音本地生活信息评估（豆包预估分、下月带货等级、整改）
   xingxuan_mine_ui      星选：AI审核进我的、增值服务加AI短剧；网页壳层与我的页本地重排
+  xingxuan_pr_orders_hot 星选与达人小程序：账号绑定标志、招募订单瘦身、专业版一键分析、火热角标
   xingxuan_ui_script_rules  星选网页按钮/布局重排；文稿审核（小红书/大众点评）规则页：星选Web+达人/星选小程序
   xingxuan_ui_desk          星选网页按确认的台账样式稿改 UI（仅 CSS/壳层，不改功能）
   ads_studio_review      本地推投流免进设置页、商家小程序 AI 标签对齐星选、审核规则半月刷新
@@ -1348,6 +1349,21 @@ App.tsx
 shellNavConfig
 AiComplianceReviewAddonPage
 index.css
+change-scope-guard
+PAT
+      ;;
+    xingxuan_pr_orders_hot)
+      cat <<'PAT'
+TalentAccountBindPanel
+ProfilePage.tsx
+PrOrdersPage.tsx
+prOrderTalentFit
+meoo-ops-mp-auth.ts
+mine-account-bind
+mine-pr-orders
+mine.js
+mine.wxml
+mine.wxss
 change-scope-guard
 PAT
       ;;

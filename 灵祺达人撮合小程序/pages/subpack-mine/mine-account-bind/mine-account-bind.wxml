@@ -2,18 +2,22 @@
   <text class="lead">和商家小程序一样：手机号、邮箱用验证码绑定。同一号码会把微信和抖音并成一个账号。</text>
   <view class="grid">
     <view class="cell {{ids.wechat ? 'on' : ''}}" data-id="wechat" bindtap="onPick">
+      <image class="cell-logo" src="/images/platforms/wechat.png" mode="aspectFit" />
       <text class="cell-name">微信</text>
       <text class="cell-sub">{{ids.wechat ? '已绑定' : '未绑定'}}</text>
     </view>
     <view class="cell {{ids.douyin ? 'on' : ''}}" data-id="douyin" bindtap="onPick">
+      <image class="cell-logo" src="/images/platforms/douyin.png" mode="aspectFit" />
       <text class="cell-name">抖音</text>
       <text class="cell-sub">{{ids.douyin ? '已绑定' : '未绑定'}}</text>
     </view>
     <view class="cell {{ids.phone ? 'on' : ''}}" data-id="phone" bindtap="onPick">
+      <view class="cell-logo cell-logo--phone"><view class="cell-glyph cell-glyph--phone"></view></view>
       <text class="cell-name">手机</text>
       <text class="cell-sub">{{ids.phone ? '已绑定' : '未绑定'}}</text>
     </view>
     <view class="cell {{ids.email ? 'on' : ''}}" data-id="email" bindtap="onPick">
+      <view class="cell-logo cell-logo--mail"><view class="cell-glyph cell-glyph--mail"></view></view>
       <text class="cell-name">邮箱</text>
       <text class="cell-sub">{{ids.email ? '已绑定' : '未绑定'}}</text>
     </view>

@@ -36,6 +36,7 @@ type MenuEntry = {
   to: string
   label: string
   desc?: string
+  hot?: boolean
   group: 'quick' | 'deal' | 'money' | 'tools' | 'help'
 }
 
@@ -281,12 +282,14 @@ export default function ProfilePage() {
       to: '/affiliate/portal',
       label: '我的推广',
       desc: '推广码 · 太阳码 · 佣金与商户明细',
+      hot: true,
       group: 'deal',
     },
     {
       to: '/profile/ai-review',
       label: 'AI审核',
       desc: '文稿与短视频合规检核',
+      hot: true,
       group: 'tools',
     },
     ...(lecturerApproved
@@ -376,8 +379,13 @@ export default function ProfilePage() {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className="surface-card flex flex-col items-start gap-3 rounded-2xl border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="surface-card relative flex flex-col items-start gap-3 rounded-2xl border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-md"
                 >
+                  {item.hot ? (
+                    <span className="absolute right-3 top-3 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                      火热
+                    </span>
+                  ) : null}
                   <span
                     className={`flex h-11 w-11 items-center justify-center rounded-2xl ${TILE_TONES[index % TILE_TONES.length]}`}
                   >
@@ -405,8 +413,13 @@ export default function ProfilePage() {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className="surface-card flex flex-col items-start gap-3 rounded-2xl border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                    className="surface-card relative flex flex-col items-start gap-3 rounded-2xl border px-4 py-4 transition hover:-translate-y-0.5 hover:shadow-md"
                   >
+                    {item.hot ? (
+                      <span className="absolute right-3 top-3 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                        火热
+                      </span>
+                    ) : null}
                     <span
                       className={`flex h-11 w-11 items-center justify-center rounded-2xl ${TILE_TONES[index % TILE_TONES.length]}`}
                     >

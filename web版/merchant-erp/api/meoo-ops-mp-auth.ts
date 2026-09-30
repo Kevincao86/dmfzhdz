@@ -750,7 +750,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             login_name?: string | null
           }
         | undefined
-      if (hallSess) {
+      const skipTalentProfile = body.includePrOwned === true && body.includeRecommendPool !== true
+      if (hallSess && !skipTalentProfile) {
         try {
           const hallAccount = hallSess.account
           const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, hallAccount)

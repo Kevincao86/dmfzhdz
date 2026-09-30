@@ -58,6 +58,7 @@ const AFFILIATE_PORTAL_MENU = {
   label: '我的推广',
   sub: '申请开通 · 推广码 · 佣金结算',
   icon: 'cooperation',
+  hot: true,
 }
 
 function injectAffiliatePortalMenu(menus) {
@@ -74,6 +75,7 @@ const AI_REVIEW_MENU = {
   label: '视频/文稿审核',
   sub: 'AI 合规检核 · 单条与批量',
   icon: 'briefTemplates',
+  hot: true,
 }
 
 const ADDONS_HUB_MENU = {

@@ -106,11 +106,19 @@ export default function TalentAccountBindPanel() {
     }
   }
 
-  const items: { id: 'wechat' | 'douyin' | 'phone' | 'email'; label: string }[] = [
-    { id: 'wechat', label: '微信' },
-    { id: 'douyin', label: '抖音' },
-    { id: 'phone', label: '手机' },
-    { id: 'email', label: '邮箱' },
+  const items: { id: 'wechat' | 'douyin' | 'phone' | 'email'; label: string; logo: string }[] = [
+    { id: 'wechat', label: '微信', logo: '/platforms/wechat.png' },
+    { id: 'douyin', label: '抖音', logo: '/platforms/douyin.png' },
+    {
+      id: 'phone',
+      label: '手机',
+      logo: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="12" fill="#0ea5e9"/><rect x="16" y="8" width="16" height="32" rx="3" fill="#fff"/><circle cx="24" cy="35" r="1.6" fill="#0ea5e9"/></svg>'),
+    },
+    {
+      id: 'email',
+      label: '邮箱',
+      logo: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="12" fill="#f59e0b"/><rect x="8" y="14" width="32" height="20" rx="3" fill="#fff"/><path d="M10 16l14 10L38 16" fill="none" stroke="#f59e0b" stroke-width="2"/></svg>'),
+    },
   ]
 
   return (
@@ -150,6 +158,7 @@ export default function TalentAccountBindPanel() {
                   : 'border-[var(--shell-border)] text-[var(--shell-muted)]'
               }`}
             >
+              <img src={it.logo} alt="" className="h-7 w-7 rounded-md object-contain" />
               <span>{it.label}</span>
               <span className="text-[10px]">{on ? '已绑定' : '未绑定'}</span>
             </button>

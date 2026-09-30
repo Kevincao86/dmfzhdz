@@ -108,6 +108,7 @@
           data-key="{{item.key}}"
           bindtap="onMenuTap"
         >
+          <text class="wb-hot-tag" wx:if="{{item.hot}}">火热</text>
           <view class="wb-tile-icon">
             <image class="wb-tile-img" src="{{item.iconSrc}}" mode="aspectFill" />
             <text class="wb-menu-badge" wx:if="{{item.badge}}">{{item.badge}}</text>
@@ -131,6 +132,7 @@
           data-key="{{menu.key}}"
           bindtap="onMenuTap"
         >
+          <text class="wb-hot-tag" wx:if="{{menu.hot}}">火热</text>
           <view class="wb-tile-icon">
             <image class="wb-tile-img" src="{{menu.iconSrc}}" mode="aspectFill" />
             <text class="wb-menu-badge" wx:if="{{menu.badge}}">{{menu.badge}}</text>

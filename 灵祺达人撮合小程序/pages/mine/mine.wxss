@@ -460,6 +460,20 @@
   align-items: center;
   padding: 8rpx 4rpx 12rpx;
   box-sizing: border-box;
+  position: relative;
+}
+
+.wb-hot-tag {
+  position: absolute;
+  top: 0;
+  right: 8rpx;
+  z-index: 2;
+  padding: 2rpx 8rpx;
+  border-radius: 999rpx;
+  background: #f43f5e;
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 1.4;
 }
 
 .wb-quick-tile--hover,
