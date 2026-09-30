@@ -7,7 +7,7 @@
       data-id="{{item.id}}"
       bindtap="onPlatform"
     >
-      <image class="plat-logo" src="{{item.icon}}" mode="aspectFit" style="width:52rpx;height:52rpx;" />
+      <image class="plat-logo" src="{{item.icon}}" mode="aspectFit" style="width:56rpx;height:56rpx;" />
       <text class="plat-name">{{item.name}}</text>
     </view>
   </view>
