@@ -24,6 +24,7 @@ const mpApiErrors = require('../../../utils/mpApiErrors.js')
 const applicantApplyFormDisplay = require('../../../utils/applicantApplyFormDisplay.js')
 const applicantPickShare = require('../../../utils/applicantPickShare.js')
 const publishLinkUtil = require('../../../utils/recruitmentPublishLink.js')
+const prOrderTalentFit = require('../../../utils/prOrderTalentFit.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -72,6 +73,8 @@ Page({
   data: {
     mpOrderId: '',
     loading: true,
+    fitBusy: false,
+    fitSheet: null,
     err: '',
     title: '',
     orderNo: '',
@@ -165,6 +168,49 @@ Page({
   },
   onUnload() {
     if (this._sharePollTimer) clearInterval(this._sharePollTimer)
+  },
+  onAnalyzeTalents() {
+    const id = this.data.mpOrderId
+    if (!id || this.data.fitBusy || this.data.detailViewMode) return
+    this.setData({ fitBusy: true })
+    wx.showLoading({ title: '分析中', mask: true })
+    prOrderTalentFit
+      .analyzePrOrderTalents(id)
+      .then((data) => {
+        this.setData({
+          fitSheet: {
+            title: this.data.title || '招募单',
+            orderRead: data.orderRead || '',
+            talents: data.talents || [],
+          },
+        })
+      })
+      .catch((err) => {
+        const msg = String((err && err.message) || '分析失败')
+        if (msg.indexOf('专业版') >= 0) {
+          wx.showModal({
+            title: '专业版会员',
+            content: '一键分析达人数据需开通专业版会员',
+            confirmText: '去开通',
+            success: (res) => {
+              if (res.confirm) {
+                wx.navigateTo({
+                  url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
+                })
+              }
+            },
+          })
+          return
+        }
+        wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
+      })
+      .finally(() => {
+        wx.hideLoading()
+        this.setData({ fitBusy: false })
+      })
+  },
+  onCloseFitSheet() {
+    this.setData({ fitSheet: null })
   },
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })

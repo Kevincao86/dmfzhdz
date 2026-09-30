@@ -28,6 +28,7 @@ import {
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
+import { analyzePrOrderTalents, type PrTalentFitResult } from '../lib/prOrderTalentFit'
 import { reviewRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
@@ -145,6 +146,8 @@ export default function PrOrderApplicantsPage() {
   const [iceRejectReason, setIceRejectReason] = useState('')
   const [sharingOrder, setSharingOrder] = useState(false)
   const [shareSheet, setShareSheet] = useState<{ text: string; title: string; order: Record<string, unknown> } | null>(null)
+  const [fitBusy, setFitBusy] = useState(false)
+  const [fitResult, setFitResult] = useState<PrTalentFitResult | null>(null)
   const [listFilters, setListFilters] = useState<ApplicantListFilters>(EMPTY_LIST_FILTERS)
   const [tagFilterOptions, setTagFilterOptions] = useState<string[]>([])
   const [salesLevelOptions, setSalesLevelOptions] = useState<string[]>([])
@@ -867,14 +870,39 @@ export default function PrOrderApplicantsPage() {
           </div>
           <div className="shrink-0 flex flex-col items-end gap-2">
             {!detailViewMode ? (
-              <button
-                type="button"
-                disabled={sharingOrder}
-                className="text-sm px-3 py-1.5 rounded-lg border disabled:opacity-50"
-                onClick={() => void onShareOrder()}
-              >
-                {sharingOrder ? '生成中…' : '分享招募'}
-              </button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={fitBusy || !mpOrderId}
+                  className="text-sm px-3 py-1.5 rounded-lg border disabled:opacity-50"
+                  onClick={() => {
+                    if (!mpOrderId || fitBusy) return
+                    setFitBusy(true)
+                    void analyzePrOrderTalents(mpOrderId)
+                      .then((data) => setFitResult(data))
+                      .catch((e: unknown) => {
+                        const msg = e instanceof Error ? e.message : '分析失败'
+                        if (msg.includes('专业版')) {
+                          window.alert('一键分析达人数据需开通专业版会员')
+                          navigate('/profile/membership')
+                          return
+                        }
+                        window.alert(msg)
+                      })
+                      .finally(() => setFitBusy(false))
+                  }}
+                >
+                  {fitBusy ? '分析中…' : '一键分析达人数据'}
+                </button>
+                <button
+                  type="button"
+                  disabled={sharingOrder}
+                  className="text-sm px-3 py-1.5 rounded-lg border disabled:opacity-50"
+                  onClick={() => void onShareOrder()}
+                >
+                  {sharingOrder ? '生成中…' : '分享招募'}
+                </button>
+              </div>
             ) : null}
             <dl className="text-xs text-[var(--shell-muted)] space-y-1 text-right">
               <div>单号 {orderNo}</div>
@@ -1553,6 +1581,39 @@ export default function PrOrderApplicantsPage() {
                 确认驳回
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {fitResult ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setFitResult(null)}>
+          <div
+            className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-5 text-[var(--shell-text)] shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-base font-semibold">达人数据分析</p>
+                <p className="mt-1 text-xs text-[var(--shell-muted)]">{title || '招募单'}</p>
+              </div>
+              <button type="button" className="text-sm text-[var(--shell-muted)]" onClick={() => setFitResult(null)}>
+                关闭
+              </button>
+            </div>
+            {fitResult.orderRead ? (
+              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm leading-6">{fitResult.orderRead}</p>
+            ) : null}
+            <ul className="mt-3 space-y-2">
+              {fitResult.talents.map((item) => (
+                <li key={`${item.name}-${item.score}-${item.fit}`} className="rounded-xl border px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">{item.name}</span>
+                    <span className="text-xs text-[var(--shell-muted)]">账号 {item.score} · 关联 {item.fit}</span>
+                  </div>
+                  {item.reason ? <p className="mt-1 text-xs leading-5 text-[var(--shell-muted)]">{item.reason}</p> : null}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       ) : null}

@@ -27,7 +27,6 @@ const appDisplay = require('../../../utils/applicationDisplay.js')
 const mpTargetedRecruit = require('../../../utils/mpTargetedRecruit.js')
 const mpTargetedRecruitApi = require('../../../utils/mpTargetedRecruitApi.js')
 const mpAccountClientSync = require('../../../utils/mpAccountClientSync.js')
-const prOrderTalentFit = require('../../../utils/prOrderTalentFit.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -156,8 +155,6 @@ Page({
     filteredDrafts: [],
     keyword: '',
     loading: true,
-    fitBusy: false,
-    fitSheet: null,
     err: '',
     deletingId: '',
     togglingId: '',
@@ -626,51 +623,6 @@ Page({
       this.setData({ workflowBusyId: '' })
     }
   },
-  onAnalyzeTalents(e) {
-    const id = e.currentTarget.dataset.id
-    if (!id || this.data.fitBusy) return
-    this.setData({ fitBusy: true })
-    wx.showLoading({ title: '分析中', mask: true })
-    prOrderTalentFit
-      .analyzePrOrderTalents(id)
-      .then((data) => {
-        const row = rowById(this.data.rows, id)
-        this.setData({
-          fitSheet: {
-            title: (row && row.title) || '招募单',
-            orderRead: data.orderRead || '',
-            talents: data.talents || [],
-          },
-        })
-      })
-      .catch((err) => {
-        const msg = String((err && err.message) || '分析失败')
-        if (msg.indexOf('专业版') >= 0) {
-          wx.showModal({
-            title: '专业版会员',
-            content: '一键分析达人数据需开通专业版会员',
-            confirmText: '去开通',
-            success: (res) => {
-              if (res.confirm) {
-                wx.navigateTo({
-                  url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
-                })
-              }
-            },
-          })
-          return
-        }
-        wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
-      })
-      .finally(() => {
-        wx.hideLoading()
-        this.setData({ fitBusy: false })
-      })
-  },
-  onCloseFitSheet() {
-    this.setData({ fitSheet: null })
-  },
-  noop() {},
   goApplicants(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return

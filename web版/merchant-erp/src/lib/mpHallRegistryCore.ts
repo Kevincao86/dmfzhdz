@@ -2,7 +2,13 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
-import type { RegistryFile, RegistryIceVideoSlot, RegistryMpRecruitmentOrder, RegistryMpPrUser } from './opsRegistryTypes.js'
+import type {
+  RegistryFile,
+  RegistryIceVideoSlot,
+  RegistryMpRecruitmentApplicant,
+  RegistryMpRecruitmentOrder,
+  RegistryMpPrUser,
+} from './opsRegistryTypes.js'
 import { resolveApplicantCountFromMp } from './mpRecruitCount.js'
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
@@ -555,20 +561,94 @@ function slimMpPublishMetaForHallList(meta: unknown): Record<string, unknown> | 
   return Object.keys(out).length ? out : undefined
 }
 
+/** 已登录达人看大厅列表时，只保留本人报名行，供「我的报名」回填 */
+export type HallListTalentViewer = {
+  memberIds: string[]
+  contacts: string[]
+  wxOpenIds: string[]
+  wechatIds: string[]
+  platformAccounts: string[]
+}
+
+function tailContact(value: unknown): string {
+  const digits = String(value || '').replace(/\D/g, '')
+  return digits.length >= 7 ? digits.slice(-11) : ''
+}
+
+export function hallListViewerFromTalent(
+  member: RegistryMpTalentMember | null | undefined,
+  account?: {
+    openid?: string | null
+    registry_member_id?: string | null
+  } | null,
+): HallListTalentViewer | undefined {
+  const memberIds = [
+    String(member?.id || '').trim(),
+    String(account?.registry_member_id || '').trim(),
+  ].filter(Boolean)
+  const contacts = [tailContact(member?.contact)].filter(Boolean)
+  const wxOpenIds = [
+    String(member?.wxOpenId || '').trim(),
+    String(account?.openid || '').trim(),
+  ].filter(Boolean)
+  const wechatIds = [String(member?.wechatId || '').trim().toLowerCase()].filter(Boolean)
+  const platformAccounts: string[] = []
+  const profiles = member?.platformProfiles
+  if (profiles && typeof profiles === 'object') {
+    for (const row of Object.values(profiles)) {
+      const acct = String(row?.platformAccount || '').trim().toLowerCase()
+      if (acct) platformAccounts.push(acct)
+    }
+  }
+  for (const row of [member?.douyin, member?.xiaohongshu]) {
+    const acct = String(row?.platformAccount || '').trim().toLowerCase()
+    if (acct) platformAccounts.push(acct)
+  }
+  if (!memberIds.length && !contacts.length && !wxOpenIds.length && !wechatIds.length && !platformAccounts.length) {
+    return undefined
+  }
+  return { memberIds, contacts, wxOpenIds, wechatIds, platformAccounts }
+}
+
+function applicantMatchesHallViewer(
+  applicant: RegistryMpRecruitmentApplicant,
+  viewer: HallListTalentViewer,
+): boolean {
+  if (!applicant) return false
+  const memberId = String(applicant.talentMemberId || '').trim()
+  if (memberId && viewer.memberIds.includes(memberId)) return true
+  const contact = tailContact(applicant.contact)
+  if (contact && viewer.contacts.includes(contact)) return true
+  const wx = String(applicant.wxOpenId || '').trim()
+  if (wx && viewer.wxOpenIds.includes(wx)) return true
+  const wechat = String(applicant.wechatId || '').trim().toLowerCase()
+  if (wechat && viewer.wechatIds.includes(wechat)) return true
+  const acct = String(applicant.platformAccount || '').trim().toLowerCase()
+  if (acct && viewer.platformAccounts.includes(acct)) return true
+  return false
+}
+
 /**
  * 小程序首页大厅：剥离 applicants / 长文案 / 无用 meta，避免：
  * - 云函数 callFunction 响应 >1MB（-501000）
  * - 微信 setData / setStorageSync 单次 1MB，列表被静默截到约 125 条
  * 保留 applicantCount、iceVideoSlots 认领字段供列表展示。详情走 includeOnly，不走此瘦身。
+ * 已登录达人只保留本人报名行，避免「我的报名」对不上。
  */
 export function slimMpRecruitmentOrdersForHallList(
   orders: RegistryMpRecruitmentOrder[],
+  viewer?: HallListTalentViewer,
 ): RegistryMpRecruitmentOrder[] {
   if (!Array.isArray(orders) || !orders.length) return []
   return orders.map((raw) => {
     const o = { ...raw }
     o.applicantCount = resolveApplicantCountFromMp(o)
-    if (Array.isArray(o.applicants) && o.applicants.length > 0) {
+    const all = Array.isArray(o.applicants) ? o.applicants : []
+    if (viewer) {
+      const mine = all.filter((row) => applicantMatchesHallViewer(row, viewer))
+      if (mine.length) o.applicants = mine
+      else delete o.applicants
+    } else if (all.length > 0) {
       delete o.applicants
     }
     if (Array.isArray(o.iceVideoSlots) && o.iceVideoSlots.length > 0) {

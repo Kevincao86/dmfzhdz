@@ -217,7 +217,6 @@
         </view>
         <view class="pr-btn pr-btn--outline" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑招募</view>
         <view class="pr-btn pr-btn--ghost" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</view>
-        <view class="pr-btn pr-btn--outline" catchtap="onAnalyzeTalents" data-id="{{item.mpOrderId}}">一键分析达人数据</view>
         <view
           wx:if="{{item.canToggleRecruit}}"
           class="pr-btn pr-btn--ghost"
@@ -352,21 +351,4 @@
     </view>
   </view>
 
-  <view class="fit-mask" wx:if="{{fitSheet}}" catchtap="onCloseFitSheet">
-    <view class="fit-sheet" catchtap="noop">
-      <view class="fit-head">
-        <text class="fit-title">达人数据分析</text>
-        <text class="fit-close" catchtap="onCloseFitSheet">关闭</text>
-      </view>
-      <text class="fit-order">{{fitSheet.title}}</text>
-      <text class="fit-read" wx:if="{{fitSheet.orderRead}}">{{fitSheet.orderRead}}</text>
-      <view class="fit-row" wx:for="{{fitSheet.talents}}" wx:for-index="idx" wx:key="idx">
-        <view class="fit-row-top">
-          <text class="fit-name">{{item.name}}</text>
-          <text class="fit-score">账号 {{item.score}} · 关联 {{item.fit}}</text>
-        </view>
-        <text class="fit-reason" wx:if="{{item.reason}}">{{item.reason}}</text>
-      </view>
-    </view>
-  </view>
 </view>

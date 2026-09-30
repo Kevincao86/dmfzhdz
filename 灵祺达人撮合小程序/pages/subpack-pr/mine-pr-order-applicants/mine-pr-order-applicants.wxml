@@ -12,6 +12,7 @@
       </view>
     </view>
     <view class="app-list-hero__side">
+      <view wx:if="{{!detailViewMode}}" class="fit-entry" catchtap="onAnalyzeTalents">一键分析达人数据</view>
       <text class="app-list-hero__meta-line">单号 {{orderNo}}</text>
       <text class="app-list-hero__meta-line">发布 {{publishedAt}}</text>
       <text class="app-list-hero__meta-line">截止 {{deadlineText}}</text>
@@ -523,6 +524,24 @@
       </view>
     </scroll-view>
     <button class="pr-selected-close" bindtap="onCloseSelectedPanel">关闭</button>
+  </view>
+</view>
+
+<view class="fit-mask" wx:if="{{fitSheet}}" catchtap="onCloseFitSheet">
+  <view class="fit-sheet" catchtap="noop">
+    <view class="fit-head">
+      <text class="fit-title">达人数据分析</text>
+      <text class="fit-close" catchtap="onCloseFitSheet">关闭</text>
+    </view>
+    <text class="fit-order">{{fitSheet.title}}</text>
+    <text class="fit-read" wx:if="{{fitSheet.orderRead}}">{{fitSheet.orderRead}}</text>
+    <view class="fit-row" wx:for="{{fitSheet.talents}}" wx:for-index="idx" wx:key="idx">
+      <view class="fit-row-top">
+        <text class="fit-name">{{item.name}}</text>
+        <text class="fit-score">账号 {{item.score}} · 关联 {{item.fit}}</text>
+      </view>
+      <text class="fit-reason" wx:if="{{item.reason}}">{{item.reason}}</text>
+    </view>
   </view>
 </view>
 

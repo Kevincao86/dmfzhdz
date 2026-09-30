@@ -12,6 +12,7 @@ import {
   loadMpHallRegistryPayload,
   loadTalentInboxForMpSession,
   resolvePublisherDisplayForMpOrder,
+  hallListViewerFromTalent,
   slimMpRecruitmentOrdersForHallList,
 } from '../src/lib/mpHallRegistryCore.js'
 import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
@@ -816,7 +817,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             return o
           })
         } else {
-          payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForHallList(orders)
+          payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForHallList(
+            orders,
+            hallListViewerFromTalent(talentMember, talentAccount),
+          )
         }
       }
       sendJson(res, 200, { ok: true, ...payload })
