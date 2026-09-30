@@ -11,6 +11,18 @@ function letterOf(name) {
   return s ? s.slice(0, 1) : '达'
 }
 
+function gainFields(score, input) {
+  if (!score) return { showGains: false, exposureText: '', salesText: '' }
+  const preview = evalApi.previewTalentGains(score.score, input && input.followers, input && input.quotePrice)
+  const exposure = score.exposureLift > 0 ? score.exposureLift : preview.exposurePct
+  const sales = score.salesLift > 0 ? score.salesLift : preview.salesYuan
+  return {
+    showGains: true,
+    exposureText: '+' + exposure + '%',
+    salesText: '+' + evalApi.formatSalesYuan(sales),
+  }
+}
+
 Page({
   data: {
     lqThemeClass: '',
@@ -51,6 +63,9 @@ Page({
     adviceStatus: '',
     sections: [],
     lift: 0,
+    showGains: false,
+    exposureText: '',
+    salesText: '',
     err: '',
     evalPoints: evalApi.TALENT_EVAL_POINTS,
     advicePoints: evalApi.TALENT_ADVICE_POINTS,
@@ -147,6 +162,9 @@ Page({
         gradeKey: '',
         gradeLabel: '',
         gradeNote: '',
+        showGains: false,
+        exposureText: '',
+        salesText: '',
       })
       return
     }
@@ -166,6 +184,7 @@ Page({
       gradeKey: grade ? grade.key : '',
       gradeLabel: grade ? grade.label : '',
       gradeNote: grade ? grade.note : '',
+      ...gainFields(saved.score, input),
     })
   },
 
@@ -227,6 +246,10 @@ Page({
         gradeKey: grade ? grade.key : '',
         gradeLabel: grade ? grade.label : '',
         gradeNote: grade ? grade.note : '',
+        adviceReady: false,
+        sections: [],
+        lift: 0,
+        ...gainFields(score, input),
       })
       this.playScore(score.score)
     } catch (e) {

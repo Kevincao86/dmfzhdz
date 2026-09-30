@@ -222,6 +222,8 @@ function scoreSystem(spec: PlatformSpec) {
     `risk 为 0 到 ${spec.risk} 的整数，表示账号风险扣分。扣分依据：${spec.riskNote}。`,
     `同时输出 score，为 0 到 100 的整数，按这些权重合成后再扣 risk：${weights}。系统会按同样权重重算，重算成功时以系统结果为准。`,
     `situations 为 3 到 5 项，每项含 name、now。now 不超过 40 字，只写该板块现状，不要写建议。现状要扣住用户填了的昵称、账号、粉丝、标签、报价或等级；没填的项不要写成具体数字。name 只能从这些板块里选：${blockNames(spec).join('、')}。`,
+    'exposureLift 为按整改后预计多出来的曝光百分比，整数 8 到 60，不要写百分号。',
+    'salesLift 为按整改后预计每月多带来的带货金额，单位元的整数。按已填粉丝和报价估算增量，不要写成当前已经成交的金额。',
     '同一份账号资料每次必须给出相同 blocks、risk 和现状。',
   ].join('')
 }
@@ -312,6 +314,8 @@ export type LocalLifeScore = {
   videoLevel: string
   liveLevel: string
   situations: LocalLifeSituation[]
+  exposureLift: number
+  salesLift: number
 }
 
 export type LocalLifeSuggestion = {
@@ -328,6 +332,46 @@ function clampLift(value: unknown): number {
   const n = Math.round(Number(value))
   if (!Number.isFinite(n) || n <= 0) return 0
   return Math.min(35, Math.max(5, n))
+}
+
+function clampExposure(value: unknown): number {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.min(60, Math.max(8, n))
+}
+
+function clampSalesYuan(value: unknown): number {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.min(5000000, n)
+}
+
+function parseCount(text: unknown): number {
+  const raw = String(text || '').replace(/,/g, '').trim()
+  const m = raw.match(/(\d+(?:\.\d+)?)\s*(万|w|W)?/)
+  if (!m) return 0
+  const n = Number(m[1])
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return m[2] ? Math.round(n * 10000) : Math.round(n)
+}
+
+/** 评估结果还没有模型给出的增量时，按分数缺口和已填粉丝、报价估一个展示值 */
+export function previewTalentGains(score: number, followers: string, quote: string): { exposurePct: number; salesYuan: number } {
+  const exposurePct = clampExposure(Math.round((100 - Math.min(92, score)) * 1.5))
+  const fans = parseCount(followers)
+  const price = parseCount(quote) || 80
+  const orders = Math.max(1, Math.round((fans || 10000) * (exposurePct / 100) * 0.002))
+  return { exposurePct, salesYuan: clampSalesYuan(Math.max(500, orders * price)) }
+}
+
+export function formatSalesYuan(yuan: number): string {
+  const n = Math.round(Number(yuan) || 0)
+  if (n >= 10000) {
+    const wan = n / 10000
+    const text = wan >= 100 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, '')
+    return `¥${text}万`
+  }
+  return `¥${n.toLocaleString('zh-CN')}`
 }
 
 function loosenJson(slice: string) {
@@ -627,6 +671,8 @@ function savedFromCache(cached: Record<string, unknown> | null): { score: LocalL
       videoLevel: levelText(cached.videoLevel),
       liveLevel: levelText(cached.liveLevel),
       situations: mapSituations(cached.situations),
+      exposureLift: clampExposure(cached.exposureLift),
+      salesLift: clampSalesYuan(cached.salesLift),
     },
     advice,
   }
@@ -645,6 +691,8 @@ function buildScore(spec: PlatformSpec, j: Record<string, unknown>): LocalLifeSc
     videoLevel: computed?.videoLevel || levelText(j.videoLevel),
     liveLevel: computed?.liveLevel || levelText(j.liveLevel),
     situations: mapSituations(j.situations),
+    exposureLift: clampExposure(j.exposureLift),
+    salesLift: clampSalesYuan(j.salesLift),
   }
 }
 

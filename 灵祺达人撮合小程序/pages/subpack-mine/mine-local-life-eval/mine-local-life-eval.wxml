@@ -12,58 +12,69 @@
     </view>
   </view>
 
-  <view class="xingxuan-card ident">
-    <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
-    <view class="avatar avatar--ph" wx:else>{{avatarLetter}}</view>
-    <text class="nick">{{nickname || '未填写昵称'}}</text>
-    <text class="did">{{accountLabel}} {{accountId || '未填写'}}</text>
-    <text class="did" wx:if="{{basis}}">{{basis}}</text>
-    <text class="did" wx:else>按已填写的昵称和账号分析</text>
-  </view>
+  <view class="eval-split">
+    <view class="eval-left">
+      <view class="xingxuan-card ident">
+        <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
+        <view class="avatar avatar--ph" wx:else>{{avatarLetter}}</view>
+        <text class="nick">{{nickname || '未填写昵称'}}</text>
+        <text class="did">{{accountLabel}} {{accountId || '未填写'}}</text>
+        <text class="did" wx:if="{{basis}}">{{basis}}</text>
+        <text class="did" wx:else>按已填写的昵称和账号分析</text>
+      </view>
 
-  <view class="xingxuan-card hero">
-    <view class="ring-stage">
-      <view class="ring-halo {{evaluating ? 'ring-halo--on' : ''}}"></view>
-      <view class="ring {{scorePop ? 'ring--pop' : ''}}" style="background: conic-gradient(from -90deg, #7c4dff 0%, #c084fc {{displayScore}}%, #efeaf8 {{displayScore}}%);">
-        <view class="ring-hole">
-          <text class="score {{scorePop ? 'score--pop' : ''}}">{{displayScore}}</text>
+      <view class="xingxuan-card hero">
+        <view class="ring-stage">
+          <view class="ring-halo {{evaluating ? 'ring-halo--on' : ''}}"></view>
+          <view class="ring {{scorePop ? 'ring--pop' : ''}}" style="background: conic-gradient(from -90deg, #7c4dff 0%, #c084fc {{displayScore}}%, #efeaf8 {{displayScore}}%);">
+            <view class="ring-hole">
+              <text class="score {{scorePop ? 'score--pop' : ''}}">{{displayScore}}</text>
+            </view>
+          </view>
+        </view>
+        <text class="label">数据智能分析</text>
+        <view class="grade" wx:if="{{showGrade}}">
+          <text class="grade-label grade-label--{{gradeKey}}">{{gradeLabel}}</text>
+          <text class="grade-note">{{gradeNote}}</text>
+        </view>
+        <view class="levels" wx:if="{{scoreReady}}">
+          <text class="level-title">{{levelTitle}}</text>
+          <text class="level">{{levelALabel}} {{videoLevel}}</text>
+          <text class="level">{{levelBLabel}} {{liveLevel}}</text>
         </view>
       </view>
     </view>
-    <text class="label">数据智能分析</text>
-    <view class="grade" wx:if="{{showGrade}}">
-      <text class="grade-label grade-label--{{gradeKey}}">{{gradeLabel}}</text>
-      <text class="grade-note">{{gradeNote}}</text>
-    </view>
-    <view class="levels" wx:if="{{scoreReady}}">
-      <text class="level-title">{{levelTitle}}</text>
-      <text class="level">{{levelALabel}} {{videoLevel}}</text>
-      <text class="level">{{levelBLabel}} {{liveLevel}}</text>
-    </view>
-  </view>
 
-  <view class="xingxuan-card advice" wx:if="{{showGrade}}">
-    <text class="advice-title">评级释义</text>
-    <view class="sec {{gradeKey === item.key ? 'sec--on' : ''}}" wx:for="{{grades}}" wx:key="key">
-      <text class="sec-name">{{item.range}}：{{item.label}}</text>
-      <text class="sec-line">{{item.note}}</text>
-    </view>
-  </view>
+    <view class="eval-right">
+      <view class="xingxuan-card gains" wx:if="{{showGains}}">
+        <view class="gain">
+          <text class="gain-k">预计提升曝光</text>
+          <text class="gain-v">{{exposureText}}</text>
+        </view>
+        <view class="gain">
+          <text class="gain-k">预计提升带货金额</text>
+          <text class="gain-v">{{salesText}}</text>
+        </view>
+      </view>
+      <view class="xingxuan-card gains" wx:else>
+        <text class="need">完成评估后，这里显示预计提升的曝光和带货金额</text>
+      </view>
 
-  <view class="xingxuan-card advice" wx:if="{{scoreReady && situations.length}}">
-    <text class="advice-title">达人现状</text>
-    <view class="sec" wx:for="{{situations}}" wx:key="name">
-      <text class="sec-name">{{item.name}}</text>
-      <text class="sec-line">{{item.now}}</text>
-    </view>
-  </view>
+      <view class="xingxuan-card advice" wx:if="{{scoreReady && situations.length}}">
+        <text class="advice-title">达人现状</text>
+        <view class="sec" wx:for="{{situations}}" wx:key="name">
+          <text class="sec-name">{{item.name}}</text>
+          <text class="sec-line">{{item.now}}</text>
+        </view>
+      </view>
 
-  <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
-    <text class="advice-title">分析与提升方案</text>
-    <text class="advice-lift" wx:if="{{lift > 0}}">整改后预计提升 {{lift}}%</text>
-    <view class="sec" wx:for="{{sections}}" wx:key="name">
-      <text class="sec-name">{{item.name}}</text>
-      <text class="sec-line">{{item.next}}</text>
+      <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
+        <text class="advice-title">分析与提升方案</text>
+        <view class="sec" wx:for="{{sections}}" wx:key="name">
+          <text class="sec-name">{{item.name}}</text>
+          <text class="sec-line">{{item.next}}</text>
+        </view>
+      </view>
     </view>
   </view>
 

@@ -7,6 +7,82 @@
   padding: 8rpx 24rpx 4rpx;
 }
 
+.eval-split {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  padding: 0 16rpx 24rpx;
+}
+
+.eval-left {
+  width: 42%;
+  flex-shrink: 0;
+}
+
+.eval-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.eval-left .xingxuan-card,
+.eval-right .xingxuan-card {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.eval-left .avatar {
+  width: 96rpx;
+  height: 96rpx;
+}
+
+.eval-left .avatar--ph {
+  line-height: 96rpx;
+  font-size: 40rpx;
+}
+
+.eval-left .ring-stage,
+.eval-left .ring {
+  width: 200rpx;
+  height: 200rpx;
+}
+
+.eval-left .ring-hole {
+  width: 148rpx;
+  height: 148rpx;
+}
+
+.eval-left .score {
+  font-size: 56rpx;
+}
+
+.gains {
+  text-align: left;
+}
+
+.gain {
+  padding: 16rpx 8rpx 8rpx;
+}
+
+.gain + .gain {
+  border-top: 2rpx solid #efeaf8;
+  margin-top: 8rpx;
+}
+
+.gain-k {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.gain-v {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #6d28d9;
+  line-height: 1.1;
+}
+
 .plat {
   display: inline-flex;
   align-items: center;
