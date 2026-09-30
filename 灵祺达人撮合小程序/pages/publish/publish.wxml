@@ -61,7 +61,7 @@
       <view class="pub-target-top" style="{{heroHeadStyle}}">
         <view class="pub-target-nav">
           <text class="pub-target-back" bindtap="onBackFromChannel">‹</text>
-          <text class="pub-target-brand">灵祺星选</text>
+          <view class="pub-target-brand">灵祺星选</view>
         </view>
         <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
@@ -97,7 +97,7 @@
       <view class="pub-target-top" style="{{heroHeadStyle}}">
         <view class="pub-target-nav">
           <text class="pub-target-back" bindtap="onBackFromTarget">‹</text>
-          <text class="pub-target-brand">灵祺星选</text>
+          <view class="pub-target-brand">灵祺星选</view>
         </view>
         <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
@@ -148,7 +148,7 @@
       <view class="pub-target-top" style="{{heroHeadStyle}}">
         <view class="pub-target-nav">
           <text class="pub-target-back" bindtap="onBackFromMode">‹</text>
-          <text class="pub-target-brand">灵祺星选</text>
+          <view class="pub-target-brand">灵祺星选</view>
         </view>
         <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
@@ -182,7 +182,7 @@
       <view class="pub-target-top" style="{{heroHeadStyle}}">
         <view class="pub-target-nav">
           <text class="pub-target-back" bindtap="onBackFromTemplate">‹</text>
-          <text class="pub-target-brand">灵祺星选</text>
+          <view class="pub-target-brand">灵祺星选</view>
         </view>
       </view>
       <scroll-view scroll-y class="tpl-scroll" enhanced show-scrollbar="{{false}}">
@@ -233,7 +233,7 @@
       <view class="pub-target-top pub-form-top" style="{{formHeadStyle}}">
         <view class="pub-target-nav">
           <text class="pub-target-back" bindtap="onBackToMode">‹</text>
-          <text class="pub-target-brand">灵祺星选</text>
+          <view class="pub-target-brand">灵祺星选</view>
         </view>
         <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
@@ -732,7 +732,8 @@
                 catchtap="onFulfillmentLoopPick"
               >开环</view>
             </view>
-            <text class="pub-cover-hint">{{form.fulfillmentLoop === 'open' ? '开环：创建时上传群码。达人报名并经审核通过后，在我的报名详情里扫码进群。' : '闭环：保持现有路径（报名 → PR 确认选择 → 进群/排期）。'}}</text>
+            <text class="pub-cover-hint">开环：正常通告方式，发群收集信息</text>
+            <text class="pub-cover-hint">闭环：从发布到视频审核，均走平台</text>
             <view class="pub-field" wx:if="{{form.fulfillmentLoop === 'open'}}">
               <text class="pub-label">上传群二维码 *</text>
               <view class="pub-cover-actions">

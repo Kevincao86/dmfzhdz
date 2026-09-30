@@ -193,10 +193,19 @@
 }
 
 .pub-target-brand {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 56rpx;
+  margin-left: -28rpx;
+  line-height: 56rpx;
+  text-align: center;
   font-size: 34rpx;
   font-weight: 800;
   color: #1f2937;
   letter-spacing: 1rpx;
+  pointer-events: none;
 }
 
 .pub-steps-v2 {

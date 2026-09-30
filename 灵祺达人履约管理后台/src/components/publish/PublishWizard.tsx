@@ -1404,10 +1404,10 @@ export default function PublishWizard() {
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-xs text-[var(--shell-muted)]">
-              {(form.fulfillmentLoop || 'closed') === 'open'
-                ? '开环：创建时上传群码。达人报名并经审核通过后，在我的报名详情里扫码进群。'
-                : '闭环：保持现有路径（报名 → PR 确认选择 → 进群/排期）。'}
+            <p className="mt-1 text-xs leading-5 text-[var(--shell-muted)]">
+              开环：正常通告方式，发群收集信息
+              <br />
+              闭环：从发布到视频审核，均走平台
             </p>
             {(form.fulfillmentLoop || 'closed') === 'open' ? (
               <div className="mt-3">
