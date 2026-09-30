@@ -798,7 +798,7 @@ function TalentApplicationsPage() {
   const timeFilterLabel =
     APPLICATION_TIME_FILTERS.find((t) => t.id === timeFilter)?.label.replace('全部时间', '时间') || '时间'
 
-  const detailHref = (mpOrderId: string) => `/recruitment/${encodeURIComponent(mpOrderId)}?applied=1`
+  const detailHref = (mpOrderId: string) => `/recruitment/${encodeURIComponent(mpOrderId)}?applied=1&from=orders`
   const detailReturnState = { returnTo: '/orders' }
 
   return (

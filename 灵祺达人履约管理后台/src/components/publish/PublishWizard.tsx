@@ -1406,12 +1406,12 @@ export default function PublishWizard() {
             </div>
             <p className="mt-1 text-xs text-[var(--shell-muted)]">
               {(form.fulfillmentLoop || 'closed') === 'open'
-                ? '开环：与通告单相同，创建时上传群码；达人报名后即可长按识别进群。'
+                ? '开环：创建时上传群码。达人报名并经审核通过后，在我的报名详情里扫码进群。'
                 : '闭环：保持现有路径（报名 → PR 确认选择 → 进群/排期）。'}
             </p>
             {(form.fulfillmentLoop || 'closed') === 'open' ? (
               <div className="mt-3">
-                <PubLabel hint="达人报名成功后即可长按识别进群">上传群二维码 *</PubLabel>
+                <PubLabel hint="审核通过后，达人在我的报名详情里扫码进群">上传群二维码 *</PubLabel>
                 <input
                   ref={groupQrInputRef}
                   type="file"

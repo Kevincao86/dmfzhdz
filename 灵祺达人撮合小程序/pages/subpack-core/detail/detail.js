@@ -205,6 +205,8 @@ Page({
     view: null,
     applied: false,
     isOpenLoop: false,
+    fromApply: false,
+    applicationApproved: false,
     openLoopGroupQr: '',
     isIce: false,
     iceApplicantId: '',
@@ -363,8 +365,9 @@ Page({
       id = m ? decodeURIComponent(m[1]) : scene
     }
     const applied = options && options.applied === '1'
+    this._fromApply = !!(options && options.from === 'apply')
     this._pendingOpenFormRelay = options && String(options.openFormRelay || '') === '1'
-    this.setData({ id, applied })
+    this.setData({ id, applied, fromApply: this._fromApply })
     if (id) this.loadOrder(id)
     else this.setData({ loading: false, err: '缺少招募单号' })
   },
@@ -1019,8 +1022,10 @@ Page({
         iceStep3Hint,
         applied: hasApplied,
         isOpenLoop: xingxuanRecruitLoop.isXingxuanOpenLoop(mp),
+        fromApply: !!this._fromApply,
+        applicationApproved: gate.reason === 'approved',
         openLoopGroupQr:
-          hasApplied && xingxuanRecruitLoop.isXingxuanOpenLoop(mp)
+          this._fromApply && hasApplied && gate.reason === 'approved' && xingxuanRecruitLoop.isXingxuanOpenLoop(mp)
             ? mpGroupQr.groupQrFromRegistry(reg, id) || mpGroupQr.groupQrFromMp(mp)
             : '',
         readOnlyEnded: isEnded && canViewEnded,

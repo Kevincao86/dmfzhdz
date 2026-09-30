@@ -671,7 +671,7 @@ export default function RecruitmentDetailPage() {
             </div>
           ) : null}
 
-          {role === 'talent' && applied && isXingxuanOpenLoop(mpRaw) ? (
+          {role === 'talent' && fromOrders && isXingxuanOpenLoop(mpRaw) && contactGate.reason === 'approved' ? (
             <section className="surface-card rounded-xl border p-4 space-y-2">
               <h3 className="font-medium">扫码进群</h3>
               <p className="text-xs text-[var(--shell-muted)]">长按或右键保存二维码，用微信识别后加入项目群</p>

@@ -331,7 +331,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   },
   goDetail(e) {
     const id = e.currentTarget.dataset.id
-    if (id) wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
+    if (id) wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}&from=apply` })
   },
   onViewVideo(e) {
     const ds = e.currentTarget.dataset || {}
