@@ -126,10 +126,15 @@ function shouldPersistHallRegistryCache(opts) {
 function postHallRegistry(body, headers) {
   if (!mpRuntime.isLocalDevRuntime()) return api.post(HALL_POST, body, headers)
   const base = String(ecs.base() || '').replace(/\/$/, '')
-  if (!base) return Promise.reject(new Error('未配置 MERCHANT_API_BASE_URL'))
+  // 基址已是 /erp-api 时，必须走 ecs.url，否则会变成 /erp-api/api/... 返回 not_found
+  const fullUrl = ecs.url(HALL_POST, base)
+  if (!fullUrl) return Promise.reject(new Error('未配置后台地址'))
+  const config = require('./config.js')
+  const ip = String(config.MP_ERP_IP || '').trim()
+  const hostHeader = ip && base.includes(ip) ? { Host: ip } : {}
   return new Promise((resolve, reject) => {
     wx.request({
-      url: `${base}${HALL_POST}`,
+      url: fullUrl,
       method: 'POST',
       timeout: 60000,
       enableHttp2: false,
@@ -137,6 +142,7 @@ function postHallRegistry(body, headers) {
       header: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
+        ...hostHeader,
         ...(headers || {}),
       },
       data: body,
@@ -147,7 +153,8 @@ function postHallRegistry(body, headers) {
           return
         }
         const detail = res && res.data && (res.data.detail || res.data.error)
-        reject(new Error(String(detail || `http_${code}`)))
+        const mpApiErrors = require('./mpApiErrors.js')
+        reject(new Error(mpApiErrors.formatMpApiErr(new Error(String(detail || `http_${code}`)), '我的发单加载失败')))
       },
       fail(err) {
         reject(new Error(String((err && err.errMsg) || 'request:fail')))
