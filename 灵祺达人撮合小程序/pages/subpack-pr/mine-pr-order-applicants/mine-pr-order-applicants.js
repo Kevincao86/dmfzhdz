@@ -44,7 +44,8 @@ function annotateApplicantFit(rows, fitById) {
       delete next.hasFit
       delete next.fitScore
       delete next.fitMatch
-      delete next.fitReason
+      delete next.fitProfile
+      delete next.fitMatchRead
       delete next.fitAfterGrid
       return next
     }
@@ -62,7 +63,8 @@ function annotateApplicantFit(rows, fitById) {
       fitAfterGrid: !linked,
       fitScore: fit.score,
       fitMatch: fit.fit,
-      fitReason: fit.reason || '',
+      fitProfile: fit.profileRead || fit.reason || '',
+      fitMatchRead: fit.matchRead || '',
       applyFormDisplayRows,
     }
   })

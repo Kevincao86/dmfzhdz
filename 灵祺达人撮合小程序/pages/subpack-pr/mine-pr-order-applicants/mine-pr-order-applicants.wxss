@@ -684,18 +684,18 @@
 .applicant-fit--below {
   margin: 16rpx 0 0;
 }
-.applicant-fit__read,
-.applicant-fit__reason {
+.applicant-fit__label {
   display: block;
-  font-size: 24rpx;
-  color: #78350f;
-  line-height: 1.5;
-}
-.applicant-fit__score {
-  display: block;
-  margin-top: 6rpx;
+  margin-top: 12rpx;
   font-size: 24rpx;
   font-weight: 600;
   color: #78350f;
 }
-.applicant-fit__reason { margin-top: 6rpx; }
+.applicant-fit__label:first-child { margin-top: 0; }
+.applicant-fit__body {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #78350f;
+  line-height: 1.6;
+}

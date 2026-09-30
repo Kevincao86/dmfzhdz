@@ -37,14 +37,22 @@ function textOf(value, max) {
 }
 
 function orderBrief(order) {
+  const meta = order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
+  const fixed = textOf(meta.fixedPrice != null ? meta.fixedPrice : order.fixedPrice, 24)
+  const cps = textOf(meta.cpsPercent != null ? meta.cpsPercent : order.cpsPercent, 24)
+  const feeType = textOf(meta.feeTypeId || order.feeTypeId, 24)
+  const fee = [feeType ? `类型${feeType}` : '', fixed ? `一口价${fixed}` : '', cps ? `CPS${cps}%` : '']
+    .filter(Boolean)
+    .join('，')
   return [
     `标题：${textOf(order.title || order.customerName, 80) || '未填写'}`,
     `平台：${textOf(order.platform, 40) || '未填写'}`,
     `品类：${textOf(order.category, 40) || '未填写'}`,
     `地区：${textOf(order.region || order.storeName || order.city, 40) || '未填写'}`,
     `粉丝要求：${textOf(order.fansRequirement, 80) || '未填写'}`,
-    `招募说明：${textOf(order.recruitmentInfo || order.taskDetail, 240) || '未填写'}`,
-    `商家要求：${textOf(order.merchantRequirements, 240) || '未填写'}`,
+    `费用：${fee || '未填写'}`,
+    `招募说明：${textOf(order.recruitmentInfo || order.taskDetail, 600) || '未填写'}`,
+    `商家要求：${textOf(order.merchantRequirements, 400) || '未填写'}`,
   ].join('\n')
 }
 
@@ -53,9 +61,13 @@ function talentLine(raw, index) {
   const bits = [
     name,
     textOf(raw.platform, 20),
+    textOf(raw.platformAccount, 40) ? `账号${textOf(raw.platformAccount, 40)}` : '',
     textOf(raw.followers || raw.fans, 24) ? `粉丝${textOf(raw.followers || raw.fans, 24)}` : '',
     textOf(raw.city || raw.region, 20),
-    textOf(raw.tags || raw.accountTags, 40),
+    textOf(raw.douyinSalesLevel, 20) ? `带货等级${textOf(raw.douyinSalesLevel, 20)}` : '',
+    textOf(raw.tags || raw.accountTags, 80),
+    textOf(raw.quotePrice || raw.quote, 20) ? `报价${textOf(raw.quotePrice || raw.quote, 20)}` : '',
+    textOf(raw.intro, 120),
   ].filter(Boolean)
   return `${index + 1}. ${bits.join('，')}`
 }
@@ -114,7 +126,9 @@ async function analyzePrOrderTalents(mpOrderId) {
     'score 是 0 到 100 的达人账号分，只根据下面给出的达人资料，不要编造粉丝、播放或成交。',
     'fit 是 0 到 100 的关联程度，看达人平台、地区、粉丝、标签和报价与这张招募单有多贴。',
     '不要写公开资料不足、仅供参考、不是官方这类句子。',
-    '只输出一个 JSON 对象。orderRead 不超过 40 字。talents 与给出的达人顺序一致，每项含 name、score、fit、reason。reason 不超过 28 字。',
+    '只输出一个 JSON 对象。talents 与给出的达人顺序一致，每项含 name、score、fit、profileRead、matchRead。',
+    'profileRead 是这位达人的完整分析说明，120到220字，按已给出的平台、地区、粉丝、标签、报价、带货等级来写，没给出的不要编。',
+    'matchRead 是这位达人和这张商单的匹配说明，120到220字，对照平台、地区、粉丝要求、费用和任务说明，写清匹配点和不匹配点。',
   ].join('')
   const user = `${orderBrief(order)}\n报名达人：\n${picked.map(talentLine).join('\n')}`
   let parsed
@@ -131,7 +145,8 @@ async function analyzePrOrderTalents(mpOrderId) {
       name: textOf(item.name || raw.name || raw.nickname, 40) || `达人${index + 1}`,
       score: clampScore(item.score),
       fit: clampScore(item.fit),
-      reason: textOf(item.reason, 40),
+      profileRead: textOf(item.profileRead || item.reason, 400),
+      matchRead: textOf(item.matchRead, 400),
     }
   })
   return {

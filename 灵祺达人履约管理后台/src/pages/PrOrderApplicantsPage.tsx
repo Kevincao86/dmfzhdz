@@ -104,14 +104,17 @@ function countPublishLinkStats(rows: EnrichedApplicantRow[]) {
   return { publishLinkPendingCount: pending, publishLinkSubmittedCount: submitted }
 }
 
-function TalentFitNote({ orderRead, row }: { orderRead?: string; row: PrTalentFitRow }) {
+function TalentFitNote({ row }: { row: PrTalentFitRow }) {
   return (
-    <div className="col-span-2 sm:col-span-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5">
-      {orderRead ? <p className="text-amber-950">{orderRead}</p> : null}
-      <p className={`font-medium text-amber-950 ${orderRead ? 'mt-1' : ''}`}>
-        账号 {row.score} · 关联 {row.fit}
-      </p>
-      {row.reason ? <p className="mt-1 text-amber-900">{row.reason}</p> : null}
+    <div className="col-span-2 sm:col-span-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 space-y-2">
+      <div>
+        <p className="font-medium text-amber-950">达人分析 · 账号 {row.score}</p>
+        {row.profileRead ? <p className="mt-1 text-amber-950">{row.profileRead}</p> : null}
+      </div>
+      <div>
+        <p className="font-medium text-amber-950">商单匹配 · 关联 {row.fit}</p>
+        {row.matchRead ? <p className="mt-1 text-amber-950">{row.matchRead}</p> : null}
+      </div>
     </div>
   )
 }
@@ -1220,7 +1223,7 @@ export default function PrOrderApplicantsPage() {
                       <span className="text-[var(--shell-muted)]">{fieldRow.label} </span>
                       {fieldRow.value}
                     </div>
-                    {showFit && fit ? <TalentFitNote orderRead={fitResult?.orderRead} row={fit} /> : null}
+                    {showFit && fit ? <TalentFitNote row={fit} /> : null}
                   </Fragment>
                 )
               })}
@@ -1229,7 +1232,7 @@ export default function PrOrderApplicantsPage() {
                 const hasLinkRow = (a.applyFormDisplayRows || []).some((row) =>
                   /主页链接/.test(String(row.label || '')),
                 )
-                return fit && !hasLinkRow ? <TalentFitNote orderRead={fitResult?.orderRead} row={fit} /> : null
+                return fit && !hasLinkRow ? <TalentFitNote row={fit} /> : null
               })()}
               {a.merchantShareNote ? (
                 <div className="col-span-2 sm:col-span-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">

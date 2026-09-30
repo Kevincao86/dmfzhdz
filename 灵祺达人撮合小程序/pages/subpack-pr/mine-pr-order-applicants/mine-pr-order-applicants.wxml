@@ -218,9 +218,10 @@
           <text class="applicant-card-v2__cell-val">{{fieldRow.value}}</text>
         </view>
         <view wx:if="{{fieldRow.showFitAfter}}" class="applicant-fit">
-          <text wx:if="{{fitOrderRead}}" class="applicant-fit__read">{{fitOrderRead}}</text>
-          <text class="applicant-fit__score">账号 {{item.fitScore}} · 关联 {{item.fitMatch}}</text>
-          <text wx:if="{{item.fitReason}}" class="applicant-fit__reason">{{item.fitReason}}</text>
+          <text class="applicant-fit__label">达人分析 · 账号 {{item.fitScore}}</text>
+          <text wx:if="{{item.fitProfile}}" class="applicant-fit__body">{{item.fitProfile}}</text>
+          <text class="applicant-fit__label">商单匹配 · 关联 {{item.fitMatch}}</text>
+          <text wx:if="{{item.fitMatchRead}}" class="applicant-fit__body">{{item.fitMatchRead}}</text>
         </view>
       </block>
       <view
@@ -234,9 +235,10 @@
     </view>
 
     <view wx:if="{{item.fitAfterGrid}}" class="applicant-fit applicant-fit--below">
-      <text wx:if="{{fitOrderRead}}" class="applicant-fit__read">{{fitOrderRead}}</text>
-      <text class="applicant-fit__score">账号 {{item.fitScore}} · 关联 {{item.fitMatch}}</text>
-      <text wx:if="{{item.fitReason}}" class="applicant-fit__reason">{{item.fitReason}}</text>
+      <text class="applicant-fit__label">达人分析 · 账号 {{item.fitScore}}</text>
+      <text wx:if="{{item.fitProfile}}" class="applicant-fit__body">{{item.fitProfile}}</text>
+      <text class="applicant-fit__label">商单匹配 · 关联 {{item.fitMatch}}</text>
+      <text wx:if="{{item.fitMatchRead}}" class="applicant-fit__body">{{item.fitMatchRead}}</text>
     </view>
 
     <view wx:if="{{isIce}}" class="ice-app-block">
