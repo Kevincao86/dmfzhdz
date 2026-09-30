@@ -6,71 +6,37 @@
 }
 
 .plats {
-  width: 100%;
-  height: 104rpx;
-  white-space: nowrap;
-}
-
-.plats-row {
-  display: block;
-  height: 88rpx;
-  padding-top: 8rpx;
-  font-size: 0;
-  white-space: nowrap;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 8rpx 0 12rpx;
 }
 
 .plat {
-  display: inline-block;
-  height: 72rpx;
-  margin-right: 16rpx;
-  padding: 0 20rpx 0 8rpx;
-  border-radius: 36rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 18rpx 8rpx 8rpx;
+  border-radius: 999rpx;
   background: #fff;
-  vertical-align: top;
-  white-space: nowrap;
-  box-shadow: 0 6rpx 18rpx rgba(15, 23, 42, 0.06);
-}
-
-.plat-mark {
-  display: inline-block;
-  width: 48rpx;
-  height: 48rpx;
-  margin: 12rpx 10rpx 0 0;
-  border-radius: 12rpx;
-  background-color: #fff;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 40rpx 40rpx;
-  vertical-align: top;
-  overflow: hidden;
-  font-size: 22rpx;
-  font-weight: 800;
-  line-height: 48rpx;
-  text-align: center;
-  color: transparent;
-}
-
-.plat-mark--ph {
-  color: #0891b2;
-  background-color: #e0f2fe;
-}
-
-.plat-name {
-  display: inline-block;
-  height: 72rpx;
-  line-height: 72rpx;
+  color: #64748b;
   font-size: 24rpx;
-  color: #334155;
-  vertical-align: top;
-  white-space: nowrap;
+  border: 2rpx solid #e2e8f0;
+  line-height: 1.4;
+}
+
+.plat-logo {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 8rpx;
+  background: #fff;
+  flex-shrink: 0;
 }
 
 .plat--on {
   background: #0891b2;
-}
-
-.plat--on .plat-name {
   color: #fff;
+  border-color: #0891b2;
   font-weight: 700;
 }
 
