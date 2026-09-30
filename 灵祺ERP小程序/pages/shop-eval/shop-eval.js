@@ -432,7 +432,18 @@ Page({
     if (!(await this.requirePaid())) return
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
     this.stopTick()
-    this.setData({ evaluating: true, err: '', scorePop: false, displayScore: 0 })
+    this.setData({
+      evaluating: true,
+      err: '',
+      scorePop: false,
+      displayScore: 0,
+      scoreReady: false,
+      situations: [],
+      showGrade: false,
+      showGains: false,
+      adviceReady: false,
+      sections: [],
+    })
     this.startEvalSweep()
     let failed = null
     try {

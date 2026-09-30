@@ -493,13 +493,45 @@ function buildScore(spec, j) {
   }
 }
 
+function namedInOrder(rows) {
+  if (!Array.isArray(rows) || rows.length !== EVAL_BLOCK_NAMES.length) return false
+  return EVAL_BLOCK_NAMES.every((name, index) => {
+    const item = rows[index]
+    return item && String(item.name || '').trim() === name
+  })
+}
+
+function blankSignals() {
+  return {
+    productTotal: 0,
+    productPriced: 0,
+    productWithImage: 0,
+    reviewTotal: 0,
+    reviewReplied: 0,
+    activityTotal: 0,
+    decorationTotal: 0,
+    decorationWithCover: 0,
+    payAmount: 0,
+    verifyAmount: 0,
+    orderCount: 0,
+    otherPlatformPay: 0,
+    clueCount: 0,
+    adShow: 0,
+    kbTotal: 0,
+    kbFeeding: 0,
+    financeVerify: 0,
+    financeRefund: 0,
+    financeRows: 0,
+  }
+}
+
 function savedFromCache(cached) {
-  if (!cached || !Array.isArray(cached.situations) || !cached.situations.length) return null
+  if (!cached || !namedInOrder(cached.situations)) return null
   const adviceRaw = cached.advice
   let advice = null
-  if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray((adviceRaw).sections)) {
-    const sections = mapSuggestions((adviceRaw).sections)
-    if (sections.length) advice = { lift: clampLift((adviceRaw).lift), sections }
+  if (adviceRaw && typeof adviceRaw === 'object' && namedInOrder(adviceRaw.sections)) {
+    const sections = mapSuggestions(adviceRaw.sections)
+    if (sections.length) advice = { lift: clampLift(adviceRaw.lift), sections }
   }
   return {
     score: {
@@ -745,25 +777,20 @@ function scoreFromSignals(spec, signals, offerPrice) {
 async function evaluateShop(raw, opts) {
   const { spec, row } = normalizeInput(raw)
   if (!row.storeName) throw new Error('请先完善门店名称')
-  if (raw && raw.signals && opts.force) {
-    const scored = scoreFromSignals(spec, raw.signals, row.offerPrice)
-    writeCache(opts.storage, cacheKey(row), scored)
-    return scored
-  }
   const loaded = loadCache(opts.storage, row)
-  const key = loaded.key
   if (!opts.force) {
     const saved = savedFromCache(loaded.data)
     if (saved) return saved.score
   }
-  const j = await askJson(
-    opts.askText,
-    scoreSystem(spec),
-    `${shopFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用商家自己能看懂的话来写。`,
+  const signals = raw && raw.signals ? raw.signals : blankSignals()
+  const scored = scoreFromSignals(spec, signals, row.offerPrice)
+  const prevAdvice = loaded.data && loaded.data.advice
+  writeCache(
+    opts.storage,
+    loaded.key,
+    prevAdvice && !namedInOrder(prevAdvice.sections) ? Object.assign({}, scored, { advice: null }) : scored,
   )
-  const score = buildScore(spec, j)
-  writeCache(opts.storage, key, score)
-  return score
+  return scored
 }
 
 async function adviseShop(raw, score, opts) {
