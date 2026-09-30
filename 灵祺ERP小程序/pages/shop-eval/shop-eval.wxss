@@ -84,6 +84,17 @@
   color: #0f172a;
 }
 
+.scope {
+  display: inline-flex;
+  margin-top: 10rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #e0f2fe;
+  color: #0e7490;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
 .did,
 .need {
   display: block;

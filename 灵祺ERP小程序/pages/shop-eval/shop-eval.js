@@ -61,6 +61,9 @@ Page({
     grades: evalApi.SHOP_EVAL_GRADES,
     platformId: 'douyin',
     storeName: '',
+    scopeLabel: '单门店',
+    evalTitle: '门店智能分析',
+    statusTitle: '门店现状',
     avatarLetter: '店',
     basis: '',
     canEval: false,
@@ -105,32 +108,33 @@ Page({
 
   async loadStore() {
     const platformId = this.data.platformId
-    const meta = evalApi.platformShopEvalMeta(platformId)
-    let row = null
+    let items = []
+    let total = 0
     try {
       const r = await feature.fetchStoresForPlatform(platformId, '')
-      row = r && r.ok && r.items && r.items[0] ? r.items[0] : null
+      items = r && r.ok && r.items ? r.items : []
+      total = r && r.ok ? Number(r.total || items.length) : items.length
     } catch (e) {}
-    const input = {
-      platformId,
-      storeName: String(row && row.name ? row.name : '').trim(),
-      address: String(row && row.address ? row.address : '').trim(),
-      phone: String(row && row.phone ? row.phone : '').trim(),
-      businessHours: String(row && row.businessHours ? row.businessHours : '').trim(),
-      city: String(row && row.city ? row.city : '').trim(),
-    }
+    const input = evalApi.resolveShopEvalFromStores(platformId, items, total)
+    const scope = evalApi.shopEvalScopeOf(input)
+    const meta = evalApi.platformShopEvalMeta(platformId, scope)
     this._input = input
     const saved = evalApi.readSavedShopEval(input, storage)
     const score = saved && saved.score
     const advice = saved && saved.advice
-    const grade = score ? evalApi.shopEvalGrade(score.score) : null
+    const grade = score ? evalApi.shopEvalGrade(score.score, scope) : null
     this._score = score || null
+    const displayName = scope === 'chain' && input.brandName ? input.brandName : input.storeName
     this.setData({
       platformName: meta.name,
+      evalTitle: meta.title,
+      statusTitle: meta.statusTitle,
       levelA: meta.levelA,
       levelB: meta.levelB,
-      storeName: input.storeName,
-      avatarLetter: letterOf(input.storeName),
+      storeName: displayName,
+      scopeLabel: scope === 'chain' ? `连锁品牌 · ${input.storeCount || '多'}家` : '单门店',
+      grades: evalApi.shopEvalGrades(scope),
+      avatarLetter: letterOf(displayName),
       basis: evalApi.describeShopEvalBasis(input),
       canEval: Boolean(input.storeName),
       scoreReady: Boolean(score),
@@ -261,7 +265,7 @@ Page({
       const input = this._input || { platformId: this.data.platformId, storeName: this.data.storeName }
       const score = await evalApi.evaluateShop(input, { force: true, storage, askText })
       this._score = score
-      const grade = evalApi.shopEvalGrade(score.score)
+      const grade = evalApi.shopEvalGrade(score.score, evalApi.shopEvalScopeOf(input))
       this.setData({
         scoreReady: true,
         searchLevel: score.searchLevel,

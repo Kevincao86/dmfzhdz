@@ -1,4 +1,5 @@
 export type ShopEvalPlatformId = 'douyin' | 'meituan' | 'xiaohongshu' | 'kuaishou'
+export type ShopEvalScope = 'single' | 'chain'
 
 export type ShopEvalInput = {
   platformId?: string
@@ -9,6 +10,10 @@ export type ShopEvalInput = {
   city?: string
   offerName?: string
   offerPrice?: string
+  scope?: ShopEvalScope
+  storeCount?: number
+  brandName?: string
+  storeNames?: string
 }
 
 export type ShopEvalSituation = { name: string; now: string }
@@ -40,6 +45,7 @@ type ScoreBlock = { name: string; weight: number }
 type PlatformSpec = {
   id: ShopEvalPlatformId
   name: string
+  scope: ShopEvalScope
   scene: string
   blocks: ScoreBlock[]
   risk: number
@@ -54,7 +60,8 @@ const PLATFORM_SPECS: Record<ShopEvalPlatformId, PlatformSpec> = {
   douyin: {
     id: 'douyin',
     name: '抖音来客',
-    scene: '按抖音来客本地生活门店打分。看资料能不能被搜到、套餐能不能挂到店、内容能不能带到核销。',
+    scope: 'single',
+    scene: '按抖音来客单门店打分。看这家店资料能不能被搜到、套餐能不能挂到店、内容能不能带到核销。',
     blocks: [
       { name: '资料可信', weight: 20 },
       { name: '套餐竞争力', weight: 25 },
@@ -72,7 +79,8 @@ const PLATFORM_SPECS: Record<ShopEvalPlatformId, PlatformSpec> = {
   meituan: {
     id: 'meituan',
     name: '美团点评',
-    scene: '按美团点评到店门店打分。资料和套餐权重大于内容，核心是能被搜到、能核销。',
+    scope: 'single',
+    scene: '按美团点评单门店打分。资料和套餐权重大于内容，核心是这家店能被搜到、能核销。',
     blocks: [
       { name: '资料可信', weight: 25 },
       { name: '套餐竞争力', weight: 25 },
@@ -90,7 +98,8 @@ const PLATFORM_SPECS: Record<ShopEvalPlatformId, PlatformSpec> = {
   xiaohongshu: {
     id: 'xiaohongshu',
     name: '小红书',
-    scene: '按小红书本地生活门店打分。笔记能不能被搜到、被相信，再引导到店或团购。',
+    scope: 'single',
+    scene: '按小红书单门店打分。笔记能不能被搜到、被相信，再引导到这家店或团购。',
     blocks: [
       { name: '资料可信', weight: 15 },
       { name: '套餐竞争力', weight: 15 },
@@ -108,7 +117,8 @@ const PLATFORM_SPECS: Record<ShopEvalPlatformId, PlatformSpec> = {
   kuaishou: {
     id: 'kuaishou',
     name: '快手团购',
-    scene: '按快手团购门店打分。老铁信任和直播/短视频挂载要能落到核销。',
+    scope: 'single',
+    scene: '按快手团购单门店打分。老铁信任和直播/短视频挂载要能落到这家店核销。',
     blocks: [
       { name: '资料可信', weight: 20 },
       { name: '套餐竞争力', weight: 25 },
@@ -125,6 +135,72 @@ const PLATFORM_SPECS: Record<ShopEvalPlatformId, PlatformSpec> = {
   },
 }
 
+const CHAIN_OVERLAYS: Record<
+  ShopEvalPlatformId,
+  Pick<PlatformSpec, 'scene' | 'blocks' | 'riskNote' | 'levelA' | 'levelB' | 'levelABlocks' | 'levelBBlocks'>
+> = {
+  douyin: {
+    scene: '按抖音来客连锁品牌打分。看各店资料是否统一、套餐能否统筹挂载、内容能否带到各店核销。',
+    blocks: [
+      { name: '品牌一致性', weight: 25 },
+      { name: '套餐统筹', weight: 20 },
+      { name: '内容种草', weight: 15 },
+      { name: '分店覆盖', weight: 25 },
+      { name: '履约口碑', weight: 15 },
+    ],
+    riskNote: '各店资料互相打架、同套餐不同价、分店漏挂载、套图冒充实拍',
+    levelA: '品牌可被搜到',
+    levelB: '分店可核销',
+    levelABlocks: ['品牌一致性', '内容种草'],
+    levelBBlocks: ['套餐统筹', '分店覆盖'],
+  },
+  meituan: {
+    scene: '按美团点评连锁品牌打分。资料和套餐在各店是否统一，分店是否都能被搜到、能核销。',
+    blocks: [
+      { name: '品牌一致性', weight: 25 },
+      { name: '套餐统筹', weight: 25 },
+      { name: '内容种草', weight: 10 },
+      { name: '分店覆盖', weight: 25 },
+      { name: '履约口碑', weight: 15 },
+    ],
+    riskNote: '各店评分口径不一、刷评、分店营业时间与真实不符',
+    levelA: '品牌可被搜到',
+    levelB: '分店可核销',
+    levelABlocks: ['品牌一致性', '内容种草'],
+    levelBBlocks: ['套餐统筹', '分店覆盖'],
+  },
+  xiaohongshu: {
+    scene: '按小红书连锁品牌打分。笔记是不是品牌一致、能不能被相信，再引导到各店或团购。',
+    blocks: [
+      { name: '品牌一致性', weight: 20 },
+      { name: '套餐统筹', weight: 15 },
+      { name: '内容种草', weight: 30 },
+      { name: '分店覆盖', weight: 20 },
+      { name: '履约口碑', weight: 15 },
+    ],
+    riskNote: '营销号感、虚假种草、分店 POI 对不上、各店笔记口径打架',
+    levelA: '品牌可被搜到',
+    levelB: '分店可核销',
+    levelABlocks: ['品牌一致性', '内容种草'],
+    levelBBlocks: ['套餐统筹', '分店覆盖'],
+  },
+  kuaishou: {
+    scene: '按快手团购连锁品牌打分。老铁信任和直播/短视频挂载要能落到各店核销。',
+    blocks: [
+      { name: '品牌一致性', weight: 25 },
+      { name: '套餐统筹', weight: 20 },
+      { name: '内容种草', weight: 15 },
+      { name: '分店覆盖', weight: 25 },
+      { name: '履约口碑', weight: 15 },
+    ],
+    riskNote: '标题党、挂车和分店无关、同套餐不同价、分店漏挂',
+    levelA: '品牌可被搜到',
+    levelB: '分店可核销',
+    levelABlocks: ['品牌一致性', '内容种草'],
+    levelBBlocks: ['套餐统筹', '分店覆盖'],
+  },
+}
+
 export const SHOP_EVAL_PLATFORMS: { id: ShopEvalPlatformId; name: string }[] = [
   { id: 'douyin', name: '抖音来客' },
   { id: 'meituan', name: '美团点评' },
@@ -132,12 +208,30 @@ export const SHOP_EVAL_PLATFORMS: { id: ShopEvalPlatformId; name: string }[] = [
   { id: 'kuaishou', name: '快手团购' },
 ]
 
-export const SHOP_EVAL_GRADES = [
-  { key: 'ready', range: '85~100', label: '可投放', note: '资料和套餐齐，适合加探店和投流' },
-  { key: 'tune', range: '70~84', label: '可优化', note: '能发单，内容和转化路径还要补' },
-  { key: 'fill', range: '55~69', label: '先补资料', note: '先把地址、套餐、挂载补齐再加大投放' },
-  { key: 'build', range: '＜55', label: '先建档', note: '门店还没形成可核销的对外形象' },
+export const SHOP_EVAL_GRADES_SINGLE = [
+  { key: 'ready', range: '85~100', label: '经营稳健', note: '资料和套餐齐，顾客能搜到、能到店核销' },
+  { key: 'tune', range: '70~84', label: '转化偏弱', note: '店能被看见，内容和到店转化还不够稳' },
+  { key: 'fill', range: '55~69', label: '资料偏薄', note: '地址、套餐或挂载还不齐，获客能力有限' },
+  { key: 'build', range: '＜55', label: '形象未立', note: '还没形成能被搜到、能核销的对外形象' },
 ] as const
+
+export const SHOP_EVAL_GRADES_CHAIN = [
+  { key: 'ready', range: '85~100', label: '品牌成型', note: '各店资料和套餐统一，品牌能被搜到、分店能核销' },
+  { key: 'tune', range: '70~84', label: '协同不足', note: '品牌能见客，分店之间资料或转化还不齐' },
+  { key: 'fill', range: '55~69', label: '分店偏散', note: '多家店还没统一资料、套餐或挂载' },
+  { key: 'build', range: '＜55', label: '品牌未立', note: '连锁还没形成统一可核销的对外形象' },
+] as const
+
+export const SHOP_EVAL_GRADES = SHOP_EVAL_GRADES_SINGLE
+
+export function shopEvalScopeOf(raw?: Pick<ShopEvalInput, 'scope' | 'storeCount'> | null): ShopEvalScope {
+  if (raw?.scope === 'chain' || Number(raw?.storeCount) >= 2) return 'chain'
+  return 'single'
+}
+
+export function shopEvalGrades(scope?: ShopEvalScope) {
+  return scope === 'chain' ? SHOP_EVAL_GRADES_CHAIN : SHOP_EVAL_GRADES_SINGLE
+}
 
 type AskText = (system: string, user: string) => Promise<string>
 type StorageLike = {
@@ -145,9 +239,11 @@ type StorageLike = {
   setItem: (key: string, value: string) => void
 }
 
-function specOf(platformId: string): PlatformSpec {
+function specOf(platformId: string, scope?: ShopEvalScope): PlatformSpec {
   const id = platformId as ShopEvalPlatformId
-  return PLATFORM_SPECS[id] || PLATFORM_SPECS.douyin
+  const base = PLATFORM_SPECS[id] || PLATFORM_SPECS.douyin
+  if (scope !== 'chain') return base
+  return { ...base, scope: 'chain', ...CHAIN_OVERLAYS[base.id] }
 }
 
 function clampScore(n: unknown): number {
@@ -179,11 +275,16 @@ function clipText(value: unknown, max: number): string {
 }
 
 function normalizeInput(raw: ShopEvalInput) {
-  const spec = specOf(String(raw?.platformId || 'douyin'))
+  const scope = shopEvalScopeOf(raw)
+  const spec = specOf(String(raw?.platformId || 'douyin'), scope)
   return {
     spec,
     row: {
       platformId: spec.id,
+      scope,
+      storeCount: Math.max(0, Math.round(Number(raw?.storeCount) || 0)),
+      brandName: String(raw?.brandName || '').trim(),
+      storeNames: String(raw?.storeNames || '').trim(),
       storeName: String(raw?.storeName || '').trim(),
       address: String(raw?.address || '').trim(),
       phone: String(raw?.phone || '').trim(),
@@ -200,16 +301,20 @@ function filledOr(value: string, empty: string) {
 }
 
 function shopFacts(spec: PlatformSpec, row: ReturnType<typeof normalizeInput>['row']) {
-  return [
+  const lines = [
     `平台：${spec.name}`,
+    `经营形态：${spec.scope === 'chain' ? `连锁品牌（${row.storeCount || '多家'}）` : '单门店'}`,
+    `品牌：${filledOr(row.brandName, spec.scope === 'chain' ? '未填写' : '无')}`,
     `门店名称：${filledOr(row.storeName, '未填写')}`,
+    `分店示例：${filledOr(row.storeNames, spec.scope === 'chain' ? '未列出' : '无')}`,
     `城市：${filledOr(row.city, '未填写')}`,
     `地址：${filledOr(row.address, '未填写')}`,
     `电话：${filledOr(row.phone, '未填写')}`,
     `营业时间：${filledOr(row.businessHours, '未填写')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
-  ].join('\n')
+  ]
+  return lines.join('\n')
 }
 
 function scoreSystem(spec: PlatformSpec) {
@@ -218,7 +323,9 @@ function scoreSystem(spec: PlatformSpec) {
   return [
     '你是豆包。',
     spec.scene,
-    '这是给商家看的门店体检，用「你」来写。不要声称读到了平台官方后台或官方等级。',
+    spec.scope === 'chain'
+      ? '这是给商家看的连锁品牌体检，用「你」来写。不要声称读到了平台官方后台或官方等级。'
+      : '这是给商家看的单门店体检，用「你」来写。不要声称读到了平台官方后台或官方等级。',
     '只根据已填写的门店资料分析。未填写的销量、核销额、GMV、评价数不要编造。',
     '不要写「公开资料不足」「仅供参考」「不是官方」「弱预估」这类提示句。没填的项写成未填写即可。',
     '只输出一个 JSON 对象，不要 Markdown。键名必须用英文双引号，最后一项后面不要逗号。',
@@ -231,18 +338,23 @@ function scoreSystem(spec: PlatformSpec) {
   ].join('')
 }
 
-const ADVICE_SYSTEM = [
-  '你是豆包。这是商家自己看的门店体检，按现状写给商家的改法，用「你」来写。',
-  '不要编造销量、核销额、GMV。未在资料里出现的数字不要写进来。',
-  '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
-  '只输出一个 JSON 对象，不要 Markdown。',
-  '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
-  '字段：sections 为 4 到 5 项。每项含 name、finding、adjust、soon。',
-  'name 与现状里的板块一致，不超过 8 个字。',
-  'finding 是分析结果：这个板块现在卡在哪里、原因是什么，60 到 100 字。',
-  'adjust 是怎么调整：改店铺、套餐、内容或挂载里的哪一项，改完应看到什么，80 到 160 字。',
-  'soon 是近期要做：近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，80 到 160 字。',
-].join('')
+function adviceSystem(spec: PlatformSpec) {
+  return [
+    '你是豆包。这是商家自己看的门店体检，按现状写给商家的改法，用「你」来写。',
+    spec.scope === 'chain'
+      ? '对象是连锁品牌。建议要能落到各店统一资料、统一套餐、补齐漏挂分店，不要只写一家店。'
+      : '对象是单门店。建议要落到这家店的资料、套餐、内容和挂载。',
+    '不要编造销量、核销额、GMV。未在资料里出现的数字不要写进来。',
+    '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
+    '只输出一个 JSON 对象，不要 Markdown。',
+    '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
+    '字段：sections 为 4 到 5 项。每项含 name、finding、adjust、soon。',
+    'name 与现状里的板块一致，不超过 8 个字。',
+    'finding 是分析结果：这个板块现在卡在哪里、原因是什么，60 到 100 字。',
+    'adjust 是怎么调整：改店铺、套餐、内容或挂载里的哪一项，改完应看到什么，80 到 160 字。',
+    'soon 是近期要做：近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，80 到 160 字。',
+  ].join('')
+}
 
 function loosenJson(slice: string) {
   return String(slice || '')
@@ -397,8 +509,11 @@ function mapSuggestions(rows: unknown): ShopEvalSuggestion[] {
 
 function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
   return [
-    'lq_merchant_shop_eval_v1',
+    'lq_merchant_shop_eval_v2',
     row.platformId,
+    row.scope,
+    String(row.storeCount || 0),
+    row.brandName,
     row.storeName,
     row.address,
     row.phone,
@@ -462,28 +577,34 @@ function savedFromCache(cached: Record<string, unknown> | null): { score: ShopEv
   }
 }
 
-export function shopEvalGrade(score: number) {
+export function shopEvalGrade(score: number, scope?: ShopEvalScope) {
   const n = Math.round(Number(score))
   if (!Number.isFinite(n)) return null
-  if (n >= 85) return SHOP_EVAL_GRADES[0]
-  if (n >= 70) return SHOP_EVAL_GRADES[1]
-  if (n >= 55) return SHOP_EVAL_GRADES[2]
-  return SHOP_EVAL_GRADES[3]
+  const grades = shopEvalGrades(scope)
+  if (n >= 85) return grades[0]
+  if (n >= 70) return grades[1]
+  if (n >= 55) return grades[2]
+  return grades[3]
 }
 
-export function platformShopEvalMeta(platformId: string) {
-  const spec = specOf(platformId)
+export function platformShopEvalMeta(platformId: string, scope?: ShopEvalScope) {
+  const spec = specOf(platformId, scope)
   return {
     id: spec.id,
     name: spec.name,
+    scope: spec.scope,
     levelA: spec.levelA,
     levelB: spec.levelB,
+    title: spec.scope === 'chain' ? '品牌智能分析' : '门店智能分析',
+    statusTitle: spec.scope === 'chain' ? '品牌现状' : '门店现状',
   }
 }
 
 export function describeShopEvalBasis(raw: ShopEvalInput) {
-  const { row } = normalizeInput(raw)
+  const { row, spec } = normalizeInput(raw)
   const bits: string[] = []
+  bits.push(spec.scope === 'chain' ? `连锁品牌 · ${row.storeCount || '多'}家` : '单门店')
+  if (row.brandName) bits.push(row.brandName)
   if (row.city) bits.push(row.city)
   if (row.address) bits.push('已填地址')
   if (row.phone) bits.push('已填电话')
@@ -517,6 +638,41 @@ export function formatVerifyYuan(yuan: number) {
     return `¥${text}万`
   }
   return `¥${n.toLocaleString('zh-CN')}`
+}
+
+export function resolveShopEvalFromStores(
+  platformId: ShopEvalPlatformId,
+  stores: Array<{
+    name?: string
+    address?: string
+    phone?: string
+    businessHours?: string
+    city?: string
+    brandName?: string
+  }>,
+  total?: number,
+): ShopEvalInput {
+  const list = Array.isArray(stores) ? stores : []
+  const count = Math.max(list.length, Math.round(Number(total) || 0))
+  const first = list[0]
+  const scope: ShopEvalScope = count >= 2 ? 'chain' : 'single'
+  const brandName = String(first?.brandName || list.find((row) => String(row.brandName || '').trim())?.brandName || '').trim()
+  return {
+    platformId,
+    scope,
+    storeCount: count,
+    brandName,
+    storeNames: list
+      .slice(0, 8)
+      .map((row) => String(row.name || '').trim())
+      .filter(Boolean)
+      .join('、'),
+    storeName: String(first?.name || '').trim(),
+    address: String(first?.address || '').trim(),
+    phone: String(first?.phone || '').trim(),
+    businessHours: String(first?.businessHours || '').trim(),
+    city: String(first?.city || '').trim(),
+  }
 }
 
 export function readSavedShopEval(raw: ShopEvalInput, storage: StorageLike) {
@@ -578,7 +734,7 @@ export async function adviseShop(
   const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
   const j = await askJson(
     opts.askText,
-    ADVICE_SYSTEM,
+    adviceSystem(spec),
     `${shopFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.searchLevel}，${spec.levelB} ${score.verifyLevel}。\n现状：\n${lines}\n请按每个板块写出分析结果、怎么调整、近两周要做的三件事。`,
   )
   const advice: ShopEvalAdvice = {

@@ -9,10 +9,12 @@ import {
   formatVerifyYuan,
   platformShopEvalMeta,
   readSavedShopEval,
-  SHOP_EVAL_GRADES,
+  resolveShopEvalFromStores,
   SHOP_EVAL_PLATFORMS,
   shopEvalGainTargets,
   shopEvalGrade,
+  shopEvalGrades,
+  shopEvalScopeOf,
   type ShopEvalAdvice,
   type ShopEvalInput,
   type ShopEvalPlatformId,
@@ -94,26 +96,23 @@ export default function MerchantShopEvalPanel() {
   const [displayScore, setDisplayScore] = useState(0)
   const [animateScore, setAnimateScore] = useState(false)
   const [animateGains, setAnimateGains] = useState(false)
-  const meta = platformShopEvalMeta(platformId)
+  const scope = shopEvalScopeOf(input)
+  const meta = platformShopEvalMeta(platformId, scope)
   const canEval = Boolean(String(input.storeName || '').trim())
   const paid = plan !== 'free'
-  const grade = score ? shopEvalGrade(score.score) : null
+  const grade = score ? shopEvalGrade(score.score, scope) : null
+  const grades = shopEvalGrades(scope)
+  const displayName = input.brandName && scope === 'chain' ? input.brandName : input.storeName
   const gains = score ? shopEvalGainTargets(score, input) : null
   const shownExposure = useRiseCount(gains?.exposure || 0, animateGains)
   const shownVerify = useRiseCount(gains?.verify || 0, animateGains)
   const basis = useMemo(() => describeShopEvalBasis(input), [input])
 
   const loadStore = useCallback(async (tab: ShopEvalPlatformId) => {
-    const res = await fetchStoresForPlatform(tab as StorePlatformTab, { page: 1, pageSize: 1 })
-    const row = res.ok ? res.items[0] : null
-    setInput({
-      platformId: tab,
-      storeName: String(row?.name || '').trim(),
-      address: String(row?.address || '').trim(),
-      phone: String(row?.phone || '').trim(),
-      businessHours: String(row?.businessHours || '').trim(),
-      city: String(row?.city || '').trim(),
-    })
+    const res = await fetchStoresForPlatform(tab as StorePlatformTab, { page: 1, pageSize: 50 })
+    const items = res.ok ? res.items || [] : []
+    const total = res.ok && 'total' in res ? Number(res.total) : items.length
+    setInput(resolveShopEvalFromStores(tab, items, total))
   }, [])
 
   useEffect(() => {
@@ -128,7 +127,7 @@ export default function MerchantShopEvalPanel() {
     setDisplayScore(saved?.score?.score || 0)
     setAnimateScore(false)
     setAnimateGains(Boolean(saved?.score))
-  }, [input.platformId, input.storeName, input.address, input.phone, input.businessHours, input.offerName, input.offerPrice])
+  }, [input.platformId, input.scope, input.storeCount, input.storeName, input.address, input.phone, input.businessHours, input.offerName, input.offerPrice])
 
   useEffect(() => {
     if (!score || !animateScore) return
@@ -190,7 +189,11 @@ export default function MerchantShopEvalPanel() {
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
           <p className="text-xs font-semibold tracking-wide text-[#1E3A5F]">门店经营评估</p>
-          <p className="mt-1 text-sm text-slate-500">多维看这家店能不能被搜到、被相信、被核销</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {scope === 'chain'
+              ? '多维看这个品牌各店是否统一、能不能被搜到、被核销'
+              : '多维看这家店能不能被搜到、被相信、被核销'}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {SHOP_EVAL_PLATFORMS.map((p) => (
@@ -212,9 +215,9 @@ export default function MerchantShopEvalPanel() {
 
       <div className="grid gap-4 p-5 lg:grid-cols-2">
         <div className="flex items-start gap-4 rounded-2xl bg-[#f6f8fb] p-4">
-          {input.storeName ? (
+          {displayName ? (
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1E3A5F] text-2xl font-bold text-white">
-              {letterOf(input.storeName)}
+              {letterOf(displayName)}
             </div>
           ) : (
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-slate-200 text-lg font-bold text-slate-500">
@@ -222,8 +225,13 @@ export default function MerchantShopEvalPanel() {
             </div>
           )}
           <div className="min-w-0 text-left">
-            <p className="text-lg font-bold text-slate-900">{input.storeName || '尚未读取到门店'}</p>
-            <p className="mt-1 text-sm text-slate-500">{meta.name}</p>
+            <p className="text-lg font-bold text-slate-900">{displayName || '尚未读取到门店'}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              <span className="mr-2 inline-flex rounded-full bg-[#1E3A5F]/10 px-2 py-0.5 text-xs font-semibold text-[#1E3A5F]">
+                {scope === 'chain' ? `连锁品牌 · ${input.storeCount || '多'}家` : '单门店'}
+              </span>
+              {meta.name}
+            </p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               {basis || '请先在「店铺信息」完善门店名称、地址和电话'}
             </p>
@@ -253,7 +261,7 @@ export default function MerchantShopEvalPanel() {
               </div>
             </div>
           </div>
-          <p className="mt-2 text-sm font-semibold text-slate-800">门店智能分析</p>
+          <p className="mt-2 text-sm font-semibold text-slate-800">{meta.title}</p>
           {grade ? (
             <div className="mt-2 text-center">
               <p className="text-lg font-extrabold text-[#1E3A5F]">{grade.label}</p>
@@ -322,7 +330,7 @@ export default function MerchantShopEvalPanel() {
 
         {score?.situations?.length ? (
           <div className="mt-4 rounded-2xl bg-[#f3f7ff] p-4">
-            <p className="text-sm font-extrabold text-[#1d4ed8]">门店现状</p>
+            <p className="text-sm font-extrabold text-[#1d4ed8]">{meta.statusTitle}</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {score.situations.map((row, index) => (
                 <div key={row.name} className="rounded-xl bg-[#e8f1ff] p-3 text-left">
@@ -370,7 +378,7 @@ export default function MerchantShopEvalPanel() {
         ) : null}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {SHOP_EVAL_GRADES.map((item) => (
+          {grades.map((item) => (
             <div
               key={item.key}
               className={`rounded-xl p-3 text-left ${grade?.key === item.key ? 'bg-[#e8eef6] ring-1 ring-[#1E3A5F]/30' : 'bg-slate-50'}`}

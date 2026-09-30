@@ -16,6 +16,7 @@
       <view class="card ident">
         <view class="avatar">{{avatarLetter}}</view>
         <text class="nick">{{storeName || '尚未读取到门店'}}</text>
+        <text class="scope">{{scopeLabel}}</text>
         <text class="did">{{platformName}}</text>
         <text class="did" wx:if="{{basis}}">{{basis}}</text>
         <text class="did" wx:else>请先在店铺信息里完善门店名称和地址</text>
@@ -31,7 +32,7 @@
             </view>
           </view>
         </view>
-        <text class="label">门店智能分析</text>
+        <text class="label">{{evalTitle}}</text>
         <view class="grade" wx:if="{{showGrade}}">
           <text class="grade-label">{{gradeLabel}}</text>
           <text class="grade-note">{{gradeNote}}</text>
@@ -77,7 +78,7 @@
   <text class="need" wx:elif="{{!scoreReady}}">请先完成门店评估</text>
 
   <view class="card advice advice--now" wx:if="{{scoreReady && situations.length}}">
-    <text class="advice-title advice-title--now">门店现状</text>
+    <text class="advice-title advice-title--now">{{statusTitle}}</text>
     <view class="plate-grid">
       <view class="plate plate--now" wx:for="{{situations}}" wx:key="name">
         <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
