@@ -11,15 +11,12 @@ function letterOf(name) {
   return s ? s.slice(0, 1) : '达'
 }
 
-function gainFields(score, input) {
-  if (!score) return { showGains: false, exposureText: '', salesText: '' }
+function gainTargets(score, input) {
+  if (!score) return null
   const preview = evalApi.previewTalentGains(score.score, input && input.followers, input && input.quotePrice)
-  const exposure = score.exposureLift > 0 ? score.exposureLift : preview.exposurePct
-  const sales = score.salesLift > 0 ? score.salesLift : preview.salesYuan
   return {
-    showGains: true,
-    exposureText: '+' + exposure + '%',
-    salesText: '+' + evalApi.formatSalesYuan(sales),
+    exposure: score.exposureLift > 0 ? score.exposureLift : preview.exposurePct,
+    sales: score.salesLift > 0 ? score.salesLift : preview.salesYuan,
   }
 }
 
@@ -148,6 +145,7 @@ Page({
     const saved = evalApi.readSavedTalentEval(input)
     if (!saved) {
       this._score = null
+      this.stopGains()
       this.setData({
         scoreReady: false,
         adviceReady: false,
@@ -184,8 +182,10 @@ Page({
       gradeKey: grade ? grade.key : '',
       gradeLabel: grade ? grade.label : '',
       gradeNote: grade ? grade.note : '',
-      ...gainFields(saved.score, input),
+      showGains: true,
     })
+    const gains = gainTargets(saved.score, input)
+    if (gains) this.playGains(gains.exposure, gains.sales)
   },
 
   stopTick() {
@@ -193,6 +193,33 @@ Page({
       clearInterval(this._timer)
       this._timer = null
     }
+  },
+
+  stopGains() {
+    if (this._gainTimer) {
+      clearInterval(this._gainTimer)
+      this._gainTimer = null
+    }
+  },
+
+  playGains(exposure, sales) {
+    this.stopGains()
+    const goalE = Math.max(0, Number(exposure) || 0)
+    const goalS = Math.max(0, Number(sales) || 0)
+    const start = Date.now()
+    const dur = 1600
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / dur)
+      const eased = 1 - Math.pow(1 - t, 3)
+      this.setData({
+        showGains: true,
+        exposureText: '+' + Math.round(goalE * eased) + '%',
+        salesText: '+' + evalApi.formatSalesYuan(Math.round(goalS * eased)),
+      })
+      if (t >= 1) this.stopGains()
+    }
+    tick()
+    this._gainTimer = setInterval(tick, 32)
   },
 
   playScore(target) {
@@ -249,9 +276,11 @@ Page({
         adviceReady: false,
         sections: [],
         lift: 0,
-        ...gainFields(score, input),
+        showGains: true,
       })
       this.playScore(score.score)
+      const gains = gainTargets(score, input)
+      if (gains) this.playGains(gains.exposure, gains.sales)
     } catch (e) {
       failed = e
     }

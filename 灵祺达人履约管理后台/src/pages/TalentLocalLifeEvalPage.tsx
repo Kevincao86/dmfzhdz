@@ -38,6 +38,28 @@ function promptUpgradeMembership(navigate: (to: string) => void, feature: string
   if (ok) navigate('/profile/membership')
 }
 
+function useRiseCount(target: number, active: boolean) {
+  const [value, setValue] = useState(0)
+  useEffect(() => {
+    if (!active || target <= 0) {
+      setValue(0)
+      return
+    }
+    const start = performance.now()
+    const dur = 1600
+    let frame = 0
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur)
+      const eased = 1 - (1 - t) ** 3
+      setValue(Math.round(target * eased))
+      if (t < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [target, active])
+  return value
+}
+
 export default function TalentLocalLifeEvalPage() {
   const navigate = useNavigate()
   const member = readMember()
@@ -160,7 +182,9 @@ export default function TalentLocalLifeEvalPage() {
 
   const preview = score ? previewTalentGains(score.score, input.followers || '', input.quotePrice || '') : null
   const exposurePct = score ? (score.exposureLift > 0 ? score.exposureLift : preview?.exposurePct || 0) : 0
-  const salesText = score ? formatSalesYuan(score.salesLift > 0 ? score.salesLift : preview?.salesYuan || 0) : ''
+  const salesYuan = score ? (score.salesLift > 0 ? score.salesLift : preview?.salesYuan || 0) : 0
+  const exposureShown = useRiseCount(exposurePct, !!score)
+  const salesShown = useRiseCount(salesYuan, !!score)
 
   return (
     <div className="page-content-shell space-y-4">
@@ -293,14 +317,14 @@ export default function TalentLocalLifeEvalPage() {
         <div className="space-y-4">
           <div className="surface-card rounded-xl border p-5">
             {score ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl bg-violet-50 px-4 py-5">
-                  <p className="text-sm text-[var(--shell-muted)]">预计提升曝光</p>
-                  <p className="mt-2 text-3xl font-extrabold tabular-nums text-violet-700">+{exposurePct}%</p>
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs tracking-wide text-[var(--shell-muted)]">预计提升曝光</p>
+                  <p className="gain-figure">+{exposureShown}%</p>
                 </div>
-                <div className="rounded-xl bg-violet-50 px-4 py-5">
-                  <p className="text-sm text-[var(--shell-muted)]">预计提升带货金额</p>
-                  <p className="mt-2 text-3xl font-extrabold tabular-nums text-violet-700">+{salesText}</p>
+                <div>
+                  <p className="text-xs tracking-wide text-[var(--shell-muted)]">预计提升带货金额</p>
+                  <p className="gain-figure">+{formatSalesYuan(salesShown)}</p>
                 </div>
               </div>
             ) : (
@@ -325,46 +349,106 @@ export default function TalentLocalLifeEvalPage() {
           </div>
 
           {score?.situations?.length ? (
-            <div className="surface-card space-y-3 rounded-xl border p-4 text-left">
-              <p className="font-medium">达人现状</p>
-              {score.situations.map((row) => (
-                <div key={row.name} className="border-t border-violet-100 pt-3">
-                  <p className="text-sm font-semibold text-violet-700">{row.name}</p>
-                  <p className="mt-1 text-sm">{row.now}</p>
-                </div>
-              ))}
+            <div className="surface-card rounded-xl border p-5 text-left">
+              <p className="text-xs tracking-wide text-[var(--shell-muted)]">达人现状</p>
+              <div className="mt-3 grid gap-3">
+                {score.situations.map((row, index) => (
+                  <div key={row.name} className="eval-plate">
+                    <span className="eval-plate-no">{String(index + 1).padStart(2, '0')}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">{row.now}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
 
           {advice?.sections?.length ? (
-            <div className="surface-card space-y-3 rounded-xl border p-4">
-              <p className="font-medium">分析与提升方案</p>
-              {advice.sections.map((row) => (
-                <div key={row.name} className="border-t border-violet-100 pt-3">
-                  <p className="text-sm font-semibold text-violet-700">{row.name}</p>
-                  <p className="mt-1 text-sm">{row.next}</p>
-                </div>
-              ))}
+            <div className="surface-card rounded-xl border p-5">
+              <p className="text-xs tracking-wide text-[var(--shell-muted)]">分析与提升方案</p>
+              <div className="mt-3 grid gap-3">
+                {advice.sections.map((row, index) => (
+                  <div key={row.name} className="eval-plate">
+                    <span className="eval-plate-no">{String(index + 1).padStart(2, '0')}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">{row.next}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
 
           {grade ? (
-            <div className="surface-card space-y-3 rounded-xl border p-4 text-left">
-              <p className="font-medium">评级释义</p>
-              {DOUYIN_SCORE_GRADES.map((row) => (
-                <div key={row.key} className="border-t border-violet-100 pt-3">
-                  <p className={`text-sm font-semibold ${row.key === grade.key ? 'text-slate-900' : 'text-violet-700'}`}>
-                    {row.range}：{row.label}
-                  </p>
-                  <p className="mt-1 text-sm">{row.note}</p>
-                </div>
-              ))}
+            <div className="surface-card rounded-xl border p-5 text-left">
+              <p className="text-xs tracking-wide text-[var(--shell-muted)]">评级释义</p>
+              <div className="mt-3 grid gap-3">
+                {DOUYIN_SCORE_GRADES.map((row) => (
+                  <div key={row.key} className={`eval-plate ${row.key === grade.key ? 'eval-plate--on' : ''}`}>
+                    <span className="eval-plate-no">{row.range}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{row.label}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">{row.note}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
         </div>
       </div>
 
-      <style>{`@keyframes talent-eval-spin { to { transform: rotate(360deg); } } @keyframes talent-eval-pop { 0% { transform: scale(0.72); opacity: 0.4; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }`}</style>
+      <style>{`
+        @keyframes talent-eval-spin { to { transform: rotate(360deg); } }
+        @keyframes talent-eval-pop { 0% { transform: scale(0.72); opacity: 0.4; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes gain-sheen { 0% { background-position: 0% 50%; } 100% { background-position: 220% 50%; } }
+        @keyframes gain-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        .gain-figure {
+          margin-top: 0.35rem;
+          font-size: clamp(2.6rem, 4vw, 3.6rem);
+          font-weight: 800;
+          letter-spacing: -0.05em;
+          line-height: 1;
+          font-variant-numeric: tabular-nums;
+          color: #5b21b6;
+          animation: gain-float 2.6s ease-in-out infinite;
+        }
+        @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+          .gain-figure {
+            background-image: linear-gradient(100deg, #3b0764 0%, #6d28d9 28%, #ddd6fe 46%, #6d28d9 64%, #3b0764 100%);
+            background-size: 220% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            animation: gain-sheen 2.2s linear infinite, gain-float 2.6s ease-in-out infinite;
+          }
+        }
+        .eval-plate {
+          display: grid;
+          grid-template-columns: 4.4rem minmax(0, 1fr);
+          gap: 0.75rem;
+          align-items: start;
+          border-radius: 1rem;
+          background: #f6f3ee;
+          padding: 0.9rem 1rem;
+        }
+        .eval-plate--on {
+          background: #efeaf8;
+          box-shadow: inset 0 0 0 1px #ddd6fe;
+        }
+        .eval-plate-no {
+          font-size: 0.8rem;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          color: #7c4dff;
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+          padding-top: 0.15rem;
+        }
+      `}</style>
     </div>
   )
 }

@@ -62,17 +62,23 @@
 
       <view class="xingxuan-card advice" wx:if="{{scoreReady && situations.length}}">
         <text class="advice-title">达人现状</text>
-        <view class="sec" wx:for="{{situations}}" wx:key="name">
-          <text class="sec-name">{{item.name}}</text>
-          <text class="sec-line">{{item.now}}</text>
+        <view class="plate" wx:for="{{situations}}" wx:key="name">
+          <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
+          <view class="plate-body">
+            <text class="plate-name">{{item.name}}</text>
+            <text class="plate-line">{{item.now}}</text>
+          </view>
         </view>
       </view>
 
       <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
         <text class="advice-title">分析与提升方案</text>
-        <view class="sec" wx:for="{{sections}}" wx:key="name">
-          <text class="sec-name">{{item.name}}</text>
-          <text class="sec-line">{{item.next}}</text>
+        <view class="plate" wx:for="{{sections}}" wx:key="name">
+          <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
+          <view class="plate-body">
+            <text class="plate-name">{{item.name}}</text>
+            <text class="plate-line">{{item.next}}</text>
+          </view>
         </view>
       </view>
     </view>
