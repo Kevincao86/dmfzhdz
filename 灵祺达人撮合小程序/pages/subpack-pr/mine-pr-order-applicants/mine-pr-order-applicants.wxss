@@ -676,26 +676,86 @@
   width: 100%;
   box-sizing: border-box;
   margin-top: 12rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.applicant-fit--below { margin: 16rpx 0 0; }
+.applicant-fit__panel {
   padding: 16rpx;
   border-radius: 16rpx;
-  background: #fff8eb;
-  border: 1px solid #fde68a;
+  box-sizing: border-box;
 }
-.applicant-fit--below {
-  margin: 16rpx 0 0;
+.applicant-fit__panel--profile {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
 }
-.applicant-fit__label {
+.applicant-fit__panel--match {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+.applicant-fit__head {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.applicant-fit__badge {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.applicant-fit__badge--profile { background: #ede9fe; }
+.applicant-fit__badge--match { background: #d1fae5; }
+.applicant-fit__num {
+  font-size: 30rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+.applicant-fit__badge--profile .applicant-fit__num,
+.applicant-fit__badge--profile .applicant-fit__unit { color: #5b21b6; }
+.applicant-fit__badge--match .applicant-fit__num,
+.applicant-fit__badge--match .applicant-fit__unit { color: #047857; }
+.applicant-fit__unit {
+  margin-top: 4rpx;
+  font-size: 18rpx;
+}
+.applicant-fit__meta { flex: 1; min-width: 0; }
+.applicant-fit__title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.applicant-fit__title--profile { color: #4c1d95; }
+.applicant-fit__title--match { color: #064e3b; }
+.applicant-fit__caption {
+  display: block;
+  margin-top: 2rpx;
+  font-size: 20rpx;
+  color: #64748b;
+}
+.applicant-fit__track {
+  margin-top: 8rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+.applicant-fit__track-fill {
+  height: 100%;
+  border-radius: 999rpx;
+}
+.applicant-fit__track-fill--profile { background: #7c3aed; }
+.applicant-fit__track-fill--match { background: #059669; }
+.applicant-fit__body {
   display: block;
   margin-top: 12rpx;
   font-size: 24rpx;
-  font-weight: 600;
-  color: #78350f;
-}
-.applicant-fit__label:first-child { margin-top: 0; }
-.applicant-fit__body {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 24rpx;
-  color: #78350f;
   line-height: 1.6;
 }
+.applicant-fit__body--profile { color: #4c1d95; }
+.applicant-fit__body--match { color: #064e3b; }

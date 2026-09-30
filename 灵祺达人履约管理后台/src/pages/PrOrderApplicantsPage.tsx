@@ -104,17 +104,95 @@ function countPublishLinkStats(rows: EnrichedApplicantRow[]) {
   return { publishLinkPendingCount: pending, publishLinkSubmittedCount: submitted }
 }
 
+function FitScoreMark({ value, color }: { value: number; color: string }) {
+  const score = Math.max(0, Math.min(100, Math.round(Number(value) || 0)))
+  const radius = 15.5
+  const circ = 2 * Math.PI * radius
+  const filled = (score / 100) * circ
+  return (
+    <div className="relative h-14 w-14 shrink-0" aria-hidden>
+      <svg viewBox="0 0 40 40" className="h-14 w-14 -rotate-90">
+        <circle cx="20" cy="20" r={radius} fill="none" stroke="currentColor" className="text-black/10" strokeWidth="3.5" />
+        <circle
+          cx="20"
+          cy="20"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeDasharray={`${filled} ${circ}`}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-900">{score}</span>
+    </div>
+  )
+}
+
+function TalentFitPanel({
+  title,
+  caption,
+  score,
+  color,
+  text,
+  panelClass,
+  titleClass,
+  bodyClass,
+  barClass,
+}: {
+  title: string
+  caption: string
+  score: number
+  color: string
+  text: string
+  panelClass: string
+  titleClass: string
+  bodyClass: string
+  barClass: string
+}) {
+  const width = Math.max(0, Math.min(100, Math.round(Number(score) || 0)))
+  return (
+    <article className={`rounded-xl border px-3 py-3 ${panelClass}`}>
+      <div className="flex items-center gap-3">
+        <FitScoreMark value={width} color={color} />
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-semibold ${titleClass}`}>{title}</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">{caption}</p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/10">
+            <div className={`h-full rounded-full ${barClass}`} style={{ width: `${width}%` }} />
+          </div>
+        </div>
+      </div>
+      {text ? <p className={`mt-2 text-xs leading-6 ${bodyClass}`}>{text}</p> : null}
+    </article>
+  )
+}
+
 function TalentFitNote({ row }: { row: PrTalentFitRow }) {
   return (
-    <div className="col-span-2 sm:col-span-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 space-y-2">
-      <div>
-        <p className="font-medium text-amber-950">达人分析 · 账号 {row.score}</p>
-        {row.profileRead ? <p className="mt-1 text-amber-950">{row.profileRead}</p> : null}
-      </div>
-      <div>
-        <p className="font-medium text-amber-950">商单匹配 · 关联 {row.fit}</p>
-        {row.matchRead ? <p className="mt-1 text-amber-950">{row.matchRead}</p> : null}
-      </div>
+    <div className="col-span-2 sm:col-span-3 grid gap-2 sm:grid-cols-2">
+      <TalentFitPanel
+        title="达人分析"
+        caption="账号分"
+        score={row.score}
+        color="#7c3aed"
+        text={row.profileRead}
+        panelClass="border-violet-200 bg-gradient-to-br from-violet-50 to-white"
+        titleClass="text-violet-950"
+        bodyClass="text-violet-950"
+        barClass="bg-violet-600"
+      />
+      <TalentFitPanel
+        title="商单匹配"
+        caption="关联分"
+        score={row.fit}
+        color="#059669"
+        text={row.matchRead}
+        panelClass="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white"
+        titleClass="text-emerald-950"
+        bodyClass="text-emerald-950"
+        barClass="bg-emerald-600"
+      />
     </div>
   )
 }

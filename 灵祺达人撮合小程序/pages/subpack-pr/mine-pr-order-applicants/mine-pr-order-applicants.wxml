@@ -1,3 +1,40 @@
+<template name="applicantFitPanels">
+  <view class="applicant-fit {{below ? 'applicant-fit--below' : ''}}">
+    <view class="applicant-fit__panel applicant-fit__panel--profile">
+      <view class="applicant-fit__head">
+        <view class="applicant-fit__badge applicant-fit__badge--profile">
+          <text class="applicant-fit__num">{{fitScore}}</text>
+          <text class="applicant-fit__unit">账号</text>
+        </view>
+        <view class="applicant-fit__meta">
+          <text class="applicant-fit__title applicant-fit__title--profile">达人分析</text>
+          <text class="applicant-fit__caption">账号分</text>
+          <view class="applicant-fit__track">
+            <view class="applicant-fit__track-fill applicant-fit__track-fill--profile" style="width: {{fitScore}}%;"></view>
+          </view>
+        </view>
+      </view>
+      <text wx:if="{{fitProfile}}" class="applicant-fit__body applicant-fit__body--profile">{{fitProfile}}</text>
+    </view>
+    <view class="applicant-fit__panel applicant-fit__panel--match">
+      <view class="applicant-fit__head">
+        <view class="applicant-fit__badge applicant-fit__badge--match">
+          <text class="applicant-fit__num">{{fitMatch}}</text>
+          <text class="applicant-fit__unit">关联</text>
+        </view>
+        <view class="applicant-fit__meta">
+          <text class="applicant-fit__title applicant-fit__title--match">商单匹配</text>
+          <text class="applicant-fit__caption">关联分</text>
+          <view class="applicant-fit__track">
+            <view class="applicant-fit__track-fill applicant-fit__track-fill--match" style="width: {{fitMatch}}%;"></view>
+          </view>
+        </view>
+      </view>
+      <text wx:if="{{fitMatchRead}}" class="applicant-fit__body applicant-fit__body--match">{{fitMatchRead}}</text>
+    </view>
+  </view>
+</template>
+
 <view class="app-list-page pr-app-page page-shell {{lqThemeClass}}">
   <view class="app-list-hero app-list-hero--split" wx:if="{{!loading && !err}}">
     <view class="app-list-hero__main">
@@ -217,12 +254,7 @@
           <text>{{fieldRow.label}}</text>
           <text class="applicant-card-v2__cell-val">{{fieldRow.value}}</text>
         </view>
-        <view wx:if="{{fieldRow.showFitAfter}}" class="applicant-fit">
-          <text class="applicant-fit__label">达人分析 · 账号 {{item.fitScore}}</text>
-          <text wx:if="{{item.fitProfile}}" class="applicant-fit__body">{{item.fitProfile}}</text>
-          <text class="applicant-fit__label">商单匹配 · 关联 {{item.fitMatch}}</text>
-          <text wx:if="{{item.fitMatchRead}}" class="applicant-fit__body">{{item.fitMatchRead}}</text>
-        </view>
+        <template wx:if="{{fieldRow.showFitAfter}}" is="applicantFitPanels" data="{{fitScore: item.fitScore, fitMatch: item.fitMatch, fitProfile: item.fitProfile, fitMatchRead: item.fitMatchRead}}" />
       </block>
       <view
         wx:if="{{item.merchantShareNote}}"
@@ -234,12 +266,7 @@
       </view>
     </view>
 
-    <view wx:if="{{item.fitAfterGrid}}" class="applicant-fit applicant-fit--below">
-      <text class="applicant-fit__label">达人分析 · 账号 {{item.fitScore}}</text>
-      <text wx:if="{{item.fitProfile}}" class="applicant-fit__body">{{item.fitProfile}}</text>
-      <text class="applicant-fit__label">商单匹配 · 关联 {{item.fitMatch}}</text>
-      <text wx:if="{{item.fitMatchRead}}" class="applicant-fit__body">{{item.fitMatchRead}}</text>
-    </view>
+    <template wx:if="{{item.fitAfterGrid}}" is="applicantFitPanels" data="{{fitScore: item.fitScore, fitMatch: item.fitMatch, fitProfile: item.fitProfile, fitMatchRead: item.fitMatchRead, below: true}}" />
 
     <view wx:if="{{isIce}}" class="ice-app-block">
       <view wx:if="{{item.iceDouyinUrl}}" class="ice-app-link-row">
