@@ -20,6 +20,7 @@ import {
   type ShopEvalPlatformId,
   type ShopEvalScore,
 } from '../../lib/merchantShopEval'
+import { MerchantPlatformIcon } from '../../lib/platformBranding'
 import { postAiChat } from '../../services/ai/aiClient'
 import { fetchStoresForPlatform, type StorePlatformTab } from '../../services/merchantStoresApi'
 
@@ -201,12 +202,18 @@ export default function MerchantShopEvalPanel() {
               key={p.id}
               type="button"
               onClick={() => setPlatformId(p.id)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
+              className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-xs font-medium ${
                 platformId === p.id
                   ? 'bg-[#1E3A5F] text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
+              <MerchantPlatformIcon
+                platformId={p.id}
+                name={p.name}
+                size="sm"
+                className="!h-5 !w-5 rounded-md bg-white p-0.5 shadow-none"
+              />
               {p.name}
             </button>
           ))}
