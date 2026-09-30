@@ -367,7 +367,7 @@
   </view>
 
   <view
-    class="pr-app-bottom-spacer {{showGroupQrPreview ? 'pr-app-bottom-spacer--expanded' : ''}}"
+    class="pr-app-bottom-spacer {{isOpenLoop && groupDockCollapsed ? 'pr-app-bottom-spacer--dock-shut' : ''}} {{isOpenLoop && !groupDockCollapsed ? 'pr-app-bottom-spacer--dock-open' : ''}} {{showGroupQrPreview ? 'pr-app-bottom-spacer--expanded' : ''}}"
     wx:if="{{!loading && applicants.length > 0 && !isIce && !detailViewMode}}"
   ></view>
 
@@ -384,7 +384,7 @@
         bindtap="onBatchConfirm"
       >批量确认 ({{checkedCount}})</button>
     </view>
-    <view class="pr-app-group-mode card" wx:if="{{selectedCount > 0}}">
+    <view class="pr-app-group-mode card" wx:if="{{selectedCount > 0 && !isOpenLoop}}">
       <text class="pr-app-group-mode__title">入群方式</text>
       <view class="pr-app-group-mode__opts">
         <view
@@ -399,7 +399,20 @@
         </view>
       </view>
     </view>
-    <view wx:if="{{groupContactMode === 'wechat_qr'}}" class="pr-app-group-panel">
+    <view wx:if="{{isOpenLoop}}" class="pr-app-open-qr">
+      <view class="pr-app-dock-toggle" bindtap="onToggleGroupDock">
+        <text class="pr-app-dock-toggle__text">{{groupDockCollapsed ? '展开修改群码' : '向下收起'}}</text>
+      </view>
+      <view wx:if="{{!groupDockCollapsed}}" class="pr-app-group-panel">
+        <button
+          class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}}"
+          loading="{{groupQrUploading}}"
+          bindtap="onModifyOpenLoopGroupQr"
+        >{{groupQrImage ? '修改群二维码' : '上传群二维码'}}</button>
+        <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
+      </view>
+    </view>
+    <view wx:if="{{!isOpenLoop && groupContactMode === 'wechat_qr'}}" class="pr-app-group-panel">
       <button
         class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}}"
         loading="{{groupQrUploading}}"
@@ -421,7 +434,7 @@
       </view>
       <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
     </view>
-    <view wx:if="{{groupContactMode === 'mp_group'}}" class="pr-app-group-panel">
+    <view wx:if="{{!isOpenLoop && groupContactMode === 'mp_group'}}" class="pr-app-group-panel">
       <button
         wx:if="{{!orderGroupChatActive}}"
         class="pr-app-tool-btn pr-app-tool-btn--primary"
@@ -438,7 +451,7 @@
     </view>
     <text
       class="hint pr-app-footer-hint"
-      wx:if="{{selectedCount > 0 && !groupContactMode}}"
+      wx:if="{{!isOpenLoop && selectedCount > 0 && !groupContactMode}}"
     >已选 {{selectedCount}} 人 · 请先选择入群方式</text>
     <view class="pr-app-toolbar pr-app-toolbar--last">
       <button
@@ -477,7 +490,7 @@
       </view>
       <text wx:if="{{shareExpiresAt}}" class="hint">有效至 {{shareExpiresAt}}</text>
     </view>
-    <text class="hint pr-app-footer-hint" wx:if="{{groupContactMode === 'wechat_qr' && selectedCount > 0 && !groupQrImage && !groupQrExpired}}">上传群码后，可通过「通知已选达人」发送</text>
+    <text class="hint pr-app-footer-hint" wx:if="{{!isOpenLoop && groupContactMode === 'wechat_qr' && selectedCount > 0 && !groupQrImage && !groupQrExpired}}">上传群码后，可通过「通知已选达人」发送</text>
   </view>
 
   <view

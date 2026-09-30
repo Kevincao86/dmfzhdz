@@ -15,6 +15,27 @@
   height: calc(420rpx + env(safe-area-inset-bottom));
 }
 
+.pr-app-bottom-spacer--dock-shut {
+  height: calc(200rpx + env(safe-area-inset-bottom));
+}
+
+.pr-app-bottom-spacer--dock-open {
+  height: calc(300rpx + env(safe-area-inset-bottom));
+}
+
+.pr-app-dock-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44rpx;
+  margin-bottom: 6rpx;
+}
+
+.pr-app-dock-toggle__text {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
 .pr-app-bottom-spacer--ice {
   height: calc(168rpx + env(safe-area-inset-bottom));
 }

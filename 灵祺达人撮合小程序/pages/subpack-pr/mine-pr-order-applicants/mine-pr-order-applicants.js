@@ -25,6 +25,7 @@ const applicantApplyFormDisplay = require('../../../utils/applicantApplyFormDisp
 const applicantPickShare = require('../../../utils/applicantPickShare.js')
 const publishLinkUtil = require('../../../utils/recruitmentPublishLink.js')
 const prOrderTalentFit = require('../../../utils/prOrderTalentFit.js')
+const xingxuanRecruitLoop = require('../../../utils/xingxuanRecruitLoop.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -143,6 +144,8 @@ Page({
     groupQrUploading: false,
     showGroupQrPreview: false,
     groupContactMode: '',
+    isOpenLoop: false,
+    groupDockCollapsed: true,
     groupContactOptions: [
       { id: 'wechat_qr', label: '上传群二维码', sub: '微信群码，通知达人时随站内信发送' },
       { id: 'mp_group', label: '一键拉群', sub: '小程序商单群，支持文字/图片/视频' },
@@ -473,8 +476,12 @@ Page({
       const applicants = applicantExtras.enrichAndSortApplicants(baseApplicants, reg, mp, mpOrderId)
       const tagFilterOptions = applicantExtras.collectApplicantTagOptions(applicants)
       const salesLevelOptions = applicantExtras.collectSalesLevelOptions(applicants)
+      const isOpenLoop = xingxuanRecruitLoop.isXingxuanOpenLoop(mp)
+      this._isOpenLoop = isOpenLoop
       this.setData({
         loading: false,
+        isOpenLoop,
+        groupDockCollapsed: isOpenLoop,
         title: mp.title || mp.customerName || mpOrderId,
         orderNo: meta.orderNo,
         publishedAt: meta.publishedAt,
@@ -493,7 +500,7 @@ Page({
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         showGroupQrPreview: false,
         showPickSharePanel: false,
-        groupContactMode: '',
+        groupContactMode: isOpenLoop ? 'wechat_qr' : '',
         err: '',
         tagFilterOptions,
         salesLevelOptions,
@@ -670,6 +677,7 @@ Page({
     this.runExport(this.data.applicants, 'exportingAll')
   },
   async syncOrderGroupChatState() {
+    if (this._isOpenLoop) return
     const mpOrderId = String(this.data.mpOrderId || '').trim()
     if (!mpOrderId || this.data.selectedCount <= 0) {
       this.setData({
@@ -697,6 +705,7 @@ Page({
     }
   },
   resolveGroupContactModeFromState() {
+    if (this._isOpenLoop) return 'wechat_qr'
     if (this.data.orderGroupChatActive) return 'mp_group'
     if (String(this.data.groupQrImage || '').trim()) return 'wechat_qr'
     return this.data.groupContactMode || ''
@@ -791,6 +800,20 @@ Page({
       showPickSharePanel: next ? false : this.data.showPickSharePanel,
     })
   },
+  onToggleGroupDock() {
+    this.setData({
+      groupDockCollapsed: !this.data.groupDockCollapsed,
+      showGroupQrPreview: false,
+    })
+  },
+  async onModifyOpenLoopGroupQr() {
+    if (this.data.groupQrUploading) return
+    if (this.data.groupQrExpired) {
+      wx.showToast({ title: '报名截止已满7天，群码已自动清理', icon: 'none' })
+      return
+    }
+    await this.uploadGroupQrImage()
+  },
   async onUploadGroupQr() {
     if (this.data.groupQrUploading) return
     if (this.data.selectedCount <= 0) {
@@ -857,7 +880,7 @@ Page({
       this.setData({
         groupQrImage: imageUrl,
         mpOrder: mp,
-        showGroupQrPreview: true,
+        showGroupQrPreview: !this._isOpenLoop,
         showPickSharePanel: false,
       })
       wx.showToast({ title: '群二维码已保存', icon: 'success' })
