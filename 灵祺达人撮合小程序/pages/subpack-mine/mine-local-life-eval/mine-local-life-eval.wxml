@@ -83,11 +83,11 @@
     <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写{{nickLabel}}或{{accountLabel}}</text>
     <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
 
-    <view class="xingxuan-card advice" wx:if="{{scoreReady && situations.length}}">
-      <text class="advice-title">达人现状</text>
+    <view class="xingxuan-card advice advice--now" wx:if="{{scoreReady && situations.length}}">
+      <text class="advice-title advice-title--now">达人现状</text>
       <view class="plate-grid">
-        <view class="plate" wx:for="{{situations}}" wx:key="name">
-          <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
+        <view class="plate plate--now" wx:for="{{situations}}" wx:key="name">
+          <text class="plate-no plate-no--now">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
           <view class="plate-body">
             <text class="plate-name">{{item.name}}</text>
             <text class="plate-line">{{item.now}}</text>
@@ -96,14 +96,25 @@
       </view>
     </view>
 
-    <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
-      <text class="advice-title">分析与提升方案</text>
-      <view class="plate-grid">
-        <view class="plate" wx:for="{{sections}}" wx:key="name">
-          <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
-          <view class="plate-body">
-            <text class="plate-name">{{item.name}}</text>
-            <text class="plate-line">{{item.next}}</text>
+    <view class="xingxuan-card advice advice--plan" wx:if="{{adviceReady}}">
+      <text class="advice-title advice-title--plan">分析与提升方案</text>
+      <view class="plan-list">
+        <view class="plan" wx:for="{{sections}}" wx:key="name">
+          <view class="plan-head">
+            <text class="plan-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
+            <text class="plan-name">{{item.name}}</text>
+          </view>
+          <view class="plan-block plan-block--find" wx:if="{{item.finding}}">
+            <text class="plan-tag">分析结果</text>
+            <text class="plan-text">{{item.finding}}</text>
+          </view>
+          <view class="plan-block plan-block--adjust" wx:if="{{item.adjust}}">
+            <text class="plan-tag">怎么调整</text>
+            <text class="plan-text">{{item.adjust}}</text>
+          </view>
+          <view class="plan-block plan-block--soon" wx:if="{{item.soon}}">
+            <text class="plan-tag">近期要做</text>
+            <text class="plan-text">{{item.soon}}</text>
           </view>
         </view>
       </view>

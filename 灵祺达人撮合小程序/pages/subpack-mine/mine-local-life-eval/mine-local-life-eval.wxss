@@ -259,6 +259,114 @@
   color: #475569;
 }
 
+.advice--now {
+  background: #f3f7ff;
+  box-shadow: inset 0 0 0 2rpx #93c5fd;
+}
+
+.eval-bottom .advice-title--now {
+  color: #1d4ed8;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.plate--now {
+  background: #e8f1ff;
+}
+
+.plate-no--now {
+  color: #1d4ed8;
+}
+
+.advice--plan {
+  background: #fff7ed;
+  box-shadow: inset 0 0 0 2rpx #fb923c;
+}
+
+.eval-bottom .advice-title--plan {
+  color: #c2410c;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.plan {
+  margin-top: 16rpx;
+  padding: 20rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  text-align: left;
+}
+
+.plan-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.plan-no {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: #c2410c;
+  line-height: 1;
+}
+
+.plan-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.plan-block {
+  margin-top: 14rpx;
+  padding: 16rpx 16rpx 14rpx;
+  border-radius: 16rpx;
+}
+
+.plan-block--find {
+  background: #e8f1ff;
+}
+
+.plan-block--adjust {
+  background: #f3e8ff;
+}
+
+.plan-block--soon {
+  background: #ffedd5;
+}
+
+.plan-tag {
+  display: inline-block;
+  margin-bottom: 8rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.plan-block--find .plan-tag {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.plan-block--adjust .plan-tag {
+  color: #6d28d9;
+  background: #e9d5ff;
+}
+
+.plan-block--soon .plan-tag {
+  color: #c2410c;
+  background: #fed7aa;
+}
+
+.plan-text {
+  display: block;
+  font-size: 26rpx;
+  line-height: 1.65;
+  color: #1e293b;
+}
+
 .plat {
   display: inline-flex;
   align-items: center;

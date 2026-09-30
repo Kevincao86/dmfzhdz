@@ -118,8 +118,12 @@ const ADVICE_SYSTEM = [
   '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
   '只输出一个 JSON 对象，不要 Markdown。',
   '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
-  '字段：sections 为 3 到 5 项，每项只含 name、next。next 不超过 40 字，只写你接下来怎么改。',
-  'name 与现状里的板块一致。',
+  '字段：sections 为 4 到 5 项。每项含 name、finding、adjust、soon。',
+  'name 与现状里的板块一致，不超过 8 个字。',
+  'finding 是分析结果：写出这个板块现在卡在哪里、原因是什么，不要复述现状原句，60 到 100 字。',
+  'adjust 是怎么调整：写出改哪一类内容、具体怎么改、改完应看到什么变化，至少两句，80 到 160 字。',
+  'soon 是近期要做：写出近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，每件写清动作和频率，80 到 160 字。',
+  '不要一句口号带过，不要编造未提供的播放量、GMV 或粉丝数。',
 ].join('')
 
 function specOf(platformId) {
@@ -499,13 +503,24 @@ function formatSalesYuan(yuan) {
   return '¥' + n.toLocaleString('zh-CN')
 }
 
+function clipText(value, max) {
+  return String(value || '').trim().slice(0, max)
+}
+
 function mapSuggestions(rows) {
   return (Array.isArray(rows) ? rows : [])
-    .map((row) => ({
-      name: String(row && row.name ? row.name : '').trim().slice(0, 12),
-      next: String(row && row.next ? row.next : '').trim().slice(0, 40),
-    }))
-    .filter((row) => row.name && row.next)
+    .map((row) => {
+      const next = clipText(row && row.next, 80)
+      const adjust = clipText(row && row.adjust, 180) || next
+      return {
+        name: clipText(row && row.name, 12),
+        finding: clipText(row && row.finding, 140),
+        adjust,
+        soon: clipText(row && row.soon, 180),
+        next: adjust,
+      }
+    })
+    .filter((row) => row.name && (row.finding || row.adjust || row.soon))
     .slice(0, 5)
 }
 
@@ -606,7 +621,7 @@ async function adviseTalent(raw, score, opts) {
   const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,
-    `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请只写给达人本人的改法。`,
+    `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请按每个板块写出分析结果、怎么调整、近两周要做的三件事。写具体动作，不要一句带过。`,
   )
   const advice = { lift: clampLift(j.lift), sections: mapSuggestions(j.sections) }
   await pointsSpend.spendTalentEvalPoints('talent_advice', '达人账号分析整改')
