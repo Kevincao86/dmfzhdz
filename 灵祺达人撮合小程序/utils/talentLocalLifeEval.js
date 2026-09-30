@@ -117,6 +117,7 @@ const ADVICE_SYSTEM = [
   '不要编造粉丝数、GMV。未在资料里出现的数字不要写进来。',
   '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
   '只输出一个 JSON 对象，不要 Markdown。',
+  '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
   '字段：sections 为 3 到 5 项，每项只含 name、next。next 不超过 40 字，只写你接下来怎么改。',
   'name 与现状里的板块一致。',
 ].join('')
@@ -451,6 +452,12 @@ function mapSituations(rows) {
     .slice(0, 5)
 }
 
+function clampLift(value) {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.min(35, Math.max(5, n))
+}
+
 function mapSuggestions(rows) {
   return (Array.isArray(rows) ? rows : [])
     .map((row) => ({
@@ -486,7 +493,7 @@ function savedFromCache(cached) {
   let advice = null
   if (adviceRaw && Array.isArray(adviceRaw.sections)) {
     const sections = mapSuggestions(adviceRaw.sections)
-    if (sections.length) advice = { sections }
+    if (sections.length) advice = { lift: clampLift(adviceRaw.lift), sections }
   }
   return {
     score: {
@@ -547,7 +554,7 @@ async function adviseTalent(raw, score, opts) {
   if (!(opts && opts.force)) {
     const cached = readCache(key)
     if (cached && cached.advice && Array.isArray(cached.advice.sections) && cached.advice.sections.length) {
-      return { sections: mapSuggestions(cached.advice.sections) }
+      return { lift: clampLift(cached.advice.lift), sections: mapSuggestions(cached.advice.sections) }
     }
   }
   await pointsSpend.assertTalentEvalAffordable('talent_advice')
@@ -556,7 +563,7 @@ async function adviseTalent(raw, score, opts) {
     ADVICE_SYSTEM,
     `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请只写给达人本人的改法。`,
   )
-  const advice = { sections: mapSuggestions(j.sections) }
+  const advice = { lift: clampLift(j.lift), sections: mapSuggestions(j.sections) }
   await pointsSpend.spendTalentEvalPoints('talent_advice', '达人账号分析整改')
   writeCache(key, { advice })
   return advice

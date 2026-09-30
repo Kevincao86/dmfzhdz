@@ -31,8 +31,8 @@ function letterOf(name: string) {
   return s ? s.slice(0, 1) : '达'
 }
 
-function promptUpgradeMembership(navigate: (to: string) => void) {
-  const ok = window.confirm('达人账号分析需更高会员档位，请升级至专业版后使用。')
+function promptUpgradeMembership(navigate: (to: string) => void, feature: string) {
+  const ok = window.confirm(`${feature}需更高会员档位，请升级至专业版后使用。`)
   if (ok) navigate('/profile/membership')
 }
 
@@ -119,7 +119,7 @@ export default function TalentLocalLifeEvalPage() {
 
   async function onEvaluate() {
     if (!canRunEval) {
-      promptUpgradeMembership(navigate)
+      promptUpgradeMembership(navigate, '达人账号评估')
       return
     }
     if (!canEval || evaluating || advising) return
@@ -141,7 +141,7 @@ export default function TalentLocalLifeEvalPage() {
 
   async function onAdvise() {
     if (!canRunAdvice) {
-      promptUpgradeMembership(navigate)
+      promptUpgradeMembership(navigate, '分析与提升方案')
       return
     }
     if (!score || evaluating || advising) return
@@ -314,7 +314,7 @@ export default function TalentLocalLifeEvalPage() {
           disabled={(canRunAdvice && !score) || evaluating || advising}
           onClick={() => void onAdvise()}
         >
-          {advising ? '分析中…' : `分析整改 · ${TALENT_ADVICE_POINTS}积分`}
+          {advising ? '分析中…' : `查看分析与提升方案 · ${TALENT_ADVICE_POINTS}积分`}
         </button>
       </div>
       {!canEval ? (
@@ -328,7 +328,10 @@ export default function TalentLocalLifeEvalPage() {
 
       {advice?.sections?.length ? (
         <div className="surface-card space-y-3 rounded-xl border p-4">
-          <p className="font-medium">整改建议</p>
+          <p className="font-medium">分析与提升方案</p>
+          {advice.lift > 0 ? (
+            <p className="text-sm font-semibold text-violet-700">整改后预计提升 {advice.lift}%</p>
+          ) : null}
           {advice.sections.map((row) => (
             <div key={row.name} className="border-t border-violet-100 pt-3">
               <p className="text-sm font-semibold text-violet-700">{row.name}</p>

@@ -1,10 +1,6 @@
-const prFeatureAccess = require('./prFeatureAccess.js')
-const sessionStore = require('./mpSessionStore.js')
-
 /** 底部 Tab：随 PR / 达人身份切换（达人隐藏「发招募」，达人账号分析始终展示） */
 function getTabList(identity) {
   const isPr = identity === 'pr'
-  const analysisUnlocked = talentAnalysisUnlocked()
   const list = [
     { pagePath: '/pages/index/index', text: '首页', icon: 'home' },
     {
@@ -28,7 +24,6 @@ function getTabList(identity) {
       icon: 'insight',
       navigate: true,
       compact: true,
-      upgradeFeature: analysisUnlocked ? '' : '达人账号分析',
     })
   }
   list.push(
@@ -41,11 +36,6 @@ function getTabList(identity) {
 function routeToPagePath(route) {
   if (!route) return ''
   return route.startsWith('/') ? route : `/${route}`
-}
-
-function talentAnalysisUnlocked(account) {
-  const talentAccess = prFeatureAccess.readAccountPrFeatureAccess(account || sessionStore.readAccount())
-  return talentAccess.talentEval === true || talentAccess.talentAdvice === true
 }
 
 function promptMembershipUpgrade(featureTitle) {
@@ -67,6 +57,5 @@ function promptMembershipUpgrade(featureTitle) {
 module.exports = {
   getTabList,
   routeToPagePath,
-  talentAnalysisUnlocked,
   promptMembershipUpgrade,
 }

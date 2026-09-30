@@ -59,7 +59,8 @@
   </view>
 
   <view class="xingxuan-card advice" wx:if="{{adviceReady}}">
-    <text class="advice-title">整改建议</text>
+    <text class="advice-title">分析与提升方案</text>
+    <text class="advice-lift" wx:if="{{lift > 0}}">整改后预计提升 {{lift}}%</text>
     <view class="sec" wx:for="{{sections}}" wx:key="name">
       <text class="sec-name">{{item.name}}</text>
       <text class="sec-line">{{item.next}}</text>

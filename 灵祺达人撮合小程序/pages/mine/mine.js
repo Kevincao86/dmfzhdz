@@ -24,7 +24,6 @@ const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const training = require('../../utils/mpTraining.js')
-const { promptMembershipUpgrade } = require('../../utils/tabBarConfig.js')
 
 const MY_ORDERS_MENU = {
   key: 'myOrders',
@@ -1019,10 +1018,6 @@ Page({
       return
     }
     if (!this.ensureWxLoggedIn()) return
-    if (key === 'myCourses' && !training.isAdvancedMember()) {
-      promptMembershipUpgrade('我的课程')
-      return
-    }
     wx.navigateTo({ url })
   },
   goEditProfile() {

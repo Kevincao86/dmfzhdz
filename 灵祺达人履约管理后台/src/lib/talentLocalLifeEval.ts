@@ -135,6 +135,7 @@ const ADVICE_SYSTEM = [
   '不要编造粉丝数、GMV。未在资料里出现的数字不要写进来。',
   '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
   '只输出一个 JSON 对象，不要 Markdown。',
+  '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
   '字段：sections 为 3 到 5 项，每项只含 name、next。next 不超过 40 字，只写你接下来怎么改。',
   'name 与现状里的板块一致。',
 ].join('')
@@ -319,7 +320,14 @@ export type LocalLifeSuggestion = {
 }
 
 export type LocalLifeAdvice = {
+  lift: number
   sections: LocalLifeSuggestion[]
+}
+
+function clampLift(value: unknown): number {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.min(35, Math.max(5, n))
 }
 
 function loosenJson(slice: string) {
@@ -611,7 +619,7 @@ function savedFromCache(cached: Record<string, unknown> | null): { score: LocalL
   let advice: LocalLifeAdvice | null = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray((adviceRaw as LocalLifeAdvice).sections)) {
     const sections = mapSuggestions((adviceRaw as LocalLifeAdvice).sections)
-    if (sections.length) advice = { sections }
+    if (sections.length) advice = { lift: clampLift((adviceRaw as LocalLifeAdvice).lift), sections }
   }
   return {
     score: {
@@ -672,7 +680,7 @@ export async function adviseTalent(
     if (cachedAdvice && typeof cachedAdvice === 'object') {
       const advice = cachedAdvice as LocalLifeAdvice
       if (Array.isArray(advice.sections) && advice.sections.length) {
-        return { sections: mapSuggestions(advice.sections) }
+        return { lift: clampLift(advice.lift), sections: mapSuggestions(advice.sections) }
       }
     }
   }
@@ -682,7 +690,10 @@ export async function adviseTalent(
     ADVICE_SYSTEM,
     `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请只写给达人本人的改法。`,
   )
-  const advice: LocalLifeAdvice = { sections: mapSuggestions(j.sections) }
+  const advice: LocalLifeAdvice = {
+    lift: clampLift(j.lift),
+    sections: mapSuggestions(j.sections),
+  }
   await spendTalentPoints('talent_advice', '达人账号分析整改')
   writeCache(key, { advice })
   return advice

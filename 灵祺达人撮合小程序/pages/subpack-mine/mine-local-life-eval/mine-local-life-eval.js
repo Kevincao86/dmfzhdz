@@ -50,12 +50,13 @@ Page({
     adviceReady: false,
     adviceStatus: '',
     sections: [],
+    lift: 0,
     err: '',
     evalPoints: evalApi.TALENT_EVAL_POINTS,
     advicePoints: evalApi.TALENT_ADVICE_POINTS,
     evalCostText: '达人信息评估 · ' + evalApi.TALENT_EVAL_POINTS + '积分',
     reevalCostText: '重新评估 · ' + evalApi.TALENT_EVAL_POINTS + '积分',
-    adviceCostText: '分析整改 · ' + evalApi.TALENT_ADVICE_POINTS + '积分',
+    adviceCostText: '查看分析与提升方案 · ' + evalApi.TALENT_ADVICE_POINTS + '积分',
   },
 
   onLoad() {
@@ -137,6 +138,7 @@ Page({
         adviceReady: false,
         situations: [],
         sections: [],
+        lift: 0,
         displayScore: 0,
         scorePop: false,
         videoLevel: '',
@@ -159,6 +161,7 @@ Page({
       situations: saved.score.situations || [],
       adviceReady: !!(saved.advice && saved.advice.sections && saved.advice.sections.length),
       sections: saved.advice ? saved.advice.sections : [],
+      lift: saved.advice ? Number(saved.advice.lift) || 0 : 0,
       showGrade: !!grade,
       gradeKey: grade ? grade.key : '',
       gradeLabel: grade ? grade.label : '',
@@ -202,7 +205,7 @@ Page({
 
   async onEvaluate() {
     if (!prFeatureAccess.canUseAddonPerm(null, 'talentEval')) {
-      promptMembershipUpgrade('达人账号分析')
+      promptMembershipUpgrade('达人账号评估')
       return
     }
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
@@ -235,7 +238,7 @@ Page({
 
   async onAdvise() {
     if (!prFeatureAccess.canUseAddonPerm(null, 'talentAdvice')) {
-      promptMembershipUpgrade('达人账号分析')
+      promptMembershipUpgrade('分析与提升方案')
       return
     }
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
@@ -248,6 +251,7 @@ Page({
         advising: false,
         adviceReady: true,
         sections: advice.sections,
+        lift: Number(advice.lift) || 0,
       })
     } catch (e) {
       failed = e

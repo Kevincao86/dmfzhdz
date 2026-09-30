@@ -156,6 +156,14 @@
   color: #0f172a;
 }
 
+.advice-lift {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #6d28d9;
+}
+
 .grade {
   margin-top: 16rpx;
 }
