@@ -104,6 +104,80 @@ function formatNum(n: number) {
   return n.toLocaleString()
 }
 
+type ModalMetric = 'payAmount' | 'verifyAmount' | 'refundAmount' | 'orderCount' | 'refundCouponCount'
+
+const MODAL_METRICS: {
+  key: ModalMetric
+  label: string
+  color: string
+  money: boolean
+  titleRealtime: string
+  titleRange: string
+}[] = [
+  {
+    key: 'payAmount',
+    label: '营收金额',
+    color: '#3b82f6',
+    money: true,
+    titleRealtime: '今日营收金额趋势（按小时）',
+    titleRange: '营收金额趋势（当前时间维度）',
+  },
+  {
+    key: 'verifyAmount',
+    label: '核销总金额',
+    color: '#0d9488',
+    money: true,
+    titleRealtime: '今日核销金额趋势（按小时）',
+    titleRange: '核销金额趋势（当前时间维度）',
+  },
+  {
+    key: 'refundAmount',
+    label: '退款金额',
+    color: '#e11d48',
+    money: true,
+    titleRealtime: '今日退款金额趋势（按小时）',
+    titleRange: '退款金额趋势（当前时间维度）',
+  },
+  {
+    key: 'orderCount',
+    label: '成交券数',
+    color: '#1E3A5F',
+    money: false,
+    titleRealtime: '今日成交券数趋势（按小时）',
+    titleRange: '成交券数趋势（当前时间维度）',
+  },
+  {
+    key: 'refundCouponCount',
+    label: '退款券数',
+    color: '#c2410c',
+    money: false,
+    titleRealtime: '今日退款券数趋势（按小时）',
+    titleRange: '退款券数趋势（当前时间维度）',
+  },
+]
+
+function scaleByWeights(weights: number[], total: number, asInt: boolean): number[] {
+  const safeTotal = Number.isFinite(total) ? Math.max(0, total) : 0
+  if (weights.length === 0) return []
+  if (safeTotal <= 0) return weights.map(() => 0)
+  const sum = weights.reduce((acc, n) => acc + (Number.isFinite(n) ? Math.max(0, n) : 0), 0)
+  if (sum <= 0) {
+    const per = safeTotal / weights.length
+    return weights.map(() => (asInt ? Math.round(per) : Math.round(per * 100) / 100))
+  }
+  const raw = weights.map((n) => ((Number.isFinite(n) ? Math.max(0, n) : 0) / sum) * safeTotal)
+  if (!asInt) return raw.map((n) => Math.round(n * 100) / 100)
+  const rounded = raw.map((n) => Math.round(n))
+  const drift = Math.round(safeTotal) - rounded.reduce((acc, n) => acc + n, 0)
+  if (rounded.length) rounded[rounded.length - 1] += drift
+  return rounded
+}
+
+function readPointMetric(point: Record<string, unknown> | undefined, key: ModalMetric): number {
+  const v = point?.[key]
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0
+}
+
 type DashBundle = Awaited<ReturnType<typeof fetchHomeDashboardByPlatforms>>
 
 export default function HomeDashboard() {
@@ -120,6 +194,7 @@ function MerchantHomeDashboard() {
   const [timeOpen, setTimeOpen] = useState(false)
   const [timeKey, setTimeKey] = useState<(typeof TIME_FILTERS)[number]['value']>('realtime')
   const [detailId, setDetailId] = useState<PlatformId | null>(null)
+  const [modalMetric, setModalMetric] = useState<ModalMetric>('payAmount')
   const [homeEmpty, setHomeEmpty] = useState(true)
   const [dashBundle, setDashBundle] = useState<DashBundle | null>(null)
   const [probeRows, setProbeRows] = useState<PlatformConnectivityRow[]>([])
@@ -200,27 +275,44 @@ function MerchantHomeDashboard() {
     }))
   }, [dashBundle, homeEmpty])
 
+  useEffect(() => {
+    setModalMetric('payAmount')
+  }, [detailId])
+
+  const activeModalMetric = MODAL_METRICS.find((item) => item.key === modalMetric) ?? MODAL_METRICS[0]
+
   const modalTrend = useMemo(() => {
     if (!detailId || !dashBundle) return []
     const platformState = dashBundle.platforms.find((x) => x.id === detailId)
+    const metrics = platformState?.metrics
+    const total = metrics ? Number(metrics[modalMetric] ?? 0) : 0
+    const asInt = !activeModalMetric.money
     if (timeKey === 'realtime') {
       const hourly = platformState?.metrics.hourlyTrend ?? []
-      if (hourly.length > 0) {
-        return hourly.map((h) => ({
-          name: h.label,
-          payAmount: h.payAmount,
-        }))
-      }
-      return Array.from({ length: 24 }, (_, hour) => ({
-        name: `${String(hour).padStart(2, '0')}:00`,
-        payAmount: 0,
-      }))
+      const points =
+        hourly.length > 0
+          ? hourly
+          : Array.from({ length: 24 }, (_, hour) => ({
+              hour,
+              label: `${String(hour).padStart(2, '0')}:00`,
+              payAmount: 0,
+            }))
+      const weights = points.map((h) => h.payAmount)
+      const own = points.map((h) => readPointMetric(h as unknown as Record<string, unknown>, modalMetric))
+      const hasOwn = modalMetric === 'payAmount' || own.some((n) => n > 0)
+      const values = hasOwn ? own : scaleByWeights(weights, total, asInt)
+      return points.map((h, i) => ({ name: h.label, value: values[i] ?? 0 }))
     }
+    const paySeries = dashBundle.trendDates.map((_, i) => dashBundle.trendByPlatform[detailId][i] ?? 0)
+    const own = (metrics?.trend ?? []).map((row) => readPointMetric(row as unknown as Record<string, unknown>, modalMetric))
+    const alignedOwn = dashBundle.trendDates.map((_, i) => own[i] ?? 0)
+    const hasOwn = modalMetric === 'payAmount' || alignedOwn.some((n) => n > 0)
+    const values = hasOwn ? (modalMetric === 'payAmount' ? paySeries : alignedOwn) : scaleByWeights(paySeries, total, asInt)
     return dashBundle.trendDates.map((date, i) => ({
       name: date,
-      payAmount: dashBundle.trendByPlatform[detailId][i] ?? 0,
+      value: values[i] ?? 0,
     }))
-  }, [detailId, dashBundle, timeKey])
+  }, [detailId, dashBundle, timeKey, modalMetric, activeModalMetric.money])
 
   if (loading) {
     return (
@@ -584,27 +676,50 @@ function MerchantHomeDashboard() {
                 </button>
               </div>
 
-              <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                {[
-                  { label: '营收金额', value: formatMoney(modalPlatform.payAmount), sub: timeLabel },
-                  { label: '核销总金额', value: formatMoney(modalPlatform.verifyAmount), sub: timeLabel },
-                  { label: '退款金额', value: formatMoney(modalPlatform.refundAmount), sub: timeLabel },
-                  { label: '成交券数', value: modalPlatform.orderCount, sub: timeLabel },
-                  { label: '退款券数', value: modalPlatform.refundCouponCount, sub: timeLabel },
-                ].map((cell) => (
-                  <div key={cell.label} className="rounded-lg bg-gray-50 p-4">
-                    <p className="mb-1 text-sm text-gray-500">{cell.label}</p>
-                    <p className="text-xl font-bold text-gray-900">{cell.value}</p>
-                    <p className="mt-1 text-xs text-gray-400">{cell.sub}</p>
-                  </div>
-                ))}
+              <div className="mb-6 grid grid-cols-2 gap-4 pt-1 sm:grid-cols-3 lg:grid-cols-5">
+                {MODAL_METRICS.map((cell) => {
+                  const selected = modalMetric === cell.key
+                  const value = cell.money
+                    ? formatMoney(Number(modalPlatform[cell.key] ?? 0))
+                    : formatCount(Number(modalPlatform[cell.key] ?? 0))
+                  return (
+                    <motion.button
+                      key={cell.key}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setModalMetric(cell.key)}
+                      whileHover={{
+                        y: -4,
+                        scale: 1.04,
+                        boxShadow: selected
+                          ? `0 0 0 2px ${cell.color}, 0 16px 32px ${cell.color}33`
+                          : `0 12px 28px ${cell.color}2e`,
+                      }}
+                      whileTap={{ scale: 0.97 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+                      className={cn(
+                        'rounded-xl p-4 text-left transition-[background-color]',
+                        selected ? 'bg-white' : 'bg-gray-50 hover:bg-white',
+                      )}
+                      style={{
+                        boxShadow: selected
+                          ? `0 0 0 2px ${cell.color}, 0 12px 24px ${cell.color}24`
+                          : undefined,
+                      }}
+                    >
+                      <p className="mb-1 text-sm text-gray-500">{cell.label}</p>
+                      <p className="text-xl font-bold tabular-nums text-gray-900">{value}</p>
+                      <p className="mt-1 text-xs" style={{ color: selected ? cell.color : '#9ca3af' }}>
+                        {selected ? '当前曲线' : timeLabel}
+                      </p>
+                    </motion.button>
+                  )
+                })}
               </div>
 
               <div className="h-64 min-h-[180px]">
                 <h4 className="mb-3 text-sm font-medium text-gray-700">
-                  {timeKey === 'realtime'
-                    ? '今日成交金额趋势（按小时）'
-                    : '成交金额趋势（当前时间维度）'}
+                  {timeKey === 'realtime' ? activeModalMetric.titleRealtime : activeModalMetric.titleRange}
                 </h4>
                 {modalTrend.length === 0 ? (
                   <div className="flex h-[85%] items-center justify-center text-sm text-gray-500">
@@ -612,7 +727,7 @@ function MerchantHomeDashboard() {
                   </div>
                 ) : timeKey === 'realtime' ? (
                   <ResponsiveContainer width="100%" height="85%">
-                    <LineChart data={modalTrend}>
+                    <LineChart data={modalTrend} key={modalMetric}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis
                         dataKey="name"
@@ -624,35 +739,62 @@ function MerchantHomeDashboard() {
                       <YAxis
                         stroke="#94a3b8"
                         fontSize={12}
-                        tickFormatter={(v) => formatMoney(Number(v)).replace('¥', '')}
+                        tickFormatter={(v) =>
+                          activeModalMetric.money
+                            ? formatMoney(Number(v)).replace('¥', '')
+                            : formatCount(Number(v))
+                        }
                       />
                       <Tooltip
                         contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }}
-                        formatter={(v) => formatMoney(Number(v ?? 0))}
+                        formatter={(v) =>
+                          activeModalMetric.money
+                            ? formatMoney(Number(v ?? 0))
+                            : formatCount(Number(v ?? 0))
+                        }
                         labelFormatter={(label) => `时段 ${label}`}
                       />
                       <Line
                         type="monotone"
-                        dataKey="payAmount"
-                        name="成交金额"
-                        stroke="#3b82f6"
+                        dataKey="value"
+                        name={activeModalMetric.label}
+                        stroke={activeModalMetric.color}
                         strokeWidth={2}
-                        dot={{ r: 2, fill: '#3b82f6' }}
+                        dot={{ r: 2, fill: activeModalMetric.color }}
                         activeDot={{ r: 4 }}
+                        animationDuration={520}
                       />
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
                   <ResponsiveContainer width="100%" height="85%">
-                    <BarChart data={modalTrend}>
+                    <BarChart data={modalTrend} key={modalMetric}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
-                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <YAxis
+                        stroke="#94a3b8"
+                        fontSize={12}
+                        tickFormatter={(v) =>
+                          activeModalMetric.money
+                            ? formatMoney(Number(v)).replace('¥', '')
+                            : formatCount(Number(v))
+                        }
+                      />
                       <Tooltip
                         contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }}
-                        formatter={(v) => formatMoney(Number(v ?? 0))}
+                        formatter={(v) =>
+                          activeModalMetric.money
+                            ? formatMoney(Number(v ?? 0))
+                            : formatCount(Number(v ?? 0))
+                        }
                       />
-                      <Bar dataKey="payAmount" name="成交金额" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar
+                        dataKey="value"
+                        name={activeModalMetric.label}
+                        fill={activeModalMetric.color}
+                        radius={[4, 4, 0, 0]}
+                        animationDuration={520}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
