@@ -134,16 +134,48 @@
     </view>
   </view>
 
-  <view class="eval-tab-bar">
+  <view class="tab-bar {{lqThemeClass}}">
     <view
       wx:for="{{tabs}}"
       wx:key="pagePath"
-      class="eval-tab {{item.navigate ? 'eval-tab--on' : ''}}"
+      class="tab-item {{item.navigate ? 'active' : ''}}"
       data-path="{{item.pagePath}}"
       data-navigate="{{item.navigate}}"
       bindtap="onTab"
     >
-      <text class="eval-tab-text">{{item.text}}</text>
+      <view class="tab-icon-wrap">
+        <view class="tab-icon tab-icon-{{item.icon}} {{item.navigate ? 'is-active' : ''}}">
+          <block wx:if="{{item.icon === 'home'}}">
+            <view class="ico ico-home">
+              <view class="ico-home-roof"></view>
+              <view class="ico-home-body">
+                <view class="ico-home-door"></view>
+              </view>
+            </view>
+          </block>
+          <block wx:elif="{{item.icon === 'star'}}">
+            <view class="ico ico-star"></view>
+            <view class="tab-ai-badge" wx:if="{{item.aiBadge}}">AI</view>
+          </block>
+          <block wx:elif="{{item.icon === 'insight'}}">
+            <view class="ico ico-insight">
+              <view class="ico-insight-spark"></view>
+            </view>
+          </block>
+          <block wx:elif="{{item.icon === 'chat'}}">
+            <view class="ico ico-chat">
+              <view class="ico-chat-tail"></view>
+            </view>
+          </block>
+          <block wx:else>
+            <view class="ico ico-user">
+              <view class="ico-user-head"></view>
+              <view class="ico-user-shoulder"></view>
+            </view>
+          </block>
+        </view>
+      </view>
+      <text class="tab-text {{item.compact ? 'tab-text--compact' : ''}}">{{item.text}}</text>
     </view>
   </view>
 </view>
