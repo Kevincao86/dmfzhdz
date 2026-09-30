@@ -19,6 +19,10 @@
           <view class="chart-bar chart-bar-2"></view>
           <view class="chart-bar chart-bar-3"></view>
         </block>
+        <block wx:elif="{{item.icon === 'insight'}}">
+          <view class="insight-ring"></view>
+          <view class="insight-dot"></view>
+        </block>
         <block wx:elif="{{item.icon === 'ai'}}">
           <view class="ai-bubble">
             <view class="ai-dot"></view>
@@ -33,6 +37,6 @@
         </block>
       </view>
     </view>
-    <text class="tab-text">{{item.text}}</text>
+      <text class="tab-text {{item.icon === 'insight' ? 'tab-text--compact' : ''}}">{{item.text}}</text>
   </view>
 </view>

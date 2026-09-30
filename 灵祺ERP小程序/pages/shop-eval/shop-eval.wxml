@@ -1,0 +1,126 @@
+<view class="shop-eval-page">
+  <view class="plats">
+    <view
+      wx:for="{{platforms}}"
+      wx:key="id"
+      class="plat {{platformId === item.id ? 'plat--on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onPlatform"
+    >
+      <text>{{item.name}}</text>
+    </view>
+  </view>
+
+  <view class="eval-top">
+    <view class="eval-left">
+      <view class="card ident">
+        <view class="avatar">{{avatarLetter}}</view>
+        <text class="nick">{{storeName || '尚未读取到门店'}}</text>
+        <text class="did">{{platformName}}</text>
+        <text class="did" wx:if="{{basis}}">{{basis}}</text>
+        <text class="did" wx:else>请先在店铺信息里完善门店名称和地址</text>
+      </view>
+    </view>
+    <view class="eval-right">
+      <view class="card hero">
+        <view class="ring-stage">
+          <view class="ring-scan" wx:if="{{evaluating}}"></view>
+          <view class="ring {{scorePop ? 'ring--pop' : ''}} {{evaluating ? 'ring--wait' : ''}}" style="background: conic-gradient(from -90deg, #0891b2 0%, #67e8f9 {{displayScore}}%, #e0f2fe {{displayScore}}%);">
+            <view class="ring-hole">
+              <text class="score {{scorePop ? 'score--pop' : ''}} {{evaluating ? 'score--wait' : ''}}">{{displayScore}}</text>
+            </view>
+          </view>
+        </view>
+        <text class="label">门店智能分析</text>
+        <view class="grade" wx:if="{{showGrade}}">
+          <text class="grade-label">{{gradeLabel}}</text>
+          <text class="grade-note">{{gradeNote}}</text>
+        </view>
+        <view class="levels" wx:if="{{scoreReady}}">
+          <text class="level">{{levelA}} {{searchLevel}}</text>
+          <text class="level">{{levelB}} {{verifyLevel}}</text>
+        </view>
+        <view class="btn-main {{!canEval || evaluating || advising ? 'btn--off' : ''}}" bindtap="onEvaluate">
+          {{evaluating ? '评估中…' : (scoreReady ? '重新评估' : '门店评估')}}
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card gains" wx:if="{{showGains}}">
+    <view class="gain-row">
+      <view class="gain">
+        <text class="gain-k">预计提升曝光</text>
+        <view class="gain-metric">
+          <view class="gain-arrow"></view>
+          <text class="gain-v">{{exposureText}}</text>
+        </view>
+      </view>
+      <view class="gain">
+        <text class="gain-k">预计提升核销额</text>
+        <view class="gain-metric">
+          <view class="gain-arrow"></view>
+          <text class="gain-v">{{salesText}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="card gains" wx:else>
+    <text class="need">完成评估后，这里显示预计提升的曝光和核销额</text>
+  </view>
+
+  <view class="btn-sub {{!scoreReady || evaluating || advising ? 'btn--off' : ''}}" bindtap="onAdvise">
+    {{advising ? '分析中…' : '查看分析与提升方案'}}
+  </view>
+  <text class="err" wx:if="{{err}}">{{err}}</text>
+  <text class="need" wx:if="{{!canEval}}">请先到「店铺信息」完善门店名称</text>
+  <text class="need" wx:elif="{{!scoreReady}}">请先完成门店评估</text>
+
+  <view class="card advice advice--now" wx:if="{{scoreReady && situations.length}}">
+    <text class="advice-title advice-title--now">门店现状</text>
+    <view class="plate-grid">
+      <view class="plate plate--now" wx:for="{{situations}}" wx:key="name">
+        <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
+        <view class="plate-body">
+          <text class="plate-name">{{item.name}}</text>
+          <text class="plate-line">{{item.now}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="card advice advice--plan" wx:if="{{adviceReady}}">
+    <text class="advice-title advice-title--plan">分析与提升方案</text>
+    <view class="plan" wx:for="{{sections}}" wx:key="name">
+      <view class="plan-head">
+        <text class="plan-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
+        <text class="plan-name">{{item.name}}</text>
+      </view>
+      <view class="plan-block plan-block--find" wx:if="{{item.finding}}">
+        <text class="plan-tag">分析结果</text>
+        <text class="plan-text">{{item.finding}}</text>
+      </view>
+      <view class="plan-block plan-block--adjust" wx:if="{{item.adjust}}">
+        <text class="plan-tag">怎么调整</text>
+        <text class="plan-text">{{item.adjust}}</text>
+      </view>
+      <view class="plan-block plan-block--soon" wx:if="{{item.soon}}">
+        <text class="plan-tag">近期要做</text>
+        <text class="plan-text">{{item.soon}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card advice" wx:if="{{showGrade}}">
+    <text class="advice-title">评级释义</text>
+    <view class="plate-grid">
+      <view class="plate {{gradeKey === item.key ? 'plate--on' : ''}}" wx:for="{{grades}}" wx:key="key">
+        <text class="plate-no">{{item.range}}</text>
+        <view class="plate-body">
+          <text class="plate-name">{{item.label}}</text>
+          <text class="plate-line">{{item.note}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

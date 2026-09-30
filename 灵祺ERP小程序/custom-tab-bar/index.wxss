@@ -152,6 +152,33 @@
   opacity: 0.92;
 }
 
+.tab-icon-insight {
+  position: relative;
+}
+
+.tab-icon-insight .insight-ring {
+  width: 26rpx;
+  height: 26rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+  border-right-color: transparent;
+  opacity: 0.85;
+}
+
+.tab-icon-insight .insight-dot {
+  position: absolute;
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.tab-text--compact {
+  font-size: 18rpx;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+
 /* 功能：四宫格 */
 .tab-icon-grid {
   display: grid;
