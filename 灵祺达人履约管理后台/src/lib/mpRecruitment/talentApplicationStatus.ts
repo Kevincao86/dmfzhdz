@@ -468,11 +468,36 @@ function isPendingVideoPhase(
   return false
 }
 
+function parseSignupDeadlineMs(value: unknown): number {
+  const raw = String(value || '').trim()
+  if (!raw) return 0
+  const normalized = raw.replace(/\//g, '-').replace(/\./g, '-')
+  const withT = normalized.includes('T') ? normalized : normalized.replace(' ', 'T')
+  const ms = Date.parse(withT)
+  if (Number.isFinite(ms) && ms > 0) return ms
+  const fallback = Date.parse(raw)
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : 0
+}
+
+function isSignupDeadlinePassed(mp: Record<string, unknown> | null): boolean {
+  if (!mp) return false
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
+  const ms = parseSignupDeadlineMs(meta?.signupDeadline || mp.deadline)
+  if (!ms) return false
+  return Date.now() > ms
+}
+
 export function resolveTalentApplicationProgress(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
   mpOrderId?: string,
 ): { id: Exclude<TalentAppProgressId, 'all'>; label: string } {
+  if (isSignupDeadlinePassed(mp) && String(applicant?.taskStatus || '') !== 'rejected') {
+    return { id: 'completed', label: '已完成' }
+  }
   const ice = resolveIceContext(mp, mpOrderId)
   if (!applicant) {
     if (ice) return { id: 'in_progress', label: '进行中' }
