@@ -282,9 +282,6 @@ Page({
         gradeKey: grade ? grade.key : '',
         gradeLabel: grade ? grade.label : '',
         gradeNote: grade ? grade.note : '',
-        adviceReady: false,
-        sections: [],
-        lift: 0,
         showGains: true,
       })
       this.playScore(score.score)

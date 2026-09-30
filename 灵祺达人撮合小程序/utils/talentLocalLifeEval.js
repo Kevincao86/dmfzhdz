@@ -424,7 +424,19 @@ async function askDoubaoJson(system, user) {
   }
 }
 
+function accountScope() {
+  try {
+    return String(require('./mpAccountLocalScope.js').currentScopeId() || '').trim()
+  } catch (e) {
+    return ''
+  }
+}
+
 function cacheKey(row) {
+  return ['lq_local_life_eval_v4', accountScope(), row.platformId].join('|')
+}
+
+function legacyCacheKey(row) {
   return [
     'lq_local_life_eval_v3',
     row.platformId,
@@ -437,6 +449,16 @@ function cacheKey(row) {
     row.talentGrade,
     row.quotePrice,
   ].join('|')
+}
+
+function loadCache(row) {
+  const key = cacheKey(row)
+  const hit = readCache(key)
+  if (hit) return { key, data: hit }
+  const old = readCache(legacyCacheKey(row))
+  if (!old) return { key, data: null }
+  writeCache(key, old, true)
+  return { key, data: readCache(key) || old }
 }
 
 function mapBlockPoints(rows) {
@@ -566,8 +588,7 @@ function savedFromCache(cached) {
 
 function readSavedTalentEval(raw) {
   const row = normalizeInput(raw).row
-  if (!row.nickname && !row.accountId) return null
-  return savedFromCache(readCache(cacheKey(row)))
+  return savedFromCache(loadCache(row).data)
 }
 
 function buildScore(spec, j) {
@@ -587,9 +608,10 @@ async function evaluateTalent(raw, opts) {
   const spec = packed.spec
   const row = packed.row
   if (!row.nickname && !row.accountId) throw new Error(`请先填写${spec.nickLabel}或${spec.accountLabel}`)
-  const key = cacheKey(row)
+  const loaded = loadCache(row)
+  const key = loaded.key
   if (!(opts && opts.force)) {
-    const saved = savedFromCache(readCache(key))
+    const saved = savedFromCache(loaded.data)
     if (saved) return saved.score
   }
   await pointsSpend.assertTalentEvalAffordable('talent_eval')
@@ -599,7 +621,7 @@ async function evaluateTalent(raw, opts) {
   )
   const score = buildScore(spec, j)
   await pointsSpend.spendTalentEvalPoints('talent_eval', '达人账号评估')
-  writeCache(key, score, true)
+  writeCache(key, score)
   return score
 }
 
@@ -610,9 +632,10 @@ async function adviseTalent(raw, score, opts) {
   const packed = normalizeInput(raw)
   const spec = packed.spec
   const row = packed.row
-  const key = cacheKey(row)
+  const loaded = loadCache(row)
+  const key = loaded.key
   if (!(opts && opts.force)) {
-    const cached = readCache(key)
+    const cached = loaded.data
     if (cached && cached.advice && Array.isArray(cached.advice.sections) && cached.advice.sections.length) {
       return { lift: clampLift(cached.advice.lift), sections: mapSuggestions(cached.advice.sections) }
     }
