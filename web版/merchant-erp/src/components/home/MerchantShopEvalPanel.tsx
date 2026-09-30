@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMembership } from '../../context/MembershipContext'
 import { MEMBERSHIP_UPGRADE_HREF } from '../../lib/membershipPlan'
@@ -19,10 +19,19 @@ import {
   type ShopEvalInput,
   type ShopEvalPlatformId,
   type ShopEvalScore,
+  type ShopEvalSignals,
 } from '../../lib/merchantShopEval'
 import { MerchantPlatformIcon } from '../../lib/platformBranding'
+import { listTenantKbDocuments } from '../../lib/knowledgeBaseApi'
 import { postAiChat } from '../../services/ai/aiClient'
-import { fetchStoresForPlatform, type StorePlatformTab } from '../../services/merchantStoresApi'
+import { fetchFinanceReconcile } from '../../services/financeReconcileApi'
+import { fetchMarketingActivities } from '../../services/marketingActivitiesApi'
+import { fetchHomeDashboardByPlatforms } from '../../services/merchantDashboardApi'
+import { fetchMerchantProductList } from '../../services/merchantProductListApi'
+import { fetchStoreDecorationsForPlatform } from '../../services/merchantStoreDecorationApi'
+import { fetchStoresForPlatform, storeTabToken, type StorePlatformTab } from '../../services/merchantStoresApi'
+import { fetchLocalClues, fetchLocalReportSummary } from '../../services/qianchuanApi'
+import { fetchReviewsList, reviewsTabToApiPlatform } from '../../services/reviewsMerchantApi'
 
 const storage = {
   getItem: (key: string) => {
@@ -55,6 +64,106 @@ async function askText(system: string, user: string) {
   const content = String(data.content || '').trim()
   if (!content) throw new Error('豆包未返回内容')
   return content
+}
+
+const EVAL_TABS: StorePlatformTab[] = ['douyin', 'kuaishou', 'meituan', 'xiaohongshu']
+
+function blankSignals(): ShopEvalSignals {
+  return {
+    productTotal: 0,
+    productPriced: 0,
+    productWithImage: 0,
+    reviewTotal: 0,
+    reviewReplied: 0,
+    activityTotal: 0,
+    decorationTotal: 0,
+    decorationWithCover: 0,
+    payAmount: 0,
+    verifyAmount: 0,
+    orderCount: 0,
+    otherPlatformPay: 0,
+    clueCount: 0,
+    adShow: 0,
+    kbTotal: 0,
+    kbFeeding: 0,
+    financeVerify: 0,
+    financeRefund: 0,
+    financeRows: 0,
+  }
+}
+
+function scaleCount(sample: number, seen: number, total: number) {
+  if (seen <= 0 || total <= seen) return sample
+  return Math.round((total * sample) / seen)
+}
+
+async function collectShopEvalSignals(platformId: ShopEvalPlatformId): Promise<ShopEvalSignals> {
+  const connected = EVAL_TABS.filter((id) => storeTabToken(id))
+  const reviewPlatform = reviewsTabToApiPlatform(platformId)
+  const activityPlatform = platformId === 'kuaishou' ? null : platformId
+  const [products, decoration, reviews, activities, dashboard, kb, finance, ads, clues] = await Promise.all([
+    fetchMerchantProductList(platformId, { page: 1, pageSize: 50 }).catch(() => null),
+    fetchStoreDecorationsForPlatform(platformId, { page: 1, pageSize: 50 }).catch(() => null),
+    reviewPlatform ? fetchReviewsList(reviewPlatform, 'all', 'all').catch(() => null) : Promise.resolve(null),
+    activityPlatform
+      ? fetchMarketingActivities({ platform: activityPlatform, page: 1, pageSize: 20 }).catch(() => null)
+      : Promise.resolve(null),
+    connected.length ? fetchHomeDashboardByPlatforms(connected, 'day7').catch(() => null) : Promise.resolve(null),
+    listTenantKbDocuments().catch(() => [] as Awaited<ReturnType<typeof listTenantKbDocuments>>),
+    fetchFinanceReconcile({ days: 14 }).catch(() => null),
+    fetchLocalReportSummary().catch(() => null),
+    fetchLocalClues(1).catch(() => null),
+  ])
+
+  const signals = blankSignals()
+  if (products?.ok) {
+    const seen = products.items.length
+    signals.productTotal = products.total || seen
+    signals.productPriced = scaleCount(
+      products.items.filter((item) => item.price > 0).length,
+      seen,
+      signals.productTotal,
+    )
+    signals.productWithImage = scaleCount(
+      products.items.filter((item) => String(item.headImageUrl || '').trim()).length,
+      seen,
+      signals.productTotal,
+    )
+  }
+  if (decoration?.ok) {
+    const seen = decoration.items.length
+    signals.decorationTotal = decoration.total || seen
+    signals.decorationWithCover = scaleCount(
+      decoration.items.filter((item) => item.coverImageUrl || (item.albumCount || 0) > 0).length,
+      seen,
+      signals.decorationTotal,
+    )
+  }
+  if (reviews?.ok) {
+    signals.reviewTotal = reviews.stats?.total ?? reviews.items.length
+    signals.reviewReplied = reviews.stats?.replied ?? reviews.items.filter((item) => item.replied).length
+  }
+  if (activities?.ok) signals.activityTotal = activities.total || activities.items.length
+  if (dashboard) {
+    const mine = dashboard.platforms.find((row) => row.id === platformId)
+    signals.payAmount = mine?.metrics.payAmount || 0
+    signals.verifyAmount = mine?.metrics.verifyAmount || 0
+    signals.orderCount = mine?.metrics.orderCount || 0
+    signals.financeRefund = mine?.metrics.refundAmount || 0
+    signals.otherPlatformPay = dashboard.platforms
+      .filter((row) => row.id !== platformId)
+      .reduce((sum, row) => sum + (row.metrics.payAmount || 0), 0)
+  }
+  signals.kbTotal = kb.length
+  signals.kbFeeding = kb.filter((doc) => doc.feed_enabled).length
+  if (finance?.ok) {
+    const rows = finance.rows.filter((row) => row.platform === platformId)
+    signals.financeRows = rows.length
+    signals.financeVerify = rows.reduce((sum, row) => sum + (row.verifyAmountYuan || 0), 0)
+  }
+  if (ads?.ok) signals.adShow = ads.summary.showCnt || 0
+  if (clues?.ok) signals.clueCount = clues.list.length
+  return signals
 }
 
 function letterOf(name: string) {
@@ -97,6 +206,7 @@ export default function MerchantShopEvalPanel() {
   const [displayScore, setDisplayScore] = useState(0)
   const [animateScore, setAnimateScore] = useState(false)
   const [animateGains, setAnimateGains] = useState(false)
+  const signalsRef = useRef<ShopEvalSignals | null>(null)
   const scope = shopEvalScopeOf(input)
   const meta = platformShopEvalMeta(platformId, scope)
   const canEval = Boolean(String(input.storeName || '').trim())
@@ -121,6 +231,7 @@ export default function MerchantShopEvalPanel() {
   }, [platformId, loadStore])
 
   useEffect(() => {
+    signalsRef.current = null
     const saved = readSavedShopEval(input, storage)
     setErr('')
     setAdvice(saved?.advice || null)
@@ -158,7 +269,9 @@ export default function MerchantShopEvalPanel() {
     setEvaluating(true)
     setErr('')
     try {
-      const next = await evaluateShop(input, { force: true, storage, askText })
+      const signals = await collectShopEvalSignals(platformId)
+      signalsRef.current = signals
+      const next = await evaluateShop({ ...input, platformId, signals }, { force: true, storage, askText })
       setAnimateScore(true)
       setAnimateGains(true)
       setDisplayScore(0)
@@ -176,7 +289,9 @@ export default function MerchantShopEvalPanel() {
     setAdvising(true)
     setErr('')
     try {
-      setAdvice(await adviseShop(input, score, { force: true, storage, askText }))
+      const signals = signalsRef.current || (await collectShopEvalSignals(platformId))
+      signalsRef.current = signals
+      setAdvice(await adviseShop({ ...input, platformId, signals }, score, { force: true, storage, askText }))
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {

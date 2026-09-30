@@ -14,6 +14,29 @@ export type ShopEvalInput = {
   storeCount?: number
   brandName?: string
   storeNames?: string
+  signals?: ShopEvalSignals
+}
+
+export type ShopEvalSignals = {
+  productTotal: number
+  productPriced: number
+  productWithImage: number
+  reviewTotal: number
+  reviewReplied: number
+  activityTotal: number
+  decorationTotal: number
+  decorationWithCover: number
+  payAmount: number
+  verifyAmount: number
+  orderCount: number
+  otherPlatformPay: number
+  clueCount: number
+  adShow: number
+  kbTotal: number
+  kbFeeding: number
+  financeVerify: number
+  financeRefund: number
+  financeRows: number
 }
 
 export type ShopEvalSituation = { name: string; now: string }
@@ -237,6 +260,7 @@ function normalizeInput(raw: ShopEvalInput) {
       city: String(raw?.city || '').trim(),
       offerName: String(raw?.offerName || '').trim(),
       offerPrice: String(raw?.offerPrice || '').trim(),
+      signals: raw?.signals,
     },
   }
 }
@@ -259,11 +283,25 @@ function shopFacts(spec: PlatformSpec, row: ReturnType<typeof normalizeInput>['r
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
     functionCoverage(row),
+    row.signals ? signalFacts(row.signals) : '',
   ]
-  return lines.join('\n')
+  return lines.filter(Boolean).join('\n')
+}
+
+function signalFacts(s: ShopEvalSignals) {
+  return [
+    `商品接口：共 ${s.productTotal} 个，有价格 ${s.productPriced} 个，有头图 ${s.productWithImage} 个。`,
+    `评价接口：${s.reviewTotal} 条，已回复 ${s.reviewReplied} 条。活动接口：${s.activityTotal} 个。`,
+    `装修接口：${s.decorationTotal} 家，有封面 ${s.decorationWithCover} 家。`,
+    `经营接口：本平台成交 ${Math.round(s.payAmount)} 元，核销 ${Math.round(s.verifyAmount)} 元，订单 ${s.orderCount}。其他平台成交 ${Math.round(s.otherPlatformPay)} 元。投流展示 ${s.adShow}，线索 ${s.clueCount}。`,
+    `知识库接口：${s.kbTotal} 份，已开启投喂 ${s.kbFeeding} 份。`,
+    `财务接口：对账 ${s.financeRows} 条，核销 ${Math.round(s.financeVerify)} 元，退款 ${Math.round(s.financeRefund)} 元。`,
+    '以上数字来自接口。为 0 的项写成未完善。有数字的项按数字写现状，不要改成未完善。',
+  ].join('\n')
 }
 
 function functionCoverage(row: ReturnType<typeof normalizeInput>['row']) {
+  if (row.signals) return ''
   const offer = [row.offerName, row.offerPrice].filter(Boolean).join(' ')
   const product = offer
     ? `商品信息：已有套餐 ${offer}。商品库和菜单图文本次未接入，不要写成图文已齐。`
@@ -677,12 +715,128 @@ async function askJson(askText: AskText, system: string, user: string) {
   }
 }
 
+function yuanBrief(n: number) {
+  const v = Math.round(Number(n) || 0)
+  if (v >= 10000) return `${(v / 10000).toFixed(1).replace(/\.0$/, '')}万`
+  return String(v)
+}
+
+function productPoints(s: ShopEvalSignals) {
+  if (s.productTotal <= 0) return 12
+  const priceRate = s.productPriced / s.productTotal
+  const imageRate = s.productWithImage / s.productTotal
+  if (priceRate >= 0.5 && imageRate >= 0.4) return 88
+  if (priceRate >= 0.5) return 72
+  if (s.productPriced > 0) return 55
+  return 32
+}
+
+function rhythmPoints(s: ShopEvalSignals) {
+  if (s.reviewTotal <= 0 && s.activityTotal <= 0) return 12
+  let points = s.reviewTotal > 0 ? 58 : 36
+  if (s.reviewReplied > 0) points += 12
+  if (s.activityTotal > 0) points += 18
+  return Math.min(92, points)
+}
+
+function visualPoints(s: ShopEvalSignals) {
+  if (s.decorationTotal <= 0) return 12
+  const rate = s.decorationWithCover / s.decorationTotal
+  if (rate >= 0.6) return 88
+  if (s.decorationWithCover > 0) return 62
+  return 28
+}
+
+function trafficPoints(s: ShopEvalSignals) {
+  const hasTrade = s.payAmount > 0 || s.orderCount > 0 || s.verifyAmount > 0
+  if (!hasTrade && s.otherPlatformPay <= 0 && s.clueCount <= 0 && s.adShow <= 0) return 12
+  if (!hasTrade) return 48
+  let points = 60
+  if (s.verifyAmount > 0) points += 15
+  if (s.otherPlatformPay > 0 && s.payAmount > 0) points += 10
+  return Math.min(92, points)
+}
+
+function geoPoints(s: ShopEvalSignals) {
+  if (s.kbTotal <= 0) return 12
+  if (s.kbFeeding <= 0) return 42
+  return Math.min(90, 70 + Math.min(20, s.kbFeeding * 4))
+}
+
+function financePoints(s: ShopEvalSignals) {
+  const verify = Math.max(s.financeVerify, s.verifyAmount)
+  if (s.financeRows <= 0 && verify <= 0 && s.financeRefund <= 0) return 12
+  if (verify > 0 && (s.financeRefund > 0 || s.financeRows > 0)) return 86
+  if (verify > 0) return 68
+  return 40
+}
+
+function scoreFromSignals(spec: PlatformSpec, signals: ShopEvalSignals, offerPrice: string): ShopEvalScore {
+  const blocks = [
+    { name: '商品信息', points: productPoints(signals) },
+    { name: '运营节奏', points: rhythmPoints(signals) },
+    { name: '品牌视觉', points: visualPoints(signals) },
+    { name: '流量分布', points: trafficPoints(signals) },
+    { name: 'GEO 投喂', points: geoPoints(signals) },
+    { name: '财务明晰', points: financePoints(signals) },
+  ]
+  const computed = scoreFromBlocks(spec, blocks, 0)
+  const nowOf: Record<string, string> = {
+    商品信息:
+      signals.productTotal > 0
+        ? `商品 ${signals.productTotal} 个，${signals.productPriced} 个有价格，${signals.productWithImage} 个有头图`
+        : '未完善，商品列表没有套餐',
+    运营节奏:
+      signals.reviewTotal > 0 || signals.activityTotal > 0
+        ? `评价 ${signals.reviewTotal} 条，已回复 ${signals.reviewReplied} 条，活动 ${signals.activityTotal} 个`
+        : '未完善，评价和活动都没有读到',
+    品牌视觉:
+      signals.decorationTotal > 0
+        ? `装修 ${signals.decorationTotal} 家，${signals.decorationWithCover} 家有封面`
+        : '未完善，装修列表没有门店封面',
+    流量分布:
+      signals.payAmount > 0 || signals.orderCount > 0
+        ? `本平台成交 ${yuanBrief(signals.payAmount)} 元，其他平台 ${yuanBrief(signals.otherPlatformPay)} 元`
+        : signals.clueCount > 0 || signals.adShow > 0
+          ? `投流展示 ${signals.adShow}，线索 ${signals.clueCount}，成交还没读到`
+          : '未完善，店铺分析没有成交',
+    'GEO 投喂':
+      signals.kbTotal > 0
+        ? signals.kbFeeding > 0
+          ? `知识库 ${signals.kbTotal} 份，${signals.kbFeeding} 份已开启投喂`
+          : `知识库 ${signals.kbTotal} 份，还没开启投喂`
+        : '未完善，知识库没有可投喂资料',
+    财务明晰:
+      Math.max(signals.financeVerify, signals.verifyAmount) > 0 || signals.financeRows > 0
+        ? `核销 ${yuanBrief(Math.max(signals.financeVerify, signals.verifyAmount))} 元，退款 ${yuanBrief(signals.financeRefund)} 元`
+        : '未完善，对账没有核销和退款',
+  }
+  const situations = blocks.map((block) => ({
+    name: block.name,
+    now: String(nowOf[block.name] || '').slice(0, 40),
+  }))
+  const preview = previewShopGains(computed?.score || 0, offerPrice)
+  return {
+    score: computed?.score || 0,
+    searchLevel: computed?.searchLevel || '',
+    verifyLevel: computed?.verifyLevel || '',
+    situations,
+    exposureLift: preview.exposurePct,
+    verifyLift: preview.verifyYuan,
+  }
+}
+
 export async function evaluateShop(
   raw: ShopEvalInput,
   opts: { force?: boolean; storage: StorageLike; askText: AskText },
 ): Promise<ShopEvalScore> {
   const { spec, row } = normalizeInput(raw)
   if (!row.storeName) throw new Error('请先完善门店名称')
+  if (raw.signals && opts.force) {
+    const scored = scoreFromSignals(spec, raw.signals, row.offerPrice)
+    writeCache(opts.storage, cacheKey(row), scored)
+    return scored
+  }
   const loaded = loadCache(opts.storage, row)
   const key = loaded.key
   if (!opts.force) {
