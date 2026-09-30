@@ -19,9 +19,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { fetchTraining } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
-import { readAccountPrFeatureAccess } from '../lib/prFeatureAccess'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
@@ -91,25 +89,12 @@ export default function ProfilePage() {
   const workId = getWorkIdentity()
   const isPr = workId === 'pr'
   const [decorBanner, setDecorBanner] = useState<RegistryPlatformDecorItem | null>(null)
-  const [lecturerApproved, setLecturerApproved] = useState(false)
 
   useEffect(() => {
     void fetchPlatformDecorItem('dr.profile.banner', workId).then((item) => {
       setDecorBanner(item && item.imageUrl ? item : null)
     })
   }, [workId])
-  useEffect(() => {
-    if (!acc?.accountId) return
-    void fetchTraining(acc.accountId)
-      .then((data) => {
-        const profile = data.profile as { lecturerStatus?: string; intro?: string; city?: string } | null
-        const status = profile?.lecturerStatus
-        setLecturerApproved(
-          status === 'approved' || ((!status || status === '') && !!(profile?.intro && profile?.city)),
-        )
-      })
-      .catch(() => setLecturerApproved(false))
-  }, [acc?.accountId])
   const member = readMember()
   const pr = readPrProfile()
   const edition = WORK_EDITION_LABEL[workId]
@@ -169,12 +154,7 @@ export default function ProfilePage() {
    * 避免错误构建/旧 dist 漏打包导致线上「我的推广」消失）。
    * 顺序：资料和接单 → 钱和订单 → 讲师课程 → 数据 → 帮助。
    */
-  const talentAccess = readAccountPrFeatureAccess(getAccount())
-  const showTalentAnalysis =
-    !isPr &&
-    workId !== 'shoot' &&
-    workId !== 'edit' &&
-    (talentAccess.talentEval || talentAccess.talentAdvice)
+  const showTalentAnalysis = !isPr && workId !== 'shoot' && workId !== 'edit'
   const menuItems: MenuEntry[] = [
     {
       to: profileLink,
@@ -292,16 +272,12 @@ export default function ProfilePage() {
       hot: true,
       group: 'tools',
     },
-    ...(lecturerApproved
-      ? [
-          {
-            to: '/training?mine=1',
-            label: '我的课程',
-            desc: '发布、编辑和结算自己的培训',
-            group: 'tools' as const,
-          },
-        ]
-      : []),
+    {
+      to: '/training?mine=1',
+      label: '我的课程',
+      desc: '发布、编辑和结算自己的培训',
+      group: 'tools',
+    },
     {
       to: '/profile/analytics',
       label: '数据分析',
