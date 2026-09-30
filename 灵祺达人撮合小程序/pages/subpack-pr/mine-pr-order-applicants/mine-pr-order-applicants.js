@@ -33,6 +33,41 @@ const EMPTY_LIST_FILTERS = {
   filterNotified: '',
 }
 
+function annotateApplicantFit(rows, fitById) {
+  const map = fitById && typeof fitById === 'object' ? fitById : {}
+  return (rows || []).map((row) => {
+    if (!row) return row
+    const fit = map[String(row.id || '')]
+    if (!fit) {
+      if (!row.hasFit) return row
+      const next = { ...row }
+      delete next.hasFit
+      delete next.fitScore
+      delete next.fitMatch
+      delete next.fitReason
+      delete next.fitAfterGrid
+      return next
+    }
+    const fields = Array.isArray(row.applyFormDisplayRows) ? row.applyFormDisplayRows : []
+    let linked = false
+    const applyFormDisplayRows = fields.map((field) => {
+      const isLink = String((field && field.label) || '').indexOf('主页链接') >= 0
+      if (!isLink || linked) return field
+      linked = true
+      return { ...field, showFitAfter: true }
+    })
+    return {
+      ...row,
+      hasFit: true,
+      fitAfterGrid: !linked,
+      fitScore: fit.score,
+      fitMatch: fit.fit,
+      fitReason: fit.reason || '',
+      applyFormDisplayRows,
+    }
+  })
+}
+
 function findApplicantById(applicants, id) {
   const aid = String(id || '').trim()
   if (!aid) return null
@@ -74,7 +109,8 @@ Page({
     mpOrderId: '',
     loading: true,
     fitBusy: false,
-    fitSheet: null,
+    fitById: {},
+    fitOrderRead: '',
     err: '',
     title: '',
     orderNo: '',
@@ -177,12 +213,16 @@ Page({
     prOrderTalentFit
       .analyzePrOrderTalents(id)
       .then((data) => {
+        const fitById = {}
+        ;(data.talents || []).forEach((row) => {
+          const id = String((row && row.applicantId) || '').trim()
+          if (id) fitById[id] = row
+        })
         this.setData({
-          fitSheet: {
-            title: this.data.title || '招募单',
-            orderRead: data.orderRead || '',
-            talents: data.talents || [],
-          },
+          fitById,
+          fitOrderRead: data.orderRead || '',
+          applicants: annotateApplicantFit(this.data.applicants, fitById),
+          displayApplicants: annotateApplicantFit(this.data.displayApplicants, fitById),
         })
       })
       .catch((err) => {
@@ -208,9 +248,6 @@ Page({
         wx.hideLoading()
         this.setData({ fitBusy: false })
       })
-  },
-  onCloseFitSheet() {
-    this.setData({ fitSheet: null })
   },
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
@@ -255,7 +292,9 @@ Page({
     const filterSelectedOnly =
       opts && opts.filterSelectedOnly != null ? opts.filterSelectedOnly : this.data.filterSelectedOnly
     const listFilters = (opts && opts.listFilters) || this.data.listFilters || EMPTY_LIST_FILTERS
-    let displayApplicants = applicantExtras.filterApplicantRows(stamped, listFilters)
+    const fitById = this.data.fitById || {}
+    const stampedWithFit = annotateApplicantFit(stamped, fitById)
+    let displayApplicants = applicantExtras.filterApplicantRows(stampedWithFit, listFilters)
     if (filterSelectedOnly) displayApplicants = displayApplicants.filter((a) => a && a.selected)
     const hasActiveListFilters = !!(
       listFilters.searchQuery ||
@@ -266,7 +305,7 @@ Page({
     const notifiedCount = (stamped || []).filter((a) => a && a.selectionNotified).length
     const publishStats = countPublishLinkStats(stamped)
     this.setData({
-      applicants: stamped,
+      applicants: stampedWithFit,
       displayApplicants,
       filterSelectedOnly,
       selectedIds: ids,
@@ -285,6 +324,7 @@ Page({
     const filters = listFilters || this.data.listFilters || EMPTY_LIST_FILTERS
     let rows = applicantExtras.filterApplicantRows(this.data.applicants || [], filters)
     if (this.data.filterSelectedOnly) rows = rows.filter((a) => a && a.selected)
+    rows = annotateApplicantFit(rows, this.data.fitById)
     const hasActiveListFilters = !!(
       filters.searchQuery ||
       filters.filterSalesLevel ||

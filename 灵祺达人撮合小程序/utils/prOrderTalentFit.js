@@ -127,6 +127,7 @@ async function analyzePrOrderTalents(mpOrderId) {
   const talents = picked.map((raw, index) => {
     const item = rows[index] && typeof rows[index] === 'object' ? rows[index] : {}
     return {
+      applicantId: textOf(raw.id, 80),
       name: textOf(item.name || raw.name || raw.nickname, 40) || `达人${index + 1}`,
       score: clampScore(item.score),
       fit: clampScore(item.fit),

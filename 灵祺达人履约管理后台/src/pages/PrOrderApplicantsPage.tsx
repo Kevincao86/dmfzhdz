@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry, fetchTalentCooperationStats, reviewCancelMpRecruitmentApply } from '../lib/mpApi'
 import {
@@ -28,7 +28,7 @@ import {
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
-import { analyzePrOrderTalents, type PrTalentFitResult } from '../lib/prOrderTalentFit'
+import { analyzePrOrderTalents, type PrTalentFitResult, type PrTalentFitRow } from '../lib/prOrderTalentFit'
 import { reviewRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
@@ -104,6 +104,18 @@ function countPublishLinkStats(rows: EnrichedApplicantRow[]) {
   return { publishLinkPendingCount: pending, publishLinkSubmittedCount: submitted }
 }
 
+function TalentFitNote({ orderRead, row }: { orderRead?: string; row: PrTalentFitRow }) {
+  return (
+    <div className="col-span-2 sm:col-span-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5">
+      {orderRead ? <p className="text-amber-950">{orderRead}</p> : null}
+      <p className={`font-medium text-amber-950 ${orderRead ? 'mt-1' : ''}`}>
+        账号 {row.score} · 关联 {row.fit}
+      </p>
+      {row.reason ? <p className="mt-1 text-amber-900">{row.reason}</p> : null}
+    </div>
+  )
+}
+
 export default function PrOrderApplicantsPage() {
   const { id: mpOrderId = '' } = useParams()
   const [searchParams] = useSearchParams()
@@ -176,6 +188,14 @@ export default function PrOrderApplicantsPage() {
     if (filterSelectedOnly) rows = rows.filter((a) => a.selected)
     return rows
   }, [applicants, listFilters, filterSelectedOnly])
+  const fitByApplicantId = useMemo(() => {
+    const map = new Map<string, PrTalentFitRow>()
+    for (const row of fitResult?.talents || []) {
+      const id = String(row.applicantId || '').trim()
+      if (id) map.set(id, row)
+    }
+    return map
+  }, [fitResult])
   const hasActiveListFilters = useMemo(
     () =>
       !!(
@@ -1189,12 +1209,28 @@ export default function PrOrderApplicantsPage() {
                   ) : null}
                 </div>
               ) : null}
-              {(a.applyFormDisplayRows || []).map((fieldRow, fieldIdx) => (
-                <div key={`${fieldRow.label}-${fieldIdx}`} className="col-span-2 sm:col-span-3">
-                  <span className="text-[var(--shell-muted)]">{fieldRow.label} </span>
-                  {fieldRow.value}
-                </div>
-              ))}
+              {(a.applyFormDisplayRows || []).map((fieldRow, fieldIdx) => {
+                const fit = fitByApplicantId.get(String(a.id || ''))
+                const rows = a.applyFormDisplayRows || []
+                const linkIdx = rows.findIndex((row) => /主页链接/.test(String(row.label || '')))
+                const showFit = !!fit && fieldIdx === linkIdx
+                return (
+                  <Fragment key={`${fieldRow.label}-${fieldIdx}`}>
+                    <div className="col-span-2 sm:col-span-3">
+                      <span className="text-[var(--shell-muted)]">{fieldRow.label} </span>
+                      {fieldRow.value}
+                    </div>
+                    {showFit && fit ? <TalentFitNote orderRead={fitResult?.orderRead} row={fit} /> : null}
+                  </Fragment>
+                )
+              })}
+              {(() => {
+                const fit = fitByApplicantId.get(String(a.id || ''))
+                const hasLinkRow = (a.applyFormDisplayRows || []).some((row) =>
+                  /主页链接/.test(String(row.label || '')),
+                )
+                return fit && !hasLinkRow ? <TalentFitNote orderRead={fitResult?.orderRead} row={fit} /> : null
+              })()}
               {a.merchantShareNote ? (
                 <div className="col-span-2 sm:col-span-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
                   <span className="text-[var(--shell-muted)]">商家备注 </span>
@@ -1581,39 +1617,6 @@ export default function PrOrderApplicantsPage() {
                 确认驳回
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
-
-      {fitResult ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setFitResult(null)}>
-          <div
-            className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-5 text-[var(--shell-text)] shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-base font-semibold">达人数据分析</p>
-                <p className="mt-1 text-xs text-[var(--shell-muted)]">{title || '招募单'}</p>
-              </div>
-              <button type="button" className="text-sm text-[var(--shell-muted)]" onClick={() => setFitResult(null)}>
-                关闭
-              </button>
-            </div>
-            {fitResult.orderRead ? (
-              <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm leading-6">{fitResult.orderRead}</p>
-            ) : null}
-            <ul className="mt-3 space-y-2">
-              {fitResult.talents.map((item) => (
-                <li key={`${item.name}-${item.score}-${item.fit}`} className="rounded-xl border px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold">{item.name}</span>
-                    <span className="text-xs text-[var(--shell-muted)]">账号 {item.score} · 关联 {item.fit}</span>
-                  </div>
-                  {item.reason ? <p className="mt-1 text-xs leading-5 text-[var(--shell-muted)]">{item.reason}</p> : null}
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       ) : null}

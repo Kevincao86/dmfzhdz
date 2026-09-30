@@ -207,16 +207,22 @@
           <text wx:if="{{item.publishLinkNote && item.publishLinkTone === 'rejected'}}" class="applicant-card-v2__publish-error">{{item.publishLinkNote}}</text>
         </view>
       </view>
-      <view
+      <block
         wx:for="{{item.applyFormDisplayRows}}"
         wx:for-item="fieldRow"
         wx:for-index="fieldIdx"
         wx:key="fieldIdx"
-        class="applicant-card-v2__cell applicant-card-v2__cell--wide"
       >
-        <text>{{fieldRow.label}}</text>
-        <text class="applicant-card-v2__cell-val">{{fieldRow.value}}</text>
-      </view>
+        <view class="applicant-card-v2__cell applicant-card-v2__cell--wide">
+          <text>{{fieldRow.label}}</text>
+          <text class="applicant-card-v2__cell-val">{{fieldRow.value}}</text>
+        </view>
+        <view wx:if="{{fieldRow.showFitAfter}}" class="applicant-fit">
+          <text wx:if="{{fitOrderRead}}" class="applicant-fit__read">{{fitOrderRead}}</text>
+          <text class="applicant-fit__score">账号 {{item.fitScore}} · 关联 {{item.fitMatch}}</text>
+          <text wx:if="{{item.fitReason}}" class="applicant-fit__reason">{{item.fitReason}}</text>
+        </view>
+      </block>
       <view
         wx:if="{{item.merchantShareNote}}"
         class="applicant-card-v2__cell applicant-card-v2__cell--wide applicant-card-v2__cell--merchant-note"
@@ -225,6 +231,12 @@
         <text class="applicant-card-v2__cell-val applicant-card-v2__cell-val--accent">{{item.merchantShareNote}}</text>
         <text wx:if="{{item.merchantShareNoteMeta}}" class="hint">{{item.merchantShareNoteMeta}}</text>
       </view>
+    </view>
+
+    <view wx:if="{{item.fitAfterGrid}}" class="applicant-fit applicant-fit--below">
+      <text wx:if="{{fitOrderRead}}" class="applicant-fit__read">{{fitOrderRead}}</text>
+      <text class="applicant-fit__score">账号 {{item.fitScore}} · 关联 {{item.fitMatch}}</text>
+      <text wx:if="{{item.fitReason}}" class="applicant-fit__reason">{{item.fitReason}}</text>
     </view>
 
     <view wx:if="{{isIce}}" class="ice-app-block">
@@ -524,24 +536,6 @@
       </view>
     </scroll-view>
     <button class="pr-selected-close" bindtap="onCloseSelectedPanel">关闭</button>
-  </view>
-</view>
-
-<view class="fit-mask" wx:if="{{fitSheet}}" catchtap="onCloseFitSheet">
-  <view class="fit-sheet" catchtap="noop">
-    <view class="fit-head">
-      <text class="fit-title">达人数据分析</text>
-      <text class="fit-close" catchtap="onCloseFitSheet">关闭</text>
-    </view>
-    <text class="fit-order">{{fitSheet.title}}</text>
-    <text class="fit-read" wx:if="{{fitSheet.orderRead}}">{{fitSheet.orderRead}}</text>
-    <view class="fit-row" wx:for="{{fitSheet.talents}}" wx:for-index="idx" wx:key="idx">
-      <view class="fit-row-top">
-        <text class="fit-name">{{item.name}}</text>
-        <text class="fit-score">账号 {{item.score}} · 关联 {{item.fit}}</text>
-      </view>
-      <text class="fit-reason" wx:if="{{item.reason}}">{{item.reason}}</text>
-    </view>
   </view>
 </view>
 

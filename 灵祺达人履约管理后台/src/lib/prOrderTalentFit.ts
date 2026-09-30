@@ -4,6 +4,7 @@ import { getAccount, getToken } from './mpSession'
 import { resolveEffectiveMembershipTier } from '@merchant/lib/mpMembershipCatalog'
 
 export type PrTalentFitRow = {
+  applicantId: string
   name: string
   score: number
   fit: number
@@ -157,6 +158,7 @@ export async function analyzePrOrderTalents(mpOrderId: string): Promise<PrTalent
   const talents = picked.map((raw, index) => {
     const item = rows[index] && typeof rows[index] === 'object' ? (rows[index] as Record<string, unknown>) : {}
     return {
+      applicantId: textOf(raw.id, 80),
       name: textOf(item.name || raw.name || raw.nickname, 40) || `达人${index + 1}`,
       score: clampScore(item.score),
       fit: clampScore(item.fit),
