@@ -508,7 +508,9 @@ Page({
       })
       const mpList = reg.mpRecruitmentOrders || []
       prPublishedOrders.pruneOrphanPublishedOrders(mpList)
-      const local = prPublishedOrders.listPublishedOrdersForCurrentPr(mpList)
+      const local = prPublishedOrders.listPublishedOrdersForCurrentPr(mpList, {
+        trustRegistryOwned: true,
+      })
       if (!local.length) {
         this.setData({
           rows: [],

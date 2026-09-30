@@ -1,5 +1,7 @@
 const api = require('./api.js')
 const auth = require('./auth.js')
+const ecs = require('./ecs.js')
+const mpRuntime = require('./mpRuntime.js')
 const userProfile = require('./userProfile.js')
 const accountMemberSync = require('./accountMemberSync.js')
 const mpPendingDistributionRef = require('./mpPendingDistributionRef.js')
@@ -117,6 +119,44 @@ function shouldPersistHallRegistryCache(opts) {
 }
 
 /**
+ * 开发者工具里普通请求只有 12 秒。拉本人全部发单经常超时，
+ * 超时后又会误用剥掉归属字段的大厅缓存，列表被滤成空的。
+ * 真机仍走原通道（120 秒）。
+ */
+function postHallRegistry(body, headers) {
+  if (!mpRuntime.isLocalDevRuntime()) return api.post(HALL_POST, body, headers)
+  const base = String(ecs.base() || '').replace(/\/$/, '')
+  if (!base) return Promise.reject(new Error('未配置 MERCHANT_API_BASE_URL'))
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: `${base}${HALL_POST}`,
+      method: 'POST',
+      timeout: 60000,
+      enableHttp2: false,
+      dataType: 'json',
+      header: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(headers || {}),
+      },
+      data: body,
+      success(res) {
+        const code = Number(res && res.statusCode) || 0
+        if (code >= 200 && code < 300) {
+          resolve(res.data)
+          return
+        }
+        const detail = res && res.data && (res.data.detail || res.data.error)
+        reject(new Error(String(detail || `http_${code}`)))
+      },
+      fail(err) {
+        reject(new Error(String((err && err.errMsg) || 'request:fail')))
+      },
+    })
+  })
+}
+
+/**
  * 拉取大厅注册表。
  * 优先 GET：mpErpProxy 对 GET 有多路上游重试；POST 为单次（避免 wx code 重试），不宜放首位。
  * 超时仅由 cloudEcs（50s）一层控制，避免双层 withTimeout 误杀。
@@ -161,7 +201,9 @@ async function fetchRegistryOnce(opts) {
             !includePrOwned &&
             !includeRecommendPool)
     if (wantIncludeOnly) body.includeOnly = true
-    const raw = await api.post(HALL_POST, body, registerAuthHeaders())
+    const raw = includePrOwned
+      ? await postHallRegistry(body, registerAuthHeaders())
+      : await api.post(HALL_POST, body, registerAuthHeaders())
     return normalizeHallPayload(raw)
   } catch (e2) {
     const msg = String(e2 && e2.message ? e2.message : e2)
@@ -371,6 +413,8 @@ async function fetchRegistry(opts) {
       return await fetchRegistryFromServer(opts)
     } catch (e) {
       console.warn('[mp] fetchRegistry server failed', String(e && e.message ? e.message : e).slice(0, 240))
+      // 大厅缓存会剥掉 lingqiPrId / prParticipantKey。拿它冒充「我的发单」会被归属判断滤成空列表。
+      if (opts && opts.includePrOwned) throw e
       const includeRecommendPool = !!(opts && opts.includeRecommendPool)
       const cached = readRegistryCache({ recommendPool: includeRecommendPool })
       if (cached && hasMpOrders(cached)) {

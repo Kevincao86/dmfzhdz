@@ -32,8 +32,18 @@ function mpOrderOwnedByCurrentPr(mp, account) {
   return false
 }
 
+function orderVisibleOnPrList(mp, account, trustRegistryOwned) {
+  if (!mp) return false
+  const pub = String(mp.publisherIdentity || '').trim()
+  if (pub && pub !== 'pr') return false
+  // includePrOwned 的响应已经按当前账号筛过。本机资料缺手机号时会变成 pr_device_ 键，
+  // 再筛一次会把服务端返回的本人发单全部丢掉。
+  if (trustRegistryOwned) return true
+  return mpOrderOwnedByCurrentPr(mp, account)
+}
+
 /** 本地发单历史 + 注册表：展示全部本 PR 发单（含已删除、已完成） */
-function mergePublishedOrdersFromRegistry(local, mpList, account) {
+function mergePublishedOrdersFromRegistry(local, mpList, account, trustRegistryOwned) {
   const scope = require('./mpAccountLocalScope.js')
   const mpById = new Map()
   ;(mpList || []).forEach((mp) => {
@@ -52,7 +62,7 @@ function mergePublishedOrdersFromRegistry(local, mpList, account) {
     const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
     if (!id || seen.has(id)) return
     const mp = mpById.get(id)
-    if (mp && !mpOrderOwnedByCurrentPr(mp, account)) return
+    if (mp && !orderVisibleOnPrList(mp, account, trustRegistryOwned)) return
     seen.add(id)
     out.push(item)
   })
@@ -60,7 +70,7 @@ function mergePublishedOrdersFromRegistry(local, mpList, account) {
   ;(mpList || []).forEach((mp) => {
     if (!mp || typeof mp !== 'object') return
     const id = String(mp.id || '').trim()
-    if (!id || seen.has(id) || !mpOrderOwnedByCurrentPr(mp, account)) return
+    if (!id || seen.has(id) || !orderVisibleOnPrList(mp, account, trustRegistryOwned)) return
     if (localById.get(id) && localById.get(id).deletedAt) return
     seen.add(id)
     out.push({
@@ -69,7 +79,7 @@ function mergePublishedOrdersFromRegistry(local, mpList, account) {
       publishedAt: String(mp.createdAt || mp.updatedAt || ''),
       hall: hallFromMp(mp),
       ownerAccountId: scope.scopeIdFromAccount(account),
-      ownerPrId: String(account.lingqiPrId || '').trim(),
+      ownerPrId: String((account && account.lingqiPrId) || '').trim(),
     })
   })
 
@@ -100,9 +110,15 @@ function pruneOrphanPublishedOrders(mpList) {
   }
 }
 
-function listPublishedOrdersForCurrentPr(mpList) {
+function listPublishedOrdersForCurrentPr(mpList, opts) {
   const account = auth.readAccount()
-  return mergePublishedOrdersFromRegistry(applicationsStore.readPublishedOrders(), mpList, account)
+  const trustRegistryOwned = !!(opts && opts.trustRegistryOwned)
+  return mergePublishedOrdersFromRegistry(
+    applicationsStore.readPublishedOrders(),
+    mpList,
+    account,
+    trustRegistryOwned,
+  )
 }
 
 module.exports = {
