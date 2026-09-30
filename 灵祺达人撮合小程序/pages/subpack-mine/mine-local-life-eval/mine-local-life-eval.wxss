@@ -1,5 +1,4 @@
 @import '../../../styles/xingxuan-subpage.wxss';
-@import '../../../custom-tab-bar/index.wxss';
 
 .plats {
   display: flex;
@@ -716,3 +715,210 @@
   60% { transform: scale(1.12); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* 分析页在分包里，不能依赖主包 tab 样式，图标尺寸写在本页 */
+.eval-tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+  height: calc(96rpx + env(safe-area-inset-bottom));
+  padding: 6rpx 8rpx calc(6rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1rpx solid #e6e4f0;
+}
+
+.eval-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.eval-tab-ico {
+  position: relative;
+  width: 44rpx;
+  height: 44rpx;
+  flex-shrink: 0;
+}
+
+.eval-tab-tx {
+  margin-top: 2rpx;
+  font-size: 20rpx;
+  line-height: 1.2;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.eval-tab--on .eval-tab-tx {
+  color: #7c4dff;
+  font-weight: 700;
+}
+
+.eval-tab-tx--compact {
+  font-size: 18rpx;
+}
+
+.eval-tab-ai {
+  position: absolute;
+  top: -4rpx;
+  right: -16rpx;
+  height: 22rpx;
+  line-height: 22rpx;
+  padding: 0 6rpx;
+  border-radius: 8rpx;
+  background: #7c4dff;
+  color: #fff;
+  font-size: 14rpx;
+  font-weight: 800;
+  z-index: 2;
+}
+
+.ei {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.ei-home {
+  left: 4rpx;
+  top: 6rpx;
+  width: 36rpx;
+  height: 32rpx;
+}
+
+.ei-home-roof {
+  position: absolute;
+  left: 2rpx;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-left: 16rpx solid transparent;
+  border-right: 16rpx solid transparent;
+  border-bottom: 12rpx solid #94a3b8;
+}
+
+.ei-home-body {
+  position: absolute;
+  left: 4rpx;
+  top: 10rpx;
+  width: 28rpx;
+  height: 20rpx;
+  border: 3rpx solid #94a3b8;
+  border-top: none;
+  border-radius: 0 0 6rpx 6rpx;
+  box-sizing: border-box;
+}
+
+.ei-home-door {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 10rpx;
+  height: 12rpx;
+  margin-left: -5rpx;
+  background: #94a3b8;
+  border-radius: 3rpx 3rpx 0 0;
+}
+
+.eval-tab--on .ei-home-roof { border-bottom-color: #7c4dff; }
+.eval-tab--on .ei-home-body { border-color: #7c4dff; }
+.eval-tab--on .ei-home-door { background: #7c4dff; }
+
+.ei-star {
+  left: 8rpx;
+  top: 8rpx;
+  width: 28rpx;
+  height: 28rpx;
+  background: #94a3b8;
+  clip-path: polygon(50% 2%, 62% 36%, 98% 38%, 70% 58%, 80% 94%, 50% 74%, 20% 94%, 30% 58%, 2% 38%, 38% 36%);
+}
+
+.eval-tab--on .ei-star { background: #7c4dff; }
+
+.ei-insight {
+  left: 2rpx;
+  top: 2rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c4dff 0%, #c084fc 100%);
+}
+
+.ei-insight-spark {
+  position: absolute;
+  left: 9rpx;
+  top: 9rpx;
+  width: 22rpx;
+  height: 22rpx;
+  background: #fff;
+  clip-path: polygon(50% 0%, 62% 34%, 100% 50%, 62% 66%, 50% 100%, 38% 66%, 0% 50%, 38% 34%);
+}
+
+.ei-chat {
+  left: 4rpx;
+  top: 10rpx;
+  width: 34rpx;
+  height: 26rpx;
+  border: 3rpx solid #94a3b8;
+  border-radius: 14rpx;
+  background: transparent;
+}
+
+.ei-chat-tail {
+  position: absolute;
+  left: 8rpx;
+  bottom: -6rpx;
+  width: 10rpx;
+  height: 10rpx;
+  border: 3rpx solid #94a3b8;
+  border-top: none;
+  border-right: none;
+  border-radius: 0 0 0 6rpx;
+  background: #fff;
+  transform: rotate(-12deg);
+}
+
+.eval-tab--on .ei-chat,
+.eval-tab--on .ei-chat-tail { border-color: #7c4dff; }
+
+.ei-user {
+  left: 8rpx;
+  top: 6rpx;
+  width: 28rpx;
+  height: 32rpx;
+}
+
+.ei-user-head {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 18rpx;
+  height: 18rpx;
+  margin-left: -9rpx;
+  border: 3rpx solid #94a3b8;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.ei-user-shoulder {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 28rpx;
+  height: 14rpx;
+  border: 3rpx solid #94a3b8;
+  border-bottom: none;
+  border-radius: 14rpx 14rpx 0 0;
+  box-sizing: border-box;
+}
+
+.eval-tab--on .ei-user-head,
+.eval-tab--on .ei-user-shoulder { border-color: #7c4dff; }
