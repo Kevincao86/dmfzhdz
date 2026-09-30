@@ -437,7 +437,8 @@ export async function accountPayloadWithMemberExtras(
         )
       }
     }
-    if (acc.active_role === 'pr' || acc.lingqi_pr_id || acc.registry_pr_id) {
+    // 达人/拍摄/剪辑身份保留达人会员权限。仅有 PR 编号时不能覆盖，否则专业版达人评估会被 PR 套餐关掉。
+    if (acc.active_role === 'pr' || (!extras.prFeatureAccess && (acc.lingqi_pr_id || acc.registry_pr_id))) {
       const pr = findRegistryPrForAccount(data, acc)
       extras.prFeatureAccess = pr
         ? resolveEffectiveFeatureAccess(

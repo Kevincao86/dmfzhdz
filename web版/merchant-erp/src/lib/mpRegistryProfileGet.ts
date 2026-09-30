@@ -133,6 +133,20 @@ export function findRegistryPrForAccount(
   return null
 }
 
+/** 当前身份是达人/拍摄/剪辑时用达人会员权限；PR 身份才用 PR 套餐。 */
+function usePrFeatureAccess(
+  account: MpAccountRow,
+  hasPr: boolean,
+  hasMember: boolean,
+  roleHint?: import('./mpMembershipCatalog.js').MpLibraryRole | null,
+): boolean {
+  if (roleHint === 'talent' || roleHint === 'shoot' || roleHint === 'edit') return false
+  if (roleHint === 'pr') return hasPr
+  if (account.active_role === 'pr') return hasPr
+  if (hasMember) return false
+  return hasPr
+}
+
 export async function mpAuthGetRegistryProfile(
   supabaseUrl: string,
   serviceRole: string,
@@ -228,16 +242,19 @@ export async function mpAuthGetRegistryProfile(
       : { mpMembershipPlan: 'basic' }
   const usageEntity = pr ?? member ?? null
   const mpPermissionEffective = resolvePermissionEffectiveMap(libRole, accessRecord, data, usageEntity)
-  const prFeatureAccess = pr
-    ? resolveEffectiveFeatureAccess(
-        'pr',
-        {
-          mpMembershipPlan: pr.mpMembershipPlan,
-          mpMembershipExpiresAt: pr.mpMembershipExpiresAt,
-          prFeatureAccess: pr.prFeatureAccess,
-        },
-        data,
-      )
+  const featureAsPr = usePrFeatureAccess(account, Boolean(pr), Boolean(member), opts?.roleHint)
+  const prFeatureAccess = featureAsPr
+    ? pr
+      ? resolveEffectiveFeatureAccess(
+          'pr',
+          {
+            mpMembershipPlan: pr.mpMembershipPlan,
+            mpMembershipExpiresAt: pr.mpMembershipExpiresAt,
+            prFeatureAccess: pr.prFeatureAccess,
+          },
+          data,
+        )
+      : { ...DEFAULT_PR_FEATURE_ACCESS }
     : member
       ? resolveEffectiveFeatureAccess(
           'talent',
