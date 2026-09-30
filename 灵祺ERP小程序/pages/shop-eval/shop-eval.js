@@ -12,12 +12,16 @@ const PLATFORM_LOGOS = {
   kuaishou: assetUrl('platforms/kuaishou-local.png'),
 }
 
-const PLATFORMS = (evalApi.SHOP_EVAL_PLATFORMS || []).map((p) => ({
-  id: p.id,
-  name: p.name,
-  letter: String(p.name || '店').slice(0, 1),
-  logo: PLATFORM_LOGOS[p.id] || '',
-}))
+const PLATFORMS = (evalApi.SHOP_EVAL_PLATFORMS || []).map((p) => {
+  const logo = PLATFORM_LOGOS[p.id] || ''
+  return {
+    id: p.id,
+    name: p.name,
+    letter: String(p.name || '店').slice(0, 1),
+    logo,
+    logoStyle: logo ? `background-image:url('${logo}')` : '',
+  }
+})
 
 const storage = {
   getItem(key) {

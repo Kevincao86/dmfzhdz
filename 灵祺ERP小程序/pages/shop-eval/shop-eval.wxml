@@ -1,5 +1,5 @@
 <view class="shop-eval-page">
-  <scroll-view scroll-x class="plats" enhanced show-scrollbar="{{false}}" enable-flex="{{true}}">
+  <scroll-view scroll-x class="plats" show-scrollbar="{{false}}">
     <view class="plats-row">
       <view
         wx:for="{{platforms}}"
@@ -8,16 +8,7 @@
         data-id="{{item.id}}"
         bindtap="onPlatform"
       >
-        <view class="plat-logo-wrap">
-          <image
-            wx:if="{{item.logo}}"
-            class="plat-logo"
-            src="{{item.logo}}"
-            mode="aspectFit"
-            style="width: 36rpx; height: 36rpx;"
-          />
-          <text wx:else class="plat-logo-ph">{{item.letter}}</text>
-        </view>
+        <view class="plat-mark {{item.logo ? '' : 'plat-mark--ph'}}" style="{{item.logoStyle}}">{{item.logo ? '' : item.letter}}</view>
         <text class="plat-name">{{item.name}}</text>
       </view>
     </view>

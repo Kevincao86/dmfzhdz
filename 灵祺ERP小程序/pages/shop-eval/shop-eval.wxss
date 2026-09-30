@@ -7,71 +7,70 @@
 
 .plats {
   width: 100%;
-  height: 88rpx;
+  height: 104rpx;
   white-space: nowrap;
-  padding: 8rpx 0 16rpx;
-  box-sizing: border-box;
 }
 
 .plats-row {
-  display: inline-flex;
-  align-items: center;
-  height: 64rpx;
+  display: block;
+  height: 88rpx;
+  padding-top: 8rpx;
+  font-size: 0;
+  white-space: nowrap;
 }
 
 .plat {
-  display: inline-flex;
-  align-items: center;
-  height: 64rpx;
-  margin-right: 12rpx;
-  padding: 0 18rpx 0 6rpx;
-  border-radius: 999rpx;
+  display: inline-block;
+  height: 72rpx;
+  margin-right: 16rpx;
+  padding: 0 20rpx 0 8rpx;
+  border-radius: 36rpx;
   background: #fff;
-  color: #64748b;
-  box-shadow: 0 6rpx 18rpx rgba(15, 23, 42, 0.04);
-  flex-shrink: 0;
-  overflow: visible;
-  box-sizing: border-box;
+  vertical-align: top;
+  white-space: nowrap;
+  box-shadow: 0 6rpx 18rpx rgba(15, 23, 42, 0.06);
 }
 
-.plat-logo-wrap {
-  width: 44rpx;
-  height: 44rpx;
-  margin-right: 10rpx;
+.plat-mark {
+  display: inline-block;
+  width: 48rpx;
+  height: 48rpx;
+  margin: 12rpx 10rpx 0 0;
   border-radius: 12rpx;
-  background: #fff;
+  background-color: #fff;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 40rpx 40rpx;
+  vertical-align: top;
   overflow: hidden;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.plat-logo {
-  width: 36rpx;
-  height: 36rpx;
-  display: block;
-}
-
-.plat-logo-ph {
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: 800;
+  line-height: 48rpx;
+  text-align: center;
+  color: transparent;
+}
+
+.plat-mark--ph {
   color: #0891b2;
-  line-height: 44rpx;
+  background-color: #e0f2fe;
 }
 
 .plat-name {
-  font-size: 22rpx;
-  line-height: 1.2;
+  display: inline-block;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 24rpx;
+  color: #334155;
+  vertical-align: top;
   white-space: nowrap;
 }
 
 .plat--on {
   background: #0891b2;
-  color: #fff;
 }
 
 .plat--on .plat-name {
+  color: #fff;
   font-weight: 700;
 }
 
