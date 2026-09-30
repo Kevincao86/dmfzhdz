@@ -159,7 +159,6 @@ export default function MerchantShopEvalPanel() {
     setErr('')
     try {
       const next = await evaluateShop(input, { force: true, storage, askText })
-      setAdvice(null)
       setAnimateScore(true)
       setAnimateGains(true)
       setDisplayScore(0)

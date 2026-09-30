@@ -507,7 +507,19 @@ function mapSuggestions(rows: unknown): ShopEvalSuggestion[] {
     .slice(0, 5)
 }
 
+function ownerId() {
+  try {
+    return sessionStorage.getItem('meoo_active_tenant_id')?.trim() || ''
+  } catch {
+    return ''
+  }
+}
+
 function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
+  return ['lq_merchant_shop_eval_v3', ownerId(), row.platformId].join('|')
+}
+
+function legacyCacheKey(row: ReturnType<typeof normalizeInput>['row']) {
   return [
     'lq_merchant_shop_eval_v2',
     row.platformId,
@@ -521,6 +533,16 @@ function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
     row.offerName,
     row.offerPrice,
   ].join('|')
+}
+
+function loadCache(storage: StorageLike, row: ReturnType<typeof normalizeInput>['row']) {
+  const key = cacheKey(row)
+  const hit = readCache(storage, key)
+  if (hit) return { key, data: hit }
+  const old = readCache(storage, legacyCacheKey(row))
+  if (!old) return { key, data: null }
+  writeCache(storage, key, old, true)
+  return { key, data: readCache(storage, key) || old }
 }
 
 function readCache(storage: StorageLike, key: string): Record<string, unknown> | null {
@@ -677,8 +699,7 @@ export function resolveShopEvalFromStores(
 
 export function readSavedShopEval(raw: ShopEvalInput, storage: StorageLike) {
   const { row } = normalizeInput(raw)
-  if (!row.storeName) return null
-  return savedFromCache(readCache(storage, cacheKey(row)))
+  return savedFromCache(loadCache(storage, row).data)
 }
 
 async function askJson(askText: AskText, system: string, user: string) {
@@ -700,9 +721,10 @@ export async function evaluateShop(
 ): Promise<ShopEvalScore> {
   const { spec, row } = normalizeInput(raw)
   if (!row.storeName) throw new Error('请先完善门店名称')
-  const key = cacheKey(row)
+  const loaded = loadCache(opts.storage, row)
+  const key = loaded.key
   if (!opts.force) {
-    const saved = savedFromCache(readCache(opts.storage, key))
+    const saved = savedFromCache(loaded.data)
     if (saved) return saved.score
   }
   const j = await askJson(
@@ -711,7 +733,7 @@ export async function evaluateShop(
     `${shopFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用商家自己能看懂的话来写。`,
   )
   const score = buildScore(spec, j)
-  writeCache(opts.storage, key, score, true)
+  writeCache(opts.storage, key, score)
   return score
 }
 
@@ -722,9 +744,10 @@ export async function adviseShop(
 ): Promise<ShopEvalAdvice> {
   if (!score?.situations?.length) throw new Error('请先完成门店评估')
   const { spec, row } = normalizeInput(raw)
-  const key = cacheKey(row)
+  const loaded = loadCache(opts.storage, row)
+  const key = loaded.key
   if (!opts.force) {
-    const cached = readCache(opts.storage, key)
+    const cached = loaded.data
     const adviceRaw = cached?.advice
     if (adviceRaw && typeof adviceRaw === 'object') {
       const sections = mapSuggestions((adviceRaw as ShopEvalAdvice).sections)

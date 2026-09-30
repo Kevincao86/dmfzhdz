@@ -440,7 +440,19 @@ function mapSuggestions(rows) {
     .slice(0, 5)
 }
 
+function ownerId() {
+  try {
+    return String(wx.getStorageSync('meoo_active_tenant_id') || '').trim()
+  } catch (e) {
+    return ''
+  }
+}
+
 function cacheKey(row) {
+  return ['lq_merchant_shop_eval_v3', ownerId(), row.platformId].join('|')
+}
+
+function legacyCacheKey(row) {
   return [
     'lq_merchant_shop_eval_v2',
     row.platformId,
@@ -454,6 +466,16 @@ function cacheKey(row) {
     row.offerName,
     row.offerPrice,
   ].join('|')
+}
+
+function loadCache(storage, row) {
+  const key = cacheKey(row)
+  const hit = readCache(storage, key)
+  if (hit) return { key, data: hit }
+  const old = readCache(storage, legacyCacheKey(row))
+  if (!old) return { key, data: null }
+  writeCache(storage, key, old, true)
+  return { key, data: readCache(storage, key) || old }
 }
 
 function readCache(storage, key) {
@@ -611,8 +633,7 @@ function resolveShopEvalFromStores(platformId, stores, total) {
 
 function readSavedShopEval(raw, storage) {
   const { row } = normalizeInput(raw)
-  if (!row.storeName) return null
-  return savedFromCache(readCache(storage, cacheKey(row)))
+  return savedFromCache(loadCache(storage, row).data)
 }
 
 async function askJson(askText, system, user) {
@@ -631,9 +652,10 @@ async function askJson(askText, system, user) {
 async function evaluateShop(raw, opts) {
   const { spec, row } = normalizeInput(raw)
   if (!row.storeName) throw new Error('请先完善门店名称')
-  const key = cacheKey(row)
+  const loaded = loadCache(opts.storage, row)
+  const key = loaded.key
   if (!opts.force) {
-    const saved = savedFromCache(readCache(opts.storage, key))
+    const saved = savedFromCache(loaded.data)
     if (saved) return saved.score
   }
   const j = await askJson(
@@ -642,16 +664,17 @@ async function evaluateShop(raw, opts) {
     `${shopFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用商家自己能看懂的话来写。`,
   )
   const score = buildScore(spec, j)
-  writeCache(opts.storage, key, score, true)
+  writeCache(opts.storage, key, score)
   return score
 }
 
 async function adviseShop(raw, score, opts) {
   if (!score || !score.situations || !score.situations.length) throw new Error('请先完成门店评估')
   const { spec, row } = normalizeInput(raw)
-  const key = cacheKey(row)
+  const loaded = loadCache(opts.storage, row)
+  const key = loaded.key
   if (!opts.force) {
-    const cached = readCache(opts.storage, key)
+    const cached = loaded.data
     const adviceRaw = cached?.advice
     if (adviceRaw && typeof adviceRaw === 'object') {
       const sections = mapSuggestions((adviceRaw).sections)

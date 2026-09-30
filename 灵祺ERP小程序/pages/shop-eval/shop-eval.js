@@ -288,8 +288,6 @@ Page({
         gradeKey: grade ? grade.key : '',
         gradeLabel: grade ? grade.label : '',
         gradeNote: grade ? grade.note : '',
-        adviceReady: false,
-        sections: [],
         showGains: true,
       })
       this.playScore(score.score)
