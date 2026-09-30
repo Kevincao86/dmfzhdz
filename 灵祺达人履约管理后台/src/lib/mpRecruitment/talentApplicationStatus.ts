@@ -1,5 +1,6 @@
 import { canTalentCancelMpApplication } from '@merchant/lib/mpRecruitmentCancelApplyCore'
 import { isIceMpOrder } from './orderCard'
+import { resolveSignupDeadlineMsFromMp } from './listFilters'
 import { getIceVerifyMode } from './iceOrderStats'
 import { isScriptReviewPlatform } from './deliveryReviewPlatform'
 
@@ -468,24 +469,9 @@ function isPendingVideoPhase(
   return false
 }
 
-function parseSignupDeadlineMs(value: unknown): number {
-  const raw = String(value || '').trim()
-  if (!raw) return 0
-  const normalized = raw.replace(/\//g, '-').replace(/\./g, '-')
-  const withT = normalized.includes('T') ? normalized : normalized.replace(' ', 'T')
-  const ms = Date.parse(withT)
-  if (Number.isFinite(ms) && ms > 0) return ms
-  const fallback = Date.parse(raw)
-  return Number.isFinite(fallback) && fallback > 0 ? fallback : 0
-}
-
 function isSignupDeadlinePassed(mp: Record<string, unknown> | null): boolean {
   if (!mp) return false
-  const meta =
-    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
-      ? (mp.mpPublishMeta as Record<string, unknown>)
-      : null
-  const ms = parseSignupDeadlineMs(meta?.signupDeadline || mp.deadline)
+  const ms = resolveSignupDeadlineMsFromMp(mp)
   if (!ms) return false
   return Date.now() > ms
 }

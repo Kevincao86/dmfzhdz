@@ -361,21 +361,10 @@ function isPendingVideoPhase(mp, applicant, mpOrderId) {
   return false
 }
 
-function parseSignupDeadlineMs(value) {
-  const raw = String(value || '').trim()
-  if (!raw) return 0
-  const normalized = raw.replace(/\//g, '-').replace(/\./g, '-')
-  const withT = normalized.includes('T') ? normalized : normalized.replace(' ', 'T')
-  const ms = Date.parse(withT)
-  if (Number.isFinite(ms) && ms > 0) return ms
-  const fallback = Date.parse(raw)
-  return Number.isFinite(fallback) && fallback > 0 ? fallback : 0
-}
-
 function isSignupDeadlinePassed(mp) {
   if (!mp) return false
-  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
-  const ms = parseSignupDeadlineMs((meta && meta.signupDeadline) || mp.deadline)
+  const listFilters = require('./recruitmentListFilters.js')
+  const ms = listFilters.resolveSignupDeadlineMs(mp, '')
   if (!ms) return false
   return Date.now() > ms
 }
