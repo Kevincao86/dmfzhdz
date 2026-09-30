@@ -26,10 +26,10 @@
     <view class="eval-right">
       <view class="xingxuan-card hero">
         <view class="ring-stage">
-          <view class="ring-halo {{evaluating ? 'ring-halo--on' : ''}}"></view>
-          <view class="ring {{scorePop ? 'ring--pop' : ''}}" style="background: conic-gradient(from -90deg, #7c4dff 0%, #c084fc {{displayScore}}%, #efeaf8 {{displayScore}}%);">
+          <view class="ring-scan" wx:if="{{evaluating}}"></view>
+          <view class="ring {{scorePop ? 'ring--pop' : ''}} {{evaluating ? 'ring--wait' : ''}}" style="background: conic-gradient(from -90deg, #7c4dff 0%, #c084fc {{displayScore}}%, #efeaf8 {{displayScore}}%);">
             <view class="ring-hole">
-              <text class="score {{scorePop ? 'score--pop' : ''}}">{{displayScore}}</text>
+              <text class="score {{scorePop ? 'score--pop' : ''}} {{evaluating ? 'score--wait' : ''}}">{{displayScore}}</text>
             </view>
           </view>
         </view>
@@ -57,11 +57,17 @@
       <view class="gain-row">
         <view class="gain">
           <text class="gain-k">预计提升曝光</text>
-          <text class="gain-v">{{exposureText}}</text>
+          <view class="gain-metric">
+            <view class="gain-arrow"></view>
+            <text class="gain-v">{{exposureText}}</text>
+          </view>
         </view>
         <view class="gain">
           <text class="gain-k">预计提升带货金额</text>
-          <text class="gain-v">{{salesText}}</text>
+          <view class="gain-metric">
+            <view class="gain-arrow"></view>
+            <text class="gain-v">{{salesText}}</text>
+          </view>
         </view>
       </view>
     </view>

@@ -222,6 +222,15 @@ Page({
     this._gainTimer = setInterval(tick, 32)
   },
 
+  startEvalSweep() {
+    this.stopTick()
+    const start = Date.now()
+    this._timer = setInterval(() => {
+      const wave = (Math.sin(((Date.now() - start) / 700) * Math.PI) + 1) / 2
+      this.setData({ displayScore: Math.round(8 + wave * 78) })
+    }, 32)
+  },
+
   playScore(target) {
     this.stopTick()
     const goal = Math.max(0, Math.min(100, Number(target) || 0))
@@ -256,8 +265,8 @@ Page({
     }
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
     this.stopTick()
-    this.setData({ evaluating: true, err: '' })
-    wx.showLoading({ title: '评估中', mask: true })
+    this.setData({ evaluating: true, err: '', scorePop: false, displayScore: 0 })
+    this.startEvalSweep()
     let failed = null
     try {
       const input = this._input || this.accountInput()
@@ -284,8 +293,12 @@ Page({
     } catch (e) {
       failed = e
     }
-    wx.hideLoading()
-    if (failed) this.failEval(failed, 'evaluating')
+    if (failed) {
+      this.stopTick()
+      const prev = this._score ? Number(this._score.score) || 0 : 0
+      this.setData({ displayScore: prev })
+      this.failEval(failed, 'evaluating')
+    }
   },
 
   async onAdvise() {
