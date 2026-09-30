@@ -2,6 +2,18 @@
 const SESSION_KEY = 'lingqi_mp_session_token'
 const ACCOUNT_KEY = 'lingqi_mp_account_v1'
 
+/** 退出时递增。进行中的登录同步回来后若代号变了，不得再写回会话。 */
+let sessionEpoch = 0
+
+function readSessionEpoch() {
+  return sessionEpoch
+}
+
+function bumpSessionEpoch() {
+  sessionEpoch += 1
+  return sessionEpoch
+}
+
 function readSessionToken() {
   try {
     return String(wx.getStorageSync(SESSION_KEY) || '').trim()
@@ -35,6 +47,8 @@ function clearSessionPair() {
 module.exports = {
   SESSION_KEY,
   ACCOUNT_KEY,
+  readSessionEpoch,
+  bumpSessionEpoch,
   readSessionToken,
   readAccount,
   writeSessionPair,

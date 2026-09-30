@@ -280,12 +280,14 @@ async function syncWithServer() {
   }
   syncing = true
   const epochAtStart = localEpoch
+  const sessionEpoch = sessionStore.readSessionEpoch()
   try {
     const data = await ecs.post(
       '/api/meoo-ops-mp-auth',
       { action: 'client_state_sync', state: collectLocalState() },
       authHeaders(),
     )
+    if (sessionEpoch !== sessionStore.readSessionEpoch() || !isLoggedIn()) return null
     if (data && data.state) applyRemoteState(data.state, epochAtStart)
     return data
   } catch (e) {
@@ -293,10 +295,11 @@ async function syncWithServer() {
     return null
   } finally {
     syncing = false
-    if (needResync) {
+    if (needResync && isLoggedIn() && sessionEpoch === sessionStore.readSessionEpoch()) {
       needResync = false
       return syncWithServer()
     }
+    needResync = false
   }
 }
 
@@ -322,6 +325,11 @@ async function flushClientStateSync() {
 
 function resetSessionPullFlag() {
   sessionPulled = false
+  needResync = false
+  if (pushTimer) {
+    clearTimeout(pushTimer)
+    pushTimer = null
+  }
 }
 
 async function ensureClientStatePulled() {

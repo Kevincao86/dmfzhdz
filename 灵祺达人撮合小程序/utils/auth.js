@@ -48,6 +48,7 @@ function writeSession(token, account) {
 }
 
 function clearSession() {
+  sessionStore.bumpSessionEpoch()
   sessionStore.clearSessionPair()
   mpAccountLocalScope.onAccountLogout()
   try {
@@ -88,7 +89,9 @@ function authHeaders() {
 }
 
 async function authPost(action, payload = {}) {
+  const epoch = sessionStore.readSessionEpoch()
   const data = await ecs.post('/api/meoo-ops-mp-auth', { action, ...payload }, authHeaders())
+  if (epoch !== sessionStore.readSessionEpoch()) return data
   if (data.token && data.account) writeSession(data.token, data.account)
   else if (data.account) writeSession(readSessionToken(), data.account)
   return data

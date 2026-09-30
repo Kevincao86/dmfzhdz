@@ -46,6 +46,7 @@ function mergeTalentMemberDraft(local, remote) {
 async function pullRegistryProfileAfterLogin() {
   let account = sessionStore.readAccount()
   const token = sessionStore.readSessionToken()
+  const epoch = sessionStore.readSessionEpoch()
   if (!account || !token) return false
   try {
     const data = await ecs.post(
@@ -53,6 +54,7 @@ async function pullRegistryProfileAfterLogin() {
       { action: 'registry_profile_get', ...mpBillingRoleHint.billingRolePayload() },
       { 'X-Mp-Session': token },
     )
+    if (epoch !== sessionStore.readSessionEpoch() || sessionStore.readSessionToken() !== token) return false
     if (!data || data.ok === false) return false
     let applied = false
     const mpMembershipPlan = String(data.mpMembershipPlan || 'basic').trim() || 'basic'
