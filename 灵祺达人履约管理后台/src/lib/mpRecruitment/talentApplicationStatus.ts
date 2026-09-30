@@ -1,6 +1,7 @@
 import { canTalentCancelMpApplication } from '@merchant/lib/mpRecruitmentCancelApplyCore'
 import { isIceMpOrder } from './orderCard'
 import { resolveSignupDeadlineMsFromMp } from './listFilters'
+import { resolveCreatedMsFromMpId } from '../mpSync/mpRecruitmentOrderId'
 import { getIceVerifyMode } from './iceOrderStats'
 import { isScriptReviewPlatform } from './deliveryReviewPlatform'
 
@@ -469,11 +470,19 @@ function isPendingVideoPhase(
   return false
 }
 
-function isSignupDeadlinePassed(mp: Record<string, unknown> | null): boolean {
-  if (!mp) return false
-  const ms = resolveSignupDeadlineMsFromMp(mp)
-  if (!ms) return false
-  return Date.now() > ms
+const SIGNUP_WINDOW_MS = 7 * 86400000
+
+function isSignupDeadlinePassed(
+  mp: Record<string, unknown> | null,
+  mpOrderId?: string,
+): boolean {
+  if (mp) {
+    const ms = resolveSignupDeadlineMsFromMp(mp)
+    if (ms > 0) return Date.now() > ms
+  }
+  const created = resolveCreatedMsFromMpId(mpOrderId)
+  if (created > 0 && Date.now() > created + SIGNUP_WINDOW_MS) return true
+  return false
 }
 
 export function resolveTalentApplicationProgress(
@@ -481,7 +490,7 @@ export function resolveTalentApplicationProgress(
   applicant: Record<string, unknown> | null,
   mpOrderId?: string,
 ): { id: Exclude<TalentAppProgressId, 'all'>; label: string } {
-  if (isSignupDeadlinePassed(mp) && String(applicant?.taskStatus || '') !== 'rejected') {
+  if (isSignupDeadlinePassed(mp, mpOrderId) && String(applicant?.taskStatus || '') !== 'rejected') {
     return { id: 'completed', label: '已完成' }
   }
   const ice = resolveIceContext(mp, mpOrderId)

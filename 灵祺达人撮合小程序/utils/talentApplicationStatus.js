@@ -361,16 +361,22 @@ function isPendingVideoPhase(mp, applicant, mpOrderId) {
   return false
 }
 
-function isSignupDeadlinePassed(mp) {
-  if (!mp) return false
-  const listFilters = require('./recruitmentListFilters.js')
-  const ms = listFilters.resolveSignupDeadlineMs(mp, '')
-  if (!ms) return false
-  return Date.now() > ms
+var SIGNUP_WINDOW_MS = 7 * 86400000
+
+function isSignupDeadlinePassed(mp, mpOrderId) {
+  if (mp) {
+    const listFilters = require('./recruitmentListFilters.js')
+    const ms = listFilters.resolveSignupDeadlineMs(mp, '')
+    if (ms > 0) return Date.now() > ms
+  }
+  const ids = require('./mpRecruitmentOrderId.js')
+  const created = ids.resolveCreatedMsFromMpId(mpOrderId)
+  if (created > 0 && Date.now() > created + SIGNUP_WINDOW_MS) return true
+  return false
 }
 
 function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
-  if (isSignupDeadlinePassed(mp) && String((applicant && applicant.taskStatus) || '') !== 'rejected') {
+  if (isSignupDeadlinePassed(mp, mpOrderId) && String((applicant && applicant.taskStatus) || '') !== 'rejected') {
     return { id: 'completed', label: '已完成' }
   }
   const ice = resolveIceContext(mp, mpOrderId)
