@@ -1,15 +1,19 @@
 <view class="shop-eval-page">
-  <view class="plats">
-    <view
-      wx:for="{{platforms}}"
-      wx:key="id"
-      class="plat {{platformId === item.id ? 'plat--on' : ''}}"
-      data-id="{{item.id}}"
-      bindtap="onPlatform"
-    >
-      <text>{{item.name}}</text>
+  <scroll-view scroll-x class="plats" enhanced show-scrollbar="{{false}}">
+    <view class="plats-row">
+      <view
+        wx:for="{{platforms}}"
+        wx:key="id"
+        class="plat {{platformId === item.id ? 'plat--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPlatform"
+      >
+        <image wx:if="{{item.logo}}" class="plat-logo" src="{{item.logo}}" mode="aspectFit" />
+        <view wx:else class="plat-logo plat-logo--ph">{{item.letter}}</view>
+        <text class="plat-name">{{item.name}}</text>
+      </view>
     </view>
-  </view>
+  </scroll-view>
 
   <view class="eval-top">
     <view class="eval-left">

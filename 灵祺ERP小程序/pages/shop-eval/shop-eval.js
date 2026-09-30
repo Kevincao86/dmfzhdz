@@ -3,6 +3,21 @@ const merchant = require('../../utils/merchantApi.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const evalApi = require('../../utils/merchantShopEval.js')
+const { assetUrl } = require('../../utils/mpStaticAssets.js')
+
+const PLATFORM_LOGOS = {
+  douyin: assetUrl('platforms/douyin-laike.png'),
+  meituan: assetUrl('platforms/dianping.png'),
+  xiaohongshu: assetUrl('platforms/xiaohongshu.png'),
+  kuaishou: assetUrl('platforms/kuaishou-local.png'),
+}
+
+const PLATFORMS = (evalApi.SHOP_EVAL_PLATFORMS || []).map((p) => ({
+  id: p.id,
+  name: p.name,
+  letter: String(p.name || '店').slice(0, 1),
+  logo: PLATFORM_LOGOS[p.id] || '',
+}))
 
 const storage = {
   getItem(key) {
@@ -57,7 +72,7 @@ async function askText(system, user) {
 
 Page({
   data: {
-    platforms: evalApi.SHOP_EVAL_PLATFORMS,
+    platforms: PLATFORMS,
     grades: evalApi.SHOP_EVAL_GRADES,
     platformId: 'douyin',
     storeName: '',
