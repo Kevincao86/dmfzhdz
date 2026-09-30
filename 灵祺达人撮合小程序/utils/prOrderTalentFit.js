@@ -155,6 +155,50 @@ async function analyzePrOrderTalents(mpOrderId) {
   }
 }
 
+const FIT_STORAGE_PREFIX = 'meoo_pr_talent_fit_v1:'
+
+function fitStorageKey(mpOrderId) {
+  return FIT_STORAGE_PREFIX + String(mpOrderId || '').trim()
+}
+
+function savePrTalentFit(mpOrderId, result) {
+  const id = String(mpOrderId || '').trim()
+  if (!id || !result || !Array.isArray(result.talents) || !result.talents.length) return
+  try {
+    wx.setStorageSync(fitStorageKey(id), {
+      orderRead: result.orderRead || '',
+      talents: result.talents,
+    })
+  } catch (e) {
+    /* 本机空间不足时仍显示当次结果 */
+  }
+}
+
+function readPrTalentFit(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return null
+  try {
+    const raw = wx.getStorageSync(fitStorageKey(id))
+    if (!raw || !Array.isArray(raw.talents) || !raw.talents.length) return null
+    return raw
+  } catch (e) {
+    return null
+  }
+}
+
+function fitMapFromResult(result) {
+  const map = {}
+  const talents = result && result.talents
+  ;(talents || []).forEach((row) => {
+    const aid = String((row && row.applicantId) || '').trim()
+    if (aid) map[aid] = row
+  })
+  return map
+}
+
 module.exports = {
   analyzePrOrderTalents,
+  savePrTalentFit,
+  readPrTalentFit,
+  fitMapFromResult,
 }

@@ -188,3 +188,45 @@ export async function analyzePrOrderTalents(mpOrderId: string): Promise<PrTalent
     talents,
   }
 }
+
+const FIT_STORAGE_PREFIX = 'meoo_pr_talent_fit_v1:'
+
+export function readSavedPrTalentFit(mpOrderId: string): PrTalentFitResult | null {
+  const id = String(mpOrderId || '').trim()
+  if (!id || typeof localStorage === 'undefined') return null
+  try {
+    const raw = JSON.parse(localStorage.getItem(`${FIT_STORAGE_PREFIX}${id}`) || '') as {
+      orderRead?: unknown
+      talents?: unknown
+    }
+    if (!raw || !Array.isArray(raw.talents)) return null
+    const talents = raw.talents
+      .filter((row): row is Record<string, unknown> => !!row && typeof row === 'object')
+      .map((row) => ({
+        applicantId: String(row.applicantId || '').trim(),
+        name: String(row.name || ''),
+        score: clampScore(row.score),
+        fit: clampScore(row.fit),
+        profileRead: String(row.profileRead || row.reason || ''),
+        matchRead: String(row.matchRead || ''),
+      }))
+      .filter((row) => row.applicantId)
+    if (!talents.length) return null
+    return { orderRead: String(raw.orderRead || ''), talents }
+  } catch {
+    return null
+  }
+}
+
+export function savePrTalentFit(mpOrderId: string, result: PrTalentFitResult) {
+  const id = String(mpOrderId || '').trim()
+  if (!id || !result?.talents?.length) return
+  try {
+    localStorage.setItem(
+      `${FIT_STORAGE_PREFIX}${id}`,
+      JSON.stringify({ orderRead: result.orderRead || '', talents: result.talents }),
+    )
+  } catch {
+    /* 本机空间不足时仍显示当次结果 */
+  }
+}

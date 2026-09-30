@@ -28,7 +28,13 @@ import {
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
-import { analyzePrOrderTalents, type PrTalentFitResult, type PrTalentFitRow } from '../lib/prOrderTalentFit'
+import {
+  analyzePrOrderTalents,
+  readSavedPrTalentFit,
+  savePrTalentFit,
+  type PrTalentFitResult,
+  type PrTalentFitRow,
+} from '../lib/prOrderTalentFit'
 import { reviewRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
@@ -425,6 +431,10 @@ export default function PrOrderApplicantsPage() {
       setLoading(false)
     }
   }, [mpOrderId, applyApplicantsState])
+
+  useEffect(() => {
+    setFitResult(readSavedPrTalentFit(mpOrderId))
+  }, [mpOrderId])
 
   useEffect(() => {
     void loadOrder()
@@ -980,7 +990,10 @@ export default function PrOrderApplicantsPage() {
                     if (!mpOrderId || fitBusy) return
                     setFitBusy(true)
                     void analyzePrOrderTalents(mpOrderId)
-                      .then((data) => setFitResult(data))
+                      .then((data) => {
+                        savePrTalentFit(mpOrderId, data)
+                        setFitResult(data)
+                      })
                       .catch((e: unknown) => {
                         const msg = e instanceof Error ? e.message : '分析失败'
                         if (msg.includes('专业版')) {

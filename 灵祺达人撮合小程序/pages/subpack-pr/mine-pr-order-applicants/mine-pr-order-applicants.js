@@ -215,11 +215,9 @@ Page({
     prOrderTalentFit
       .analyzePrOrderTalents(id)
       .then((data) => {
-        const fitById = {}
-        ;(data.talents || []).forEach((row) => {
-          const id = String((row && row.applicantId) || '').trim()
-          if (id) fitById[id] = row
-        })
+        const fitById = prOrderTalentFit.fitMapFromResult(data)
+        prOrderTalentFit.savePrTalentFit(id, data)
+        this._fitById = fitById
         this.setData({
           fitById,
           fitOrderRead: data.orderRead || '',
@@ -259,7 +257,16 @@ Page({
     if (detailViewMode) {
       wx.setNavigationBarTitle({ title: '商单明细' })
     }
-    this.setData({ mpOrderId, detailViewMode, filterSelectedOnly: detailViewMode })
+    const savedFit = prOrderTalentFit.readPrTalentFit(mpOrderId)
+    const fitById = prOrderTalentFit.fitMapFromResult(savedFit)
+    this._fitById = fitById
+    this.setData({
+      mpOrderId,
+      detailViewMode,
+      filterSelectedOnly: detailViewMode,
+      fitById,
+      fitOrderRead: (savedFit && savedFit.orderRead) || '',
+    })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
@@ -294,7 +301,7 @@ Page({
     const filterSelectedOnly =
       opts && opts.filterSelectedOnly != null ? opts.filterSelectedOnly : this.data.filterSelectedOnly
     const listFilters = (opts && opts.listFilters) || this.data.listFilters || EMPTY_LIST_FILTERS
-    const fitById = this.data.fitById || {}
+    const fitById = this._fitById || this.data.fitById || {}
     const stampedWithFit = annotateApplicantFit(stamped, fitById)
     let displayApplicants = applicantExtras.filterApplicantRows(stampedWithFit, listFilters)
     if (filterSelectedOnly) displayApplicants = displayApplicants.filter((a) => a && a.selected)
@@ -326,7 +333,7 @@ Page({
     const filters = listFilters || this.data.listFilters || EMPTY_LIST_FILTERS
     let rows = applicantExtras.filterApplicantRows(this.data.applicants || [], filters)
     if (this.data.filterSelectedOnly) rows = rows.filter((a) => a && a.selected)
-    rows = annotateApplicantFit(rows, this.data.fitById)
+    rows = annotateApplicantFit(rows, this._fitById || this.data.fitById)
     const hasActiveListFilters = !!(
       filters.searchQuery ||
       filters.filterSalesLevel ||
