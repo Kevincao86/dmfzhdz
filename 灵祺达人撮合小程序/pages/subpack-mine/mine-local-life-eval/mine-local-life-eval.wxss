@@ -33,11 +33,17 @@
   width: 88rpx;
   height: 88rpx;
   margin: 0 0 16rpx;
+  overflow: hidden;
 }
 
 .eval-left .avatar--ph {
-  line-height: 88rpx;
+  line-height: 1;
   font-size: 36rpx;
+}
+
+.eval-left .avatar-letter {
+  font-size: 36rpx;
+  line-height: 1;
 }
 
 .eval-left .nick {
@@ -307,13 +313,26 @@
   border-radius: 50%;
   margin: 12rpx auto 16rpx;
   display: block;
+  overflow: hidden;
   background: #efeaf8;
 }
 
 .avatar--ph {
-  line-height: 144rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   font-size: 56rpx;
   font-weight: 700;
+  color: #7c4dff;
+  text-align: center;
+}
+
+.avatar-letter {
+  display: block;
+  font-size: 56rpx;
+  font-weight: 700;
+  line-height: 1;
   color: #7c4dff;
 }
 

@@ -16,7 +16,7 @@
     <view class="eval-left">
       <view class="xingxuan-card ident">
         <image class="avatar" src="{{avatarUrl}}" mode="aspectFill" wx:if="{{avatarUrl}}" />
-        <view class="avatar avatar--ph" wx:else>{{avatarLetter}}</view>
+        <view class="avatar avatar--ph" wx:else><text class="avatar-letter">{{avatarLetter}}</text></view>
         <text class="nick">{{nickname || '未填写昵称'}}</text>
         <text class="did">{{accountLabel}} {{accountId || '未填写'}}</text>
         <text class="did" wx:if="{{basis}}">{{basis}}</text>
