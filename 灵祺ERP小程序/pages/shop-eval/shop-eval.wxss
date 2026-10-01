@@ -67,6 +67,94 @@
   opacity: 0.35;
 }
 
+.report {
+  margin-top: 16rpx;
+}
+
+.report-text {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  line-height: 40rpx;
+  color: #334155;
+}
+
+.report-summary {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 28rpx;
+  line-height: 42rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.report-line {
+  display: flex;
+  margin-top: 12rpx;
+}
+
+.report-no {
+  width: 36rpx;
+  flex-shrink: 0;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.metric {
+  margin-top: 20rpx;
+  padding-top: 16rpx;
+  border-top: 2rpx solid #e2e8f0;
+}
+
+.metric-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metric-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.metric-score {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #0369a1;
+}
+
+.metric-bar {
+  height: 10rpx;
+  margin-top: 10rpx;
+  border-radius: 999rpx;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.metric-fill {
+  height: 10rpx;
+  border-radius: 999rpx;
+  background: #0369a1;
+}
+
+.metric-comment {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 38rpx;
+  color: #475569;
+}
+
+.source-chip {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 34rpx;
+  color: #64748b;
+}
+
 .eval-top {
   display: flex;
   align-items: stretch;

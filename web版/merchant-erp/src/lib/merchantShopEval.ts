@@ -41,12 +41,36 @@ export type ShopEvalSignals = {
 
 export type ShopEvalSituation = { name: string; now: string }
 
+export type ShopEvalIndicator = { name: string; score: number; comment: string }
+
+export const PUBLIC_EVAL_INDICATORS = [
+  { name: '平台基础搭建', weight: 16 },
+  { name: '短视频与团购', weight: 20 },
+  { name: '品牌资产与口碑', weight: 16 },
+  { name: '私域与复购', weight: 16 },
+  { name: '门店标准化', weight: 16 },
+  { name: '数据复盘', weight: 16 },
+] as const
+
+const ERP_SOLUTION_MODULES = [
+  '商品与套餐',
+  '评价管理',
+  '店铺装修',
+  '活动中心',
+  '达人招募',
+  '店铺分析与投流',
+  '知识库与GEO投喂',
+  '财务对账',
+  '线索跟进',
+] as const
+
 export type ShopEvalSuggestion = {
   name: string
   finding: string
   adjust: string
   soon: string
   next: string
+  module?: string
 }
 
 export type ShopEvalScore = {
@@ -56,6 +80,12 @@ export type ShopEvalScore = {
   situations: ShopEvalSituation[]
   exposureLift: number
   verifyLift: number
+  positioning?: string
+  indicators?: ShopEvalIndicator[]
+  highlights?: string[]
+  gaps?: string[]
+  summary?: string
+  sources?: string[]
 }
 
 export type ShopEvalAdvice = {
@@ -282,78 +312,8 @@ function shopFacts(spec: PlatformSpec, row: ReturnType<typeof normalizeInput>['r
     `营业时间：${filledOr(row.businessHours, '未填写')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
-    functionCoverage(row),
-    row.signals ? signalFacts(row.signals) : '',
   ]
   return lines.filter(Boolean).join('\n')
-}
-
-function signalFacts(s: ShopEvalSignals) {
-  return [
-    `商品接口：共 ${s.productTotal} 个，有价格 ${s.productPriced} 个，有头图 ${s.productWithImage} 个。`,
-    `评价接口：${s.reviewTotal} 条，已回复 ${s.reviewReplied} 条。活动接口：${s.activityTotal} 个。`,
-    `装修接口：${s.decorationTotal} 家，有封面 ${s.decorationWithCover} 家。`,
-    `经营接口：本平台成交 ${Math.round(s.payAmount)} 元，核销 ${Math.round(s.verifyAmount)} 元，订单 ${s.orderCount}。其他平台成交 ${Math.round(s.otherPlatformPay)} 元。投流展示 ${s.adShow}，线索 ${s.clueCount}。`,
-    `知识库接口：${s.kbTotal} 份，已开启投喂 ${s.kbFeeding} 份。`,
-    `财务接口：对账 ${s.financeRows} 条，核销 ${Math.round(s.financeVerify)} 元，退款 ${Math.round(s.financeRefund)} 元。`,
-    '以上数字来自接口。为 0 的项写成未完善。有数字的项按数字写现状，不要改成未完善。',
-  ].join('\n')
-}
-
-function functionCoverage(row: ReturnType<typeof normalizeInput>['row']) {
-  if (row.signals) return ''
-  const offer = [row.offerName, row.offerPrice].filter(Boolean).join(' ')
-  const product = offer
-    ? `商品信息：已有套餐 ${offer}。商品库和菜单图文本次未接入，不要写成图文已齐。`
-    : '商品信息：未完善。没有套餐名称和价格。'
-  return [
-    product,
-    '运营节奏：未完善。活动中心、达人招募、AI 运营方案、评价管理本次未接入。',
-    '品牌视觉：未完善。店铺装修和 AI 视觉工坊本次未接入。',
-    '流量分布：未完善。店铺分析、投流、线索本次未接入。',
-    'GEO 投喂：未完善。GEO 运营优化和知识库本次未接入。',
-    '财务明晰：未完善。财务对账和报税管理本次未接入。',
-  ].join('\n')
-}
-
-function scoreSystem(spec: PlatformSpec) {
-  const weights = spec.blocks.map((block) => `${block.name}占 ${block.weight} 分`).join('，')
-  const names = spec.blocks.map((block) => block.name).join('、')
-  return [
-    '你是豆包。',
-    spec.scene,
-    spec.scope === 'chain'
-      ? '这是给商家看的连锁品牌体检，用「你」来写。不要声称读到了平台官方后台或官方等级。'
-      : '这是给商家看的单门店体检，用「你」来写。不要声称读到了平台官方后台或官方等级。',
-    '只根据下面列出的功能完成度打分。标成「未完善」的功能，points 必须在 0 到 20，不要编造成已经在用。',
-    '商品信息如果只有套餐名称或价格，points 不要超过 55。',
-    '不要写「公开资料不足」「仅供参考」「不是官方」「弱预估」这类提示句。',
-    '只输出一个 JSON 对象，不要 Markdown。键名必须用英文双引号，最后一项后面不要逗号。',
-    `blocks 为数组，必须正好 6 项，每项含 name、points。points 为 0 到 100 的整数。name 必须是：${names}。`,
-    `risk 为 0 到 ${spec.risk} 的整数，表示风险扣分。扣分依据：${spec.riskNote}。没有实锤不要乱扣。`,
-    `同时输出 score，为 0 到 100 的整数，按这些权重合成后再扣 risk：${weights}。`,
-    `situations 必须正好 6 项，顺序与 blocks 一致。每项含 name、now。now 不超过 40 字，只写现状。未完善的项，now 以「未完善」开头。`,
-    'exposureLift 为整改后预计多出来的被搜到/展示百分比，整数 8 到 60，不要写百分号。',
-    'verifyLift 为整改后预计每月多带来的核销金额，单位元的整数。按已填套餐价格估算增量，没有价格不要编造当前已成交额。',
-  ].join('')
-}
-
-function adviceSystem(spec: PlatformSpec) {
-  return [
-    '你是豆包。这是商家自己看的门店体检，按现状写给商家的改法，用「你」来写。',
-    spec.scope === 'chain'
-      ? '对象是连锁品牌。建议要落到各店把同一项功能补齐、对齐，不要把未完善写成已经统一。'
-      : '对象是单门店。建议要落到这家店对应的 ERP 功能，未完善的项写去哪里补。',
-    '不要编造销量、核销额、GMV。未在资料里出现的数字不要写进来。',
-    '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
-    '只输出一个 JSON 对象，不要 Markdown。',
-    '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
-    '字段：sections 必须正好 6 项。每项含 name、finding、adjust、soon。',
-    'name 必须与六项打分完全一致：商品信息、运营节奏、品牌视觉、流量分布、GEO 投喂、财务明晰。',
-    'finding 是分析结果：这个板块现在卡在哪里、原因是什么，60 到 100 字。',
-    'adjust 是怎么调整：去对应的 ERP 功能里补哪一项，改完应看到什么，80 到 160 字。',
-    'soon 是近期要做：近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，80 到 160 字。',
-  ].join('')
 }
 
 function loosenJson(slice: string) {
@@ -442,52 +402,6 @@ export function parseShopEvalJson(text: string): Record<string, unknown> {
   throw new Error('评估结果暂时读不出来，请再点一次')
 }
 
-function levelFromPoints(points: number) {
-  const steps = [15, 28, 40, 52, 64, 76, 86, 94]
-  let lv = 0
-  for (const step of steps) {
-    if (points >= step) lv += 1
-  }
-  return `Lv${lv}`
-}
-
-function averagePoints(byName: Record<string, number>, names: string[]) {
-  const vals = names.map((name) => byName[name]).filter((n) => Number.isFinite(n))
-  if (!vals.length) return null
-  return vals.reduce((sum, n) => sum + n, 0) / vals.length
-}
-
-function scoreFromBlocks(spec: PlatformSpec, blocks: { name: string; points: number }[], risk: unknown) {
-  const byName: Record<string, number> = {}
-  for (const block of blocks) byName[block.name] = block.points
-  let sum = 0
-  for (const block of spec.blocks) {
-    const points = byName[block.name]
-    if (!Number.isFinite(points)) return null
-    sum += (points / 100) * block.weight
-  }
-  const deduct = Math.max(0, Math.min(spec.risk, Math.round(Number(risk) || 0)))
-  const searchPoints = averagePoints(byName, spec.levelABlocks)
-  const verifyPoints = averagePoints(byName, spec.levelBBlocks)
-  return {
-    score: clampScore(sum - deduct),
-    searchLevel: searchPoints == null ? '' : levelFromPoints(searchPoints),
-    verifyLevel: verifyPoints == null ? '' : levelFromPoints(verifyPoints),
-  }
-}
-
-function mapSituations(rows: unknown): ShopEvalSituation[] {
-  return (Array.isArray(rows) ? rows : [])
-    .map((row) => {
-      const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
-      return {
-        name: clipText(item.name, 12),
-        now: clipText(item.now, 40),
-      }
-    })
-    .filter((row) => row.name && row.now)
-    .slice(0, 6)
-}
 
 function mapSuggestions(rows: unknown): ShopEvalSuggestion[] {
   return (Array.isArray(rows) ? rows : [])
@@ -501,6 +415,7 @@ function mapSuggestions(rows: unknown): ShopEvalSuggestion[] {
         adjust,
         soon: clipText(item.soon, 180),
         next: adjust,
+        module: clipText(item.module, 16),
       }
     })
     .filter((row) => row.name && (row.finding || row.adjust || row.soon))
@@ -516,33 +431,12 @@ function ownerId() {
 }
 
 function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
-  return ['lq_merchant_shop_eval_v3', ownerId(), row.platformId].join('|')
-}
-
-function legacyCacheKey(row: ReturnType<typeof normalizeInput>['row']) {
-  return [
-    'lq_merchant_shop_eval_v2',
-    row.platformId,
-    row.scope,
-    String(row.storeCount || 0),
-    row.brandName,
-    row.storeName,
-    row.address,
-    row.phone,
-    row.businessHours,
-    row.offerName,
-    row.offerPrice,
-  ].join('|')
+  return ['lq_merchant_shop_eval_v4', ownerId(), row.platformId].join('|')
 }
 
 function loadCache(storage: StorageLike, row: ReturnType<typeof normalizeInput>['row']) {
   const key = cacheKey(row)
-  const hit = readCache(storage, key)
-  if (hit) return { key, data: hit }
-  const old = readCache(storage, legacyCacheKey(row))
-  if (!old) return { key, data: null }
-  writeCache(storage, key, old, true)
-  return { key, data: readCache(storage, key) || old }
+  return { key, data: readCache(storage, key) }
 }
 
 function readCache(storage: StorageLike, key: string): Record<string, unknown> | null {
@@ -562,24 +456,9 @@ function writeCache(storage: StorageLike, key: string, patch: Record<string, unk
   storage.setItem(key, JSON.stringify({ ...prev, ...patch }))
 }
 
-function buildScore(spec: PlatformSpec, j: Record<string, unknown>): ShopEvalScore {
-  const blocks = (Array.isArray(j.blocks) ? j.blocks : []).map((row) => {
-    const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
-    return { name: clipText(item.name, 12), points: clampScore(item.points) }
-  })
-  const computed = scoreFromBlocks(spec, blocks, j.risk)
-  return {
-    score: computed ? computed.score : clampScore(j.score),
-    searchLevel: (computed && computed.searchLevel) || clipText(j.searchLevel, 8),
-    verifyLevel: (computed && computed.verifyLevel) || clipText(j.verifyLevel, 8),
-    situations: mapSituations(j.situations),
-    exposureLift: clampExposure(j.exposureLift),
-    verifyLift: clampYuan(j.verifyLift),
-  }
-}
-
 function savedFromCache(cached: Record<string, unknown> | null): { score: ShopEvalScore; advice: ShopEvalAdvice | null } | null {
-  if (!cached || !Array.isArray(cached.situations) || !cached.situations.length) return null
+  const indicators = mapIndicators(cached?.indicators)
+  if (!cached || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
   const adviceRaw = cached.advice
   let advice: ShopEvalAdvice | null = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray((adviceRaw as ShopEvalAdvice).sections)) {
@@ -587,14 +466,7 @@ function savedFromCache(cached: Record<string, unknown> | null): { score: ShopEv
     if (sections.length) advice = { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections }
   }
   return {
-    score: {
-      score: clampScore(cached.score),
-      searchLevel: clipText(cached.searchLevel, 8),
-      verifyLevel: clipText(cached.verifyLevel, 8),
-      situations: mapSituations(cached.situations),
-      exposureLift: clampExposure(cached.exposureLift),
-      verifyLift: clampYuan(cached.verifyLift),
-    },
+    score: scoreFromPublic(cached, indicators),
     advice,
   }
 }
@@ -715,115 +587,176 @@ async function askJson(askText: AskText, system: string, user: string) {
   }
 }
 
-function yuanBrief(n: number) {
-  const v = Math.round(Number(n) || 0)
-  if (v >= 10000) return `${(v / 10000).toFixed(1).replace(/\.0$/, '')}万`
-  return String(v)
-}
-
-function productPoints(s: ShopEvalSignals) {
-  if (s.productTotal <= 0) return 12
-  const priceRate = s.productPriced / s.productTotal
-  const imageRate = s.productWithImage / s.productTotal
-  if (priceRate >= 0.5 && imageRate >= 0.4) return 88
-  if (priceRate >= 0.5) return 72
-  if (s.productPriced > 0) return 55
-  return 32
-}
-
-function rhythmPoints(s: ShopEvalSignals) {
-  if (s.reviewTotal <= 0 && s.activityTotal <= 0) return 12
-  let points = s.reviewTotal > 0 ? 58 : 36
-  if (s.reviewReplied > 0) points += 12
-  if (s.activityTotal > 0) points += 18
-  return Math.min(92, points)
-}
-
-function visualPoints(s: ShopEvalSignals) {
-  if (s.decorationTotal <= 0) return 12
-  const rate = s.decorationWithCover / s.decorationTotal
-  if (rate >= 0.6) return 88
-  if (s.decorationWithCover > 0) return 62
-  return 28
-}
-
-function trafficPoints(s: ShopEvalSignals) {
-  const hasTrade = s.payAmount > 0 || s.orderCount > 0 || s.verifyAmount > 0
-  if (!hasTrade && s.otherPlatformPay <= 0 && s.clueCount <= 0 && s.adShow <= 0) return 12
-  if (!hasTrade) return 48
-  let points = 60
-  if (s.verifyAmount > 0) points += 15
-  if (s.otherPlatformPay > 0 && s.payAmount > 0) points += 10
-  return Math.min(92, points)
-}
-
-function geoPoints(s: ShopEvalSignals) {
-  if (s.kbTotal <= 0) return 12
-  if (s.kbFeeding <= 0) return 42
-  return Math.min(90, 70 + Math.min(20, s.kbFeeding * 4))
-}
-
-function financePoints(s: ShopEvalSignals) {
-  const verify = Math.max(s.financeVerify, s.verifyAmount)
-  if (s.financeRows <= 0 && verify <= 0 && s.financeRefund <= 0) return 12
-  if (verify > 0 && (s.financeRefund > 0 || s.financeRows > 0)) return 86
-  if (verify > 0) return 68
-  return 40
-}
-
-function scoreFromSignals(spec: PlatformSpec, signals: ShopEvalSignals, offerPrice: string): ShopEvalScore {
-  const blocks = [
-    { name: '商品信息', points: productPoints(signals) },
-    { name: '运营节奏', points: rhythmPoints(signals) },
-    { name: '品牌视觉', points: visualPoints(signals) },
-    { name: '流量分布', points: trafficPoints(signals) },
-    { name: 'GEO 投喂', points: geoPoints(signals) },
-    { name: '财务明晰', points: financePoints(signals) },
-  ]
-  const computed = scoreFromBlocks(spec, blocks, 0)
-  const nowOf: Record<string, string> = {
-    商品信息:
-      signals.productTotal > 0
-        ? `商品 ${signals.productTotal} 个，${signals.productPriced} 个有价格，${signals.productWithImage} 个有头图`
-        : '未完善，商品列表没有套餐',
-    运营节奏:
-      signals.reviewTotal > 0 || signals.activityTotal > 0
-        ? `评价 ${signals.reviewTotal} 条，已回复 ${signals.reviewReplied} 条，活动 ${signals.activityTotal} 个`
-        : '未完善，评价和活动都没有读到',
-    品牌视觉:
-      signals.decorationTotal > 0
-        ? `装修 ${signals.decorationTotal} 家，${signals.decorationWithCover} 家有封面`
-        : '未完善，装修列表没有门店封面',
-    流量分布:
-      signals.payAmount > 0 || signals.orderCount > 0
-        ? `本平台成交 ${yuanBrief(signals.payAmount)} 元，其他平台 ${yuanBrief(signals.otherPlatformPay)} 元`
-        : signals.clueCount > 0 || signals.adShow > 0
-          ? `投流展示 ${signals.adShow}，线索 ${signals.clueCount}，成交还没读到`
-          : '未完善，店铺分析没有成交',
-    'GEO 投喂':
-      signals.kbTotal > 0
-        ? signals.kbFeeding > 0
-          ? `知识库 ${signals.kbTotal} 份，${signals.kbFeeding} 份已开启投喂`
-          : `知识库 ${signals.kbTotal} 份，还没开启投喂`
-        : '未完善，知识库没有可投喂资料',
-    财务明晰:
-      Math.max(signals.financeVerify, signals.verifyAmount) > 0 || signals.financeRows > 0
-        ? `核销 ${yuanBrief(Math.max(signals.financeVerify, signals.verifyAmount))} 元，退款 ${yuanBrief(signals.financeRefund)} 元`
-        : '未完善，对账没有核销和退款',
+function mapIndicators(rows: unknown): ShopEvalIndicator[] {
+  const byName = new Map<string, ShopEvalIndicator>()
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
+    const name = clipText(item.name, 12)
+    if (!name) continue
+    byName.set(name, {
+      name,
+      score: clampScore(item.score ?? item.points),
+      comment: clipText(item.comment || item.now, 180),
+    })
   }
-  const situations = blocks.map((block) => ({
-    name: block.name,
-    now: String(nowOf[block.name] || '').slice(0, 40),
-  }))
-  const preview = previewShopGains(computed?.score || 0, offerPrice)
+  return PUBLIC_EVAL_INDICATORS.map((block) => byName.get(block.name)).filter((row): row is ShopEvalIndicator => Boolean(row?.comment))
+}
+
+function textList(rows: unknown, limit: number, maxLen: number) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => clipText(row, maxLen))
+    .filter(Boolean)
+    .slice(0, limit)
+}
+
+function scoreFromPublic(raw: Record<string, unknown>, indicators: ShopEvalIndicator[]): ShopEvalScore {
+  const byName = new Map(indicators.map((row) => [row.name, row.score]))
+  let sum = 0
+  for (const block of PUBLIC_EVAL_INDICATORS) {
+    sum += ((byName.get(block.name) || 0) / 100) * block.weight
+  }
+  const highlights = textList(raw.highlights, 3, 140)
+  const gaps = textList(raw.gaps, 4, 160)
   return {
-    score: computed?.score || 0,
-    searchLevel: computed?.searchLevel || '',
-    verifyLevel: computed?.verifyLevel || '',
-    situations,
-    exposureLift: preview.exposurePct,
-    verifyLift: preview.verifyYuan,
+    score: clampScore(sum),
+    searchLevel: '',
+    verifyLevel: '',
+    situations: indicators.map((row) => ({ name: row.name, now: row.comment })),
+    exposureLift: 0,
+    verifyLift: 0,
+    positioning: clipText(raw.positioning, 180),
+    indicators,
+    highlights,
+    gaps,
+    summary: clipText(raw.summary, 100),
+    sources: textList(raw.sources, 8, 80),
   }
+}
+
+function stripTags(html: string) {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function parseSogouTitles(html: string) {
+  const out: string[] = []
+  const re = /<h3 class="vr-title[\s\S]*?<\/h3>/gi
+  for (const block of html.matchAll(re)) {
+    const title = stripTags(block[0] || '')
+    if (title.length < 6 || out.includes(title)) continue
+    out.push(title.slice(0, 80))
+    if (out.length >= 6) break
+  }
+  return out
+}
+
+async function readPublicHtml(url: string) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) })
+    if (!res.ok) return ''
+    return await res.text()
+  } catch {
+    return ''
+  }
+}
+
+async function briefSearchTitles(query: string) {
+  const body = JSON.stringify({
+    platform: 'douyin',
+    queries: [query],
+    limit: 4,
+    briefContent: { requirementSummary: query, topics: [query] },
+  })
+  let urls: string[] = [`/api/meoo-brief-reference-search`]
+  try {
+    const mod = await import('./merchantErpApiBase')
+    urls = mod.merchantApiFetchUrls('/api/meoo-brief-reference-search')
+  } catch {
+    /* 同源路径 */
+  }
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(20000),
+      })
+      if (!res.ok) continue
+      const data = (await res.json()) as { hits?: Array<{ title?: string; originalVideoUrl?: string }> }
+      const titles = (data.hits || [])
+        .map((hit) => clipText(hit.title || hit.originalVideoUrl, 80))
+        .filter(Boolean)
+      if (titles.length) return titles
+    } catch {
+      /* 下一条 */
+    }
+  }
+  return [] as string[]
+}
+
+async function searchPublicBrand(row: { brandName: string; storeName: string; city: string }) {
+  const name = row.brandName || row.storeName
+  const queries = [`${name} ${row.city} 团购`, `${name} 抖音 探店`, `${row.storeName} 点评`].map((q) => q.replace(/\s+/g, ' ').trim())
+  const titles: string[] = []
+  const push = (list: string[]) => {
+    for (const title of list) {
+      if (!title || titles.includes(title)) continue
+      titles.push(title)
+      if (titles.length >= 12) return
+    }
+  }
+  const batches = await Promise.all(
+    queries.slice(0, 3).map(async (query) => {
+      const [html, brief] = await Promise.all([
+        readPublicHtml(`https://www.sogou.com/web?query=${encodeURIComponent(query)}`),
+        briefSearchTitles(query),
+      ])
+      return [...parseSogouTitles(html), ...brief]
+    }),
+  )
+  for (const batch of batches) push(batch)
+  return titles
+}
+
+function publicScoreSystem() {
+  const names = PUBLIC_EVAL_INDICATORS.map((item) => item.name).join('、')
+  return [
+    '你在给商家写线上运营打分，用「你」来写，对象是这个品牌或这家店。',
+    '只根据下面的门店档案和公开检索标题来写。检索标题里有的事实优先写进去。',
+    '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。',
+    '检索标题很少时，按品牌名称和门店档案写能从公开渠道核对的判断，把没被提到的能力放进短板。',
+    '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
+    '只输出一个 JSON 对象，不要 Markdown。',
+    'positioning：一句定位，40 到 90 字，写这个品牌在本地公开渠道上的位置和最明显的短板。',
+    `indicators 必须正好 6 项，name 只能是：${names}。每项含 score（0 到 100 的整数）和 comment（40 到 90 字，先写做到了什么，再写短板）。`,
+    'highlights 正好 3 条，每条 40 到 80 字，写公开渠道上已经跑通的优势。',
+    'gaps 正好 4 条，每条 40 到 90 字，写会拖后腿的短板。',
+    'summary：一句话总结，30 到 60 字。',
+  ].join('')
+}
+
+function erpAdviceSystem() {
+  const modules = ERP_SOLUTION_MODULES.join('、')
+  return [
+    '你在给商家写灵祺 ERP 里能直接去做的改法，用「你」来写。',
+    '前面的打分来自公开渠道。这里不要再复述网评，要落到系统功能。',
+    `只能使用这些功能：${modules}。不要写系统里没有的会员储值、社群积分商城。`,
+    '私域和复购写到线索跟进、评价管理、活动中心。核销和升单写到财务对账、店铺分析与投流、商品与套餐。多店不统一写到店铺装修、商品与套餐、评价管理。',
+    '不要编造销量、核销额、GMV。',
+    '不要写「公开资料不足」「仅供参考」「无法判断」。',
+    '只输出一个 JSON 对象。',
+    'sections 正好 4 项，对应四条短板。每项含 name、module、finding、adjust、soon。',
+    'name 是短板标题，12 字以内。module 必须是上面列出的功能名。',
+    'finding 说明这条短板现在卡在哪，40 到 80 字。',
+    'adjust 写去哪个功能里改什么，改完应看到什么，60 到 140 字。',
+    'soon 是近两周的 3 件事，用「1.」「2.」「3.」分开。',
+  ].join('')
 }
 
 export async function evaluateShop(
@@ -832,24 +765,24 @@ export async function evaluateShop(
 ): Promise<ShopEvalScore> {
   const { spec, row } = normalizeInput(raw)
   if (!row.storeName) throw new Error('请先完善门店名称')
-  if (raw.signals && opts.force) {
-    const scored = scoreFromSignals(spec, raw.signals, row.offerPrice)
-    writeCache(opts.storage, cacheKey(row), scored)
-    return scored
-  }
   const loaded = loadCache(opts.storage, row)
-  const key = loaded.key
   if (!opts.force) {
     const saved = savedFromCache(loaded.data)
     if (saved) return saved.score
   }
+  const sources = await searchPublicBrand(row)
+  const material = sources.length
+    ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n')
+    : '这次没有抓到检索标题。'
   const j = await askJson(
     opts.askText,
-    scoreSystem(spec),
-    `${shopFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用商家自己能看懂的话来写。`,
+    publicScoreSystem(),
+    `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请给出定位、六项得分和点评、三条优势、四条短板、一句话总结。`,
   )
-  const score = buildScore(spec, j)
-  writeCache(opts.storage, key, score)
+  const indicators = mapIndicators(j.indicators)
+  if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
+  const score = scoreFromPublic({ ...j, sources }, indicators)
+  writeCache(opts.storage, loaded.key, score)
   return score
 }
 
@@ -858,7 +791,7 @@ export async function adviseShop(
   score: ShopEvalScore | null,
   opts: { force?: boolean; storage: StorageLike; askText: AskText },
 ): Promise<ShopEvalAdvice> {
-  if (!score?.situations?.length) throw new Error('请先完成门店评估')
+  if (!score?.indicators?.length) throw new Error('请先完成门店评估')
   const { spec, row } = normalizeInput(raw)
   const loaded = loadCache(opts.storage, row)
   const key = loaded.key
@@ -870,11 +803,12 @@ export async function adviseShop(
       if (sections.length) return { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections }
     }
   }
-  const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
+  const lines = (score.indicators || []).map((item) => `${item.name} ${item.score}分：${item.comment}`).join('\n')
+  const gaps = (score.gaps || []).map((item, index) => `${index + 1}. ${item}`).join('\n')
   const j = await askJson(
     opts.askText,
-    adviceSystem(spec),
-    `${shopFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.searchLevel}，${spec.levelB} ${score.verifyLevel}。\n现状：\n${lines}\n请按每个板块写出分析结果、怎么调整、近两周要做的三件事。`,
+    erpAdviceSystem(),
+    `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n分项：\n${lines}\n短板：\n${gaps}\n请按四条短板，给出灵祺 ERP 里对应功能的改法。`,
   )
   const advice: ShopEvalAdvice = {
     lift: clampLift(j.lift),
@@ -885,6 +819,7 @@ export async function adviseShop(
 }
 
 export function shopEvalGainTargets(score: ShopEvalScore, input: ShopEvalInput) {
+  if (String(score.positioning || '').trim()) return null
   const preview = previewShopGains(score.score, String(input.offerPrice || ''))
   return {
     exposure: score.exposureLift > 0 ? score.exposureLift : preview.exposurePct,

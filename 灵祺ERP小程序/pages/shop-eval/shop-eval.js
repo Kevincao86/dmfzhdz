@@ -3,11 +3,7 @@ const merchant = require('../../utils/merchantApi.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const evalApi = require('../../utils/merchantShopEval.js')
-const productsApi = require('../../utils/productListingMp.js')
-const dashboardApi = require('../../utils/dashboardMp.js')
-const kbApi = require('../../utils/knowledgeBaseMp.js')
-const reviewsApi = require('../../utils/reviewsMp.js')
-const { readPlatformToken, apiSegment } = require('../../utils/platformTokensMp.js')
+const { readPlatformToken } = require('../../utils/platformTokensMp.js')
 
 const PLATFORM_ICONS = {
   douyin: '/images/platforms/douyin-laike.png',
@@ -40,149 +36,6 @@ const storage = {
       wx.setStorageSync(key, value)
     } catch (e) {}
   },
-}
-
-const PRODUCT_PATHS = {
-  douyin: '/api/meoo-douyin-goods-products',
-  kuaishou: '/api/meoo-kuaishou-goods-products',
-  meituan: '/api/meoo-meituan-goods-products',
-  xiaohongshu: '/api/meoo-xhs-goods-products',
-}
-
-const EVAL_PLATFORMS = ['douyin', 'kuaishou', 'meituan', 'xiaohongshu']
-
-function scaleCount(sample, seen, total) {
-  if (seen <= 0 || total <= seen) return sample
-  return Math.round((total * sample) / seen)
-}
-
-function numOf(v) {
-  const n = Number(v)
-  return Number.isFinite(n) ? n : 0
-}
-
-async function readProductSignals(platformId) {
-  const token = readPlatformToken(platformId)
-  const seg = apiSegment(platformId)
-  const qs = '?page=1&page_size=50'
-  const paths = []
-  if (PRODUCT_PATHS[platformId]) paths.push(`${PRODUCT_PATHS[platformId]}${qs}`)
-  if (seg) paths.push(`/api/merchant/${seg}/goods/products${qs}`)
-  if (token) {
-    for (const path of paths) {
-      try {
-        const data = await merchant.merchantRequestAuth('GET', path, { bearerToken: token, timeoutMs: 18000 })
-        const inner = data && data.data && typeof data.data === 'object' ? data.data : data || {}
-        const raw = Array.isArray(inner.items) ? inner.items : []
-        const total = typeof inner.total === 'number' ? inner.total : raw.length
-        let priced = 0
-        let imaged = 0
-        for (const row of raw) {
-          if (!row || typeof row !== 'object') continue
-          if (numOf(row.price) > 0) priced += 1
-          const img = String(row.head_image_url || row.headImageUrl || row.image_url || row.cover || '').trim()
-          if (img) imaged += 1
-        }
-        return {
-          productTotal: total || raw.length,
-          productPriced: scaleCount(priced, raw.length, total || raw.length),
-          productWithImage: scaleCount(imaged, raw.length, total || raw.length),
-        }
-      } catch (e) {}
-    }
-  }
-  try {
-    const listed = await productsApi.fetchMerchantProductList(platformId, { page: 1, pageSize: 50 })
-    if (!listed || !listed.ok) return null
-    const items = listed.items || []
-    const total = listed.total || items.length
-    const priced = items.filter((item) => numOf(item.price) > 0).length
-    return {
-      productTotal: total,
-      productPriced: scaleCount(priced, items.length, total),
-      productWithImage: 0,
-    }
-  } catch (e) {
-    return null
-  }
-}
-
-async function collectShopEvalSignals(platformId) {
-  const reviewPlatform = platformId === 'xiaohongshu' ? 'xhs' : platformId
-  const [products, decoration, reviews, activities, dashboards, kb, finance, ads, clues] = await Promise.all([
-    readProductSignals(platformId),
-    feature.fetchStoreDecorations(platformId).catch(() => null),
-    reviewsApi.fetchReviewsList(reviewPlatform, 'all', 'all').catch(() => null),
-    platformId === 'kuaishou' ? Promise.resolve(null) : feature.fetchMarketingActivities(platformId, 'all').catch(() => null),
-    Promise.all(EVAL_PLATFORMS.map((id) => dashboardApi.fetchPlatformSummary(id, 'day7').catch(() => null))),
-    kbApi.listDocuments().catch(() => null),
-    feature.fetchFinanceReconcile(14).catch(() => null),
-    feature.fetchAdsReport('qianchuan').catch(() => null),
-    feature.fetchAdsClues('qianchuan', 1).catch(() => null),
-  ])
-  const signals = {
-    productTotal: 0,
-    productPriced: 0,
-    productWithImage: 0,
-    reviewTotal: 0,
-    reviewReplied: 0,
-    activityTotal: 0,
-    decorationTotal: 0,
-    decorationWithCover: 0,
-    payAmount: 0,
-    verifyAmount: 0,
-    orderCount: 0,
-    otherPlatformPay: 0,
-    clueCount: 0,
-    adShow: 0,
-    kbTotal: 0,
-    kbFeeding: 0,
-    financeVerify: 0,
-    financeRefund: 0,
-    financeRows: 0,
-  }
-  if (products) {
-    signals.productTotal = products.productTotal
-    signals.productPriced = products.productPriced
-    signals.productWithImage = products.productWithImage
-  }
-  if (decoration && decoration.ok) {
-    const items = decoration.items || []
-    signals.decorationTotal = items.length
-    signals.decorationWithCover = items.filter((item) => item.coverImageUrl || numOf(item.albumCount) > 0).length
-  }
-  if (reviews && reviews.ok) {
-    const stats = reviews.stats || {}
-    signals.reviewTotal = typeof stats.total === 'number' ? stats.total : (reviews.items || []).length
-    signals.reviewReplied =
-      typeof stats.replied === 'number'
-        ? stats.replied
-        : (reviews.items || []).filter((item) => item && item.replied).length
-  }
-  if (activities && activities.ok) signals.activityTotal = (activities.items || []).length
-  EVAL_PLATFORMS.forEach((id, index) => {
-    const row = dashboards[index]
-    if (!row) return
-    if (id === platformId) {
-      signals.payAmount = numOf(row.payAmount)
-      signals.verifyAmount = numOf(row.verifyAmount)
-      signals.orderCount = numOf(row.orderCount)
-      signals.financeRefund = numOf(row.refundAmount)
-    } else {
-      signals.otherPlatformPay += numOf(row.payAmount)
-    }
-  })
-  const docs = kb && kb.ok && Array.isArray(kb.documents) ? kb.documents : []
-  signals.kbTotal = docs.length
-  signals.kbFeeding = docs.filter((doc) => doc && doc.feed_enabled).length
-  if (finance && finance.ok) {
-    const rows = (finance.rows || []).filter((row) => row && row.platform === platformId)
-    signals.financeRows = rows.length
-    signals.financeVerify = rows.reduce((sum, row) => sum + numOf(row.verifyAmountYuan), 0)
-  }
-  if (ads && ads.ok && ads.summary) signals.adShow = numOf(ads.summary.showCnt || ads.summary.show_cnt)
-  if (clues && clues.ok) signals.clueCount = (clues.items || []).length
-  return signals
 }
 
 function letterOf(name) {
@@ -249,6 +102,12 @@ Page({
     exposureText: '',
     salesText: '',
     situations: [],
+    positioning: '',
+    indicators: [],
+    highlights: [],
+    gaps: [],
+    summary: '',
+    sources: [],
     adviceReady: false,
     sections: [],
     err: '',
@@ -314,6 +173,12 @@ Page({
       searchLevel: score ? score.searchLevel : '',
       verifyLevel: score ? score.verifyLevel : '',
       situations: score ? score.situations : [],
+      positioning: score && score.positioning ? score.positioning : '',
+      indicators: score && score.indicators ? score.indicators : [],
+      highlights: score && score.highlights ? score.highlights : [],
+      gaps: score && score.gaps ? score.gaps : [],
+      summary: score && score.summary ? score.summary : '',
+      sources: score && score.sources ? score.sources : [],
       showGrade: Boolean(grade),
       gradeKey: grade ? grade.key : '',
       gradeLabel: grade ? grade.label : '',
@@ -322,9 +187,9 @@ Page({
       sections: advice ? advice.sections : [],
       err: '',
     })
-    if (score) {
+    if (score && !score.positioning) {
       const gains = evalApi.shopEvalGainTargets(score, input)
-      this.playGains(gains.exposure, gains.verify)
+      if (gains) this.playGains(gains.exposure, gains.verify)
     } else {
       this.setData({ showGains: false, exposureText: '', salesText: '' })
     }
@@ -439,6 +304,12 @@ Page({
       displayScore: 0,
       scoreReady: false,
       situations: [],
+      positioning: '',
+      indicators: [],
+      highlights: [],
+      gaps: [],
+      summary: '',
+      sources: [],
       showGrade: false,
       showGains: false,
       adviceReady: false,
@@ -448,9 +319,7 @@ Page({
     let failed = null
     try {
       const input = this._input || { platformId: this.data.platformId, storeName: this.data.storeName }
-      const signals = await collectShopEvalSignals(input.platformId)
-      this._signals = signals
-      const score = await evalApi.evaluateShop(Object.assign({}, input, { signals }), { force: true, storage, askText })
+      const score = await evalApi.evaluateShop(input, { force: true, storage, askText })
       this._score = score
       const grade = evalApi.shopEvalGrade(score.score, evalApi.shopEvalScopeOf(input))
       this.setData({
@@ -458,15 +327,19 @@ Page({
         searchLevel: score.searchLevel,
         verifyLevel: score.verifyLevel,
         situations: score.situations || [],
+        positioning: score.positioning || '',
+        indicators: score.indicators || [],
+        highlights: score.highlights || [],
+        gaps: score.gaps || [],
+        summary: score.summary || '',
+        sources: score.sources || [],
         showGrade: !!grade,
         gradeKey: grade ? grade.key : '',
         gradeLabel: grade ? grade.label : '',
         gradeNote: grade ? grade.note : '',
-        showGains: true,
+        showGains: false,
       })
       this.playScore(score.score)
-      const gains = evalApi.shopEvalGainTargets(score, input)
-      if (gains) this.playGains(gains.exposure, gains.verify)
     } catch (e) {
       failed = e
     }
@@ -485,9 +358,7 @@ Page({
     let failed = null
     try {
       const base = this._input || { platformId: this.data.platformId, storeName: this.data.storeName }
-      const signals = this._signals || (await collectShopEvalSignals(base.platformId))
-      this._signals = signals
-      const advice = await evalApi.adviseShop(Object.assign({}, base, { signals }), this._score, {
+      const advice = await evalApi.adviseShop(base, this._score, {
         force: true,
         storage,
         askText,

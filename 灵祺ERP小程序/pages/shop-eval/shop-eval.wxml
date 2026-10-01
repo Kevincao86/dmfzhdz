@@ -49,6 +49,11 @@
     </view>
   </view>
 
+  <view class="card report" wx:if="{{positioning}}">
+    <text class="advice-title">定位</text>
+    <text class="report-text">{{positioning}}</text>
+    <text class="report-summary" wx:if="{{summary}}">{{summary}}</text>
+  </view>
   <view class="card gains" wx:if="{{showGains}}">
     <view class="gain-row">
       <view class="gain">
@@ -78,17 +83,35 @@
   <text class="need" wx:if="{{!canEval}}">请先到「店铺信息」完善门店名称</text>
   <text class="need" wx:elif="{{!scoreReady}}">请先完成门店评估</text>
 
-  <view class="card advice advice--now" wx:if="{{scoreReady && situations.length}}">
-    <text class="advice-title advice-title--now">{{statusTitle}}</text>
-    <view class="plate-grid">
-      <view class="plate plate--now" wx:for="{{situations}}" wx:key="name">
-        <text class="plate-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
-        <view class="plate-body">
-          <text class="plate-name">{{item.name}}</text>
-          <text class="plate-line">{{item.now}}</text>
-        </view>
+  <view class="card advice advice--now" wx:if="{{scoreReady && indicators.length}}">
+    <text class="advice-title advice-title--now">线上运营打分</text>
+    <view class="metric" wx:for="{{indicators}}" wx:key="name">
+      <view class="metric-head">
+        <text class="metric-name">{{item.name}}</text>
+        <text class="metric-score">{{item.score}}</text>
       </view>
+      <view class="metric-bar"><view class="metric-fill" style="width: {{item.score}}%;"></view></view>
+      <text class="metric-comment">{{item.comment}}</text>
     </view>
+  </view>
+
+  <view class="card report" wx:if="{{highlights.length}}">
+    <text class="advice-title">优势亮点</text>
+    <view class="report-line" wx:for="{{highlights}}" wx:key="*this">
+      <text class="report-no">{{index + 1}}.</text>
+      <text class="report-text">{{item}}</text>
+    </view>
+  </view>
+  <view class="card report report--gap" wx:if="{{gaps.length}}">
+    <text class="advice-title advice-title--plan">核心短板</text>
+    <view class="report-line" wx:for="{{gaps}}" wx:key="*this">
+      <text class="report-no">{{index + 1}}.</text>
+      <text class="report-text">{{item}}</text>
+    </view>
+  </view>
+  <view class="card report" wx:if="{{sources.length}}">
+    <text class="advice-title">公开来源</text>
+    <text class="source-chip" wx:for="{{sources}}" wx:key="*this">{{item}}</text>
   </view>
 
   <view class="card advice advice--plan" wx:if="{{adviceReady}}">
@@ -96,14 +119,14 @@
     <view class="plan" wx:for="{{sections}}" wx:key="name">
       <view class="plan-head">
         <text class="plan-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
-        <text class="plan-name">{{item.name}}</text>
+        <text class="plan-name">{{item.name}}{{item.module ? ' · ' + item.module : ''}}</text>
       </view>
       <view class="plan-block plan-block--find" wx:if="{{item.finding}}">
-        <text class="plan-tag">分析结果</text>
+        <text class="plan-tag">短板</text>
         <text class="plan-text">{{item.finding}}</text>
       </view>
       <view class="plan-block plan-block--adjust" wx:if="{{item.adjust}}">
-        <text class="plan-tag">怎么调整</text>
+        <text class="plan-tag">系统里怎么做</text>
         <text class="plan-text">{{item.adjust}}</text>
       </view>
       <view class="plan-block plan-block--soon" wx:if="{{item.soon}}">
