@@ -485,19 +485,30 @@ function writeCache(storage: StorageLike, key: string, patch: Record<string, unk
   storage.setItem(key, JSON.stringify({ ...prev, ...patch }))
 }
 
+type ShopEvalProfile = {
+  storeCount: number
+  scope: ShopEvalScope
+  storeNames: string
+  brandName: string
+  storeName: string
+  address: string
+  category: string
+}
+
 function profileFromRow(row: {
   storeCount?: number
-  scope?: ShopEvalScope
+  scope?: ShopEvalScope | string
   storeNames?: string
   brandName?: string
   storeName?: string
   address?: string
   category?: string
-}) {
+}): ShopEvalProfile {
   const storeCount = Math.max(0, Math.round(Number(row.storeCount) || 0))
+  const scope: ShopEvalScope = row.scope === 'chain' || storeCount >= 2 ? 'chain' : 'single'
   return {
     storeCount,
-    scope: row.scope === 'chain' || storeCount >= 2 ? 'chain' : 'single',
+    scope,
     storeNames: String(row.storeNames || ''),
     brandName: String(row.brandName || ''),
     storeName: String(row.storeName || ''),
@@ -509,7 +520,7 @@ function profileFromRow(row: {
 function savedFromCache(cached: Record<string, unknown> | null): {
   score: ShopEvalScore
   advice: ShopEvalAdvice | null
-  profile: ReturnType<typeof profileFromRow> | null
+  profile: ShopEvalProfile | null
 } | null {
   const indicators = mapIndicators(cached?.indicators)
   if (!cached || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
@@ -520,7 +531,7 @@ function savedFromCache(cached: Record<string, unknown> | null): {
     if (sections.length) advice = { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections }
   }
   const rawProfile = cached.profile
-  const profile = rawProfile && typeof rawProfile === 'object' ? profileFromRow(rawProfile as ReturnType<typeof profileFromRow>) : null
+  const profile = rawProfile && typeof rawProfile === 'object' ? profileFromRow(rawProfile as ShopEvalProfile) : null
   return {
     score: scoreFromPublic(cached, indicators),
     advice,

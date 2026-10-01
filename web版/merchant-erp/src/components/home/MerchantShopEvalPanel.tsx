@@ -239,7 +239,7 @@ export default function MerchantShopEvalPanel() {
       const profile = saved?.profile
       if (profile && profile.storeCount >= 2) {
         setInput((prev) => {
-          if (prev.scope === 'chain' && prev.storeCount >= profile.storeCount) return prev
+          if (prev.scope === 'chain' && (prev.storeCount || 0) >= profile.storeCount) return prev
           return {
             ...prev,
             storeCount: profile.storeCount,
