@@ -150,6 +150,8 @@ Page({
     const scope = evalApi.shopEvalScopeOf(input)
     const meta = evalApi.platformShopEvalMeta(platformId, scope)
     this._input = input
+    if (evalApi.hydrateShopEval) await evalApi.hydrateShopEval(input, storage)
+    if (this.data.platformId !== platformId) return
     const saved = evalApi.readSavedShopEval(input, storage)
     const score = saved && saved.score
     const advice = saved && saved.advice
@@ -275,7 +277,7 @@ Page({
     } catch (e) {}
     wx.showModal({
       title: '请升级会员',
-      content: '门店经营评估需开通会员版后使用。',
+      content: '查看提升方案需开通会员版。分析不消耗积分。',
       confirmText: '去升级',
       cancelText: '取消',
       success(res) {
@@ -294,7 +296,6 @@ Page({
   },
 
   async onEvaluate() {
-    if (!(await this.requirePaid())) return
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
     this.stopTick()
     this.setData({

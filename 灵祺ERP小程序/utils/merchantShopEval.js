@@ -898,6 +898,62 @@ function publicScoreSystem() {
   ].join('')
 }
 
+function readShopEvalCloud(habits) {
+  if (!habits || typeof habits !== 'object') return null
+  const shopEval = habits.shopEval
+  if (!shopEval || typeof shopEval !== 'object') return null
+  return shopEval
+}
+
+function requestShopEvalCloud(method, data) {
+  let merchant
+  try {
+    merchant = require('./merchantApi.js')
+  } catch (e) {
+    return Promise.resolve(null)
+  }
+  if (!merchant || !merchant.merchantRequestAuth) return Promise.resolve(null)
+  return merchant
+    .merchantRequestAuth(method, '/api/meoo-agent-user-state', { data, timeoutMs: 15000 })
+    .then((body) => (body && body.ok !== false ? body : null))
+    .catch(() => null)
+}
+
+async function publishShopEval(storage, key, platformId) {
+  const data = readCache(storage, key)
+  if (!data) return
+  const savedAt = String(data.savedAt || new Date().toISOString())
+  const remote = await requestShopEvalCloud('GET')
+  const prev = readShopEvalCloud(remote && remote.habits) || {}
+  const platforms = Object.assign({}, prev.platforms || {})
+  platforms[platformId] = { savedAt, payload: data }
+  await requestShopEvalCloud('POST', {
+    habits: {
+      shopEval: { updatedAt: savedAt, platforms },
+      updatedAt: savedAt,
+    },
+  })
+}
+
+async function hydrateShopEval(raw, storage) {
+  const { row } = normalizeInput(raw)
+  const remote = await requestShopEvalCloud('GET')
+  const fresh = loadCache(storage, row)
+  const localAt = Date.parse(String((fresh.data && fresh.data.savedAt) || '')) || 0
+  const cloud = readShopEvalCloud(remote && remote.habits)
+  const slot = cloud && cloud.platforms ? cloud.platforms[row.platformId] : null
+  const remoteAt = Date.parse(String((slot && slot.savedAt) || '')) || 0
+  if (slot && slot.payload && remoteAt > localAt && savedFromCache(slot.payload)) {
+    storage.setItem(fresh.key, JSON.stringify(slot.payload))
+    return savedFromCache(slot.payload)
+  }
+  if (fresh.data && savedFromCache(fresh.data) && localAt >= remoteAt && (localAt > remoteAt || remoteAt === 0)) {
+    if (!localAt) writeCache(storage, fresh.key, { savedAt: new Date().toISOString() })
+    void publishShopEval(storage, fresh.key, row.platformId)
+  }
+  return savedFromCache(fresh.data)
+}
+
 function erpAdviceSystem() {
   return [
     '你在给商家写灵祺 ERP 里能直接去做的改法，用「你」来写。',
@@ -933,7 +989,8 @@ async function evaluateShop(raw, opts) {
   const indicators = mapIndicators(j.indicators)
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators)
-  writeCache(opts.storage, loaded.key, score)
+  writeCache(opts.storage, loaded.key, Object.assign({}, score, { savedAt: new Date().toISOString() }))
+  void publishShopEval(opts.storage, loaded.key, row.platformId)
   return score
 }
 
@@ -961,7 +1018,8 @@ async function adviseShop(raw, score, opts) {
     lift: clampLift(j.lift),
     sections: mapSuggestions(j.sections),
   }
-  writeCache(opts.storage, key, { advice })
+  writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
+  void publishShopEval(opts.storage, key, row.platformId)
   return advice
 }
 
@@ -986,6 +1044,7 @@ module.exports = {
   formatVerifyYuan,
   resolveShopEvalFromStores,
   readSavedShopEval,
+  hydrateShopEval,
   evaluateShop,
   adviseShop,
   shopEvalGainTargets,

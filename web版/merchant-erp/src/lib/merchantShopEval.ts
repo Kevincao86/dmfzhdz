@@ -741,6 +741,84 @@ function publicScoreSystem() {
   ].join('')
 }
 
+type ShopEvalCloudSlot = { savedAt?: string; payload?: Record<string, unknown> }
+type ShopEvalCloudFile = { updatedAt?: string; platforms?: Record<string, ShopEvalCloudSlot> }
+
+function readShopEvalCloud(habits: unknown): ShopEvalCloudFile | null {
+  if (!habits || typeof habits !== 'object') return null
+  const shopEval = (habits as Record<string, unknown>).shopEval
+  if (!shopEval || typeof shopEval !== 'object') return null
+  return shopEval as ShopEvalCloudFile
+}
+
+async function requestShopEvalCloud(method: 'GET' | 'POST', body?: unknown): Promise<{ habits?: unknown } | null> {
+  try {
+    const [{ merchantApiFetchUrls }, { merchantApiAuthHeaders, resolveMerchantApiBearer }] = await Promise.all([
+      import('./merchantErpApiBase'),
+      import('./merchantApiAuth'),
+    ])
+    const auth = await resolveMerchantApiBearer()
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...merchantApiAuthHeaders(auth.token, auth.source),
+    }
+    if (!auth.token) return null
+    for (const url of merchantApiFetchUrls('/api/meoo-agent-user-state')) {
+      try {
+        const res = await fetch(url, {
+          method,
+          headers,
+          body: method === 'POST' ? JSON.stringify(body || {}) : undefined,
+          signal: AbortSignal.timeout(15000),
+        })
+        if (!res.ok) continue
+        const data = (await res.json()) as { ok?: boolean; habits?: unknown }
+        if (data && data.ok !== false) return data
+      } catch {
+        /* 下一条地址 */
+      }
+    }
+  } catch {
+    /* 云端不可用时保留本机结果 */
+  }
+  return null
+}
+
+async function publishShopEval(storage: StorageLike, key: string, platformId: string) {
+  const data = readCache(storage, key)
+  if (!data) return
+  const savedAt = String(data.savedAt || new Date().toISOString())
+  const remote = await requestShopEvalCloud('GET')
+  const prev = readShopEvalCloud(remote?.habits)
+  const platforms = { ...(prev?.platforms || {}) }
+  platforms[platformId] = { savedAt, payload: data }
+  await requestShopEvalCloud('POST', {
+    habits: {
+      shopEval: { updatedAt: savedAt, platforms },
+      updatedAt: savedAt,
+    },
+  })
+}
+
+export async function hydrateShopEval(raw: ShopEvalInput, storage: StorageLike) {
+  const { row } = normalizeInput(raw)
+  const remote = await requestShopEvalCloud('GET')
+  const fresh = loadCache(storage, row)
+  const localAt = Date.parse(String(fresh.data?.savedAt || '')) || 0
+  const slot = readShopEvalCloud(remote?.habits)?.platforms?.[row.platformId]
+  const remoteAt = Date.parse(String(slot?.savedAt || '')) || 0
+  if (slot?.payload && remoteAt > localAt && savedFromCache(slot.payload)) {
+    storage.setItem(fresh.key, JSON.stringify(slot.payload))
+    return savedFromCache(slot.payload)
+  }
+  if (fresh.data && savedFromCache(fresh.data) && localAt >= remoteAt && (localAt > remoteAt || remoteAt === 0)) {
+    if (!localAt) writeCache(storage, fresh.key, { savedAt: new Date().toISOString() })
+    void publishShopEval(storage, fresh.key, row.platformId)
+  }
+  return savedFromCache(fresh.data)
+}
+
 function erpAdviceSystem() {
   const modules = ERP_SOLUTION_MODULES.join('、')
   return [
@@ -782,7 +860,8 @@ export async function evaluateShop(
   const indicators = mapIndicators(j.indicators)
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic({ ...j, sources }, indicators)
-  writeCache(opts.storage, loaded.key, score)
+  writeCache(opts.storage, loaded.key, { ...score, savedAt: new Date().toISOString() })
+  void publishShopEval(opts.storage, loaded.key, row.platformId)
   return score
 }
 
@@ -814,7 +893,8 @@ export async function adviseShop(
     lift: clampLift(j.lift),
     sections: mapSuggestions(j.sections),
   }
-  writeCache(opts.storage, key, { advice })
+  writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
+  void publishShopEval(opts.storage, key, row.platformId)
   return advice
 }
 

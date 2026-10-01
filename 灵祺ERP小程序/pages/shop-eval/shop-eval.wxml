@@ -109,8 +109,9 @@
   </view>
 
   <view class="btn-sub {{!scoreReady || evaluating || advising ? 'btn--off' : ''}}" bindtap="onAdvise">
-    {{advising ? '分析中…' : '查看分析与提升方案'}}
+    {{advising ? '提升方案生成中…' : '查看分析与提升方案'}}
   </view>
+  <text class="need">分析不消耗积分。查看提升方案需开通会员版。</text>
   <text class="err" wx:if="{{err}}">{{err}}</text>
   <text class="need" wx:if="{{!canEval}}">请先到「店铺信息」完善门店名称</text>
   <text class="need" wx:elif="{{!scoreReady}}">请先完成门店评估</text>

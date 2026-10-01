@@ -7,6 +7,7 @@ import {
   describeShopEvalBasis,
   evaluateShop,
   formatVerifyYuan,
+  hydrateShopEval,
   platformShopEvalMeta,
   readSavedShopEval,
   resolveShopEvalFromStores,
@@ -141,13 +142,21 @@ export default function MerchantShopEvalPanel() {
   }, [platformId, platformBound, loadStore])
 
   useEffect(() => {
-    const saved = readSavedShopEval(input, storage)
-    setErr('')
-    setAdvice(saved?.advice || null)
-    setScore(saved?.score || null)
-    setDisplayScore(saved?.score?.score || 0)
-    setAnimateScore(false)
-    setAnimateGains(Boolean(saved?.score))
+    let cancel = false
+    const apply = (saved: ReturnType<typeof readSavedShopEval>) => {
+      if (cancel) return
+      setErr('')
+      setAdvice(saved?.advice || null)
+      setScore(saved?.score || null)
+      setDisplayScore(saved?.score?.score || 0)
+      setAnimateScore(false)
+      setAnimateGains(Boolean(saved?.score))
+    }
+    apply(readSavedShopEval(input, storage))
+    void hydrateShopEval(input, storage).then(apply)
+    return () => {
+      cancel = true
+    }
   }, [input.platformId, input.scope, input.storeCount, input.storeName, input.address, input.phone, input.businessHours, input.offerName, input.offerPrice])
 
   useEffect(() => {
@@ -173,7 +182,6 @@ export default function MerchantShopEvalPanel() {
   }
 
   async function onEvaluate() {
-    if (!requirePaid()) return
     if (!canEval || evaluating || advising) return
     setEvaluating(true)
     setErr('')
@@ -411,11 +419,11 @@ export default function MerchantShopEvalPanel() {
           onClick={() => void onAdvise()}
           className="mt-3 w-full rounded-xl bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
         >
-          {advising ? '分析中…' : '查看分析与提升方案'}
+          {advising ? '提升方案生成中…' : '查看分析与提升方案'}
         </button>
         {!paid ? (
           <p className="mt-2 text-center text-xs text-slate-500">
-            免费版可看页面，评估和分析需开通会员。
+            分析不消耗积分。查看提升方案需开通会员版。
             <button type="button" className="ml-1 text-[#1E3A5F] hover:underline" onClick={() => navigate(MEMBERSHIP_UPGRADE_HREF)}>
               去升级
             </button>
