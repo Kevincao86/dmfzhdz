@@ -642,6 +642,19 @@ function scoreFromPublic(raw, indicators) {
   }
 }
 
+function profileFromRow(row) {
+  const storeCount = Math.max(0, Math.round(Number(row && row.storeCount) || 0))
+  return {
+    storeCount,
+    scope: (row && row.scope) === 'chain' || storeCount >= 2 ? 'chain' : 'single',
+    storeNames: String((row && row.storeNames) || ''),
+    brandName: String((row && row.brandName) || ''),
+    storeName: String((row && row.storeName) || ''),
+    address: String((row && row.address) || ''),
+    category: String((row && row.category) || ''),
+  }
+}
+
 function savedFromCache(cached) {
   const indicators = mapIndicators(cached && cached.indicators)
   if (!cached || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
@@ -651,7 +664,12 @@ function savedFromCache(cached) {
     const sections = mapSuggestions(adviceRaw.sections)
     if (sections.length) advice = { lift: clampLift(adviceRaw.lift), sections }
   }
-  return { score: scoreFromPublic(cached, indicators), advice }
+  const rawProfile = cached.profile && typeof cached.profile === 'object' ? cached.profile : null
+  return {
+    score: scoreFromPublic(cached, indicators),
+    advice,
+    profile: rawProfile ? profileFromRow(rawProfile) : null,
+  }
 }
 
 function shopEvalGrade(score, scope) {
@@ -1075,7 +1093,7 @@ async function evaluateShop(raw, opts) {
   const indicators = applyEvidenceFloors(mapIndicators(j.indicators), row.storeCount, evidenceNote)
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators)
-  writeCache(opts.storage, loaded.key, Object.assign({}, score, { savedAt: new Date().toISOString() }))
+  writeCache(opts.storage, loaded.key, Object.assign({}, score, { profile: profileFromRow(row), savedAt: new Date().toISOString() }))
   void publishShopEval(opts.storage, loaded.key, slotId(row))
   return score
 }

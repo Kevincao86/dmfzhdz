@@ -485,7 +485,32 @@ function writeCache(storage: StorageLike, key: string, patch: Record<string, unk
   storage.setItem(key, JSON.stringify({ ...prev, ...patch }))
 }
 
-function savedFromCache(cached: Record<string, unknown> | null): { score: ShopEvalScore; advice: ShopEvalAdvice | null } | null {
+function profileFromRow(row: {
+  storeCount?: number
+  scope?: ShopEvalScope
+  storeNames?: string
+  brandName?: string
+  storeName?: string
+  address?: string
+  category?: string
+}) {
+  const storeCount = Math.max(0, Math.round(Number(row.storeCount) || 0))
+  return {
+    storeCount,
+    scope: row.scope === 'chain' || storeCount >= 2 ? 'chain' : 'single',
+    storeNames: String(row.storeNames || ''),
+    brandName: String(row.brandName || ''),
+    storeName: String(row.storeName || ''),
+    address: String(row.address || ''),
+    category: String(row.category || ''),
+  }
+}
+
+function savedFromCache(cached: Record<string, unknown> | null): {
+  score: ShopEvalScore
+  advice: ShopEvalAdvice | null
+  profile: ReturnType<typeof profileFromRow> | null
+} | null {
   const indicators = mapIndicators(cached?.indicators)
   if (!cached || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
   const adviceRaw = cached.advice
@@ -494,9 +519,12 @@ function savedFromCache(cached: Record<string, unknown> | null): { score: ShopEv
     const sections = mapSuggestions((adviceRaw as ShopEvalAdvice).sections)
     if (sections.length) advice = { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections }
   }
+  const rawProfile = cached.profile
+  const profile = rawProfile && typeof rawProfile === 'object' ? profileFromRow(rawProfile as ReturnType<typeof profileFromRow>) : null
   return {
     score: scoreFromPublic(cached, indicators),
     advice,
+    profile,
   }
 }
 
@@ -950,7 +978,7 @@ export async function evaluateShop(
   const indicators = applyEvidenceFloors(mapIndicators(j.indicators), row.storeCount, evidenceNote)
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic({ ...j, sources }, indicators)
-  writeCache(opts.storage, loaded.key, { ...score, savedAt: new Date().toISOString() })
+  writeCache(opts.storage, loaded.key, { ...score, profile: profileFromRow(row), savedAt: new Date().toISOString() })
   void publishShopEval(opts.storage, loaded.key, slotId(row))
   return score
 }

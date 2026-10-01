@@ -73,6 +73,76 @@ function letterOf(name) {
   return s ? s.slice(0, 1) : '店'
 }
 
+const FORM_KEY = 'lq_shop_eval_form'
+
+function formInput(data) {
+  const region = data.region || []
+  const cat1 = (data.cat1List || [])[data.cat1Index] || ''
+  const cat2 = (data.cat2List || [])[data.cat2Index] || ''
+  const name = String(data.formName || '').trim()
+  return {
+    platformId: data.platformId || 'douyin',
+    storeName: name,
+    brandName: name,
+    city: region[1] || '',
+    address: region.join('') + String(data.detailAddress || '').trim(),
+    category: cat1 && cat2 ? cat1 + ' / ' + cat2 : '',
+  }
+}
+
+function withChain(input, profile) {
+  if (!profile || !(Number(profile.storeCount) >= 2)) return input
+  return Object.assign({}, input, {
+    storeCount: Number(profile.storeCount) || 0,
+    scope: 'chain',
+    storeNames: profile.storeNames || input.storeNames || '',
+    brandName: profile.brandName || input.brandName || input.storeName,
+  })
+}
+
+function identityPatch(input, score) {
+  const scope = evalApi.shopEvalScopeOf(input)
+  const grade = score ? evalApi.shopEvalGrade(score.score, scope) : null
+  const name = String(input.storeName || input.brandName || '').trim()
+  const bits = []
+  if (input.category) bits.push(input.category)
+  if (input.address) bits.push(input.address)
+  return {
+    storeName: name,
+    scopeLabel: scope === 'chain' ? '连锁品牌 · ' + (input.storeCount || '多') + '家' : '单门店',
+    grades: evalApi.shopEvalGrades(scope),
+    avatarLetter: letterOf(name),
+    basis: bits.join(' · '),
+    showGrade: Boolean(grade),
+    gradeKey: grade ? grade.key : '',
+    gradeLabel: grade ? grade.label : '',
+    gradeNote: grade ? grade.note : '',
+  }
+}
+
+function readSavedForm() {
+  try {
+    const raw = wx.getStorageSync(FORM_KEY)
+    const saved = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!saved || !saved.formName) return null
+    const cat1Index = Math.max(0, CAT1.indexOf(saved.cat1))
+    const cat2List = CATEGORIES[CAT1[cat1Index]] || []
+    let cat2Index = cat2List.indexOf(saved.cat2)
+    if (cat2Index < 0) cat2Index = 0
+    return {
+      formName: saved.formName,
+      region: saved.region || [],
+      regionText: (saved.region || []).join(' '),
+      detailAddress: saved.detailAddress || '',
+      cat1Index,
+      cat2List,
+      cat2Index,
+    }
+  } catch (e) {
+    return null
+  }
+}
+
 async function askText(system, user) {
   const token = api.getBearerToken ? api.getBearerToken() : ''
   let tenantId = ''
@@ -164,9 +234,119 @@ Page({
     }
     const rows = platformRows()
     let platformId = this.data.platformId
-    this.setData({ platforms: rows, platformId, canEval: formReady(this.data) })
+    const restored = readSavedForm()
+    const view = restored ? Object.assign({}, this.data, restored) : this.data
+    if (restored) this._formTouched = true
+    this.setData(Object.assign({ platforms: rows, platformId }, restored || {}, { canEval: formReady(view) }))
     void this.refreshQuota()
-    if (rows.some((p) => p.id === platformId && p.bound)) void this.loadStore(platformId)
+    if (formReady(view)) void this.syncFormResult(view)
+    else if (rows.some((p) => p.id === platformId && p.bound)) void this.loadStore(platformId)
+  },
+
+  rememberForm(extra) {
+    const data = Object.assign({}, this.data, extra || {})
+    try {
+      wx.setStorageSync(
+        FORM_KEY,
+        JSON.stringify({
+          formName: data.formName || '',
+          region: data.region || [],
+          detailAddress: data.detailAddress || '',
+          cat1: (data.cat1List || [])[data.cat1Index] || '',
+          cat2: (data.cat2List || [])[data.cat2Index] || '',
+        }),
+      )
+    } catch (e) {}
+  },
+
+  scheduleSync() {
+    if (this._syncTimer) clearTimeout(this._syncTimer)
+    this._syncTimer = setTimeout(() => {
+      this._syncTimer = 0
+      if (formReady(this.data) && !this.data.evaluating) void this.syncFormResult(this.data)
+    }, 500)
+  },
+
+  async syncFormResult(data) {
+    const view = data || this.data
+    if (!formReady(view) || this.data.evaluating) return
+    const base = Object.assign({}, formInput(view))
+    let saved = null
+    try {
+      if (evalApi.hydrateShopEval) await evalApi.hydrateShopEval(base, storage)
+      saved = evalApi.readSavedShopEval(base, storage)
+    } catch (e) {}
+    if (this.data.evaluating) return
+    let input = withChain(base, saved && saved.profile)
+    if (!(Number(input.storeCount) >= 2)) {
+      try {
+        const located = await postLocate({
+          action: 'locate',
+          address: base.address,
+          city: base.city,
+          category: base.category,
+          storeName: base.storeName,
+        })
+        const brandCount = Number(located.brandCount) || 0
+        const brandNames = Array.isArray(located.brandNames) ? located.brandNames : []
+        const titles = Array.isArray(located.publicTitles) ? located.publicTitles : []
+        input = Object.assign({}, input, {
+          storeCount: brandCount,
+          scope: brandCount >= 2 ? 'chain' : 'single',
+          storeNames: brandNames.slice(0, 8).join('、'),
+          brandName: base.storeName,
+          mapNote: [located.mapNote, located.brandNote].filter(Boolean).join('\n'),
+          publicNote: titles.join('\n'),
+        })
+      } catch (e) {}
+    }
+    if (this.data.evaluating) return
+    this._input = input
+    const score = (saved && saved.score) || null
+    const advice = saved && saved.advice
+    if (score) this._score = score
+    else this._score = null
+    const meta = evalApi.platformShopEvalMeta(view.platformId || this.data.platformId, evalApi.shopEvalScopeOf(input))
+    const patch = Object.assign(
+      {
+        platformName: meta.name,
+        evalTitle: meta.title,
+        levelA: meta.levelA,
+        levelB: meta.levelB,
+      },
+      identityPatch(input, score),
+    )
+    if (score) {
+      Object.assign(patch, {
+        scoreReady: true,
+        displayScore: score.score,
+        searchLevel: score.searchLevel,
+        verifyLevel: score.verifyLevel,
+        situations: score.situations || [],
+        positioning: score.positioning || '',
+        indicators: score.indicators || [],
+        highlights: readableLines(score.highlights),
+        gaps: readableLines(score.gaps),
+        summary: score.summary || '',
+        sources: score.sources || [],
+        adviceReady: Boolean(advice && advice.sections && advice.sections.length),
+        sections: advice && advice.sections ? advice.sections : [],
+      })
+    } else {
+      Object.assign(patch, {
+        scoreReady: false,
+        displayScore: 0,
+        positioning: '',
+        indicators: [],
+        highlights: [],
+        gaps: [],
+        summary: '',
+        sources: [],
+        adviceReady: false,
+        sections: [],
+      })
+    }
+    this.setData(patch)
   },
 
   async refreshQuota() {
@@ -196,17 +376,18 @@ Page({
       total = r && r.ok ? Number(r.total || items.length) : items.length
     } catch (e) {}
     const input = evalApi.resolveShopEvalFromStores(platformId, items, total)
-    const scope = evalApi.shopEvalScopeOf(input)
-    const meta = evalApi.platformShopEvalMeta(platformId, scope)
-    this._input = input
     if (evalApi.hydrateShopEval) await evalApi.hydrateShopEval(input, storage)
-    if (this.data.platformId !== platformId) return
+    if (this.data.platformId !== platformId || formReady(this.data)) return
     const saved = evalApi.readSavedShopEval(input, storage)
+    const viewed = withChain(input, saved && saved.profile)
+    const scope = evalApi.shopEvalScopeOf(viewed)
+    const meta = evalApi.platformShopEvalMeta(platformId, scope)
+    this._input = viewed
     const score = saved && saved.score
     const advice = saved && saved.advice
     const grade = score ? evalApi.shopEvalGrade(score.score, scope) : null
     this._score = score || null
-    const displayName = String(this.data.formName || '').trim() || (scope === 'chain' && input.brandName ? input.brandName : input.storeName)
+    const displayName = String(this.data.formName || '').trim() || (scope === 'chain' && viewed.brandName ? viewed.brandName : viewed.storeName)
     if (!this._formTouched && input.storeName) {
       this.setData({
         formName: input.storeName,
@@ -220,10 +401,10 @@ Page({
       levelA: meta.levelA,
       levelB: meta.levelB,
       storeName: displayName,
-      scopeLabel: scope === 'chain' ? `连锁品牌 · ${input.storeCount || '多'}家` : '单门店',
+      scopeLabel: scope === 'chain' ? `连锁品牌 · ${viewed.storeCount || '多'}家` : '单门店',
       grades: evalApi.shopEvalGrades(scope),
       avatarLetter: letterOf(displayName),
-      basis: evalApi.describeShopEvalBasis(input),
+      basis: [viewed.category, viewed.address].filter(Boolean).join(' · ') || evalApi.describeShopEvalBasis(viewed),
       canEval: formReady(Object.assign({}, this.data, !this._formTouched && input.storeName ? { formName: input.storeName, detailAddress: this.data.detailAddress || input.address || '' } : {})),
       scoreReady: Boolean(score),
       displayScore: score ? score.score : 0,
@@ -245,7 +426,7 @@ Page({
       err: '',
     })
     if (score) {
-      const gains = evalApi.shopEvalGainTargets(score, input)
+      const gains = evalApi.shopEvalGainTargets(score, viewed)
       if (gains) this.playGains(gains.exposure, gains.verify)
     } else {
       this.setData({ showGains: false, exposureText: '', salesText: '' })
@@ -425,9 +606,14 @@ Page({
       this._input = input
       const score = await evalApi.evaluateShop(input, { force: true, storage, askText })
       this._score = score
-      const grade = evalApi.shopEvalGrade(score.score, evalApi.shopEvalScopeOf(input))
-      this.setData({
+      const meta = evalApi.platformShopEvalMeta(input.platformId, evalApi.shopEvalScopeOf(input))
+      this.rememberForm()
+      this.setData(Object.assign({
         scoreReady: true,
+        platformName: meta.name,
+        evalTitle: meta.title,
+        levelA: meta.levelA,
+        levelB: meta.levelB,
         searchLevel: score.searchLevel,
         verifyLevel: score.verifyLevel,
         situations: score.situations || [],
@@ -437,11 +623,7 @@ Page({
         gaps: readableLines(score.gaps),
         summary: score.summary || '',
         sources: score.sources || [],
-        showGrade: !!grade,
-        gradeKey: grade ? grade.key : '',
-        gradeLabel: grade ? grade.label : '',
-        gradeNote: grade ? grade.note : '',
-      })
+      }, identityPatch(input, score)))
       this.playScore(score.score)
       const gains = evalApi.shopEvalGainTargets(score, input)
       if (gains) this.playGains(gains.exposure, gains.verify)
@@ -469,12 +651,16 @@ Page({
     this._formTouched = true
     const formName = e.detail.value
     this.setData({ formName, canEval: formReady(Object.assign({}, this.data, { formName })) })
+    this.rememberForm({ formName })
+    this.scheduleSync()
   },
 
   onDetail(e) {
     this._formTouched = true
     const detailAddress = e.detail.value
     this.setData({ detailAddress, canEval: formReady(Object.assign({}, this.data, { detailAddress })) })
+    this.rememberForm({ detailAddress })
+    this.scheduleSync()
   },
 
   onRegion(e) {
@@ -485,6 +671,8 @@ Page({
       regionText: region.join(' '),
       canEval: formReady(Object.assign({}, this.data, { region })),
     })
+    this.rememberForm({ region })
+    this.scheduleSync()
   },
 
   onCat1(e) {
@@ -493,12 +681,16 @@ Page({
     const cat2List = CATEGORIES[this.data.cat1List[cat1Index]] || []
     const next = Object.assign({}, this.data, { cat1Index, cat2List, cat2Index: 0 })
     this.setData({ cat1Index, cat2List, cat2Index: 0, canEval: formReady(next) })
+    this.rememberForm({ cat1Index, cat2List, cat2Index: 0 })
+    this.scheduleSync()
   },
 
   onCat2(e) {
     this._formTouched = true
     const cat2Index = Number(e.detail.value) || 0
     this.setData({ cat2Index, canEval: formReady(Object.assign({}, this.data, { cat2Index })) })
+    this.rememberForm({ cat2Index })
+    this.scheduleSync()
   },
 
   async onAdvise() {
