@@ -24,6 +24,102 @@ function amapKey(env: Record<string, string | undefined>) {
   )
 }
 
+function stripTags(html: string) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function parseSearchTitles(html: string) {
+  const out: string[] = []
+  const re = /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi
+  for (const block of html.matchAll(re)) {
+    const title = stripTags(block[1] || '')
+    if (title.length < 8 || title.length > 80) continue
+    if (/搜狗|百度一下|相关搜索|登录|广告|更多结果/.test(title)) continue
+    if (out.includes(title)) continue
+    out.push(title)
+    if (out.length >= 6) break
+  }
+  return out
+}
+
+async function publicTitlesFor(name: string, city: string) {
+  const queries = [`${name} ${city} 连锁 门店`, `${name} 抖音 团购`, `${name} ${city} 点评`].map((q) => q.replace(/\s+/g, ' ').trim())
+  const headers = {
+    Accept: 'text/html',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  }
+  const titles: string[] = []
+  await Promise.all(
+    queries.map(async (query) => {
+      const urls = [
+        `https://www.sogou.com/web?query=${encodeURIComponent(query)}`,
+        `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
+      ]
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) })
+          if (!res.ok) continue
+          const found = parseSearchTitles(await res.text())
+          if (!found.length) continue
+          for (const title of found) {
+            if (!titles.includes(title)) titles.push(title)
+          }
+          break
+        } catch {
+          /* 下一条 */
+        }
+      }
+    }),
+  )
+  return titles.slice(0, 12)
+}
+
+async function brandPlaces(name: string, city: string, env: Record<string, string | undefined>) {
+  const key = amapKey(env)
+  const token = name.trim()
+  if (!key || token.length < 2) return { count: 0, names: [] as string[], note: '' }
+  const qs = new URLSearchParams({
+    key,
+    keywords: token,
+    offset: '20',
+    page: '1',
+    extensions: 'base',
+    output: 'JSON',
+  })
+  if (city.trim()) {
+    qs.set('city', city.trim())
+    qs.set('citylimit', 'true')
+  }
+  const res = await fetch(`https://restapi.amap.com/v3/place/text?${qs.toString()}`, { signal: AbortSignal.timeout(8000) })
+  const json = (await res.json()) as { status?: string; count?: string; pois?: Array<{ name?: string; address?: string }> }
+  if (String(json.status) !== '1') return { count: 0, names: [] as string[], note: '' }
+  const pois = (json.pois || []).filter((row) => String(row.name || '').includes(token))
+  const listed = pois.length
+  const reported = Number(json.count)
+  const count = listed > 0 && listed === (json.pois || []).length && Number.isFinite(reported) && reported > listed ? reported : listed
+  const names = pois.slice(0, 12).map((row) => {
+    const addr = String(row.address || '').trim()
+    return addr ? `${row.name}（${addr}）` : String(row.name || '')
+  })
+  const where = city.trim() || '全国'
+  const note =
+    count >= 2
+      ? `高德在${where}按「${token}」检索到 ${count} 家同名门店：${names.join('、')}。这是连锁品牌，按品牌评估，不要写成单店。`
+      : count === 1
+        ? `高德在${where}只检索到 1 家名称含「${token}」的门店：${names[0] || token}。`
+        : `高德在${where}没有检索到名称含「${token}」的门店。`
+  return { count, names, note }
+}
+
 async function districtNames(keywords: string, env: Record<string, string | undefined>) {
   const key = amapKey(env)
   if (!key) return { ok: false as const, message: '未配置高德地图' }
@@ -56,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMerchantJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录' })
     return
   }
-  let body: { action?: string; keywords?: string; address?: string; city?: string; category?: string }
+  let body: { action?: string; keywords?: string; address?: string; city?: string; category?: string; storeName?: string }
   try {
     body = JSON.parse(rawBody(req) || '{}') as typeof body
   } catch {
@@ -79,6 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const address = String(body.address || '').trim()
   const city = String(body.city || '').trim()
   const category = String(body.category || '').trim()
+  const storeName = String(body.storeName || '').trim()
   if (!address) {
     sendMerchantJson(res, 400, { ok: false, message: '请填写地址' })
     return
@@ -89,7 +186,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
   const query = amapQueryForIndustry(category || '餐饮')
-  const nearby = await amapPlaceNearby(env, { location: geo.location, query, radiusM: 3000, pageSize: 8 })
+  const [nearby, brand, titles] = await Promise.all([
+    amapPlaceNearby(env, { location: geo.location, query, radiusM: 3000, pageSize: 8 }),
+    brandPlaces(storeName, city, env),
+    storeName ? publicTitlesFor(storeName, city) : Promise.resolve([] as string[]),
+  ])
   const pois = nearby.ok
     ? nearby.pois.slice(0, 8).map((poi) => ({
         name: poi.name,
@@ -99,11 +200,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const poiLine = pois.length
     ? pois.map((poi) => `${poi.name}${poi.distanceM != null ? ` ${poi.distanceM}米` : ''}`).join('；')
     : '3 公里内没有检索到同类门店'
-  const mapNote = `高德已定位到该地址（坐标 ${geo.location.lng},${geo.location.lat}）。周边同类「${query}」：${poiLine}。`
+  const mapNote = `高德已定位到该地址（坐标 ${geo.location.lng},${geo.location.lat}）。周边同类「${query}」是别的店，不能当成这家没有客流：${poiLine}。`
   sendMerchantJson(res, 200, {
     ok: true,
     location: geo.location,
     mapNote,
     pois,
+    brandCount: brand.count,
+    brandNames: brand.names,
+    brandNote: brand.note,
+    publicTitles: titles,
   })
 }

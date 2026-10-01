@@ -21,7 +21,7 @@ async function postLocate(body) {
   const token = api.getBearerToken ? api.getBearerToken() : ''
   const data = await merchant.merchantRequestAuth('POST', '/api/meoo-shop-eval-locate', {
     bearerToken: token,
-    timeoutMs: 20000,
+    timeoutMs: 28000,
     data: body,
   })
   if (!data || data.ok === false) {
@@ -363,14 +363,23 @@ Page({
         address,
         city: region[1] || '',
         category,
+        storeName: String(this.data.formName || '').trim(),
       })
+      const brandCount = Number(located.brandCount) || 0
+      const brandNames = Array.isArray(located.brandNames) ? located.brandNames : []
+      const titles = Array.isArray(located.publicTitles) ? located.publicTitles : []
       const input = Object.assign({}, this._input || {}, {
         platformId: this.data.platformId,
         storeName: String(this.data.formName || '').trim(),
+        brandName: String(this.data.formName || '').trim(),
+        storeNames: brandNames.slice(0, 8).join('、'),
+        storeCount: brandCount,
+        scope: brandCount >= 2 ? 'chain' : 'single',
         city: region[1] || '',
         address,
         category,
-        mapNote: located.mapNote || '',
+        mapNote: [located.mapNote, located.brandNote].filter(Boolean).join('\n'),
+        publicNote: titles.join('\n'),
       })
       this._input = input
       const score = await evalApi.evaluateShop(input, { force: true, storage, askText })

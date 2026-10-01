@@ -176,6 +176,7 @@ function normalizeInput(raw) {
       offerPrice: String((raw && raw.offerPrice) || '').trim(),
       category: String((raw && raw.category) || '').trim(),
       mapNote: String((raw && raw.mapNote) || '').trim(),
+      publicNote: String((raw && raw.publicNote) || '').trim(),
       signals: raw && raw.signals,
     },
   }
@@ -200,6 +201,7 @@ function shopFacts(spec, row) {
     `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
     `经营分类：${filledOr(row.category, '未填写')}`,
     `高德定位：${filledOr(row.mapNote, '未返回')}`,
+    `公开检索：${filledOr(row.publicNote, '未返回')}`,
     functionCoverage(row),
     row.signals ? signalFacts(row.signals) : '',
   ]
@@ -440,7 +442,7 @@ function slotId(row) {
 }
 
 function cacheKey(row) {
-  return ['lq_merchant_shop_eval_v5', ownerId(), slotId(row)].join('|')
+  return ['lq_merchant_shop_eval_v6', ownerId(), slotId(row)].join('|')
 }
 
 function legacyCacheKey(row) {
@@ -558,6 +560,45 @@ function textList(rows, limit, maxLen) {
     .map((row) => clipText(row, maxLen))
     .filter(Boolean)
     .slice(0, limit)
+}
+
+function collapsedChainText(text, storeCount) {
+  if (storeCount < 2) return false
+  return /单门店|完全空白|形象未立|基本空白/.test(String(text || ''))
+}
+
+function brandScoreLow(raw) {
+  const rows = Array.isArray(raw && raw.indicators) ? raw.indicators : []
+  for (const row of rows) {
+    if (!row || String(row.name || '') !== '品牌资产与口碑') continue
+    const score = Math.round(Number(row.score != null ? row.score : row.points))
+    return !Number.isFinite(score) || score < 40
+  }
+  return false
+}
+
+function applyEvidenceFloors(indicators, storeCount, note) {
+  if (storeCount < 2) return indicators
+  const floors = {
+    品牌资产与口碑: storeCount >= 5 ? 74 : 62,
+    门店标准化: storeCount >= 5 ? 68 : 58,
+    私域与复购: storeCount >= 5 ? 52 : 42,
+    数据复盘: storeCount >= 5 ? 40 : 32,
+    短视频与团购: storeCount >= 5 ? 50 : 42,
+    平台基础搭建: storeCount >= 5 ? 48 : 40,
+  }
+  if (/团购|抖音|探店|点评|榜/.test(note)) {
+    floors['短视频与团购'] = storeCount >= 5 ? 58 : 48
+    floors['平台基础搭建'] = storeCount >= 5 ? 54 : 46
+  }
+  return indicators.map((row) => {
+    const floor = floors[row.name] || 0
+    if (row.score >= floor) return row
+    const comment = /空白|未立|没有线上|零/.test(row.comment)
+      ? `${row.name}按高德同城 ${storeCount} 家同名门店来看，品牌已经被本地顾客叫得上名。这一家地址的后台和团购页这次没有逐条核对，短板写在货盘和数据，不把品牌写成没有形象。`
+      : row.comment
+    return Object.assign({}, row, { score: floor, comment })
+  })
 }
 
 function scoreFromPublic(raw, indicators) {
@@ -877,6 +918,11 @@ function httpGet(url) {
 }
 
 async function searchPublicBrand(row) {
+  const preset = String(row.publicNote || '')
+    .split('\n')
+    .map((line) => line.replace(/^\d+\.\s*/, '').trim())
+    .filter((line) => line.length >= 6)
+  if (preset.length) return preset.slice(0, 12)
   const name = row.brandName || row.storeName
   const queries = [`${name} ${row.city} 团购`, `${name} 抖音 探店`, `${row.storeName} 点评`]
   const titles = []
@@ -894,10 +940,13 @@ function publicScoreSystem() {
   const names = PUBLIC_EVAL_INDICATORS.map((item) => item.name).join('、')
   return [
     '你在给商家写线上运营打分，用「你」来写，对象是这个品牌或这家店。',
-    '只根据下面的门店档案和公开检索标题来写。检索标题里有的事实优先写进去。',
-    '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。',
-    '检索标题很少时，按品牌名称和门店档案写能从公开渠道核对的判断，把没被提到的能力放进短板。',
-    '经营分类和高德定位写在档案里。周边店名只写高德结果里出现过的，不要编造距离和门店数量。',
+    '只根据下面的门店档案、高德同名门店和公开检索标题来写。检索标题里有的事实优先写进去。',
+    '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。高德给出的同名门店数量可以写。',
+    '高德同名门店达到 2 家时，这是连锁品牌。禁止写成单门店、形象未立、线上运营完全空白、线上经营基本空白。',
+    '品牌资产与口碑、门店标准化按品牌在本地的公开认知和门店数量写。没绑定平台账号，只说明这一家地址的后台数据还没接进来，不能把品牌口碑打到 40 分以下。',
+    '短视频与团购、平台基础搭建：检索里有团购、探店、点评、榜单时按已有线上内容写；没有时写这一家地址的货盘这次没核对到，分数放在 40 到 60，不要打到个位数。',
+    '数据复盘可以低，因为用户还没绑定门店账号，后台数还没进来。',
+    '周边同类店是别的餐厅，不能用来证明这家没有客流。不要编造距离和门店数量。',
     '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
     '只输出一个 JSON 对象，不要 Markdown。',
     'positioning：一句定位，40 到 90 字，写这个品牌在本地公开渠道上的位置和最明显的短板。',
@@ -991,12 +1040,21 @@ async function evaluateShop(raw, opts) {
   }
   const sources = await searchPublicBrand(row)
   const material = sources.length ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n') : '这次没有抓到检索标题。'
-  const j = await askJson(
-    opts.askText,
-    publicScoreSystem(),
-    `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请给出定位、六项得分和点评、三条优势、四条短板、一句话总结。`,
-  )
-  const indicators = mapIndicators(j.indicators)
+  const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请给出定位、六项得分和点评、三条优势、四条短板、一句话总结。`
+  let j = await askJson(opts.askText, publicScoreSystem(), user)
+  const evidenceNote = `${row.mapNote}\n${row.publicNote}\n${material}`
+  if (collapsedChainText(JSON.stringify(j), row.storeCount) || (row.storeCount >= 3 && brandScoreLow(j))) {
+    j = await askJson(
+      opts.askText,
+      publicScoreSystem(),
+      `${user}\n纠正：高德已给出同城同名门店 ${row.storeCount} 家，这是连锁品牌。重写定位、优势和品牌资产、门店标准化，禁止出现单门店、形象未立、线上完全空白。短板只写这一家地址还没接进来的后台数据和这次没核对到的团购货盘。`,
+    )
+  }
+  if (row.storeCount >= 2 && collapsedChainText(`${j.positioning || ''}${j.summary || ''}`, row.storeCount)) {
+    j.positioning = `高德在同城检索到 ${row.storeCount} 家同名门店，品牌在本地已经被叫得上名。这一家地址的后台还没绑定，短板在货盘核对和数据复盘。`
+    j.summary = `同城已有 ${row.storeCount} 家同名门店，先把这一家的线上货盘和后台数据补上。`
+  }
+  const indicators = applyEvidenceFloors(mapIndicators(j.indicators), row.storeCount, evidenceNote)
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators)
   writeCache(opts.storage, loaded.key, Object.assign({}, score, { savedAt: new Date().toISOString() }))

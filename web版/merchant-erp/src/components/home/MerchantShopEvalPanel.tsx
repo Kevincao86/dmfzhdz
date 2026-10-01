@@ -43,7 +43,16 @@ async function postLocate(body: Record<string, unknown>) {
   for (const url of merchantApiFetchUrls('/api/meoo-shop-eval-locate')) {
     try {
       const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
-      const data = (await res.json()) as { ok?: boolean; message?: string; names?: string[]; mapNote?: string }
+      const data = (await res.json()) as {
+        ok?: boolean
+        message?: string
+        names?: string[]
+        mapNote?: string
+        brandNote?: string
+        brandCount?: number
+        brandNames?: string[]
+        publicTitles?: string[]
+      }
       if (data && data.ok !== false) return data
       last = String(data.message || data || last)
     } catch {
@@ -263,15 +272,24 @@ export default function MerchantShopEvalPanel() {
         address: fullAddress,
         city: cityName,
         category: categoryLabel,
+        storeName: formName.trim(),
       })
+      const brandCount = Number(located.brandCount) || 0
+      const brandNames = Array.isArray(located.brandNames) ? located.brandNames : []
+      const titles = Array.isArray(located.publicTitles) ? located.publicTitles : []
       const nextInput: ShopEvalInput = {
         ...input,
         platformId,
         storeName: formName.trim(),
+        brandName: formName.trim(),
+        storeNames: brandNames.slice(0, 8).join('、'),
+        storeCount: brandCount,
+        scope: brandCount >= 2 ? 'chain' : 'single',
         city: cityName,
         address: fullAddress,
         category: categoryLabel,
-        mapNote: located.mapNote || '',
+        mapNote: [located.mapNote, located.brandNote].filter(Boolean).join('\n'),
+        publicNote: titles.join('\n'),
       }
       setInput(nextInput)
       const next = await evaluateShop(nextInput, { force: true, storage, askText })
