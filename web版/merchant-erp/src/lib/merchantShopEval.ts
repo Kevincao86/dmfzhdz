@@ -10,6 +10,8 @@ export type ShopEvalInput = {
   city?: string
   offerName?: string
   offerPrice?: string
+  category?: string
+  mapNote?: string
   scope?: ShopEvalScope
   storeCount?: number
   brandName?: string
@@ -290,6 +292,8 @@ function normalizeInput(raw: ShopEvalInput) {
       city: String(raw?.city || '').trim(),
       offerName: String(raw?.offerName || '').trim(),
       offerPrice: String(raw?.offerPrice || '').trim(),
+      category: String(raw?.category || '').trim(),
+      mapNote: String(raw?.mapNote || '').trim(),
       signals: raw?.signals,
     },
   }
@@ -312,6 +316,8 @@ function shopFacts(spec: PlatformSpec, row: ReturnType<typeof normalizeInput>['r
     `营业时间：${filledOr(row.businessHours, '未填写')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
+    `经营分类：${filledOr(row.category, '未填写')}`,
+    `高德定位：${filledOr(row.mapNote, '未返回')}`,
   ]
   return lines.filter(Boolean).join('\n')
 }
@@ -430,8 +436,12 @@ function ownerId() {
   }
 }
 
+function slotId(row: ReturnType<typeof normalizeInput>['row']) {
+  return [row.platformId, row.storeName, row.address, row.category].join('|')
+}
+
 function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
-  return ['lq_merchant_shop_eval_v4', ownerId(), row.platformId].join('|')
+  return ['lq_merchant_shop_eval_v5', ownerId(), slotId(row)].join('|')
 }
 
 function loadCache(storage: StorageLike, row: ReturnType<typeof normalizeInput>['row']) {
@@ -505,6 +515,7 @@ export function describeShopEvalBasis(raw: ShopEvalInput) {
   if (row.businessHours) bits.push('已填营业时间')
   if (row.offerName) bits.push(`套餐 ${row.offerName}`)
   if (row.offerPrice) bits.push(`价格 ${row.offerPrice}`)
+  if (row.category) bits.push(row.category)
   return bits.join(' · ')
 }
 
@@ -731,6 +742,7 @@ function publicScoreSystem() {
     '只根据下面的门店档案和公开检索标题来写。检索标题里有的事实优先写进去。',
     '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。',
     '检索标题很少时，按品牌名称和门店档案写能从公开渠道核对的判断，把没被提到的能力放进短板。',
+    '经营分类和高德定位写在档案里。周边店名只写高德结果里出现过的，不要编造距离和门店数量。',
     '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
     '只输出一个 JSON 对象，不要 Markdown。',
     'positioning：一句定位，40 到 90 字，写这个品牌在本地公开渠道上的位置和最明显的短板。',
@@ -785,14 +797,14 @@ async function requestShopEvalCloud(method: 'GET' | 'POST', body?: unknown): Pro
   return null
 }
 
-async function publishShopEval(storage: StorageLike, key: string, platformId: string) {
+async function publishShopEval(storage: StorageLike, key: string, slot: string) {
   const data = readCache(storage, key)
   if (!data) return
   const savedAt = String(data.savedAt || new Date().toISOString())
   const remote = await requestShopEvalCloud('GET')
   const prev = readShopEvalCloud(remote?.habits)
   const platforms = { ...(prev?.platforms || {}) }
-  platforms[platformId] = { savedAt, payload: data }
+  platforms[slot] = { savedAt, payload: data }
   await requestShopEvalCloud('POST', {
     habits: {
       shopEval: { updatedAt: savedAt, platforms },
@@ -806,7 +818,7 @@ export async function hydrateShopEval(raw: ShopEvalInput, storage: StorageLike) 
   const remote = await requestShopEvalCloud('GET')
   const fresh = loadCache(storage, row)
   const localAt = Date.parse(String(fresh.data?.savedAt || '')) || 0
-  const slot = readShopEvalCloud(remote?.habits)?.platforms?.[row.platformId]
+  const slot = readShopEvalCloud(remote?.habits)?.platforms?.[slotId(row)]
   const remoteAt = Date.parse(String(slot?.savedAt || '')) || 0
   if (slot?.payload && remoteAt > localAt && savedFromCache(slot.payload)) {
     storage.setItem(fresh.key, JSON.stringify(slot.payload))
@@ -814,7 +826,7 @@ export async function hydrateShopEval(raw: ShopEvalInput, storage: StorageLike) 
   }
   if (fresh.data && savedFromCache(fresh.data) && localAt >= remoteAt && (localAt > remoteAt || remoteAt === 0)) {
     if (!localAt) writeCache(storage, fresh.key, { savedAt: new Date().toISOString() })
-    void publishShopEval(storage, fresh.key, row.platformId)
+    void publishShopEval(storage, fresh.key, slotId(row))
   }
   return savedFromCache(fresh.data)
 }
@@ -861,7 +873,7 @@ export async function evaluateShop(
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic({ ...j, sources }, indicators)
   writeCache(opts.storage, loaded.key, { ...score, savedAt: new Date().toISOString() })
-  void publishShopEval(opts.storage, loaded.key, row.platformId)
+  void publishShopEval(opts.storage, loaded.key, slotId(row))
   return score
 }
 
@@ -894,7 +906,7 @@ export async function adviseShop(
     sections: mapSuggestions(j.sections),
   }
   writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
-  void publishShopEval(opts.storage, key, row.platformId)
+  void publishShopEval(opts.storage, key, slotId(row))
   return advice
 }
 

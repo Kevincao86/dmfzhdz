@@ -3,7 +3,7 @@
     <view
       wx:for="{{platforms}}"
       wx:key="id"
-      class="plat {{item.bound ? '' : 'plat--off'}} {{item.bound && platformId === item.id ? 'plat--on' : ''}}"
+      class="plat {{platformId === item.id ? 'plat--on' : ''}}"
       data-id="{{item.id}}"
       bindtap="onPlatform"
     >
@@ -12,15 +12,35 @@
     </view>
   </view>
 
+  <view class="card form">
+    <text class="advice-title">免费评估</text>
+    <text class="form-label">门店名称</text>
+    <input class="form-input" placeholder="输入门店或品牌名称" value="{{formName}}" bindinput="onFormName" />
+    <text class="form-label">地址</text>
+    <picker mode="region" bindchange="onRegion" value="{{region}}">
+      <view class="form-input">{{regionText || '选择省市区'}}</view>
+    </picker>
+    <input class="form-input" placeholder="详细地址，如道路、门牌、商场楼层" value="{{detailAddress}}" bindinput="onDetail" />
+    <text class="form-label">分类</text>
+    <view class="form-row">
+      <picker class="form-pick" mode="selector" range="{{cat1List}}" value="{{cat1Index}}" bindchange="onCat1">
+        <view class="form-input">{{cat1List[cat1Index] || '一级分类'}}</view>
+      </picker>
+      <picker class="form-pick" mode="selector" range="{{cat2List}}" value="{{cat2Index}}" bindchange="onCat2">
+        <view class="form-input">{{cat2List[cat2Index] || '二级分类'}}</view>
+      </picker>
+    </view>
+  </view>
+
   <view class="eval-top">
     <view class="eval-left">
       <view class="card ident">
         <view class="avatar">{{avatarLetter}}</view>
-        <text class="nick">{{storeName || '尚未读取到门店'}}</text>
+        <text class="nick">{{formName || storeName || '填写门店名称'}}</text>
         <text class="scope">{{scopeLabel}}</text>
         <text class="did">{{platformName}}</text>
         <text class="did" wx:if="{{basis}}">{{basis}}</text>
-        <text class="did" wx:else>请先在店铺信息里完善门店名称和地址</text>
+        <text class="did" wx:else>填写名称、省市区、详细地址和分类后即可免费评估</text>
       </view>
     </view>
     <view class="eval-right">
@@ -43,7 +63,7 @@
           <text class="level">{{levelB}} {{verifyLevel}}</text>
         </view>
         <view class="btn-main {{!canEval || evaluating || advising ? 'btn--off' : ''}}" bindtap="onEvaluate">
-          {{evaluating ? '评估中…' : (scoreReady ? '重新评估' : '门店评估')}}
+          {{evaluating ? '评估中…' : (scoreReady ? '重新评估' : '免费评估')}}
         </view>
       </view>
     </view>
@@ -109,11 +129,11 @@
   </view>
 
   <view class="btn-sub {{!scoreReady || evaluating || advising ? 'btn--off' : ''}}" bindtap="onAdvise">
-    {{advising ? '提升方案生成中…' : '查看分析与提升方案'}}
+    {{advising ? '分析评估中…' : '分析评估'}}
   </view>
-  <text class="need">分析不消耗积分。查看提升方案需开通会员版。</text>
+  <text class="need">首次评估免费。分析评估需开通会员或会员 Plus，并先绑定门店账号。</text>
   <text class="err" wx:if="{{err}}">{{err}}</text>
-  <text class="need" wx:if="{{!canEval}}">请先到「店铺信息」完善门店名称</text>
+  <text class="need" wx:if="{{!canEval}}">请填写门店名称、省市区、详细地址和分类</text>
   <text class="need" wx:elif="{{!scoreReady}}">请先完成门店评估</text>
 
   <view class="card advice advice--plan" wx:if="{{adviceReady}}">

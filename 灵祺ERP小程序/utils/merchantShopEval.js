@@ -174,6 +174,8 @@ function normalizeInput(raw) {
       city: String((raw && raw.city) || '').trim(),
       offerName: String((raw && raw.offerName) || '').trim(),
       offerPrice: String((raw && raw.offerPrice) || '').trim(),
+      category: String((raw && raw.category) || '').trim(),
+      mapNote: String((raw && raw.mapNote) || '').trim(),
       signals: raw && raw.signals,
     },
   }
@@ -196,6 +198,8 @@ function shopFacts(spec, row) {
     `营业时间：${filledOr(row.businessHours, '未填写')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
+    `经营分类：${filledOr(row.category, '未填写')}`,
+    `高德定位：${filledOr(row.mapNote, '未返回')}`,
     functionCoverage(row),
     row.signals ? signalFacts(row.signals) : '',
   ]
@@ -431,8 +435,12 @@ function ownerId() {
   }
 }
 
+function slotId(row) {
+  return [row.platformId, row.storeName, row.address, row.category].join('|')
+}
+
 function cacheKey(row) {
-  return ['lq_merchant_shop_eval_v4', ownerId(), row.platformId].join('|')
+  return ['lq_merchant_shop_eval_v5', ownerId(), slotId(row)].join('|')
 }
 
 function legacyCacheKey(row) {
@@ -623,6 +631,7 @@ function describeShopEvalBasis(raw) {
   if (row.businessHours) bits.push('已填营业时间')
   if (row.offerName) bits.push(`套餐 ${row.offerName}`)
   if (row.offerPrice) bits.push(`价格 ${row.offerPrice}`)
+  if (row.category) bits.push(row.category)
   return bits.join(' · ')
 }
 
@@ -888,6 +897,7 @@ function publicScoreSystem() {
     '只根据下面的门店档案和公开检索标题来写。检索标题里有的事实优先写进去。',
     '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。',
     '检索标题很少时，按品牌名称和门店档案写能从公开渠道核对的判断，把没被提到的能力放进短板。',
+    '经营分类和高德定位写在档案里。周边店名只写高德结果里出现过的，不要编造距离和门店数量。',
     '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
     '只输出一个 JSON 对象，不要 Markdown。',
     'positioning：一句定位，40 到 90 字，写这个品牌在本地公开渠道上的位置和最明显的短板。',
@@ -919,14 +929,14 @@ function requestShopEvalCloud(method, data) {
     .catch(() => null)
 }
 
-async function publishShopEval(storage, key, platformId) {
+async function publishShopEval(storage, key, slot) {
   const data = readCache(storage, key)
   if (!data) return
   const savedAt = String(data.savedAt || new Date().toISOString())
   const remote = await requestShopEvalCloud('GET')
   const prev = readShopEvalCloud(remote && remote.habits) || {}
   const platforms = Object.assign({}, prev.platforms || {})
-  platforms[platformId] = { savedAt, payload: data }
+  platforms[slot] = { savedAt, payload: data }
   await requestShopEvalCloud('POST', {
     habits: {
       shopEval: { updatedAt: savedAt, platforms },
@@ -941,7 +951,7 @@ async function hydrateShopEval(raw, storage) {
   const fresh = loadCache(storage, row)
   const localAt = Date.parse(String((fresh.data && fresh.data.savedAt) || '')) || 0
   const cloud = readShopEvalCloud(remote && remote.habits)
-  const slot = cloud && cloud.platforms ? cloud.platforms[row.platformId] : null
+  const slot = cloud && cloud.platforms ? cloud.platforms[slotId(row)] : null
   const remoteAt = Date.parse(String((slot && slot.savedAt) || '')) || 0
   if (slot && slot.payload && remoteAt > localAt && savedFromCache(slot.payload)) {
     storage.setItem(fresh.key, JSON.stringify(slot.payload))
@@ -949,7 +959,7 @@ async function hydrateShopEval(raw, storage) {
   }
   if (fresh.data && savedFromCache(fresh.data) && localAt >= remoteAt && (localAt > remoteAt || remoteAt === 0)) {
     if (!localAt) writeCache(storage, fresh.key, { savedAt: new Date().toISOString() })
-    void publishShopEval(storage, fresh.key, row.platformId)
+    void publishShopEval(storage, fresh.key, slotId(row))
   }
   return savedFromCache(fresh.data)
 }
@@ -990,7 +1000,7 @@ async function evaluateShop(raw, opts) {
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators)
   writeCache(opts.storage, loaded.key, Object.assign({}, score, { savedAt: new Date().toISOString() }))
-  void publishShopEval(opts.storage, loaded.key, row.platformId)
+  void publishShopEval(opts.storage, loaded.key, slotId(row))
   return score
 }
 
@@ -1019,7 +1029,7 @@ async function adviseShop(raw, score, opts) {
     sections: mapSuggestions(j.sections),
   }
   writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
-  void publishShopEval(opts.storage, key, row.platformId)
+  void publishShopEval(opts.storage, key, slotId(row))
   return advice
 }
 
@@ -1031,9 +1041,24 @@ function shopEvalGainTargets(score, input) {
   }
 }
 
+const SHOP_EVAL_CATEGORIES = {
+  餐饮: ['火锅/汤锅', '烧烤/烤肉', '自助餐', '小吃快餐', '地方小吃', '饮品店', '面包蛋糕甜品', '早餐', '食堂/团餐', '日本料理', '韩国料理', '东南亚菜', '西餐', '中东菜', '川菜', '湘菜', '粤菜', '本帮江浙菜', '东北菜', '云贵菜', '西北菜', '新疆菜', '海鲜水产', '烤鱼', '小龙虾', '地锅鸡/鸡煲', '素食', '创意/融合菜', '私厨到家', '咖啡厅', '茶馆', '夜宵大排档', '其他中餐'],
+  丽人: ['美发', '美甲', '美睫', '美容美体', '祛痘/皮肤管理', '半永久纹绣', '纹身刺青', '养发护发', '美体塑形', '产后恢复', '男士美容', '舞蹈塑形', '瑜伽普拉提', 'SPA按摩', '其他丽人'],
+  休闲娱乐: ['KTV', '酒吧', '电影院', '剧本杀', '密室逃脱', '棋牌室', '网吧电竞', '游戏厅', '桌游馆', '轰趴馆', '农家乐', '真人CS', '温泉洗浴', '汗蒸桑拿', '其他玩乐'],
+  运动健身: ['健身房', '私教工作室', '瑜伽馆', '舞蹈培训', '格斗搏击', '游泳馆', '羽毛球馆', '篮球场馆', '网球场地', '滑雪户外', '马术俱乐部', '攀岩馆', '团操课', '其他运动'],
+  亲子: ['儿童乐园', '亲子餐厅', '婴儿游泳', '早教中心', '托育托管', '亲子摄影', '儿童理发', '绘本馆', '手工DIY', '亲子酒店', '动物园门票', '科技馆', '营地研学', '其他亲子'],
+  生活服务: ['家政保洁', '家电清洗', '搬家货运', '开锁换锁', '维修到家', '洗衣洗鞋', '月嫂保姆', '婚庆摄影', '法律咨询', '财务代办', '装修设计', '甲醛检测', '绿植养护', '其他生活'],
+  爱车: ['洗车美容', '保养维修', '轮胎服务', '贴膜改色', '钣金喷漆', '道路救援', '年检代办', '二手车服务', '充电桩', '加油优惠', '驾校培训', '租车服务', '车内消毒', '其他汽车'],
+  购物: ['商超便利', '百货零售', '服饰鞋包', '美妆集合', '数码家电', '母婴用品', '礼品鲜花', '图书文具', '进口商品', '农副产品', '茶叶酒水', '珠宝首饰', '眼镜钟表', '其他购物'],
+  学习培训: ['语言培训', '职业技能', '学历教育', '考研公考', '艺术培训', '体育培训', 'IT编程', '财会金融', '企业管理', '心理咨询', '书法绘画', '音乐乐器', '早幼教', '其他教育'],
+  宠物: ['宠物医疗', '宠物美容', '宠物寄养', '宠物训练', '宠物食品', '宠物用品', '宠物摄影', '异宠服务', '宠物殡葬', '宠物保险', '宠物出行', '水族造景', '爬宠服务', '其他宠物'],
+  医疗医美: ['口腔齿科', '眼科视光', '体检中心', '中医理疗', '轻医美', '植发养发', '医学美容', '疫苗接种', '康复护理', '心理咨询', '基因检测', '孕产服务', '专科门诊', '其他医疗'],
+}
+
 module.exports = {
   SHOP_EVAL_PLATFORMS,
   SHOP_EVAL_GRADES,
+  SHOP_EVAL_CATEGORIES,
   shopEvalScopeOf,
   shopEvalGrades,
   parseShopEvalJson,

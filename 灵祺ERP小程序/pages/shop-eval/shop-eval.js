@@ -5,6 +5,31 @@ const membershipMp = require('../../utils/membershipMp.js')
 const evalApi = require('../../utils/merchantShopEval.js')
 const { readPlatformToken } = require('../../utils/platformTokensMp.js')
 
+const CATEGORIES = evalApi.SHOP_EVAL_CATEGORIES || {}
+const CAT1 = Object.keys(CATEGORIES)
+
+function formReady(data) {
+  const name = String(data.formName || '').trim()
+  const region = data.region || []
+  const detail = String(data.detailAddress || '').trim()
+  const cat1 = (data.cat1List || [])[data.cat1Index]
+  const cat2 = (data.cat2List || [])[data.cat2Index]
+  return Boolean(name && region.length === 3 && region[0] && detail && cat1 && cat2)
+}
+
+async function postLocate(body) {
+  const token = api.getBearerToken ? api.getBearerToken() : ''
+  const data = await merchant.merchantRequestAuth('POST', '/api/meoo-shop-eval-locate', {
+    bearerToken: token,
+    timeoutMs: 20000,
+    data: body,
+  })
+  if (!data || data.ok === false) {
+    throw new Error(String((data && (data.message || data.error)) || '高德定位失败'))
+  }
+  return data
+}
+
 const PLATFORM_ICONS = {
   douyin: '/images/platforms/douyin-laike.png',
   meituan: '/images/platforms/dianping.png',
@@ -111,6 +136,14 @@ Page({
     adviceReady: false,
     sections: [],
     err: '',
+    formName: '',
+    region: [],
+    regionText: '',
+    detailAddress: '',
+    cat1List: CAT1,
+    cat1Index: 0,
+    cat2List: CATEGORIES[CAT1[0]] || [],
+    cat2Index: 0,
   },
 
   onShow() {
@@ -123,12 +156,8 @@ Page({
     }
     const rows = platformRows()
     let platformId = this.data.platformId
-    if (!rows.some((p) => p.id === platformId && p.bound)) {
-      const hit = rows.find((p) => p.bound)
-      if (hit) platformId = hit.id
-    }
-    this.setData({ platforms: rows, platformId })
-    void this.loadStore(platformId)
+    this.setData({ platforms: rows, platformId, canEval: formReady(this.data) })
+    if (rows.some((p) => p.id === platformId && p.bound)) void this.loadStore(platformId)
   },
 
   onUnload() {
@@ -157,7 +186,13 @@ Page({
     const advice = saved && saved.advice
     const grade = score ? evalApi.shopEvalGrade(score.score, scope) : null
     this._score = score || null
-    const displayName = scope === 'chain' && input.brandName ? input.brandName : input.storeName
+    const displayName = String(this.data.formName || '').trim() || (scope === 'chain' && input.brandName ? input.brandName : input.storeName)
+    if (!this._formTouched && input.storeName) {
+      this.setData({
+        formName: input.storeName,
+        detailAddress: this.data.detailAddress || input.address || '',
+      })
+    }
     this.setData({
       platformName: meta.name,
       evalTitle: meta.title,
@@ -169,7 +204,7 @@ Page({
       grades: evalApi.shopEvalGrades(scope),
       avatarLetter: letterOf(displayName),
       basis: evalApi.describeShopEvalBasis(input),
-      canEval: Boolean(readPlatformToken(platformId) && input.storeName),
+      canEval: formReady(Object.assign({}, this.data, !this._formTouched && input.storeName ? { formName: input.storeName, detailAddress: this.data.detailAddress || input.address || '' } : {})),
       scoreReady: Boolean(score),
       displayScore: score ? score.score : 0,
       searchLevel: score ? score.searchLevel : '',
@@ -199,12 +234,11 @@ Page({
 
   onPlatform(e) {
     const id = e.currentTarget.dataset.id
-    const row = (this.data.platforms || []).find((p) => p.id === id)
-    if (!row || !row.bound || id === this.data.platformId) return
+    if (!id || id === this.data.platformId) return
     this.stopTick()
     this._signals = null
     this.setData({ platformId: id })
-    void this.loadStore(id)
+    if (readPlatformToken(id)) void this.loadStore(id)
   },
 
   stopTick() {
@@ -277,7 +311,7 @@ Page({
     } catch (e) {}
     wx.showModal({
       title: '请升级会员',
-      content: '查看提升方案需开通会员版。分析不消耗积分。',
+      content: '分析评估需开通会员或会员 Plus。',
       confirmText: '去升级',
       cancelText: '取消',
       success(res) {
@@ -319,7 +353,26 @@ Page({
     this.startEvalSweep()
     let failed = null
     try {
-      const input = this._input || { platformId: this.data.platformId, storeName: this.data.storeName }
+      const cat1 = this.data.cat1List[this.data.cat1Index]
+      const cat2 = this.data.cat2List[this.data.cat2Index]
+      const region = this.data.region || []
+      const address = region.join('') + String(this.data.detailAddress || '').trim()
+      const category = cat1 + ' / ' + cat2
+      const located = await postLocate({
+        action: 'locate',
+        address,
+        city: region[1] || '',
+        category,
+      })
+      const input = Object.assign({}, this._input || {}, {
+        platformId: this.data.platformId,
+        storeName: String(this.data.formName || '').trim(),
+        city: region[1] || '',
+        address,
+        category,
+        mapNote: located.mapNote || '',
+      })
+      this._input = input
       const score = await evalApi.evaluateShop(input, { force: true, storage, askText })
       this._score = score
       const grade = evalApi.shopEvalGrade(score.score, evalApi.shopEvalScopeOf(input))
@@ -353,7 +406,56 @@ Page({
     }
   },
 
+  onFormName(e) {
+    this._formTouched = true
+    const formName = e.detail.value
+    this.setData({ formName, canEval: formReady(Object.assign({}, this.data, { formName })) })
+  },
+
+  onDetail(e) {
+    this._formTouched = true
+    const detailAddress = e.detail.value
+    this.setData({ detailAddress, canEval: formReady(Object.assign({}, this.data, { detailAddress })) })
+  },
+
+  onRegion(e) {
+    this._formTouched = true
+    const region = e.detail.value || []
+    this.setData({
+      region,
+      regionText: region.join(' '),
+      canEval: formReady(Object.assign({}, this.data, { region })),
+    })
+  },
+
+  onCat1(e) {
+    this._formTouched = true
+    const cat1Index = Number(e.detail.value) || 0
+    const cat2List = CATEGORIES[this.data.cat1List[cat1Index]] || []
+    const next = Object.assign({}, this.data, { cat1Index, cat2List, cat2Index: 0 })
+    this.setData({ cat1Index, cat2List, cat2Index: 0, canEval: formReady(next) })
+  },
+
+  onCat2(e) {
+    this._formTouched = true
+    const cat2Index = Number(e.detail.value) || 0
+    this.setData({ cat2Index, canEval: formReady(Object.assign({}, this.data, { cat2Index })) })
+  },
+
   async onAdvise() {
+    const bound = (this.data.platforms || []).some((item) => item.id === this.data.platformId && item.bound)
+    if (!bound) {
+      wx.showModal({
+        title: '请先绑定门店',
+        content: '分析评估前请先绑定门店账号。',
+        confirmText: '去绑定',
+        cancelText: '取消',
+        success(res) {
+          if (res.confirm) wx.navigateTo({ url: '/pages/store-list/store-list?mode=info' })
+        },
+      })
+      return
+    }
     if (!(await this.requirePaid())) return
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
     this.setData({ advising: true, err: '' })

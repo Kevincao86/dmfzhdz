@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMembership } from '../../context/MembershipContext'
 import { MEMBERSHIP_UPGRADE_HREF } from '../../lib/membershipPlan'
 import {
   adviseShop,
-  describeShopEvalBasis,
   evaluateShop,
   formatVerifyYuan,
   hydrateShopEval,
@@ -22,8 +21,37 @@ import {
   type ShopEvalScore,
 } from '../../lib/merchantShopEval'
 import { MerchantPlatformIcon } from '../../lib/platformBranding'
+import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../../lib/merchantApiAuth'
+import { merchantApiFetchUrls } from '../../lib/merchantErpApiBase'
 import { postAiChat } from '../../services/ai/aiClient'
+import { MOCK_CATEGORY_TREE } from '../../data/douyinCategoryMock'
 import { fetchStoresForPlatform, storeTabToken, type StorePlatformTab } from '../../services/merchantStoresApi'
+
+const CATEGORY_TREE = MOCK_CATEGORY_TREE.map((node) => ({
+  name: node.name,
+  children: (node.sub_tree_infos || []).map((child) => child.name).filter(Boolean),
+}))
+
+async function postLocate(body: Record<string, unknown>) {
+  const auth = await resolveMerchantApiBearer()
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    ...merchantApiAuthHeaders(auth.token, auth.source),
+  }
+  let last = '高德定位失败'
+  for (const url of merchantApiFetchUrls('/api/meoo-shop-eval-locate')) {
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
+      const data = (await res.json()) as { ok?: boolean; message?: string; names?: string[]; mapNote?: string }
+      if (data && data.ok !== false) return data
+      last = String(data.message || data || last)
+    } catch {
+      /* 下一条地址 */
+    }
+  }
+  throw new Error(last)
+}
 
 const storage = {
   getItem: (key: string) => {
@@ -102,18 +130,31 @@ export default function MerchantShopEvalPanel() {
   const [evaluating, setEvaluating] = useState(false)
   const [advising, setAdvising] = useState(false)
   const [err, setErr] = useState('')
+  const [formName, setFormName] = useState('')
+  const [province, setProvince] = useState('')
+  const [cityName, setCityName] = useState('')
+  const [district, setDistrict] = useState('')
+  const [detailAddress, setDetailAddress] = useState('')
+  const [provinces, setProvinces] = useState<string[]>([])
+  const [cities, setCities] = useState<string[]>([])
+  const [districts, setDistricts] = useState<string[]>([])
+  const [cat1, setCat1] = useState('')
+  const [cat2, setCat2] = useState('')
+  const formTouched = useRef(false)
+  const cat2Options = CATEGORY_TREE.find((item) => item.name === cat1)?.children || []
+  const fullAddress = [province, cityName, district, detailAddress].filter(Boolean).join('')
+  const categoryLabel = cat1 && cat2 ? `${cat1} / ${cat2}` : ''
   const [displayScore, setDisplayScore] = useState(0)
   const [animateScore, setAnimateScore] = useState(false)
   const [animateGains, setAnimateGains] = useState(false)
   const scope = shopEvalScopeOf(input)
   const meta = platformShopEvalMeta(platformId, scope)
   const platformBound = boundIds.includes(platformId)
-  const canEval = platformBound && Boolean(String(input.storeName || '').trim())
+  const canEval = Boolean(formName.trim() && province && cityName && district && detailAddress.trim() && categoryLabel)
   const paid = plan !== 'free'
   const grade = score ? shopEvalGrade(score.score, scope) : null
   const grades = shopEvalGrades(scope)
-  const displayName = input.brandName && scope === 'chain' ? input.brandName : input.storeName
-  const basis = useMemo(() => describeShopEvalBasis(input), [input])
+  const displayName = formName.trim() || (input.brandName && scope === 'chain' ? input.brandName : input.storeName)
   const gains = score ? shopEvalGainTargets(score, input) : null
   const shownExposure = useRiseCount(gains?.exposure || 0, animateGains && Boolean(gains))
   const shownVerify = useRiseCount(gains?.verify || 0, animateGains && Boolean(gains))
@@ -122,7 +163,12 @@ export default function MerchantShopEvalPanel() {
     const res = await fetchStoresForPlatform(tab as StorePlatformTab, { page: 1, pageSize: 50 })
     const items = res.ok ? res.items || [] : []
     const total = res.ok && 'total' in res ? Number(res.total) : items.length
-    setInput(resolveShopEvalFromStores(tab, items, total))
+    const next = resolveShopEvalFromStores(tab, items, total)
+    setInput(next)
+    if (!formTouched.current && next.storeName) {
+      setFormName(next.storeName)
+      if (next.address) setDetailAddress(next.address)
+    }
   }, [])
 
   useEffect(() => {
@@ -140,6 +186,12 @@ export default function MerchantShopEvalPanel() {
     if (!platformBound) return
     void loadStore(platformId)
   }, [platformId, platformBound, loadStore])
+
+  useEffect(() => {
+    void postLocate({ action: 'districts', keywords: '中国' })
+      .then((data) => setProvinces(data.names || []))
+      .catch(() => setProvinces([]))
+  }, [])
 
   useEffect(() => {
     let cancel = false
@@ -175,10 +227,30 @@ export default function MerchantShopEvalPanel() {
     return () => cancelAnimationFrame(frame)
   }, [score, animateScore])
 
-  function requirePaid() {
-    if (plan !== 'free') return true
-    navigate(MEMBERSHIP_UPGRADE_HREF)
-    return false
+  function diagnosisAllowed() {
+    return plan === 'member' || plan === 'member_store' || plan === 'member_plus'
+  }
+
+  async function onProvince(value: string) {
+    formTouched.current = true
+    setProvince(value)
+    setCityName('')
+    setDistrict('')
+    setCities([])
+    setDistricts([])
+    if (!value) return
+    const data = await postLocate({ action: 'districts', keywords: value }).catch(() => null)
+    setCities(data?.names || [])
+  }
+
+  async function onCity(value: string) {
+    formTouched.current = true
+    setCityName(value)
+    setDistrict('')
+    setDistricts([])
+    if (!value) return
+    const data = await postLocate({ action: 'districts', keywords: value }).catch(() => null)
+    setDistricts(data?.names || [])
   }
 
   async function onEvaluate() {
@@ -186,7 +258,23 @@ export default function MerchantShopEvalPanel() {
     setEvaluating(true)
     setErr('')
     try {
-      const next = await evaluateShop({ ...input, platformId }, { force: true, storage, askText })
+      const located = await postLocate({
+        action: 'locate',
+        address: fullAddress,
+        city: cityName,
+        category: categoryLabel,
+      })
+      const nextInput: ShopEvalInput = {
+        ...input,
+        platformId,
+        storeName: formName.trim(),
+        city: cityName,
+        address: fullAddress,
+        category: categoryLabel,
+        mapNote: located.mapNote || '',
+      }
+      setInput(nextInput)
+      const next = await evaluateShop(nextInput, { force: true, storage, askText })
       setAnimateScore(true)
       setAnimateGains(true)
       setDisplayScore(0)
@@ -199,7 +287,14 @@ export default function MerchantShopEvalPanel() {
   }
 
   async function onAdvise() {
-    if (!requirePaid()) return
+    if (!diagnosisAllowed()) {
+      navigate(MEMBERSHIP_UPGRADE_HREF)
+      return
+    }
+    if (!platformBound) {
+      setErr('请先绑定门店账号，再做分析评估')
+      return
+    }
     if (!score || evaluating || advising) return
     setAdvising(true)
     setErr('')
@@ -217,7 +312,7 @@ export default function MerchantShopEvalPanel() {
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
           <p className="text-xs font-semibold tracking-wide text-[#1E3A5F]">门店经营评估</p>
-          <p className="mt-1 text-sm text-slate-500">按公开渠道上的品牌和门店资料打分，再给出系统里的改法</p>
+          <p className="mt-1 text-sm text-slate-500">首次评估免费，按公开资料和高德定位打分。分析评估需开通会员，并先绑定门店账号</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {SHOP_EVAL_PLATFORMS.map((p) => {
@@ -226,17 +321,12 @@ export default function MerchantShopEvalPanel() {
               <button
                 key={p.id}
                 type="button"
-                disabled={!bound}
-                title={bound ? p.name : `${p.name}尚未绑定`}
-                onClick={() => {
-                  if (bound) setPlatformId(p.id)
-                }}
+                title={bound ? p.name : `${p.name}尚未绑定，仍可做免费评估`}
+                onClick={() => setPlatformId(p.id)}
                 className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-xs font-medium ${
-                  !bound
-                    ? 'cursor-not-allowed bg-slate-100 text-slate-400'
-                    : platformId === p.id
-                      ? 'bg-[#1E3A5F] text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  platformId === p.id
+                    ? 'bg-[#1E3A5F] text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 <MerchantPlatformIcon
@@ -249,6 +339,110 @@ export default function MerchantShopEvalPanel() {
               </button>
             )
           })}
+        </div>
+      </div>
+
+      <div className="grid gap-3 border-b border-slate-100 px-5 py-4 md:grid-cols-2">
+        <label className="block text-left text-sm text-slate-600">
+          门店名称
+          <input
+            value={formName}
+            onChange={(e) => {
+              formTouched.current = true
+              setFormName(e.target.value)
+            }}
+            placeholder="输入门店或品牌名称"
+            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900"
+          />
+        </label>
+        <label className="block text-left text-sm text-slate-600">
+          分类
+          <span className="mt-1 flex gap-2">
+            <select
+              value={cat1}
+              onChange={(e) => {
+                formTouched.current = true
+                setCat1(e.target.value)
+                setCat2('')
+              }}
+              className="w-1/2 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="">一级分类</option>
+              {CATEGORY_TREE.map((item) => (
+                <option key={item.name} value={item.name}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={cat2}
+              onChange={(e) => {
+                formTouched.current = true
+                setCat2(e.target.value)
+              }}
+              className="w-1/2 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            >
+              <option value="">二级分类</option>
+              {cat2Options.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </span>
+        </label>
+        <div className="text-left text-sm text-slate-600 md:col-span-2">
+          地址
+          {provinces.length ? (
+            <div className="mt-1 grid gap-2 sm:grid-cols-3">
+              <select value={province} onChange={(e) => void onProvince(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                <option value="">省</option>
+                {provinces.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <select value={cityName} onChange={(e) => void onCity(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                <option value="">市</option>
+                {cities.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={district}
+                onChange={(e) => {
+                  formTouched.current = true
+                  setDistrict(e.target.value)
+                }}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              >
+                <option value="">区</option>
+                {districts.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="mt-1 grid gap-2 sm:grid-cols-3">
+              <input value={province} onChange={(e) => { formTouched.current = true; setProvince(e.target.value) }} placeholder="省" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+              <input value={cityName} onChange={(e) => { formTouched.current = true; setCityName(e.target.value) }} placeholder="市" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+              <input value={district} onChange={(e) => { formTouched.current = true; setDistrict(e.target.value) }} placeholder="区" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            </div>
+          )}
+          <input
+            value={detailAddress}
+            onChange={(e) => {
+              formTouched.current = true
+              setDetailAddress(e.target.value)
+            }}
+            placeholder="详细地址，如道路、门牌、商场楼层"
+            className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900"
+          />
         </div>
       </div>
 
@@ -272,17 +466,8 @@ export default function MerchantShopEvalPanel() {
               {meta.name}
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              {basis || '请先在「店铺信息」完善门店名称、地址和电话'}
+              {[categoryLabel, fullAddress].filter(Boolean).join(' · ') || '填写名称、地址和分类后即可免费评估'}
             </p>
-            {!canEval ? (
-              <button
-                type="button"
-                onClick={() => navigate('/store/info')}
-                className="mt-2 text-sm font-medium text-[#1E3A5F] hover:underline"
-              >
-                去完善店铺信息
-              </button>
-            ) : null}
           </div>
         </div>
 
@@ -323,7 +508,7 @@ export default function MerchantShopEvalPanel() {
             onClick={() => void onEvaluate()}
             className="mt-3 w-full rounded-xl bg-[#1E3A5F] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
           >
-            {evaluating ? '评估中…' : score ? '重新评估' : '门店评估'}
+            {evaluating ? '评估中…' : score ? '重新评估' : '免费评估'}
           </button>
         </div>
       </div>
@@ -419,18 +604,26 @@ export default function MerchantShopEvalPanel() {
           onClick={() => void onAdvise()}
           className="mt-3 w-full rounded-xl bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
         >
-          {advising ? '提升方案生成中…' : '查看分析与提升方案'}
+          {advising ? '分析评估中…' : '分析评估'}
         </button>
         {!paid ? (
           <p className="mt-2 text-center text-xs text-slate-500">
-            分析不消耗积分。查看提升方案需开通会员版。
+            分析评估需开通会员或会员 Plus。
             <button type="button" className="ml-1 text-[#1E3A5F] hover:underline" onClick={() => navigate(MEMBERSHIP_UPGRADE_HREF)}>
               去升级
             </button>
           </p>
         ) : null}
         {err ? <p className="mt-2 text-center text-sm text-red-600">{err}</p> : null}
-        {!canEval ? <p className="mt-2 text-center text-sm text-slate-500">请先完善门店名称后再评估</p> : null}
+        {!canEval ? <p className="mt-2 text-center text-sm text-slate-500">请填写门店名称、省市区、详细地址和分类</p> : null}
+        {!platformBound ? (
+          <p className="mt-2 text-center text-sm text-slate-500">
+            分析评估前请先绑定门店账号。
+            <button type="button" className="ml-1 text-[#1E3A5F] hover:underline" onClick={() => navigate('/store/info')}>
+              去绑定
+            </button>
+          </p>
+        ) : null}
 
         {advice?.sections?.length ? (
           <div className="mt-4 rounded-2xl bg-[#fff7ed] p-4">
