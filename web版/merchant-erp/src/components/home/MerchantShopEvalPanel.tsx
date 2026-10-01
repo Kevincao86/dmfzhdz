@@ -6,10 +6,12 @@ import {
   adviseShop,
   describeShopEvalBasis,
   evaluateShop,
+  formatVerifyYuan,
   platformShopEvalMeta,
   readSavedShopEval,
   resolveShopEvalFromStores,
   SHOP_EVAL_PLATFORMS,
+  shopEvalGainTargets,
   shopEvalGrade,
   shopEvalGrades,
   shopEvalScopeOf,
@@ -64,6 +66,28 @@ function letterOf(name: string) {
   return s ? s.slice(0, 1) : '店'
 }
 
+function useRiseCount(target: number, play: boolean) {
+  const [value, setValue] = useState(0)
+  useEffect(() => {
+    if (!play) {
+      setValue(target)
+      return
+    }
+    const start = performance.now()
+    const dur = 1600
+    let frame = 0
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur)
+      const eased = 1 - (1 - t) ** 3
+      setValue(Math.round(target * eased))
+      if (t < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [target, play])
+  return value
+}
+
 export default function MerchantShopEvalPanel() {
   const { plan } = useMembership()
   const navigate = useNavigate()
@@ -79,6 +103,7 @@ export default function MerchantShopEvalPanel() {
   const [err, setErr] = useState('')
   const [displayScore, setDisplayScore] = useState(0)
   const [animateScore, setAnimateScore] = useState(false)
+  const [animateGains, setAnimateGains] = useState(false)
   const scope = shopEvalScopeOf(input)
   const meta = platformShopEvalMeta(platformId, scope)
   const platformBound = boundIds.includes(platformId)
@@ -88,6 +113,9 @@ export default function MerchantShopEvalPanel() {
   const grades = shopEvalGrades(scope)
   const displayName = input.brandName && scope === 'chain' ? input.brandName : input.storeName
   const basis = useMemo(() => describeShopEvalBasis(input), [input])
+  const gains = score ? shopEvalGainTargets(score, input) : null
+  const shownExposure = useRiseCount(gains?.exposure || 0, animateGains && Boolean(gains))
+  const shownVerify = useRiseCount(gains?.verify || 0, animateGains && Boolean(gains))
 
   const loadStore = useCallback(async (tab: ShopEvalPlatformId) => {
     const res = await fetchStoresForPlatform(tab as StorePlatformTab, { page: 1, pageSize: 50 })
@@ -119,6 +147,7 @@ export default function MerchantShopEvalPanel() {
     setScore(saved?.score || null)
     setDisplayScore(saved?.score?.score || 0)
     setAnimateScore(false)
+    setAnimateGains(Boolean(saved?.score))
   }, [input.platformId, input.scope, input.storeCount, input.storeName, input.address, input.phone, input.businessHours, input.offerName, input.offerPrice])
 
   useEffect(() => {
@@ -151,6 +180,7 @@ export default function MerchantShopEvalPanel() {
     try {
       const next = await evaluateShop({ ...input, platformId }, { force: true, storage, askText })
       setAnimateScore(true)
+      setAnimateGains(true)
       setDisplayScore(0)
       setScore(next)
     } catch (e) {
@@ -301,25 +331,6 @@ export default function MerchantShopEvalPanel() {
           <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">完成评估后，这里显示公开渠道上的定位和综合判断</div>
         )}
 
-        <button
-          type="button"
-          disabled={!score || evaluating || advising}
-          onClick={() => void onAdvise()}
-          className="mt-3 w-full rounded-xl bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
-        >
-          {advising ? '分析中…' : '查看分析与提升方案'}
-        </button>
-        {!paid ? (
-          <p className="mt-2 text-center text-xs text-slate-500">
-            免费版可看页面，评估和分析需开通会员。
-            <button type="button" className="ml-1 text-[#1E3A5F] hover:underline" onClick={() => navigate(MEMBERSHIP_UPGRADE_HREF)}>
-              去升级
-            </button>
-          </p>
-        ) : null}
-        {err ? <p className="mt-2 text-center text-sm text-red-600">{err}</p> : null}
-        {!canEval ? <p className="mt-2 text-center text-sm text-slate-500">请先完善门店名称后再评估</p> : null}
-
         {score?.indicators?.length ? (
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
             <div className="grid grid-cols-[148px_72px_1fr] bg-[#1E3A5F] px-4 py-2 text-xs font-semibold text-white">
@@ -378,6 +389,40 @@ export default function MerchantShopEvalPanel() {
             ))}
           </div>
         ) : null}
+
+        {gains ? (
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-[#eef4ff] px-4 py-4 text-left">
+              <p className="text-xs tracking-wide text-slate-500">预计提升曝光</p>
+              <p className="shop-eval-gain mt-1 text-3xl font-extrabold text-[#1d4ed8]">▲ +{shownExposure}%</p>
+            </div>
+            <div className="rounded-2xl bg-[#fff4e8] px-4 py-4 text-left">
+              <p className="text-xs tracking-wide text-slate-500">预计提升核销额</p>
+              <p className="shop-eval-gain mt-1 text-3xl font-extrabold text-[#c2410c]">▲ +{formatVerifyYuan(shownVerify)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">完成评估后，这里显示预计提升的曝光和核销额</div>
+        )}
+
+        <button
+          type="button"
+          disabled={!score || evaluating || advising}
+          onClick={() => void onAdvise()}
+          className="mt-3 w-full rounded-xl bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
+        >
+          {advising ? '分析中…' : '查看分析与提升方案'}
+        </button>
+        {!paid ? (
+          <p className="mt-2 text-center text-xs text-slate-500">
+            免费版可看页面，评估和分析需开通会员。
+            <button type="button" className="ml-1 text-[#1E3A5F] hover:underline" onClick={() => navigate(MEMBERSHIP_UPGRADE_HREF)}>
+              去升级
+            </button>
+          </p>
+        ) : null}
+        {err ? <p className="mt-2 text-center text-sm text-red-600">{err}</p> : null}
+        {!canEval ? <p className="mt-2 text-center text-sm text-slate-500">请先完善门店名称后再评估</p> : null}
 
         {advice?.sections?.length ? (
           <div className="mt-4 rounded-2xl bg-[#fff7ed] p-4">

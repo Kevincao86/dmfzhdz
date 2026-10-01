@@ -187,7 +187,7 @@ Page({
       sections: advice ? advice.sections : [],
       err: '',
     })
-    if (score && !score.positioning) {
+    if (score) {
       const gains = evalApi.shopEvalGainTargets(score, input)
       if (gains) this.playGains(gains.exposure, gains.verify)
     } else {
@@ -337,9 +337,10 @@ Page({
         gradeKey: grade ? grade.key : '',
         gradeLabel: grade ? grade.label : '',
         gradeNote: grade ? grade.note : '',
-        showGains: false,
       })
       this.playScore(score.score)
+      const gains = evalApi.shopEvalGainTargets(score, input)
+      if (gains) this.playGains(gains.exposure, gains.verify)
     } catch (e) {
       failed = e
     }

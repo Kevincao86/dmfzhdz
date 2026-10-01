@@ -54,34 +54,6 @@
     <text class="report-text">{{positioning}}</text>
     <text class="report-summary" wx:if="{{summary}}">{{summary}}</text>
   </view>
-  <view class="card gains" wx:if="{{showGains}}">
-    <view class="gain-row">
-      <view class="gain">
-        <text class="gain-k">预计提升曝光</text>
-        <view class="gain-metric">
-          <view class="gain-arrow"></view>
-          <text class="gain-v">{{exposureText}}</text>
-        </view>
-      </view>
-      <view class="gain">
-        <text class="gain-k">预计提升核销额</text>
-        <view class="gain-metric">
-          <view class="gain-arrow"></view>
-          <text class="gain-v">{{salesText}}</text>
-        </view>
-      </view>
-    </view>
-  </view>
-  <view class="card gains" wx:else>
-    <text class="need">完成评估后，这里显示预计提升的曝光和核销额</text>
-  </view>
-
-  <view class="btn-sub {{!scoreReady || evaluating || advising ? 'btn--off' : ''}}" bindtap="onAdvise">
-    {{advising ? '分析中…' : '查看分析与提升方案'}}
-  </view>
-  <text class="err" wx:if="{{err}}">{{err}}</text>
-  <text class="need" wx:if="{{!canEval}}">请先到「店铺信息」完善门店名称</text>
-  <text class="need" wx:elif="{{!scoreReady}}">请先完成门店评估</text>
 
   <view class="card advice advice--now" wx:if="{{scoreReady && indicators.length}}">
     <text class="advice-title advice-title--now">线上运营打分</text>
@@ -113,6 +85,35 @@
     <text class="advice-title">公开来源</text>
     <text class="source-chip" wx:for="{{sources}}" wx:key="*this">{{item}}</text>
   </view>
+
+  <view class="card gains" wx:if="{{showGains}}">
+    <view class="gain-row">
+      <view class="gain">
+        <text class="gain-k">预计提升曝光</text>
+        <view class="gain-metric">
+          <view class="gain-arrow"></view>
+          <text class="gain-v">{{exposureText}}</text>
+        </view>
+      </view>
+      <view class="gain">
+        <text class="gain-k">预计提升核销额</text>
+        <view class="gain-metric">
+          <view class="gain-arrow"></view>
+          <text class="gain-v">{{salesText}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="card gains" wx:else>
+    <text class="need">完成评估后，这里显示预计提升的曝光和核销额</text>
+  </view>
+
+  <view class="btn-sub {{!scoreReady || evaluating || advising ? 'btn--off' : ''}}" bindtap="onAdvise">
+    {{advising ? '分析中…' : '查看分析与提升方案'}}
+  </view>
+  <text class="err" wx:if="{{err}}">{{err}}</text>
+  <text class="need" wx:if="{{!canEval}}">请先到「店铺信息」完善门店名称</text>
+  <text class="need" wx:elif="{{!scoreReady}}">请先完成门店评估</text>
 
   <view class="card advice advice--plan" wx:if="{{adviceReady}}">
     <text class="advice-title advice-title--plan">分析与提升方案</text>

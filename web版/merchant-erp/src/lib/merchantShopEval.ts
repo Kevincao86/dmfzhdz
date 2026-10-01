@@ -819,7 +819,6 @@ export async function adviseShop(
 }
 
 export function shopEvalGainTargets(score: ShopEvalScore, input: ShopEvalInput) {
-  if (String(score.positioning || '').trim()) return null
   const preview = previewShopGains(score.score, String(input.offerPrice || ''))
   return {
     exposure: score.exposureLift > 0 ? score.exposureLift : preview.exposurePct,
