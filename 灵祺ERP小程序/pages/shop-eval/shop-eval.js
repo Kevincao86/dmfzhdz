@@ -37,6 +37,10 @@ const PLATFORM_ICONS = {
   kuaishou: '/images/platforms/kuaishou-local.png',
 }
 
+function readableLines(rows) {
+  return (Array.isArray(rows) ? rows : []).filter((line) => typeof line === 'string' && line.trim() && line.indexOf('[object Object]') < 0)
+}
+
 function platformRows() {
   return (evalApi.SHOP_EVAL_PLATFORMS || []).map((p) => ({
     id: p.id,
@@ -212,8 +216,8 @@ Page({
       situations: score ? score.situations : [],
       positioning: score && score.positioning ? score.positioning : '',
       indicators: score && score.indicators ? score.indicators : [],
-      highlights: score && score.highlights ? score.highlights : [],
-      gaps: score && score.gaps ? score.gaps : [],
+      highlights: readableLines(score && score.highlights),
+      gaps: readableLines(score && score.gaps),
       summary: score && score.summary ? score.summary : '',
       sources: score && score.sources ? score.sources : [],
       showGrade: Boolean(grade),
@@ -392,8 +396,8 @@ Page({
         situations: score.situations || [],
         positioning: score.positioning || '',
         indicators: score.indicators || [],
-        highlights: score.highlights || [],
-        gaps: score.gaps || [],
+        highlights: readableLines(score.highlights),
+        gaps: readableLines(score.gaps),
         summary: score.summary || '',
         sources: score.sources || [],
         showGrade: !!grade,

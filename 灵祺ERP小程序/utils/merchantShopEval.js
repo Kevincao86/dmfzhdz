@@ -152,8 +152,26 @@ function clampYuan(n) {
   return Math.min(5_000_000, v)
 }
 
+function lineText(value) {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const text = String(value).trim()
+    return text.indexOf('[object Object]') >= 0 ? '' : text
+  }
+  if (Array.isArray(value)) return value.map(lineText).filter(Boolean).join('，')
+  if (!value || typeof value !== 'object') return ''
+  const keys = ['text', 'content', 'comment', 'point', 'title', 'desc', 'description', 'finding', 'summary', 'now', 'detail', 'value', 'highlight', 'gap']
+  for (const key of keys) {
+    const hit = lineText(value[key])
+    if (hit) return hit
+  }
+  return Object.keys(value)
+    .map((key) => lineText(value[key]))
+    .filter(Boolean)
+    .join('，')
+}
+
 function clipText(value, max) {
-  return String(value || '').trim().slice(0, max)
+  return lineText(value).slice(0, max)
 }
 
 function normalizeInput(raw) {
@@ -951,8 +969,8 @@ function publicScoreSystem() {
     '只输出一个 JSON 对象，不要 Markdown。',
     'positioning：一句定位，40 到 90 字，写这个品牌在本地公开渠道上的位置和最明显的短板。',
     `indicators 必须正好 6 项，name 只能是：${names}。每项含 score（0 到 100 的整数）和 comment（40 到 90 字，先写做到了什么，再写短板）。`,
-    'highlights 正好 3 条，每条 40 到 80 字，写公开渠道上已经跑通的优势。',
-    'gaps 正好 4 条，每条 40 到 90 字，写会拖后腿的短板。',
+    'highlights 正好 3 条，每一条都是字符串，不要写成对象。每条 40 到 80 字，写公开渠道上已经跑通的优势。',
+    'gaps 正好 4 条，每一条都是字符串，不要写成对象。每条 40 到 90 字，写会拖后腿的短板。',
     'summary：一句话总结，30 到 60 字。',
   ].join('')
 }

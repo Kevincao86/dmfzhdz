@@ -27,6 +27,10 @@ import { postAiChat } from '../../services/ai/aiClient'
 import { MOCK_CATEGORY_TREE } from '../../data/douyinCategoryMock'
 import { fetchStoresForPlatform, storeTabToken, type StorePlatformTab } from '../../services/merchantStoresApi'
 
+function readableLines(rows?: string[]) {
+  return (rows || []).filter((line) => typeof line === 'string' && line.trim() && !line.includes('[object Object]'))
+}
+
 const CATEGORY_TREE = MOCK_CATEGORY_TREE.map((node) => ({
   name: node.name,
   children: (node.sub_tree_infos || []).map((child) => child.name).filter(Boolean),
@@ -164,6 +168,8 @@ export default function MerchantShopEvalPanel() {
   const grade = score ? shopEvalGrade(score.score, scope) : null
   const grades = shopEvalGrades(scope)
   const displayName = formName.trim() || (input.brandName && scope === 'chain' ? input.brandName : input.storeName)
+  const highlightLines = readableLines(score?.highlights)
+  const gapLines = readableLines(score?.gaps)
   const gains = score ? shopEvalGainTargets(score, input) : null
   const shownExposure = useRiseCount(gains?.exposure || 0, animateGains && Boolean(gains))
   const shownVerify = useRiseCount(gains?.verify || 0, animateGains && Boolean(gains))
@@ -564,12 +570,12 @@ export default function MerchantShopEvalPanel() {
           </div>
         ) : null}
 
-        {score?.highlights?.length || score?.gaps?.length ? (
+        {highlightLines.length || gapLines.length ? (
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <div className="rounded-2xl bg-[#f3f7ff] p-4 text-left">
               <p className="text-sm font-extrabold text-[#1d4ed8]">优势亮点</p>
               <div className="mt-3 space-y-3">
-                {(score.highlights || []).map((line, index) => (
+                {highlightLines.map((line, index) => (
                   <p key={line} className="text-sm leading-6 text-slate-700">
                     <span className="mr-2 font-bold text-[#1d4ed8]">{index + 1}.</span>
                     {line}
@@ -580,7 +586,7 @@ export default function MerchantShopEvalPanel() {
             <div className="rounded-2xl bg-[#fff7ed] p-4 text-left">
               <p className="text-sm font-extrabold text-[#c2410c]">核心短板</p>
               <div className="mt-3 space-y-3">
-                {(score.gaps || []).map((line, index) => (
+                {gapLines.map((line, index) => (
                   <p key={line} className="text-sm leading-6 text-slate-700">
                     <span className="mr-2 font-bold text-[#c2410c]">{index + 1}.</span>
                     {line}
