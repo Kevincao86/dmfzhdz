@@ -893,6 +893,7 @@ export type RegistryMpAiPointsSpendEntry = {
     | 'review_ai'
     | 'talent_eval'
     | 'talent_advice'
+    | 'shop_eval_advice'
   points: number
   balanceAfter: number
   createdAt: string
