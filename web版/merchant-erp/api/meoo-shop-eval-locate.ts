@@ -2,8 +2,11 @@
  * POST /api/meoo-shop-eval-locate
  * 门店首次评估：高德省市区、地址定位、周边同类门店。不扣积分、不看会员。
  */
+import fs from 'fs'
+import path from 'path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
+import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore.js'
 import {
   amapGeocodeAddress,
   amapPlaceNearby,
@@ -13,6 +16,85 @@ import {
 import { handleMerchantApiOptions, rawBody, sendMerchantJson } from './merchant/merchantGatewayShared.js'
 
 export const config = { maxDuration: 30 }
+
+const PAID_EVALS_PER_MONTH = 30
+const FREE_EVALS_LIFETIME = 1
+const QUOTA_DIR = path.join(process.cwd(), 'data', 'shop-eval-quota')
+
+type EvalQuotaFile = { freeUsed?: number; month?: string; paidUsed?: number }
+
+function shanghaiMonth(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(now)
+  const y = parts.find((p) => p.type === 'year')?.value || '1970'
+  const m = parts.find((p) => p.type === 'month')?.value || '01'
+  return `${y}-${m}`
+}
+
+function quotaPath(tenantId: string, userId: string) {
+  const key = `${tenantId}_${userId}`.replace(/[^a-zA-Z0-9_-]/g, '_')
+  return path.join(QUOTA_DIR, `${key}.json`)
+}
+
+function readQuotaFile(tenantId: string, userId: string): EvalQuotaFile {
+  try {
+    const raw = fs.readFileSync(quotaPath(tenantId, userId), 'utf8')
+    const parsed = JSON.parse(raw) as EvalQuotaFile
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeQuotaFile(tenantId: string, userId: string, file: EvalQuotaFile) {
+  if (!fs.existsSync(QUOTA_DIR)) fs.mkdirSync(QUOTA_DIR, { recursive: true })
+  fs.writeFileSync(quotaPath(tenantId, userId), JSON.stringify(file), 'utf8')
+}
+
+function quotaSnapshot(file: EvalQuotaFile, paid: boolean) {
+  const month = shanghaiMonth()
+  if (paid) {
+    const used = file.month === month ? Math.max(0, Math.floor(Number(file.paidUsed) || 0)) : 0
+    return {
+      paid: true,
+      month,
+      limit: PAID_EVALS_PER_MONTH,
+      used,
+      remaining: Math.max(0, PAID_EVALS_PER_MONTH - used),
+      message: used >= PAID_EVALS_PER_MONTH ? '本月 30 次评估已用完，下月恢复' : '',
+    }
+  }
+  const used = Math.max(0, Math.floor(Number(file.freeUsed) || 0))
+  return {
+    paid: false,
+    month,
+    limit: FREE_EVALS_LIFETIME,
+    used,
+    remaining: Math.max(0, FREE_EVALS_LIFETIME - used),
+    message: used >= FREE_EVALS_LIFETIME ? '免费评估已用完。升级会员后每月可评估 30 次' : '',
+  }
+}
+
+async function evalQuota(userId: string, env: Record<string, string>, token: string, consume: boolean) {
+  const ctx = await loadTenantAiContextForUser(userId, env, token)
+  if (!ctx?.tenantId) return { ok: false as const, message: '请先登录' }
+  const paid = ctx.plan === 'member' || ctx.plan === 'member_store' || ctx.plan === 'member_plus'
+  const file = readQuotaFile(ctx.tenantId, userId)
+  const current = quotaSnapshot(file, paid)
+  if (!consume) return { ok: true as const, ...current }
+  if (current.remaining <= 0) return { ok: false as const, ...current }
+  const month = current.month
+  const next: EvalQuotaFile = {
+    freeUsed: paid ? Math.max(0, Math.floor(Number(file.freeUsed) || 0)) : current.used + 1,
+    month,
+    paidUsed: paid ? current.used + 1 : file.month === month ? Math.max(0, Math.floor(Number(file.paidUsed) || 0)) : 0,
+  }
+  writeQuotaFile(ctx.tenantId, userId, next)
+  return { ok: true as const, ...quotaSnapshot(next, paid) }
+}
 
 function amapKey(env: Record<string, string | undefined>) {
   return (
@@ -152,11 +234,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMerchantJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录' })
     return
   }
-  let body: { action?: string; keywords?: string; address?: string; city?: string; category?: string; storeName?: string }
+  let body: { action?: string; keywords?: string; address?: string; city?: string; category?: string; storeName?: string; consume?: boolean }
   try {
     body = JSON.parse(rawBody(req) || '{}') as typeof body
   } catch {
     sendMerchantJson(res, 400, { ok: false, error: 'invalid_json' })
+    return
+  }
+  if (body.action === 'eval-quota') {
+    const token = typeof req.headers.authorization === 'string' ? req.headers.authorization : ''
+    const hit = await evalQuota(session.id, env, token, body.consume === true)
+    sendMerchantJson(res, 200, hit as unknown as Record<string, unknown>)
     return
   }
   if (!isAmapMapConfigured(env)) {

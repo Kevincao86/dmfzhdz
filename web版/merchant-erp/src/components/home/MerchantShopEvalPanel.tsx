@@ -24,6 +24,7 @@ import { MerchantPlatformIcon } from '../../lib/platformBranding'
 import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../../lib/merchantApiAuth'
 import { merchantApiFetchUrls } from '../../lib/merchantErpApiBase'
 import { postAiChat } from '../../services/ai/aiClient'
+import { checkErpPointsAffordable, spendErpPointsForUsage, type ErpPointsSpendKind } from '../../services/tenantBillingClient'
 import { MOCK_CATEGORY_TREE } from '../../data/douyinCategoryMock'
 import { fetchStoresForPlatform, storeTabToken, type StorePlatformTab } from '../../services/merchantStoresApi'
 
@@ -56,6 +57,9 @@ async function postLocate(body: Record<string, unknown>) {
         brandCount?: number
         brandNames?: string[]
         publicTitles?: string[]
+        paid?: boolean
+        remaining?: number
+        limit?: number
       }
       if (data && data.ok !== false) return data
       last = String(data.message || data || last)
@@ -165,6 +169,8 @@ export default function MerchantShopEvalPanel() {
   const platformBound = boundIds.includes(platformId)
   const canEval = Boolean(formName.trim() && province && cityName && district && detailAddress.trim() && categoryLabel)
   const paid = plan !== 'free'
+  const [quota, setQuota] = useState<{ paid: boolean; remaining: number; limit: number } | null>(null)
+  const adviceKind = 'shop_eval_advice' as ErpPointsSpendKind
   const grade = score ? shopEvalGrade(score.score, scope) : null
   const grades = shopEvalGrades(scope)
   const displayName = formName.trim() || (input.brandName && scope === 'chain' ? input.brandName : input.storeName)
@@ -201,6 +207,18 @@ export default function MerchantShopEvalPanel() {
     if (!platformBound) return
     void loadStore(platformId)
   }, [platformId, platformBound, loadStore])
+
+  useEffect(() => {
+    void postLocate({ action: 'eval-quota' })
+      .then((data) =>
+        setQuota({
+          paid: Boolean(data.paid),
+          remaining: Number(data.remaining) || 0,
+          limit: Number(data.limit) || 0,
+        }),
+      )
+      .catch(() => setQuota(null))
+  }, [])
 
   useEffect(() => {
     void postLocate({ action: 'districts', keywords: '中国' })
@@ -273,6 +291,14 @@ export default function MerchantShopEvalPanel() {
     setEvaluating(true)
     setErr('')
     try {
+      const gate = await postLocate({ action: 'eval-quota' })
+      const remaining = Number(gate.remaining) || 0
+      setQuota({ paid: Boolean(gate.paid), remaining, limit: Number(gate.limit) || 0 })
+      if (remaining <= 0) {
+        setErr(gate.message || '评估次数已用完')
+        if (!gate.paid) navigate(MEMBERSHIP_UPGRADE_HREF)
+        return
+      }
       const located = await postLocate({
         action: 'locate',
         address: fullAddress,
@@ -303,6 +329,12 @@ export default function MerchantShopEvalPanel() {
       setAnimateGains(true)
       setDisplayScore(0)
       setScore(next)
+      const used = await postLocate({ action: 'eval-quota', consume: true })
+      setQuota({
+        paid: Boolean(used.paid),
+        remaining: Number(used.remaining) || 0,
+        limit: Number(used.limit) || 0,
+      })
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -323,7 +355,14 @@ export default function MerchantShopEvalPanel() {
     setAdvising(true)
     setErr('')
     try {
-      setAdvice(await adviseShop({ ...input, platformId }, score, { force: true, storage, askText }))
+      await checkErpPointsAffordable({ kind: adviceKind })
+      const advice = await adviseShop({ ...input, platformId }, score, { force: true, storage, askText })
+      await spendErpPointsForUsage({
+        kind: adviceKind,
+        idempotencyKey: `shop-eval-advice-${Date.now()}`,
+        note: '门店分析提升',
+      })
+      setAdvice(advice)
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -336,7 +375,7 @@ export default function MerchantShopEvalPanel() {
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
           <p className="text-xs font-semibold tracking-wide text-[#1E3A5F]">门店经营评估</p>
-          <p className="mt-1 text-sm text-slate-500">首次评估免费，按公开资料和高德定位打分。分析评估需开通会员，并先绑定门店账号</p>
+          <p className="mt-1 text-sm text-slate-500">首次评估免费。升级会员后每月可评估 30 次。生成分析提升每次 5 积分，并需先绑定门店账号</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {SHOP_EVAL_PLATFORMS.map((p) => {
@@ -532,7 +571,17 @@ export default function MerchantShopEvalPanel() {
             onClick={() => void onEvaluate()}
             className="mt-3 w-full rounded-xl bg-[#1E3A5F] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
           >
-            {evaluating ? '评估中…' : score ? '重新评估' : '免费评估'}
+            {evaluating
+              ? '评估中…'
+              : quota && quota.remaining <= 0
+                ? quota.paid
+                  ? '本月次数已用完'
+                  : '升级后每月 30 次'
+                : score
+                  ? '重新评估'
+                  : quota?.paid
+                    ? `评估 · 剩 ${quota.remaining} 次`
+                    : '免费评估'}
           </button>
         </div>
       </div>
@@ -628,11 +677,11 @@ export default function MerchantShopEvalPanel() {
           onClick={() => void onAdvise()}
           className="mt-3 w-full rounded-xl bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
         >
-          {advising ? '分析评估中…' : '分析评估'}
+          {advising ? '分析提升中…' : '分析提升 · 5积分'}
         </button>
         {!paid ? (
           <p className="mt-2 text-center text-xs text-slate-500">
-            分析评估需开通会员或会员 Plus。
+            分析提升需开通会员，每次 5 积分。
             <button type="button" className="ml-1 text-[#1E3A5F] hover:underline" onClick={() => navigate(MEMBERSHIP_UPGRADE_HREF)}>
               去升级
             </button>

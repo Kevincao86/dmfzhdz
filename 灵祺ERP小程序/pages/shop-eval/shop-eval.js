@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js')
 const merchant = require('../../utils/merchantApi.js')
+const billing = require('../../utils/tenantBillingApiMp.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const evalApi = require('../../utils/merchantShopEval.js')
@@ -148,6 +149,9 @@ Page({
     cat1Index: 0,
     cat2List: CATEGORIES[CAT1[0]] || [],
     cat2Index: 0,
+    quotaPaid: false,
+    quotaRemaining: -1,
+    quotaLimit: 1,
   },
 
   onShow() {
@@ -161,7 +165,19 @@ Page({
     const rows = platformRows()
     let platformId = this.data.platformId
     this.setData({ platforms: rows, platformId, canEval: formReady(this.data) })
+    void this.refreshQuota()
     if (rows.some((p) => p.id === platformId && p.bound)) void this.loadStore(platformId)
+  },
+
+  async refreshQuota() {
+    try {
+      const data = await postLocate({ action: 'eval-quota' })
+      this.setData({
+        quotaPaid: Boolean(data.paid),
+        quotaRemaining: Number(data.remaining) || 0,
+        quotaLimit: Number(data.limit) || 0,
+      })
+    } catch (e) {}
   },
 
   onUnload() {
@@ -315,7 +331,7 @@ Page({
     } catch (e) {}
     wx.showModal({
       title: '请升级会员',
-      content: '分析评估需开通会员或会员 Plus。',
+      content: '分析提升需开通会员，每次 5 积分。升级后每月可评估 30 次。',
       confirmText: '去升级',
       cancelText: '取消',
       success(res) {
@@ -357,6 +373,27 @@ Page({
     this.startEvalSweep()
     let failed = null
     try {
+      const gate = await postLocate({ action: 'eval-quota' })
+      const remaining = Number(gate.remaining) || 0
+      this.setData({
+        quotaPaid: Boolean(gate.paid),
+        quotaRemaining: remaining,
+        quotaLimit: Number(gate.limit) || 0,
+      })
+      if (remaining <= 0) {
+        if (!gate.paid) {
+          wx.showModal({
+            title: '请升级会员',
+            content: gate.message || '免费评估已用完。升级会员后每月可评估 30 次。',
+            confirmText: '去升级',
+            cancelText: '取消',
+            success(res) {
+              if (res.confirm) wx.navigateTo({ url: '/pages/subscription/subscription' })
+            },
+          })
+        }
+        throw new Error(gate.message || '评估次数已用完')
+      }
       const cat1 = this.data.cat1List[this.data.cat1Index]
       const cat2 = this.data.cat2List[this.data.cat2Index]
       const region = this.data.region || []
@@ -416,7 +453,16 @@ Page({
       const prev = this._score ? Number(this._score.score) || 0 : 0
       this.setData({ displayScore: prev })
       this.failEval(failed, 'evaluating')
+      return
     }
+    try {
+      const used = await postLocate({ action: 'eval-quota', consume: true })
+      this.setData({
+        quotaPaid: Boolean(used.paid),
+        quotaRemaining: Number(used.remaining) || 0,
+        quotaLimit: Number(used.limit) || 0,
+      })
+    } catch (e) {}
   },
 
   onFormName(e) {
@@ -474,11 +520,17 @@ Page({
     this.setData({ advising: true, err: '' })
     let failed = null
     try {
+      await billing.checkErpPointsAffordable({ kind: 'shop_eval_advice' })
       const base = this._input || { platformId: this.data.platformId, storeName: this.data.storeName }
       const advice = await evalApi.adviseShop(base, this._score, {
         force: true,
         storage,
         askText,
+      })
+      await billing.spendErpPointsForUsage({
+        kind: 'shop_eval_advice',
+        idempotencyKey: 'shop-eval-advice-' + Date.now(),
+        note: '门店分析提升',
       })
       this.setData({
         advising: false,
