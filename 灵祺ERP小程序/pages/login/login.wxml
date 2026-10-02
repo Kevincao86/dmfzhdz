@@ -121,6 +121,7 @@
       <image class="welcome-glass__icon" src="{{item.icon}}" mode="aspectFit" />
     </view>
   </view>
+  <site-icp-footer />
 </scroll-view>
 
 <view wx:if="{{showBindPhone}}" class="login-legal-mask" catchtouchmove="true">

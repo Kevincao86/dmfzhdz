@@ -105,5 +105,8 @@
     }
   },
   "requiredPrivateInfos": ["chooseLocation"],
+  "usingComponents": {
+    "site-icp-footer": "/components/site-icp-footer/index"
+  },
   "lazyCodeLoading": "requiredComponents"
 }

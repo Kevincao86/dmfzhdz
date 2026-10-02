@@ -1,4 +1,4 @@
-<view class="site-icp-footer {{compact ? 'site-icp-footer--compact' : ''}}">
+<view class="site-icp-footer">
   <text class="site-icp-footer__text">{{filing}}</text>
   <view class="site-icp-footer__psb">
     <image class="site-icp-footer__badge" src="/images/beian-ghs.png" mode="aspectFit" />
