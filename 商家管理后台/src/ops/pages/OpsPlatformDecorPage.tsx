@@ -77,8 +77,14 @@ function DecorDateTimeField({
   onChange: (next?: string) => void
 }) {
   const [open, setOpen] = useState(false)
-  const parts = partsFromIso(iso)
-  const display = toDatetimeLocalValue(iso).replace('T', ' ') || '点击选择日期和时间'
+  const [parts, setParts] = useState<DecorDateParts>(() => partsFromIso(iso))
+  useEffect(() => {
+    setParts(partsFromIso(iso))
+  }, [iso])
+  const display =
+    parts.y || parts.m || parts.d || parts.h || parts.min
+      ? `${parts.y || '----'}年${parts.m || '--'}月${parts.d || '--'}日 ${parts.h || '--'}:${parts.min || '--'}`
+      : '点击选择日期和时间'
   const yearNow = new Date().getFullYear()
   const years = Array.from({ length: 6 }, (_, i) => String(yearNow - 1 + i))
   const months = Array.from({ length: 12 }, (_, i) => pad2(i + 1))
@@ -90,6 +96,7 @@ function DecorDateTimeField({
 
   function setPart(key: keyof DecorDateParts, value: string) {
     const next = { ...parts, [key]: value }
+    setParts(next)
     if (!next.y || !next.m || !next.d) return
     const isoNext = isoFromParts(next)
     if (isoNext) onChange(isoNext)
@@ -103,7 +110,9 @@ function DecorDateTimeField({
         className="ops-field mt-1 flex w-full items-center justify-between text-left"
         onClick={() => setOpen((v) => !v)}
       >
-        <span className={iso ? '' : 'text-[var(--ops-muted)]'}>{display}</span>
+        <span className={parts.y || parts.m || parts.d || parts.h || parts.min ? '' : 'text-[var(--ops-muted)]'}>
+          {display}
+        </span>
         <span className="text-xs text-[var(--ops-muted)]">{open ? '收起' : '选择'}</span>
       </button>
       {open ? (
@@ -159,6 +168,7 @@ function DecorDateTimeField({
               type="button"
               className="text-xs text-[var(--ops-muted)]"
               onClick={() => {
+                setParts({ y: '', m: '', d: '', h: '', min: '' })
                 onChange(undefined)
                 setOpen(false)
               }}
