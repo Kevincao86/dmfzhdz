@@ -170,16 +170,23 @@ export default function MerchantShopEvalPanel() {
   const scope = shopEvalScopeOf(input)
   const meta = platformShopEvalMeta(platformId, scope)
   const platformBound = boundIds.includes(platformId)
-  const canEval = Boolean(formName.trim() && province && cityName && district && detailAddress.trim() && categoryLabel)
-  const paid = plan !== 'free'
   const [boundStores, setBoundStores] = useState<ShopEvalBoundStore[]>([])
   const [chooser, setChooser] = useState<null | 'mode' | 'store'>(null)
   const [storeQuery, setStoreQuery] = useState('')
+  const boundAccount = platformBound && boundStores.length > 0
+  const boundName = String(input.evalFocus === 'store' ? input.storeName : input.brandName || input.storeName || formName || '').trim()
+  const canEval = boundAccount
+    ? Boolean(boundName)
+    : Boolean(formName.trim() && province && cityName && district && detailAddress.trim() && categoryLabel)
+  const paid = plan !== 'free'
   const [quota, setQuota] = useState<{ paid: boolean; remaining: number; limit: number } | null>(null)
   const adviceKind = 'shop_eval_advice' as ErpPointsSpendKind
   const grade = score ? shopEvalGrade(score.score, scope) : null
   const grades = shopEvalGrades(scope)
-  const displayName = formName.trim() || (input.brandName && scope === 'chain' ? input.brandName : input.storeName)
+  const displayName =
+    input.evalFocus === 'brand'
+      ? input.brandName || formName.trim() || input.storeName
+      : formName.trim() || input.storeName || ''
   const scopeText =
     input.evalFocus === 'brand'
       ? `总品牌 · ${input.storeCount || boundStores.length || '多'}家`
@@ -410,13 +417,26 @@ export default function MerchantShopEvalPanel() {
   }
 
   async function runEvaluate(draft: ShopEvalInput, snap?: { formName: string; province: string; cityName: string; district: string; detailAddress: string }) {
-    const name = (snap?.formName ?? formName).trim()
+    const usingBound = platformBound && boundStores.length > 0
+    const name = (
+      draft.evalFocus === 'brand'
+        ? draft.brandName || snap?.formName || formName
+        : draft.evalFocus === 'store'
+          ? draft.storeName || snap?.formName || formName
+          : snap?.formName || formName
+    ).trim()
     const prov = snap?.province ?? province
-    const city = snap?.cityName ?? cityName
+    const city = (usingBound ? draft.city || snap?.cityName || cityName : snap?.cityName ?? cityName).trim()
     const dist = snap?.district ?? district
     const detail = (snap?.detailAddress ?? detailAddress).trim()
-    const address = [prov, city, dist, detail].filter(Boolean).join('')
-    if (!name || !prov || !city || !dist || !detail || !categoryLabel) {
+    const typedAddress = [prov, city, dist, detail].filter(Boolean).join('')
+    const address = usingBound ? draft.address || typedAddress || name : typedAddress
+    if (usingBound) {
+      if (!name) {
+        setErr('请先选择总品牌或一家门店')
+        return
+      }
+    } else if (!name || !prov || !city || !dist || !detail || !categoryLabel) {
       setErr('请补全名称、省市区、详细地址和分类')
       return
     }
@@ -627,6 +647,7 @@ export default function MerchantShopEvalPanel() {
         </div>
       </div>
 
+      {boundAccount ? null : (
       <div className="grid gap-3 border-b border-slate-100 px-5 py-4 md:grid-cols-2">
         <label className="block text-left text-sm text-slate-600">
           门店名称
@@ -730,6 +751,7 @@ export default function MerchantShopEvalPanel() {
           />
         </div>
       </div>
+      )}
 
       {platformBound && boundStores.length >= 2 ? (
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3">
@@ -781,7 +803,8 @@ export default function MerchantShopEvalPanel() {
               {meta.name}
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              {[categoryLabel, fullAddress].filter(Boolean).join(' · ') || '填写名称、地址和分类后即可免费评估'}
+              {[categoryLabel, boundAccount ? input.address || fullAddress : fullAddress].filter(Boolean).join(' · ') ||
+                (boundAccount ? '已使用绑定门店的资料' : '填写名称、地址和分类后即可免费评估')}
             </p>
           </div>
         </div>
@@ -940,7 +963,7 @@ export default function MerchantShopEvalPanel() {
           </p>
         ) : null}
         {err ? <p className="mt-2 text-center text-sm text-red-600">{err}</p> : null}
-        {!canEval ? <p className="mt-2 text-center text-sm text-slate-500">请填写门店名称、省市区、详细地址和分类</p> : null}
+        {!canEval && !boundAccount ? <p className="mt-2 text-center text-sm text-slate-500">请填写门店名称、省市区、详细地址和分类</p> : null}
         {!platformBound ? (
           <p className="mt-2 text-center text-sm text-slate-500">
             分析评估前请先绑定门店账号。

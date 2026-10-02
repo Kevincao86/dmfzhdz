@@ -10,7 +10,8 @@ const CATEGORIES = evalApi.SHOP_EVAL_CATEGORIES || {}
 const CAT1 = Object.keys(CATEGORIES)
 
 function formReady(data) {
-  const name = String(data.formName || '').trim()
+  const name = String(data.formName || data.storeName || '').trim()
+  if (Number(data.boundCount) >= 1) return Boolean(name)
   const region = data.region || []
   const detail = String(data.detailAddress || '').trim()
   const cat1 = (data.cat1List || [])[data.cat1Index]
@@ -468,7 +469,7 @@ Page({
       grades: evalApi.shopEvalGrades(scope),
       avatarLetter: letterOf(displayName),
       basis: [viewed.category, viewed.address].filter(Boolean).join(' · ') || evalApi.describeShopEvalBasis(viewed),
-      canEval: formReady(Object.assign({}, this.data, filled || {})),
+      canEval: formReady(Object.assign({}, this.data, filled || {}, { boundCount: Math.max(mapped.length, total) })),
       scoreReady: Boolean(score),
       displayScore: score ? score.score : 0,
       searchLevel: score ? score.searchLevel : '',
@@ -693,9 +694,20 @@ Page({
   },
 
   async runEvaluate(draft, snap) {
-    const data = Object.assign({}, this.data, snap || {})
-    if (!formReady(data)) {
+    const data = Object.assign({}, this.data, snap || {}, {
+      boundCount: Math.max(Number(this.data.boundCount) || 0, (this._boundStores || []).length),
+    })
+    const bound = Number(data.boundCount) >= 1
+    const focus = draft && draft.evalFocus
+    const pickedName = String(
+      (focus === 'brand' ? (draft && draft.brandName) || data.formName : focus === 'store' ? (draft && draft.storeName) || data.formName : data.formName) || '',
+    ).trim()
+    if (!bound && !formReady(data)) {
       wx.showToast({ title: '请补全名称、省市区、详细地址和分类', icon: 'none' })
+      return
+    }
+    if (bound && !pickedName) {
+      wx.showToast({ title: '请先选择总品牌或一家门店', icon: 'none' })
       return
     }
     this.stopTick()
@@ -744,13 +756,15 @@ Page({
       const cat1 = data.cat1List[data.cat1Index]
       const cat2 = data.cat2List[data.cat2Index]
       const region = data.region || []
-      const name = String(data.formName || '').trim()
-      const address = region.join('') + String(data.detailAddress || '').trim()
-      const category = cat1 + ' / ' + cat2
+      const name = pickedName
+      const typedAddress = region.join('') + String(data.detailAddress || '').trim()
+      const address = bound ? String((draft && draft.address) || typedAddress || name) : typedAddress
+      const city = bound ? String((draft && draft.city) || region[1] || '') : region[1] || ''
+      const category = cat1 && cat2 ? cat1 + ' / ' + cat2 : ''
       const located = await postLocate({
         action: 'locate',
         address,
-        city: region[1] || '',
+        city,
         category,
         storeName: name,
       })
@@ -758,10 +772,9 @@ Page({
       const brandNames = Array.isArray(located.brandNames) ? located.brandNames : []
       const titles = Array.isArray(located.publicTitles) ? located.publicTitles : []
       const note = [located.mapNote, located.brandNote].filter(Boolean).join('\n')
-      const focus = draft && draft.evalFocus
       const base = Object.assign({}, this._input || {}, draft || {}, {
         platformId: this.data.platformId,
-        city: region[1] || '',
+        city,
         address,
         category,
         mapNote: note,

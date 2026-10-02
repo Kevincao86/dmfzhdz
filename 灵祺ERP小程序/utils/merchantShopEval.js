@@ -782,15 +782,20 @@ function resolveShopEvalFromStores(platformId, stores, total) {
   }
 }
 
-function inferBoundBrandLabel(store) {
-  const fromApi = String((store && store.brandName) || '').trim()
-  if (fromApi) return fromApi
-  const title = String((store && store.name) || '').trim()
-  const paren = title.match(/^(.+?)[（(]([^)）]{1,24}店)[)）]\s*$/)
+function stripStoreSuffix(title) {
+  const text = String(title || '').trim()
+  const paren = text.match(/^(.+?)[（(]([^)）]{1,24}店)[)）]\s*$/)
   if (paren && paren[1] && paren[1].trim()) return paren[1].trim()
-  const dot = title.match(/^(.+?)[·•—－-]([^·•—－-]{1,24}店)\s*$/)
-  if (dot && dot[1] && dot[1].trim()) return dot[1].trim()
-  return title
+  const dot = text.match(/^(.+?)[·•—－-]([^·•—－-]{1,24}店)\s*$/)
+  if (dot && dot[1] && dot[1].trim() && dot[1].trim().length >= 2) return dot[1].trim()
+  return text
+}
+
+function inferBoundBrandLabel(store) {
+  const fromName = stripStoreSuffix(store && store.name)
+  const fromApi = stripStoreSuffix(store && store.brandName)
+  if (fromApi && fromName && fromApi !== fromName && fromName.indexOf(fromApi) === 0) return fromApi
+  return fromName || fromApi
 }
 
 function boundEvalBrandTarget(stores) {

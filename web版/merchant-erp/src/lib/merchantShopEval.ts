@@ -656,15 +656,20 @@ export function resolveShopEvalFromStores(
   }
 }
 
-function inferBoundBrandLabel(store: ShopEvalBoundStore) {
-  const fromApi = String(store.brandName || '').trim()
-  if (fromApi) return fromApi
-  const title = String(store.name || '').trim()
-  const paren = title.match(/^(.+?)[（(]([^)）]{1,24}店)[)）]\s*$/)
+function stripStoreSuffix(title: string) {
+  const text = String(title || '').trim()
+  const paren = text.match(/^(.+?)[（(]([^)）]{1,24}店)[)）]\s*$/)
   if (paren?.[1]?.trim()) return paren[1].trim()
-  const dot = title.match(/^(.+?)[·•—－-]([^·•—－-]{1,24}店)\s*$/)
-  if (dot?.[1]?.trim()) return dot[1].trim()
-  return title
+  const dot = text.match(/^(.+?)[·•—－-]([^·•—－-]{1,24}店)\s*$/)
+  if (dot?.[1]?.trim() && dot[1].trim().length >= 2) return dot[1].trim()
+  return text
+}
+
+function inferBoundBrandLabel(store: ShopEvalBoundStore) {
+  const fromName = stripStoreSuffix(store.name)
+  const fromApi = stripStoreSuffix(store.brandName || '')
+  if (fromApi && fromName && fromApi !== fromName && fromName.startsWith(fromApi)) return fromApi
+  return fromName || fromApi
 }
 
 /** 绑定账号里多家门店时，归出总品牌名称和门店数 */

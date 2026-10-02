@@ -12,7 +12,7 @@
     </view>
   </view>
 
-  <view class="card form">
+  <view class="card form" wx:if="{{boundCount < 1}}">
     <text class="advice-title">免费评估</text>
     <text class="form-label">门店名称</text>
     <input class="form-input" placeholder="输入门店或品牌名称" value="{{formName}}" bindinput="onFormName" />
