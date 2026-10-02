@@ -95,11 +95,11 @@ export const MP_POINTS_GOODS_AI_PER_USE = 5
 /** 投流/线索 AI（广告洞察、跟进话术）：5 积分/次；≈¥0.05 */
 export const MP_POINTS_AD_AI_PER_USE = 5
 
-/** 达人账号评估：5 积分/次；一次豆包结构化打分≈¥0.05 */
-export const MP_POINTS_TALENT_EVAL_PER_USE = 5
+/** 达人账号评估不扣积分：免费每月 1 次，会员每月 15 次 */
+export const MP_POINTS_TALENT_EVAL_PER_USE = 0
 
-/** 达人账号分析整改：3 积分/次；短建议≈¥0.03 */
-export const MP_POINTS_TALENT_ADVICE_PER_USE = 3
+/** 达人账号分析提升：5 积分/次 */
+export const MP_POINTS_TALENT_ADVICE_PER_USE = 5
 
 /** 门店分析提升：5 积分/次；一次整改方案≈¥0.05 */
 export const MP_POINTS_SHOP_EVAL_ADVICE_PER_USE = 5
@@ -284,7 +284,7 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motion
   if (kind === 'recruitment_ai') return `${MP_POINTS_RECRUITMENT_AI_PER_USE} 积分/次`
   if (kind === 'goods_ai') return `${MP_POINTS_GOODS_AI_PER_USE} 积分/次`
   if (kind === 'ad_ai') return `${MP_POINTS_AD_AI_PER_USE} 积分/次`
-  if (kind === 'talent_eval') return `${MP_POINTS_TALENT_EVAL_PER_USE} 积分/次`
+  if (kind === 'talent_eval') return '免费每月 1 次，会员每月 15 次'
   if (kind === 'talent_advice') return `${MP_POINTS_TALENT_ADVICE_PER_USE} 积分/次`
   if (kind === 'shop_eval_advice') return `${MP_POINTS_SHOP_EVAL_ADVICE_PER_USE} 积分/次`
   if (kind === 'review_ai') {

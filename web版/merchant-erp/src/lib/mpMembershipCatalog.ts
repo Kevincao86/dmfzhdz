@@ -226,7 +226,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_digital_human: dash(),
       addon_visual_studio: dash(),
       addon_ai_drama: dash(),
-      addon_talent_eval: dash(),
+      addon_talent_eval: q(1),
       addon_talent_advice: dash(),
       addon_ai_video_review: dash(),
       addon_ai_script_review: dash(),
@@ -242,7 +242,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       fulfillment_upload: b(true),
       ai_selfcheck_video: q(matrixAiQuotas('talent', 'pro').video),
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'pro').copy),
-      addon_talent_eval: b(true),
+      addon_talent_eval: q(15),
       addon_talent_advice: b(true),
       publish_link_check: b(true),
       addon_shortvideo: b(true),
@@ -264,7 +264,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       fulfillment_upload: b(true),
       ai_selfcheck_video: q(matrixAiQuotas('talent', 'flagship').video),
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'flagship').copy),
-      addon_talent_eval: b(true),
+      addon_talent_eval: q(15),
       addon_talent_advice: b(true),
       publish_link_check: b(true),
       addon_shortvideo: b(true),
@@ -286,7 +286,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       fulfillment_upload: b(true),
       ai_selfcheck_video: q(matrixAiQuotas('talent', 'enterprise').video),
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'enterprise').copy),
-      addon_talent_eval: b(true),
+      addon_talent_eval: q(15),
       addon_talent_advice: b(true),
       publish_link_check: b(true),
       addon_shortvideo: b(true),
@@ -490,8 +490,8 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_visual_studio', label: 'AI 视觉工坊', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_drama', label: 'AI短剧', group: 'AI 内容', kind: 'boolean' },
-    { key: 'addon_talent_eval', label: '达人账号评估（5 积分/次）', group: 'AI 内容', kind: 'boolean' },
-    { key: 'addon_talent_advice', label: '达人账号分析（3 积分/次）', group: 'AI 内容', kind: 'boolean' },
+    { key: 'addon_talent_eval', label: '达人账号评估（免费每月 1 次，会员每月 15 次）', group: 'AI 内容', kind: 'quota' },
+    { key: 'addon_talent_advice', label: '达人账号分析提升（5 积分/次）', group: 'AI 内容', kind: 'boolean' },
     { key: 'addon_ai_video_review', label: 'AI短视频审核（2 积分/秒）', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_script_review', label: 'AI文稿审核（2 积分/次）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（8 积分/篇）', group: 'AI 增值', kind: 'boolean' },
@@ -725,7 +725,8 @@ export function resolveAddonSubmoduleAccess(cells: Record<string, TierCell>): Mp
   const digitalHuman = submoduleEnabled(cells, 'addon_digital_human', legacy ? ['addons'] : [])
   const visualStudio = submoduleEnabled(cells, 'addon_visual_studio', legacy ? ['addons'] : [])
   const aiDrama = submoduleEnabled(cells, 'addon_ai_drama', [])
-  const talentEval = submoduleEnabled(cells, 'addon_talent_eval', [])
+  const talentEvalCell = cells.addon_talent_eval
+  const talentEval = talentEvalCell === true || (typeof talentEvalCell === 'number' && talentEvalCell > 0)
   const talentAdvice = submoduleEnabled(cells, 'addon_talent_advice', [])
   const brief = cells.ai_brief_gen === true
   const aiVideoReview = submoduleEnabled(cells, 'addon_ai_video_review', [])
@@ -1178,6 +1179,10 @@ function tierCellForPlan(
   key: string,
   planVersions?: MpMembershipPlanVersion[],
 ): TierCell {
+  if (role === 'talent' && key === 'addon_talent_eval') {
+    const tier = normalizeMpMembershipTier(planId)
+    return MATRIX.talent?.[tier]?.addon_talent_eval ?? q(1)
+  }
   if (planVersions?.length) {
     const v = findMembershipPlanVersion(planVersions, planId)
     if (v?.permissions) {

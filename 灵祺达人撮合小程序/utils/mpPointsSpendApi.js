@@ -10,8 +10,8 @@ const VISUAL_STUDIO_COPY_POINTS = 3
 const VISUAL_STUDIO_IMAGE_POINTS = 8
 /** 高级生图 GPT Image 2：与 Web mpPointsEconomics 对齐 */
 const VISUAL_STUDIO_IMAGE_PRO_POINTS = 150
-const TALENT_EVAL_POINTS = 5
-const TALENT_ADVICE_POINTS = 3
+const TALENT_EVAL_POINTS = 0
+const TALENT_ADVICE_POINTS = 5
 const VISUAL_STUDIO_PRO_IMAGE_MODEL = 'gpt-image-2'
 
 function authHeaders() {

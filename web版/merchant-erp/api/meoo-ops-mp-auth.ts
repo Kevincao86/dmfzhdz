@@ -1430,17 +1430,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       })
       if (!result.ok) {
         // 返回 200 + ok:false，便于小程序拿到 required/balance（非 2xx 时 ecs 会丢 body）
-        sendJson(res, 200, {
-          ok: false,
-          error: result.error,
-          message: result.message,
-          required: result.required,
-          balance: result.balance,
-          remaining:
-            result.balance != null && result.required != null
-              ? Math.floor(Number(result.balance) || 0) - Math.floor(Number(result.required) || 0)
-              : undefined,
-        })
+      sendJson(res, 200, {
+        ok: false,
+        error: result.error,
+        message: result.message,
+        required: result.required,
+        balance: result.balance,
+        remaining:
+          result.balance != null && result.required != null
+            ? Math.floor(Number(result.balance) || 0) - Math.floor(Number(result.required) || 0)
+            : undefined,
+        quotaLimit: result.quotaLimit,
+        quotaRemaining: result.quotaRemaining,
+        quotaPaid: result.quotaPaid,
+      })
         return
       }
       sendJson(res, 200, {
@@ -1451,6 +1454,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           0,
           Math.floor(Number(result.newBalance) || 0) - Math.floor(Number(result.pointsCharged) || 0),
         ),
+        quotaLimit: result.quotaLimit,
+        quotaRemaining: result.quotaRemaining,
+        quotaPaid: result.quotaPaid,
       })
       return
     }
@@ -1484,12 +1490,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         roleHint: spendRoleHint,
       })
       if (!result.ok) {
-        sendJson(res, mpPointsSpendHttpStatus(result.error), {
+        sendJson(res, kind === 'talent_eval' ? 200 : mpPointsSpendHttpStatus(result.error), {
           ok: false,
           error: result.error,
           message: result.message,
           required: result.required,
           balance: result.balance,
+          quotaLimit: result.quotaLimit,
+          quotaRemaining: result.quotaRemaining,
+          quotaPaid: result.quotaPaid,
         })
         return
       }
@@ -1498,6 +1507,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         pointsCharged: result.pointsCharged,
         mpAiPointsBalance: result.newBalance,
         already: result.already === true,
+        quotaLimit: result.quotaLimit,
+        quotaRemaining: result.quotaRemaining,
+        quotaPaid: result.quotaPaid,
       })
       return
     }

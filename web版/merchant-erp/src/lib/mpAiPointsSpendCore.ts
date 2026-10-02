@@ -28,15 +28,21 @@ import {
   resolveEffectiveQuotaCell,
 } from './mpMembershipQuota.js'
 
+type TalentEvalQuotaFields = {
+  quotaLimit?: number
+  quotaRemaining?: number
+  quotaPaid?: boolean
+}
+
 export type MpAiPointsSpendResult =
-  | { ok: true; pointsCharged: number; newBalance: number; already?: boolean }
-  | {
+  | ({ ok: true; pointsCharged: number; newBalance: number; already?: boolean } & TalentEvalQuotaFields)
+  | ({
       ok: false
       error: 'insufficient_points' | 'not_found' | 'invalid_amount' | 'duplicate_pending'
       message: string
       required?: number
       balance?: number
-    }
+    } & TalentEvalQuotaFields)
 
 export { readMpPointsBucketsForTarget }
 

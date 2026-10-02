@@ -1,5 +1,6 @@
 import { getToken } from './mpSession'
 import { mpApiFetchCandidates } from './mpApiBase'
+import { getWorkIdentity } from './mpWorkIdentity'
 
 type ScoreBlock = { name: string; weight: number }
 
@@ -521,10 +522,29 @@ async function askDoubao(system: string, user: string): Promise<string> {
   throw new Error(lastErr)
 }
 
-export const TALENT_EVAL_POINTS = 5
-export const TALENT_ADVICE_POINTS = 3
+export const TALENT_EVAL_POINTS = 0
+export const TALENT_ADVICE_POINTS = 5
 
-async function postAuth(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+export type TalentEvalQuota = {
+  ok: boolean
+  message: string
+  remaining: number
+  limit: number
+  paid: boolean
+}
+
+function quotaFrom(data: Record<string, unknown>): TalentEvalQuota {
+  const remaining = Number(data.quotaRemaining)
+  return {
+    ok: data.ok !== false,
+    message: String(data.message || ''),
+    remaining: Number.isFinite(remaining) ? remaining : -1,
+    limit: Number(data.quotaLimit) || 1,
+    paid: data.quotaPaid === true,
+  }
+}
+
+async function postAuth(body: Record<string, unknown>, allowFail = false): Promise<Record<string, unknown>> {
   const candidates = mpApiFetchCandidates('/api/meoo-ops-mp-auth')
   if (!candidates.length) throw new Error('未配置评估接口')
   const token = getToken()
@@ -538,10 +558,16 @@ async function postAuth(body: Record<string, unknown>): Promise<Record<string, u
           'Content-Type': 'application/json',
           ...(token ? { 'X-Mp-Session': token, Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ ...body, sessionToken: token, token }),
+        body: JSON.stringify({
+          ...body,
+          sessionToken: token,
+          token,
+          billingRole: getWorkIdentity(),
+        }),
       })
       const data = (await res.json()) as Record<string, unknown>
       if (!res.ok || data.ok === false) {
+        if (allowFail && res.ok) return data
         const msg = String(data.message || data.detail || data.error || `http_${res.status}`)
         if ((res.status === 404 || msg === 'not_found') && i < candidates.length - 1) {
           lastErr = msg
@@ -557,6 +583,24 @@ async function postAuth(body: Record<string, unknown>): Promise<Record<string, u
     }
   }
   throw new Error(lastErr)
+}
+
+export async function readTalentEvalQuota(): Promise<TalentEvalQuota> {
+  const data = await postAuth({ action: 'mp_ai_points_afford', kind: 'talent_eval' }, true)
+  return quotaFrom(data)
+}
+
+async function consumeTalentEvalQuota() {
+  const data = await postAuth(
+    {
+      action: 'mp_ai_points_spend',
+      kind: 'talent_eval',
+      idempotencyKey: `talent-eval-${Date.now()}`,
+      note: '达人账号评估',
+    },
+    true,
+  )
+  return quotaFrom(data)
 }
 
 async function assertTalentPoints(kind: 'talent_eval' | 'talent_advice') {
@@ -704,14 +748,19 @@ export async function evaluateTalent(raw: EvalAccountInput, opts?: { force?: boo
     const saved = savedFromCache(readCache(key))
     if (saved) return saved.score
   }
-  await assertTalentPoints('talent_eval')
+  const gate = await readTalentEvalQuota()
+  if (!gate.ok) throw new Error(gate.message || '本月评估次数已用完')
   const j = await askDoubaoJson(
     scoreSystem(spec),
     `${accountFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用达人自己能看懂的话来写，不要写给商家的合作判断。`,
   )
   const score = buildScore(spec, j)
-  await spendTalentPoints('talent_eval', '达人账号评估')
   writeCache(key, score, true)
+  try {
+    await consumeTalentEvalQuota()
+  } catch {
+    /* 次数没记上时仍保留这次结果 */
+  }
   return score
 }
 
@@ -742,7 +791,7 @@ export async function adviseTalent(
     lift: clampLift(j.lift),
     sections: mapSuggestions(j.sections),
   }
-  await spendTalentPoints('talent_advice', '达人账号分析整改')
+  await spendTalentPoints('talent_advice', '达人账号分析提升')
   writeCache(key, { advice })
   return advice
 }

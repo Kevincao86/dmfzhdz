@@ -1,4 +1,6 @@
 const ecs = require('./ecs.js')
+const auth = require('./auth.js')
+const billing = require('./mpBillingRoleHint.js')
 const sessionStore = require('./mpSessionStore.js')
 const pointsSpend = require('./mpPointsSpendApi.js')
 
@@ -603,6 +605,40 @@ function buildScore(spec, j) {
   }
 }
 
+function quotaFrom(data) {
+  const remaining = Number(data && data.quotaRemaining)
+  return {
+    ok: !data || data.ok !== false,
+    message: String((data && data.message) || ''),
+    remaining: Number.isFinite(remaining) ? remaining : -1,
+    limit: Number(data && data.quotaLimit) || 1,
+    paid: !!(data && data.quotaPaid),
+  }
+}
+
+async function postTalentQuota(action, extra) {
+  const token = auth.readSessionToken()
+  const data = await ecs.post(
+    '/api/meoo-ops-mp-auth',
+    Object.assign(
+      {
+        action,
+        kind: 'talent_eval',
+        sessionToken: token,
+        token,
+      },
+      billing.billingRolePayload(),
+      extra || {},
+    ),
+    token ? { 'X-Mp-Session': token } : {},
+  )
+  return quotaFrom(data)
+}
+
+async function readTalentEvalQuota() {
+  return postTalentQuota('mp_ai_points_afford')
+}
+
 async function evaluateTalent(raw, opts) {
   const packed = normalizeInput(raw)
   const spec = packed.spec
@@ -614,14 +650,20 @@ async function evaluateTalent(raw, opts) {
     const saved = savedFromCache(loaded.data)
     if (saved) return saved.score
   }
-  await pointsSpend.assertTalentEvalAffordable('talent_eval')
+  const gate = await readTalentEvalQuota()
+  if (!gate.ok) throw new Error(gate.message || '本月评估次数已用完')
   const j = await askDoubaoJson(
     scoreSystem(spec),
     `${accountFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用达人自己能看懂的话来写，不要写给商家的合作判断。`,
   )
   const score = buildScore(spec, j)
-  await pointsSpend.spendTalentEvalPoints('talent_eval', '达人账号评估')
   writeCache(key, score)
+  try {
+    await postTalentQuota('mp_ai_points_spend', {
+      idempotencyKey: 'talent-eval-' + Date.now(),
+      note: '达人账号评估',
+    })
+  } catch (e) {}
   return score
 }
 
@@ -647,7 +689,7 @@ async function adviseTalent(raw, score, opts) {
     `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请按每个板块写出分析结果、怎么调整、近两周要做的三件事。写具体动作，不要一句带过。`,
   )
   const advice = { lift: clampLift(j.lift), sections: mapSuggestions(j.sections) }
-  await pointsSpend.spendTalentEvalPoints('talent_advice', '达人账号分析整改')
+  await pointsSpend.spendTalentEvalPoints('talent_advice', '达人账号分析提升')
   writeCache(key, { advice })
   return advice
 }
@@ -664,4 +706,5 @@ module.exports = {
   formatSalesYuan,
   TALENT_EVAL_POINTS: pointsSpend.TALENT_EVAL_POINTS,
   TALENT_ADVICE_POINTS: pointsSpend.TALENT_ADVICE_POINTS,
+  readTalentEvalQuota,
 }

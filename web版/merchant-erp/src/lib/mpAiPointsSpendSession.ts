@@ -8,6 +8,8 @@ import {
   type MpAiPointsSpendResult,
 } from './mpAiPointsSpendCore.js'
 import type { MpPointsUsageKind } from './mpPointsEconomics.js'
+import { talentEvalMonthlyLimit, talentEvalQuotaDeniedMessage } from './mpMembershipQuota.js'
+import { consumeTalentEvalQuota, peekTalentEvalQuota } from './talentEvalQuotaStore.js'
 
 export type { MpAiPointsSpendResult }
 
@@ -40,6 +42,28 @@ export async function spendMpAiPointsForSessionToken(
   const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
+  if (opts.kind === 'talent_eval') {
+    const plan = talentEvalMonthlyLimit(data, account, { roleHint: opts.roleHint })
+    const used = consumeTalentEvalQuota(String(account.id), plan.limit, plan.paid)
+    if (!used.ok) {
+      return {
+        ok: false,
+        error: 'not_found',
+        message: talentEvalQuotaDeniedMessage(plan.paid),
+        quotaLimit: used.limit,
+        quotaRemaining: 0,
+        quotaPaid: plan.paid,
+      }
+    }
+    return {
+      ok: true,
+      pointsCharged: 0,
+      newBalance: 0,
+      quotaLimit: used.limit,
+      quotaRemaining: used.remaining,
+      quotaPaid: plan.paid,
+    }
+  }
   const result = spendMpAiPointsWithSnapshot(data, account, opts)
   if (result.ok && !result.already) {
     await io.save(data)
@@ -66,6 +90,28 @@ export async function assertMpAiPointsAffordableForSessionToken(
   const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
+  if (kind === 'talent_eval') {
+    const plan = talentEvalMonthlyLimit(data, account, { roleHint: opts?.roleHint })
+    const quota = peekTalentEvalQuota(String(account.id), plan.limit, plan.paid)
+    if (quota.remaining <= 0) {
+      return {
+        ok: false,
+        error: 'not_found',
+        message: talentEvalQuotaDeniedMessage(plan.paid),
+        quotaLimit: quota.limit,
+        quotaRemaining: 0,
+        quotaPaid: plan.paid,
+      }
+    }
+    return {
+      ok: true,
+      pointsCharged: 0,
+      newBalance: 0,
+      quotaLimit: quota.limit,
+      quotaRemaining: quota.remaining,
+      quotaPaid: plan.paid,
+    }
+  }
   const gift = ensureMonthlyGiftPointsGranted(data, account, { roleHint: opts?.roleHint })
   const result = assertMpAiPointsAffordable(data, account, kind, opts)
   if (gift.granted > 0) {

@@ -10,8 +10,8 @@ import {
   douyinScoreGrade,
   evaluateTalent,
   platformEvalMeta,
+  readTalentEvalQuota,
   TALENT_ADVICE_POINTS,
-  TALENT_EVAL_POINTS,
   readSavedTalentEval,
   previewTalentGains,
   formatSalesYuan,
@@ -82,8 +82,8 @@ export default function TalentLocalLifeEvalPage() {
   const basis = describeEvalBasis(input)
   const avatarUrl = String(getAccount()?.wxAvatarUrl || '').trim()
   const talentAccess = readAccountPrFeatureAccess(getAccount())
-  const canRunEval = talentAccess.talentEval
   const canRunAdvice = talentAccess.talentAdvice
+  const [quota, setQuota] = useState<{ paid: boolean; remaining: number; limit: number } | null>(null)
   const canEval = !!(nickname || accountId)
   const [evaluating, setEvaluating] = useState(false)
   const [advising, setAdvising] = useState(false)
@@ -124,6 +124,18 @@ export default function TalentLocalLifeEvalPage() {
   }, [savedKey])
 
   useEffect(() => {
+    let cancel = false
+    void readTalentEvalQuota()
+      .then((row) => {
+        if (!cancel) setQuota({ paid: row.paid, remaining: row.remaining, limit: row.limit })
+      })
+      .catch(() => {})
+    return () => {
+      cancel = true
+    }
+  }, [score])
+
+  useEffect(() => {
     if (!score || !animateScore) return
     const goal = score.score
     const start = performance.now()
@@ -142,8 +154,13 @@ export default function TalentLocalLifeEvalPage() {
   }, [score, animateScore])
 
   async function onEvaluate() {
-    if (!canRunEval) {
-      promptUpgradeMembership(navigate, '达人账号评估')
+    if (quota && quota.remaining <= 0) {
+      if (quota.paid) {
+        setErr('本月 15 次评估已用完，下月恢复')
+        return
+      }
+      const ok = window.confirm('本月免费评估已用完。升级会员后每月可评估 15 次。')
+      if (ok) navigate('/profile/membership')
       return
     }
     if (!canEval || evaluating || advising) return
@@ -303,15 +320,24 @@ export default function TalentLocalLifeEvalPage() {
             <button
               type="button"
               className="mt-4 w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white disabled:opacity-50"
-              disabled={(canRunEval && !canEval) || evaluating || advising}
+              disabled={!canEval || evaluating || advising}
               onClick={() => void onEvaluate()}
             >
               {evaluating
                 ? '评估中…'
-                : score
-                  ? `重新评估 · ${TALENT_EVAL_POINTS}积分`
-                  : `达人信息评估 · ${TALENT_EVAL_POINTS}积分`}
+                : quota && quota.remaining === 0
+                  ? quota.paid
+                    ? '本月次数已用完'
+                    : '升级后每月 15 次'
+                  : score
+                    ? `重新评估 · 剩 ${quota && quota.remaining >= 0 ? quota.remaining : ''}次`
+                    : quota?.paid
+                      ? `评估 · 剩 ${quota.remaining}次`
+                      : `免费评估 · 剩 ${quota && quota.remaining >= 0 ? quota.remaining : 1}次`}
             </button>
+            <p className="mt-2 text-center text-xs text-[var(--shell-muted)]">
+              免费版每月可评估 1 次。升级会员后每月可评估 15 次。分析提升每次 {TALENT_ADVICE_POINTS} 积分。
+            </p>
           </div>
       </div>
 
@@ -337,7 +363,7 @@ export default function TalentLocalLifeEvalPage() {
               disabled={(canRunAdvice && !score) || evaluating || advising}
               onClick={() => void onAdvise()}
             >
-              {advising ? '分析中…' : `查看分析与提升方案 · ${TALENT_ADVICE_POINTS}积分`}
+              {advising ? '分析中…' : `分析提升 · ${TALENT_ADVICE_POINTS}积分`}
             </button>
             {!canEval ? (
               <p className="mt-3 text-center text-sm text-[var(--shell-muted)]">

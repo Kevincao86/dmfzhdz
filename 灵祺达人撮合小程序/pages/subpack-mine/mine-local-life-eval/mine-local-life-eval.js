@@ -64,11 +64,13 @@ Page({
     exposureText: '',
     salesText: '',
     err: '',
-    evalPoints: evalApi.TALENT_EVAL_POINTS,
+    evalPoints: 0,
     advicePoints: evalApi.TALENT_ADVICE_POINTS,
-    evalCostText: '达人信息评估 · ' + evalApi.TALENT_EVAL_POINTS + '积分',
-    reevalCostText: '重新评估 · ' + evalApi.TALENT_EVAL_POINTS + '积分',
-    adviceCostText: '查看分析与提升方案 · ' + evalApi.TALENT_ADVICE_POINTS + '积分',
+    quotaPaid: false,
+    quotaRemaining: -1,
+    evalCostText: '免费评估',
+    reevalCostText: '重新评估',
+    adviceCostText: '分析提升 · ' + evalApi.TALENT_ADVICE_POINTS + '积分',
   },
 
   onLoad() {
@@ -82,6 +84,26 @@ Page({
     syncPageIdentity(this)
     this.loadIdentity()
     this.setData({ tabs: getTabList(userProfile.readIdentity()) })
+    void this.refreshQuota()
+  },
+
+  async refreshQuota() {
+    try {
+      const row = await evalApi.readTalentEvalQuota()
+      const remaining = Number(row.remaining)
+      const paid = !!row.paid
+      const left = Number.isFinite(remaining) && remaining >= 0 ? remaining : -1
+      let evalCostText = '免费评估'
+      let reevalCostText = '重新评估'
+      if (left === 0) {
+        evalCostText = paid ? '本月次数已用完' : '升级后每月 15 次'
+        reevalCostText = evalCostText
+      } else if (left > 0) {
+        evalCostText = (paid ? '评估 · 剩' : '免费评估 · 剩') + left + '次'
+        reevalCostText = '重新评估 · 剩' + left + '次'
+      }
+      this.setData({ quotaPaid: paid, quotaRemaining: left, evalCostText, reevalCostText })
+    } catch (e) {}
   },
 
   onPlatform(e) {
@@ -259,8 +281,24 @@ Page({
   },
 
   async onEvaluate() {
-    if (!prFeatureAccess.canUseAddonPerm(null, 'talentEval')) {
-      promptMembershipUpgrade('达人账号评估')
+    if (this.data.quotaRemaining === 0) {
+      if (this.data.quotaPaid) {
+        const msg = '本月 15 次评估已用完，下月恢复'
+        this.setData({ err: msg })
+        wx.showToast({ title: msg, icon: 'none' })
+        return
+      }
+      wx.showModal({
+        title: '本月免费次数已用完',
+        content: '免费版每月可评估 1 次。升级会员后每月可评估 15 次。',
+        confirmText: '去升级',
+        cancelText: '取消',
+        success(res) {
+          if (res.confirm) {
+            wx.navigateTo({ url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership' }).catch(() => {})
+          }
+        },
+      })
       return
     }
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
@@ -287,6 +325,7 @@ Page({
       this.playScore(score.score)
       const gains = gainTargets(score, input)
       if (gains) this.playGains(gains.exposure, gains.sales)
+      void this.refreshQuota()
     } catch (e) {
       failed = e
     }

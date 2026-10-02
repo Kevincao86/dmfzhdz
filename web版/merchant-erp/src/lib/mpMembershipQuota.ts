@@ -212,6 +212,25 @@ export function resolveEffectiveQuotaCell(
   return cells[quotaKey] ?? '—'
 }
 
+/** 达人账号评估：免费档每月 1 次，付费档每月 15 次。过期会员按免费档。 */
+export function talentEvalMonthlyLimit(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
+): { limit: number; paid: boolean } {
+  const role = resolvePointsLibraryRole(data, account, opts)
+  const subject =
+    role === 'pr' ? findRegistryPrForAccount(data, account) : findRegistryMemberForAccount(data, account)
+  const record = buildMembershipAccessRecord(role, subject)
+  const tier = resolveEffectiveMembershipTier(record.mpMembershipPlan, record.mpMembershipExpiresAt)
+  const paid = tier !== 'basic'
+  return { limit: paid ? 15 : 1, paid }
+}
+
+export function talentEvalQuotaDeniedMessage(paid: boolean) {
+  return paid ? '本月 15 次评估已用完，下月恢复' : '本月免费评估已用完。升级会员后每月可评估 15 次'
+}
+
 function isBooleanCellEnabled(cell: TierCell): boolean {
   if (cell === '—' || cell === dash()) return false
   return cell === true

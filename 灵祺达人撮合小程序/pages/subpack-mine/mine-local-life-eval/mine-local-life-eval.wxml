@@ -80,6 +80,7 @@
       bindtap="onAdvise"
     >{{advising ? '分析中…' : adviceCostText}}</view>
     <text class="err" wx:if="{{err}}">{{err}}</text>
+    <text class="need">免费版每月可评估 1 次。升级会员后每月可评估 15 次。分析提升每次 5 积分。</text>
     <text class="need" wx:if="{{!canEval}}">请先到「我的信息」填写{{nickLabel}}或{{accountLabel}}</text>
     <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
 
