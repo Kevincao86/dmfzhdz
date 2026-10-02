@@ -219,7 +219,7 @@ function shopFacts(spec, row) {
     `电话：${filledOr(row.phone, '未填写')}`,
     `营业时间：${filledOr(row.businessHours, '未填写')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
-    `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
+    `套餐价格：${filledOr(row.offerPrice, /\d+\s*元|套餐/.test(String(row.publicNote || '')) ? '公开检索里已经有抖音团购价格，写进短视频与团购，禁止写成未上架' : '未填写，不要编造')}`,
     `经营分类：${filledOr(row.category, '未填写')}`,
     `评估范围：${row.evalFocus === 'brand' ? '用户指定按总品牌' : row.evalFocus === 'store' ? '用户指定只分析这一家绑定门店' : '未指定'}`,
     `高德定位：${filledOr(row.mapNote, '未返回')}`,
@@ -246,9 +246,12 @@ function signalFacts(s) {
 function functionCoverage(row) {
   if (row.signals) return ''
   const offer = [row.offerName, row.offerPrice].filter(Boolean).join(' ')
+  const publicOffer = /\d+\s*元|套餐/.test(String(row.publicNote || ''))
   const product = offer
     ? `商品信息：已有套餐 ${offer}。商品库和菜单图文本次未接入，不要写成图文已齐。`
-    : '商品信息：未完善。没有套餐名称和价格。'
+    : publicOffer
+      ? '商品信息：公开检索里已经有抖音团购套餐和价格。短视频与团购必须写出套餐和价格，禁止写成未上架、暂未上架、没有套餐。'
+      : '商品信息：未完善。没有套餐名称和价格。'
   return [
     product,
     '运营节奏：未完善。活动中心、达人招募、AI 运营方案、评价管理本次未接入。',
@@ -667,7 +670,7 @@ function profileFromRow(row) {
 
 function savedFromCache(cached) {
   const indicators = mapIndicators(cached && cached.indicators)
-  if (!cached || cached.sourcesSearch !== 'store-search-v2' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
+  if (!cached || cached.sourcesSearch !== 'store-search-v3' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
   const adviceRaw = cached.advice
   let advice = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray(adviceRaw.sections)) {
@@ -1113,7 +1116,7 @@ function publicScoreSystem(focus) {
     '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。高德给出的同名门店数量可以写。',
     chainRule,
     '品牌资产与口碑、门店标准化按品牌在本地的公开认知和门店数量写。没绑定平台账号，只说明这一家地址的后台数据还没接进来，不能把品牌口碑打到 40 分以下。',
-    '短视频与团购：检索标题里出现汤泉、足浴、团购、套餐、开业、探店、SPA 时，点评必须引用这些标题里的店名和内容，禁止写未检索到、没查到、完全未筹备、货盘未启动。',
+    '短视频与团购：检索里出现套餐名、价格或抖音时，点评必须写出套餐和价格，并写明这是已经公开的抖音团购。禁止写暂未上架、未上架、没上架、未检索到、没查到、货盘未启动。',
     '数据复盘可以低，因为用户还没绑定门店账号，后台数还没进来。',
     '周边同类店是别的餐厅，不能用来证明这家没有客流。不要编造距离和门店数量。',
     '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
@@ -1234,7 +1237,7 @@ async function evaluateShop(raw, opts) {
   const indicators = applyEvidenceFloors(mapIndicators(j.indicators), row.storeCount, evidenceNote)
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators)
-  writeCache(opts.storage, loaded.key, Object.assign({}, score, { sourcesSearch: 'store-search-v2', profile: profileFromRow(row), savedAt: new Date().toISOString() }))
+  writeCache(opts.storage, loaded.key, Object.assign({}, score, { sourcesSearch: 'store-search-v3', profile: profileFromRow(row), savedAt: new Date().toISOString() }))
   void publishShopEval(opts.storage, loaded.key, slotId(row))
   return score
 }

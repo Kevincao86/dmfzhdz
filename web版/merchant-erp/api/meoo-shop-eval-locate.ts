@@ -135,6 +135,39 @@ function keepStoreTitle(title: string, core: string) {
   return true
 }
 
+function collapseCjkSpaces(text: string) {
+  return text.replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/gu, '$1')
+}
+
+function extractPackageLines(html: string, core: string) {
+  const bits = collapseCjkSpaces(stripTags(html))
+    .split(/[。！？]/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  const out: string[] = []
+  for (let i = 0; i < bits.length; i += 1) {
+    const bit = bits[i]
+    if (!/套餐|\d+\s*元/.test(bit)) continue
+    if (/牛仔裤|羊毛大衣|搜狗搜索|高级搜索|团购返税/.test(bit)) continue
+    let brand = bit.includes(core) ? bit : ''
+    if (!brand) {
+      for (let j = i - 1; j >= Math.max(0, i - 2); j -= 1) {
+        if (bits[j].includes(core)) {
+          brand = bits[j]
+          break
+        }
+      }
+    }
+    if (!brand) continue
+    let line = (brand === bit ? bit : `${brand}。${bit}`).replace(/\s+/g, '')
+    if (line.length > 88) line = line.slice(0, 88)
+    if (line.length < 12 || out.some((item) => item.includes(line) || line.includes(item))) continue
+    out.push(line)
+    if (out.length >= 4) break
+  }
+  return out
+}
+
 function parseSearchTitles(html: string, core: string) {
   const out: string[] = []
   const re = /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi
@@ -150,7 +183,7 @@ function parseSearchTitles(html: string, core: string) {
 async function publicTitlesFor(name: string, city: string) {
   const core = brandCore(name) || name.trim()
   const cityShort = city.replace(/市$/u, '').trim()
-  const queries = [`${core} ${cityShort} 团购`, `${name} ${cityShort} 团购`, `${core} ${cityShort}`]
+  const queries = [`${core} ${cityShort} 团购套餐`, `${core} ${cityShort} 团购`, `${name} ${cityShort} 团购`]
     .map((q) => q.replace(/\s+/g, ' ').trim())
     .filter((q, i, all) => q.length >= 2 && all.indexOf(q) === i)
   const headers = {
@@ -158,23 +191,28 @@ async function publicTitlesFor(name: string, city: string) {
     'User-Agent':
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   }
+  const packages: string[] = []
   const titles: string[] = []
   for (const query of queries) {
-    if (titles.length >= 6) break
+    if (packages.length >= 3) break
     try {
       const res = await fetch(`https://www.sogou.com/web?query=${encodeURIComponent(query)}`, {
         headers,
         signal: AbortSignal.timeout(7000),
       })
       if (!res.ok) continue
-      for (const title of parseSearchTitles(await res.text(), core)) {
+      const html = await res.text()
+      for (const line of extractPackageLines(html, core)) {
+        if (!packages.includes(line)) packages.push(line)
+      }
+      for (const title of parseSearchTitles(html, core)) {
         if (!titles.includes(title)) titles.push(title)
       }
     } catch {
       /* 下一条检索词 */
     }
   }
-  return titles.slice(0, 8)
+  return [...packages, ...titles.filter((title) => !packages.some((line) => line.includes(title)))].slice(0, 8)
 }
 
 async function brandPlaces(name: string, city: string, env: Record<string, string | undefined>) {
