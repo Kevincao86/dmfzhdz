@@ -3691,19 +3691,12 @@ async function runPublicWebSearch(query: string): Promise<string> {
   }
 }
 
-const DOUBAO_WEB_SEARCH_TOOL = {
-  type: 'function',
-  function: {
-    name: 'web_search',
-    description: '搜索互联网公开信息。查门店、抖音团购套餐、价格、探店、点评时必须调用。',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: '搜索词，带上店名、城市和团购或套餐' },
-      },
-      required: ['query'],
-    },
-  },
+function webSearchQueries(user: string) {
+  const name = (user.match(/店名：([^\n]+)/) || [])[1]?.trim() || ''
+  const city = ((user.match(/城市：([^\n]+)/) || [])[1] || '').replace(/市$/u, '').trim()
+  const core = searchCore(name || user)
+  const queries = [`${core} ${city} 团购套餐`.trim(), `${name || core} ${city} 抖音 团购`.trim()]
+  return queries.filter((query, index) => query.length >= 2 && queries.indexOf(query) === index).slice(0, 2)
 }
 
 async function doubaoFunctionWebSearch(
@@ -3713,63 +3706,25 @@ async function doubaoFunctionWebSearch(
   system: string,
   user: string,
 ): Promise<string> {
-  const url = `${doubaoArkApiV3Root(env)}/chat/completions`
-  const messages: Array<Record<string, unknown>> = [
-    {
-      role: 'system',
-      content: `${system}\n需要公开信息时必须调用 web_search。只根据工具返回的事实回答，不要编造价格和套餐名。`,
-    },
-    { role: 'user', content: user },
-  ]
-  for (let step = 0; step < 3; step += 1) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        tools: [DOUBAO_WEB_SEARCH_TOOL],
-        tool_choice: step === 0 ? { type: 'function', function: { name: 'web_search' } } : 'auto',
-        temperature: 0,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(45_000),
-    })
-    const data = await readJson(res)
-    if (!res.ok) throw new Error(upstreamErrorMessage(data, res.status))
-    const choice = (data.choices as Array<Record<string, unknown>> | undefined)?.[0]
-    const message = (choice?.message || {}) as Record<string, unknown>
-    const calls = Array.isArray(message.tool_calls) ? (message.tool_calls as Array<Record<string, unknown>>) : []
-    const text = messageContentToText(message) || ''
-    if (!calls.length) {
-      if (text.trim()) return text.trim()
-      throw new Error('豆包联网未返回正文')
-    }
-    messages.push({
-      role: 'assistant',
-      content: typeof message.content === 'string' ? message.content : '',
-      tool_calls: calls,
-    })
-    for (const call of calls.slice(0, 2)) {
-      const fn = (call.function || {}) as Record<string, unknown>
-      let query = user
-      try {
-        const args = JSON.parse(String(fn.arguments || '{}')) as { query?: string }
-        if (args.query && args.query.trim()) query = args.query.trim()
-      } catch {
-        /* 用原问题检索 */
-      }
-      messages.push({
-        role: 'tool',
-        tool_call_id: String(call.id || 'web_search'),
-        content: await runPublicWebSearch(query),
-      })
-    }
+  const blocks: string[] = []
+  for (const query of webSearchQueries(user)) {
+    const block = await runPublicWebSearch(query)
+    if (!block || /没有公开结果|检索没有结果|检索超时|检索词为空/.test(block)) continue
+    blocks.push(block)
+    break
   }
-  throw new Error('豆包联网未返回正文')
+  const notes = blocks.join('\n')
+  const grounded = notes
+    ? `${user}\n\n联网检索结果：\n${notes}\n只根据这些检索结果回答。有套餐和价格就写出来。`
+    : user
+  return openAiStyleChat(
+    `${doubaoArkApiV3Root(env)}/chat/completions`,
+    apiKey,
+    model,
+    `${system}\n你已经拿到联网检索结果。只根据检索结果回答，不要编造价格。`,
+    grounded,
+    { temperature: 0, max_tokens: 1200 },
+  )
 }
 
 /** 豆包联网：先走方舟联网插件；账号未开通时改为对话里调用 web_search 工具 */
