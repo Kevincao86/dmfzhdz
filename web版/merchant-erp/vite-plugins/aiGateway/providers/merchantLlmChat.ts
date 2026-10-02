@@ -62,6 +62,17 @@ export async function chatDoubaoAgent(req: AIChatRequest, env: Record<string, st
   }
   const { system, user } = flattenMessages(req.messages)
   const mo = req.model?.trim() || undefined
+  if (req.webSearch) {
+    const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'doubao', mo, system, user, {
+      webSearch: true,
+    })
+    return {
+      provider: 'doubao',
+      model: modelUsed,
+      content: text,
+      usage: estimateLlmTokensFromText(`${system}\n${user}`, text),
+    }
+  }
   let doubaoErr = ''
   try {
     const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'doubao', mo, system, user)

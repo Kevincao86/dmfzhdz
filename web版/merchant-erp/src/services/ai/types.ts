@@ -74,6 +74,8 @@ export type AIChatRequest = {
   tenantId?: string
   /** OpenAI-compatible tools；有则透传上游，服务端不执行 */
   tools?: AIChatTool[]
+  /** 豆包评估检索：走方舟联网搜索，不回退到不联网的模型 */
+  webSearch?: boolean
   tool_choice?: 'none' | 'auto' | 'required' | { type: 'function'; function: { name: string } }
 }
 

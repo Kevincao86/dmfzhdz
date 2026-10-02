@@ -248,7 +248,7 @@ export function shopEvalGrades(scope?: ShopEvalScope) {
   return scope === 'chain' ? SHOP_EVAL_GRADES_CHAIN : SHOP_EVAL_GRADES_SINGLE
 }
 
-type AskText = (system: string, user: string) => Promise<string>
+type AskText = (system: string, user: string, opts?: { webSearch?: boolean }) => Promise<string>
 type StorageLike = {
   getItem: (key: string) => string | null
   setItem: (key: string, value: string) => void
@@ -540,7 +540,7 @@ function savedFromCache(cached: Record<string, unknown> | null): {
   profile: ShopEvalProfile | null
 } | null {
   const indicators = mapIndicators(cached?.indicators)
-  if (!cached || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
+  if (!cached || cached.sourcesSearch !== 'doubao-web' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
   const adviceRaw = cached.advice
   let advice: ShopEvalAdvice | null = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray((adviceRaw as ShopEvalAdvice).sections)) {
@@ -902,6 +902,33 @@ async function briefSearchTitles(query: string) {
   return [] as string[]
 }
 
+async function doubaoPublicNotes(
+  askText: AskText,
+  row: { brandName: string; storeName: string; city: string; address: string; category: string },
+) {
+  const name = row.brandName || row.storeName
+  try {
+    const text = await askText(
+      [
+        '你是豆包联网检索。必须联网查询这家店在抖音团购、抖音探店、大众点评、小红书上的公开信息。',
+        '只输出查到的事实，每条一行，最多 8 行。每行写清渠道和具体内容，例如团购套餐名、探店主题、点评关键词。',
+        '禁止写「公开渠道暂未检索到」「未检索到」「没有找到」。没查到的渠道不要提。',
+        '如果联网后一条都没有，只输出：无公开团购或探店记录。',
+      ].join(''),
+      `店名：${name}\n城市：${row.city || ''}\n地址：${row.address || ''}\n分类：${row.category || ''}\n请联网检索团购、探店和点评。`,
+      { webSearch: true },
+    )
+    const lines = String(text || '')
+      .split('\n')
+      .map((line) => line.replace(/^\d+[.、]\s*/, '').trim())
+      .filter((line) => line.length >= 6 && !/暂未检索|未检索到|没有找到|无法查询|公开渠道/.test(line))
+    if (/无公开团购或探店记录/.test(text) && !lines.length) return '无公开团购或探店记录'
+    return lines.slice(0, 8).map((line, index) => `${index + 1}. ${line}`).join('\n')
+  } catch {
+    return ''
+  }
+}
+
 async function searchPublicBrand(row: { brandName: string; storeName: string; city: string; publicNote?: string }) {
   const preset = String(row.publicNote || '')
     .split('\n')
@@ -945,7 +972,7 @@ function publicScoreSystem(focus?: string) {
     '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。高德给出的同名门店数量可以写。',
     chainRule,
     '品牌资产与口碑、门店标准化按品牌在本地的公开认知和门店数量写。没绑定平台账号，只说明这一家地址的后台数据还没接进来，不能把品牌口碑打到 40 分以下。',
-    '短视频与团购、平台基础搭建：检索里有团购、探店、点评、榜单时按已有线上内容写；没有时写这一家地址的货盘这次没核对到，分数放在 40 到 60，不要打到个位数。',
+    '短视频与团购、平台基础搭建：检索事实里有团购、探店、点评、套餐、榜单时，按这些已经公开的内容写，禁止写「公开渠道暂未检索到」「公开渠道没查到」「完全未筹备」。只有检索事实明确写了「无公开团购或探店记录」时，才写这一家货盘这次没核对到具体套餐名，分数放在 40 到 60。',
     '数据复盘可以低，因为用户还没绑定门店账号，后台数还没进来。',
     '周边同类店是别的餐厅，不能用来证明这家没有客流。不要编造距离和门店数量。',
     '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
@@ -1073,9 +1100,10 @@ export async function evaluateShop(
     if (saved) return saved.score
   }
   const sources = await searchPublicBrand(row)
-  const material = sources.length
+  const webNotes = await doubaoPublicNotes(opts.askText, row)
+  const material = webNotes || (sources.length
     ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n')
-    : '这次没有抓到检索标题。'
+    : '无公开团购或探店记录')
   const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请给出定位、六项得分和点评、三条优势、四条短板、一句话总结。`
   let j = await askJson(opts.askText, publicScoreSystem(row.evalFocus), user)
   const evidenceNote = `${row.mapNote}\n${row.publicNote}\n${material}`
@@ -1096,7 +1124,12 @@ export async function evaluateShop(
   const indicators = applyEvidenceFloors(mapIndicators(j.indicators), row.storeCount, evidenceNote)
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic({ ...j, sources }, indicators)
-  writeCache(opts.storage, loaded.key, { ...score, profile: profileFromRow(row), savedAt: new Date().toISOString() })
+  writeCache(opts.storage, loaded.key, {
+    ...score,
+    sourcesSearch: 'doubao-web',
+    profile: profileFromRow(row),
+    savedAt: new Date().toISOString(),
+  })
   void publishShopEval(opts.storage, loaded.key, slotId(row))
   return score
 }

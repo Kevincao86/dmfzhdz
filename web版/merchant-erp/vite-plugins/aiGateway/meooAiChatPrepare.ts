@@ -204,6 +204,7 @@ export async function prepareMeooAiChat(
     ...(taskTypes?.length ? { taskTypes } : {}),
     ...(tools?.length ? { tools } : {}),
     ...(tool_choice != null ? { tool_choice } : {}),
+    ...(parsed.webSearch === true ? { webSearch: true } : {}),
   }
 
   return { ok: true, user, req, chatEnv, env, usageCtx }

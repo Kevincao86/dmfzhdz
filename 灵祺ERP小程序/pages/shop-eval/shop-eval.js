@@ -152,19 +152,21 @@ function readSavedForm() {
   }
 }
 
-async function askText(system, user) {
+async function askText(system, user, opts) {
   const token = api.getBearerToken ? api.getBearerToken() : ''
   let tenantId = ''
   try {
     tenantId = String(wx.getStorageSync('meoo_active_tenant_id') || '').trim()
   } catch (e) {}
+  const webSearch = Boolean(opts && opts.webSearch)
   const data = await merchant.merchantRequestAuth('POST', '/api/meoo-ai-chat', {
     bearerToken: token,
-    timeoutMs: 90000,
+    timeoutMs: webSearch ? 120000 : 90000,
     data: {
       provider: 'doubao',
       stream: false,
       temperature: 0,
+      ...(webSearch ? { webSearch: true } : {}),
       ...(tenantId ? { tenantId } : {}),
       messages: [
         { role: 'system', content: system },

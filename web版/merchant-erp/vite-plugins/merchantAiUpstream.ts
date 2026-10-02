@@ -3576,12 +3576,124 @@ export async function streamBuiltinAgentChatFromMessages(
   throw lastDoubaoErr ?? new Error('豆包流式对话失败：未配置可用模型')
 }
 
+function doubaoWebSearchModel(id: string): boolean {
+  return /doubao-seed-(1-6|1-8|2-0)|doubao-seed-1\.6|doubao-seed-2/i.test(id) && !/character|embedding|seedream|seedance/i.test(id)
+}
+
+function extractResponsesOutputText(data: Record<string, unknown>): string {
+  if (typeof data.output_text === 'string' && data.output_text.trim()) return data.output_text.trim()
+  const output = data.output
+  if (!Array.isArray(output)) return ''
+  const parts: string[] = []
+  for (const item of output) {
+    if (!item || typeof item !== 'object') continue
+    const content = (item as Record<string, unknown>).content
+    if (!Array.isArray(content)) continue
+    for (const block of content) {
+      if (!block || typeof block !== 'object') continue
+      const text = (block as Record<string, unknown>).text
+      if (typeof text === 'string' && text.trim()) parts.push(text.trim())
+    }
+  }
+  return parts.join('\n').trim()
+}
+
+function upstreamErrorMessage(data: Record<string, unknown>, status: number): string {
+  const errObj = data.error as { message?: string; msg?: string } | undefined
+  return (
+    (typeof errObj?.message === 'string' && errObj.message) ||
+    (typeof errObj?.msg === 'string' && errObj.msg) ||
+    (typeof data.message === 'string' && data.message) ||
+    `HTTP ${status}`
+  )
+}
+
+async function postDoubaoResponsesSearch(
+  apiKey: string,
+  env: MerchantAiEnv,
+  model: string,
+  system: string,
+  user: string,
+  withThinkingOff: boolean,
+): Promise<string> {
+  const res = await fetch(`${doubaoArkApiV3Root(env)}/responses`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      tools: [{ type: 'web_search', max_keyword: 3 }],
+      ...(withThinkingOff ? { thinking: { type: 'disabled' } } : {}),
+      input: [
+        { role: 'system', content: [{ type: 'input_text', text: system }] },
+        { role: 'user', content: [{ type: 'input_text', text: user }] },
+      ],
+    }),
+    signal: AbortSignal.timeout(70_000),
+  })
+  const data = await readJson(res)
+  if (!res.ok) throw new Error(upstreamErrorMessage(data, res.status))
+  const text = extractResponsesOutputText(data)
+  if (!text) throw new Error('豆包联网未返回正文')
+  return text
+}
+
+/** 门店评估公开检索：豆包方舟联网，不用搜狗/必应抓页 */
+export async function callDoubaoWebSearch(
+  apiKey: string,
+  env: MerchantAiEnv,
+  system: string,
+  user: string,
+): Promise<{ text: string; modelUsed: string }> {
+  const live = await resolveDoubaoLiveChatCandidates(apiKey, env)
+  const models = live.filter(doubaoWebSearchModel).slice(0, 3)
+  const queue = models.length ? models : [doubaoChatModelId(env)]
+  let lastErr = '豆包联网搜索失败'
+  for (const model of queue) {
+    try {
+      const text = await postDoubaoResponsesSearch(apiKey, env, model, system, user, true)
+      return { text, modelUsed: model }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      lastErr = msg
+      try {
+        const text = await postDoubaoResponsesSearch(apiKey, env, model, system, user, false)
+        return { text, modelUsed: model }
+      } catch (again) {
+        lastErr = again instanceof Error ? again.message : String(again)
+      }
+      try {
+        const text = await openAiStyleChat(
+          `${doubaoArkApiV3Root(env)}/chat/completions`,
+          apiKey,
+          model,
+          system,
+          user,
+          {
+            temperature: 0,
+            max_tokens: 1200,
+            tools: [{ type: 'web_search', max_keyword: 3 }],
+          },
+        )
+        if (text.trim()) return { text, modelUsed: model }
+      } catch (chatErr) {
+        lastErr = chatErr instanceof Error ? chatErr.message : String(chatErr)
+      }
+    }
+  }
+  throw new Error(lastErr)
+}
+
 export async function merchantAgentChatFromMessages(
   env: MerchantAiEnv,
   vendor: 'doubao' | 'qwen',
   modelOverride: string | undefined,
   system: string,
   user: string,
+  opts?: { webSearch?: boolean },
 ): Promise<{ text: string; modelUsed: string }> {
   const envM = env
   const { key, label } = pickKey(envM, vendor)
@@ -3599,6 +3711,12 @@ export async function merchantAgentChatFromMessages(
         : { ...envM, MERCHANT_AI_QWEN_CHAT_MODEL: mo }
   }
   if (vendor === 'doubao') {
+    if (opts?.webSearch) {
+      const { text, modelUsed } = await withUpstreamChatTimeoutMs(90_000, () =>
+        callDoubaoWebSearch(key, envM, system, user),
+      )
+      return { text: polishVisibleAssistantText(text), modelUsed }
+    }
     const { text, modelUsed } = await withUpstreamChatTimeoutMs(AGENT_STREAM_TIMEOUT_MS, () =>
       callDoubaoChat(key, eff, system, user),
     )

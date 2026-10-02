@@ -90,11 +90,12 @@ const storage = {
   },
 }
 
-async function askText(system: string, user: string) {
+async function askText(system: string, user: string, opts?: { webSearch?: boolean }) {
   const data = await postAiChat({
     provider: 'doubao',
     stream: false,
     temperature: 0,
+    ...(opts?.webSearch ? { webSearch: true } : {}),
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
