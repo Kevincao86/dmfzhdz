@@ -23,7 +23,7 @@ async function postLocate(body) {
   const token = api.getBearerToken ? api.getBearerToken() : ''
   const data = await merchant.merchantRequestAuth('POST', '/api/meoo-shop-eval-locate', {
     bearerToken: token,
-    timeoutMs: 28000,
+    timeoutMs: 40000,
     data: body,
   })
   if (!data || data.ok === false) {

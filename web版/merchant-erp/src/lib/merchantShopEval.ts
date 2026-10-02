@@ -540,7 +540,7 @@ function savedFromCache(cached: Record<string, unknown> | null): {
   profile: ShopEvalProfile | null
 } | null {
   const indicators = mapIndicators(cached?.indicators)
-  if (!cached || cached.sourcesSearch !== 'doubao-web' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
+  if (!cached || cached.sourcesSearch !== 'store-search-v2' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
   const adviceRaw = cached.advice
   let advice: ShopEvalAdvice | null = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray((adviceRaw as ShopEvalAdvice).sections)) {
@@ -929,18 +929,36 @@ async function doubaoPublicNotes(
   }
 }
 
+function brandCoreName(name: string) {
+  return name
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/(南湖店|旗舰店|总店|分店)$/u, '')
+    .replace(/店$/u, '')
+    .replace(/[·•\s]/g, '')
+    .trim()
+}
+
+function keepStoreTitle(title: string, core: string) {
+  const text = title.trim()
+  if (text.length < 8 || text.length > 140) return false
+  if (/汉语词语|近义词|反义词|造句|百度百科|安全验证|搜狗搜索/.test(text)) return false
+  if (core.length >= 2 && !text.includes(core)) return false
+  return true
+}
+
 async function searchPublicBrand(row: { brandName: string; storeName: string; city: string; publicNote?: string }) {
+  const core = brandCoreName(row.brandName || row.storeName)
   const preset = String(row.publicNote || '')
     .split('\n')
     .map((line) => line.replace(/^\d+\.\s*/, '').trim())
-    .filter((line) => line.length >= 6)
-  if (preset.length) return preset.slice(0, 12)
+    .filter((line) => keepStoreTitle(line, core))
+  if (preset.length) return preset.slice(0, 8)
   const name = row.brandName || row.storeName
   const queries = [`${name} ${row.city} 团购`, `${name} 抖音 探店`, `${row.storeName} 点评`].map((q) => q.replace(/\s+/g, ' ').trim())
   const titles: string[] = []
   const push = (list: string[]) => {
     for (const title of list) {
-      if (!title || titles.includes(title)) continue
+      if (!title || !keepStoreTitle(title, core) || titles.includes(title)) continue
       titles.push(title)
       if (titles.length >= 12) return
     }
@@ -972,7 +990,7 @@ function publicScoreSystem(focus?: string) {
     '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。高德给出的同名门店数量可以写。',
     chainRule,
     '品牌资产与口碑、门店标准化按品牌在本地的公开认知和门店数量写。没绑定平台账号，只说明这一家地址的后台数据还没接进来，不能把品牌口碑打到 40 分以下。',
-    '短视频与团购、平台基础搭建：检索事实里有团购、探店、点评、套餐、榜单时，按这些已经公开的内容写，禁止写「公开渠道暂未检索到」「公开渠道没查到」「完全未筹备」。只有检索事实明确写了「无公开团购或探店记录」时，才写这一家货盘这次没核对到具体套餐名，分数放在 40 到 60。',
+    '短视频与团购：检索标题里出现汤泉、足浴、团购、套餐、开业、探店、SPA 时，点评必须引用这些标题里的店名和内容，禁止写未检索到、没查到、完全未筹备、货盘未启动。',
     '数据复盘可以低，因为用户还没绑定门店账号，后台数还没进来。',
     '周边同类店是别的餐厅，不能用来证明这家没有客流。不要编造距离和门店数量。',
     '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
@@ -1100,7 +1118,7 @@ export async function evaluateShop(
     if (saved) return saved.score
   }
   const sources = await searchPublicBrand(row)
-  const webNotes = await doubaoPublicNotes(opts.askText, row)
+  const webNotes = sources.length ? '' : await doubaoPublicNotes(opts.askText, row)
   const material = webNotes || (sources.length
     ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n')
     : '无公开团购或探店记录')
@@ -1126,7 +1144,7 @@ export async function evaluateShop(
   const score = scoreFromPublic({ ...j, sources }, indicators)
   writeCache(opts.storage, loaded.key, {
     ...score,
-    sourcesSearch: 'doubao-web',
+    sourcesSearch: 'store-search-v2',
     profile: profileFromRow(row),
     savedAt: new Date().toISOString(),
   })

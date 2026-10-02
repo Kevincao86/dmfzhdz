@@ -119,14 +119,28 @@ function stripTags(html: string) {
     .trim()
 }
 
-function parseSearchTitles(html: string) {
+function brandCore(name: string) {
+  return name
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/(南湖店|旗舰店|总店|分店)$/u, '')
+    .replace(/店$/u, '')
+    .replace(/[·•\s]/g, '')
+    .trim()
+}
+
+function keepStoreTitle(title: string, core: string) {
+  if (title.length < 8 || title.length > 140) return false
+  if (/汉语词语|近义词|反义词|造句|百度百科|安全验证|搜狗搜索|相关搜索/.test(title)) return false
+  if (core.length >= 2 && !title.includes(core)) return false
+  return true
+}
+
+function parseSearchTitles(html: string, core: string) {
   const out: string[] = []
   const re = /<h[23][^>]*>([\s\S]*?)<\/h[23]>/gi
   for (const block of html.matchAll(re)) {
     const title = stripTags(block[1] || '')
-    if (title.length < 8 || title.length > 80) continue
-    if (/搜狗|百度一下|相关搜索|登录|广告|更多结果/.test(title)) continue
-    if (out.includes(title)) continue
+    if (!keepStoreTitle(title, core) || out.includes(title)) continue
     out.push(title)
     if (out.length >= 6) break
   }
@@ -134,35 +148,33 @@ function parseSearchTitles(html: string) {
 }
 
 async function publicTitlesFor(name: string, city: string) {
-  const queries = [`${name} ${city} 连锁 门店`, `${name} 抖音 团购`, `${name} ${city} 点评`].map((q) => q.replace(/\s+/g, ' ').trim())
+  const core = brandCore(name) || name.trim()
+  const cityShort = city.replace(/市$/u, '').trim()
+  const queries = [`${core} ${cityShort} 团购`, `${name} ${cityShort} 团购`, `${core} ${cityShort}`]
+    .map((q) => q.replace(/\s+/g, ' ').trim())
+    .filter((q, i, all) => q.length >= 2 && all.indexOf(q) === i)
   const headers = {
     Accept: 'text/html',
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'User-Agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   }
   const titles: string[] = []
-  await Promise.all(
-    queries.map(async (query) => {
-      const urls = [
-        `https://www.sogou.com/web?query=${encodeURIComponent(query)}`,
-        `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
-      ]
-      for (const url of urls) {
-        try {
-          const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) })
-          if (!res.ok) continue
-          const found = parseSearchTitles(await res.text())
-          if (!found.length) continue
-          for (const title of found) {
-            if (!titles.includes(title)) titles.push(title)
-          }
-          break
-        } catch {
-          /* 下一条 */
-        }
+  for (const query of queries) {
+    if (titles.length >= 6) break
+    try {
+      const res = await fetch(`https://www.sogou.com/web?query=${encodeURIComponent(query)}`, {
+        headers,
+        signal: AbortSignal.timeout(7000),
+      })
+      if (!res.ok) continue
+      for (const title of parseSearchTitles(await res.text(), core)) {
+        if (!titles.includes(title)) titles.push(title)
       }
-    }),
-  )
-  return titles.slice(0, 12)
+    } catch {
+      /* 下一条检索词 */
+    }
+  }
+  return titles.slice(0, 8)
 }
 
 async function brandPlaces(name: string, city: string, env: Record<string, string | undefined>) {
