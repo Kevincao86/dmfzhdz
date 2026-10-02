@@ -43,14 +43,136 @@ function toDatetimeLocalValue(iso?: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** datetime-local → ISO（本地时区）。未填完的中间值返回空串，避免把选择器弹回空白 */
-function fromDatetimeLocalValue(local: string): string | undefined | '' {
-  const v = String(local || '').trim()
-  if (!v) return undefined
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return ''
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return ''
+function pad2(n: number) {
+  return String(n).padStart(2, '0')
+}
+
+type DecorDateParts = { y: string; m: string; d: string; h: string; min: string }
+
+function partsFromIso(iso?: string): DecorDateParts {
+  const local = toDatetimeLocalValue(iso)
+  if (!local) return { y: '', m: '', d: '', h: '', min: '' }
+  const [date, time] = local.split('T')
+  const [y, m, d] = date.split('-')
+  const [h, min] = (time || '').split(':')
+  return { y, m, d, h: h || '00', min: min || '00' }
+}
+
+function isoFromParts(p: DecorDateParts): string | undefined {
+  if (!p.y || !p.m || !p.d) return undefined
+  const h = p.h || '00'
+  const min = p.min || '00'
+  const d = new Date(Number(p.y), Number(p.m) - 1, Number(p.d), Number(h), Number(min), 0, 0)
+  if (Number.isNaN(d.getTime()) || d.getMonth() !== Number(p.m) - 1) return undefined
   return d.toISOString()
+}
+
+function DecorDateTimeField({
+  label,
+  iso,
+  onChange,
+}: {
+  label: string
+  iso?: string
+  onChange: (next?: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const parts = partsFromIso(iso)
+  const display = toDatetimeLocalValue(iso).replace('T', ' ') || '点击选择日期和时间'
+  const yearNow = new Date().getFullYear()
+  const years = Array.from({ length: 6 }, (_, i) => String(yearNow - 1 + i))
+  const months = Array.from({ length: 12 }, (_, i) => pad2(i + 1))
+  const days = Array.from({ length: 31 }, (_, i) => pad2(i + 1))
+  const hours = Array.from({ length: 24 }, (_, i) => pad2(i))
+  const minuteSet = new Set(Array.from({ length: 12 }, (_, i) => pad2(i * 5)))
+  if (parts.min) minuteSet.add(parts.min)
+  const minutes = [...minuteSet].sort()
+
+  function setPart(key: keyof DecorDateParts, value: string) {
+    const next = { ...parts, [key]: value }
+    if (!next.y || !next.m || !next.d) return
+    const isoNext = isoFromParts(next)
+    if (isoNext) onChange(isoNext)
+  }
+
+  return (
+    <div className="ops-label relative">
+      {label}
+      <button
+        type="button"
+        className="ops-field mt-1 flex w-full items-center justify-between text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={iso ? '' : 'text-[var(--ops-muted)]'}>{display}</span>
+        <span className="text-xs text-[var(--ops-muted)]">{open ? '收起' : '选择'}</span>
+      </button>
+      {open ? (
+        <div className="absolute left-0 z-40 mt-1 w-72 space-y-2 rounded-lg border border-[var(--ops-border)] bg-[var(--ops-panel)] p-3 shadow-lg">
+          <p className="text-xs text-[var(--ops-muted)]">日期</p>
+          <div className="grid grid-cols-3 gap-2">
+            <select className="ops-field" value={parts.y} onChange={(e) => setPart('y', e.target.value)}>
+              <option value="">年</option>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+            <select className="ops-field" value={parts.m} onChange={(e) => setPart('m', e.target.value)}>
+              <option value="">月</option>
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <select className="ops-field" value={parts.d} onChange={(e) => setPart('d', e.target.value)}>
+              <option value="">日</option>
+              {days.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-xs text-[var(--ops-muted)]">时间</p>
+          <div className="grid grid-cols-2 gap-2">
+            <select className="ops-field" value={parts.h} onChange={(e) => setPart('h', e.target.value)}>
+              <option value="">时</option>
+              {hours.map((h) => (
+                <option key={h} value={h}>
+                  {h}
+                </option>
+              ))}
+            </select>
+            <select className="ops-field" value={parts.min} onChange={(e) => setPart('min', e.target.value)}>
+              <option value="">分</option>
+              {minutes.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-between pt-1">
+            <button
+              type="button"
+              className="text-xs text-[var(--ops-muted)]"
+              onClick={() => {
+                onChange(undefined)
+                setOpen(false)
+              }}
+            >
+              清除
+            </button>
+            <button type="button" className="text-xs text-[var(--ops-accent)]" onClick={() => setOpen(false)}>
+              完成
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function emptyItem(slotKey: string): RegistryPlatformDecorItem {
@@ -455,32 +577,16 @@ export default function OpsPlatformDecorPage() {
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="ops-label">
-              开始时间
-              <input
-                type="datetime-local"
-                className="ops-field mt-1"
-                value={toDatetimeLocalValue(editing.startAt)}
-                onChange={(e) => {
-                  const next = fromDatetimeLocalValue(e.target.value)
-                  if (next === '') return
-                  patchItem(editing.id, { startAt: next })
-                }}
-              />
-            </div>
-            <div className="ops-label">
-              结束时间
-              <input
-                type="datetime-local"
-                className="ops-field mt-1"
-                value={toDatetimeLocalValue(editing.endAt)}
-                onChange={(e) => {
-                  const next = fromDatetimeLocalValue(e.target.value)
-                  if (next === '') return
-                  patchItem(editing.id, { endAt: next })
-                }}
-              />
-            </div>
+            <DecorDateTimeField
+              label="开始时间"
+              iso={editing.startAt}
+              onChange={(startAt) => patchItem(editing.id, { startAt })}
+            />
+            <DecorDateTimeField
+              label="结束时间"
+              iso={editing.endAt}
+              onChange={(endAt) => patchItem(editing.id, { endAt })}
+            />
             <label className="ops-label">
               优先级（小优先）
               <input
