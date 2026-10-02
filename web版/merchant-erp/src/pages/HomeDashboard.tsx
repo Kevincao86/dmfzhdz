@@ -37,7 +37,6 @@ import {
 } from '../services/merchantDashboardApi'
 import { probeMerchantPlatforms, type PlatformConnectivityRow } from '../services/platformConnectivityProbe'
 import AiTokenUsagePanel from '../components/home/AiTokenUsagePanel'
-import MerchantShopEvalPanel from '../components/home/MerchantShopEvalPanel'
 import { isPartnerEdition } from '../lib/appEdition'
 import PartnerHomeDashboard from './PartnerHomeDashboard'
 import type { MerchantUiOutletContext } from '../config/nav'
@@ -357,8 +356,6 @@ function MerchantHomeDashboard() {
           </span>
         </div>
 
-        <MerchantShopEvalPanel />
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {(
             [
@@ -413,8 +410,6 @@ function MerchantHomeDashboard() {
           {statsLoading ? '正在刷新数据…' : `更新于 ${new Date().toLocaleString('zh-CN')}`}
         </span>
       </div>
-
-      <MerchantShopEvalPanel />
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-6 lg:grid-cols-3">
         {(

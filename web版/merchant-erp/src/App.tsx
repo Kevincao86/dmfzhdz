@@ -31,6 +31,7 @@ const FinanceTaxPage = lazy(() =>
 const PartnerAgentSettlementPage = lazy(() => import('./pages/finance/PartnerAgentSettlementPage'))
 const GeoPage = lazy(() => import('./pages/GeoPage'))
 const HomeDashboard = lazy(() => import('./pages/HomeDashboard'))
+const HealthAnalysisPage = lazy(() => import('./pages/HealthAnalysisPage'))
 const ActivityCenterPage = lazy(() => import('./pages/ActivityCenterPage'))
 const ReviewsManagementPage = lazy(() => import('./pages/ReviewsManagementPage'))
 const StoreDecorationPage = lazy(() => import('./pages/StoreDecorationPage'))
@@ -136,6 +137,7 @@ export default function App() {
                     }
                   >
                     <Route path="/home" element={<HomeDashboard />} />
+                    <Route path="/health-analysis" element={<HealthAnalysisPage />} />
                     <Route path="ai-agent" element={<AiAgentPage />} />
                     <Route path="knowledge-base" element={<KnowledgeBasePage />} />
                     <Route path="store" element={<Navigate to="/store/info" replace />} />

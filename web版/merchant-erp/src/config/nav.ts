@@ -5,6 +5,7 @@ import {
   Bot,
   Briefcase,
   BookOpen,
+  HeartPulse,
   Home,
   Megaphone,
   MessageSquare,
@@ -29,6 +30,7 @@ export type NavItem = {
 /** 与 https://ldjrg1ypt9x4.meoo.zone/ 前端 bundle 中菜单配置一致 */
 export const NAV_ITEMS: NavItem[] = [
   { path: '/home', label: '首页', icon: Home },
+  { path: '/health-analysis', label: '健康分析', icon: HeartPulse },
   { path: '/ai-agent', label: 'AI 智能体', icon: Bot },
   { path: '/knowledge-base', label: '我的知识库', icon: BookOpen },
   {
@@ -198,6 +200,7 @@ const DENSITY_KEY = 'meoo_merchant_ui_density_v1'
 
 const SIMPLE_PRIMARY_PATHS = new Set([
   '/home',
+  '/health-analysis',
   '/ai-agent',
   '/store/info',
   '/products',
@@ -260,6 +263,7 @@ function leftoverMoreChildren(fullNav: NavItem[]): NavChild[] {
 export function buildSimpleNavItems(fullNav: NavItem[]): NavItem[] {
   const items: NavItem[] = [
     { path: '/home', label: '今天', icon: Home },
+    { path: '/health-analysis', label: '健康分析', icon: HeartPulse },
     { path: '/ai-agent', label: '问灵祺', icon: Bot },
     { path: '/store/info', label: '我的店', icon: Store },
     { path: '/products', label: '上架套餐', icon: Package },
