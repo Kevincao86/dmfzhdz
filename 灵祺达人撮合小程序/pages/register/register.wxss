@@ -227,9 +227,9 @@
 }
 
 .gender-chip--on {
-  color: #4338ca;
-  background: #eef2ff;
-  border-color: #818cf8;
+  color: #fff;
+  background: #6d28d9;
+  border-color: #6d28d9;
   font-weight: 600;
 }
 
@@ -283,9 +283,25 @@
   color: #475569;
 }
 
+.paper-page .platform-card {
+  background: #fffdf8;
+  border: 1rpx solid #efe8dc;
+  border-radius: 28rpx;
+  box-shadow: none;
+}
+
+.paper-page .wx-nick-input,
+.paper-page .wx-name {
+  color: #1c1917;
+}
+
+.paper-page .wx-avatar {
+  border-color: #fffdf8;
+}
+
 .account-tag-chip--on {
-  color: #2563eb;
-  background: #eff6ff;
-  border-color: #93c5fd;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #ddd6fe;
   font-weight: 600;
 }

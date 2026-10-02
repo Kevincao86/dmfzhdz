@@ -717,3 +717,109 @@
   border-color: transparent;
   box-shadow: var(--lq-shadow-tab);
 }
+
+/* 达人首页：暖纸底，紫色只用于选中和价格 */
+page {
+  background: #f7f3ec;
+}
+
+.home-page--v1 {
+  background: #f7f3ec;
+}
+
+.home-page--v1 .lq-hero-header--home,
+.home-page--v1 .home-hero-shell {
+  background: #f7f3ec;
+}
+
+.home-page--v1 .home-brand-v1 {
+  padding-top: 8rpx;
+  font-size: 52rpx;
+  font-weight: 800;
+  color: #1c1917;
+  letter-spacing: 1rpx;
+}
+
+.home-page--v1 .home-search-v2 {
+  height: 76rpx;
+  background: #fffdf8;
+  border: 1rpx solid #efe8dc;
+  border-radius: 999rpx;
+}
+
+.home-page--v1 .home-search-v2__icon,
+.home-page--v1 .home-search-v2__input {
+  color: #1c1917;
+}
+
+.home-page--v1 .home-search-v2__ph {
+  color: #a8a29e;
+}
+
+.home-page--v1 .home-search-v2__btn {
+  display: none;
+}
+
+.home-page--v1 .home-toolbar,
+.home-page--v1 .home-list-scroll {
+  margin: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.home-page--v1 .home-hall-mini {
+  gap: 36rpx;
+  padding: 8rpx 32rpx 0;
+}
+
+.home-page--v1 .home-hall-mini__item {
+  padding: 12rpx 0 16rpx;
+  font-size: 30rpx;
+  color: #78716c;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  border-bottom: 4rpx solid transparent;
+}
+
+.home-page--v1 .home-hall-mini__item--on {
+  color: #1c1917;
+  background: transparent;
+  border-color: transparent;
+  border-bottom-color: #6d28d9;
+  box-shadow: none;
+}
+
+.home-page--v1 .home-filter-v1__chip {
+  background: #fffdf8;
+  border: 1rpx solid #efe8dc;
+  color: #44403c;
+  border-radius: 999rpx;
+}
+
+.home-page--v1 .home-filter-v1__chip--on {
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.home-page--v1 .job-card-v1 {
+  margin: 16rpx 24rpx 0;
+  background: #fffdf8;
+  border: 1rpx solid #efe8dc;
+  border-radius: 28rpx;
+  box-shadow: none;
+}
+
+.home-page--v1 .job-card-v1__price {
+  color: #6d28d9;
+  font-size: 32rpx;
+}
+
+.home-page--v1 .home-desk {
+  margin: 8rpx 24rpx 0;
+  background: #fffdf8;
+  border: 1rpx solid #efe8dc;
+  border-radius: 28rpx;
+}

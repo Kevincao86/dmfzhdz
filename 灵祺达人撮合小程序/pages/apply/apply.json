@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "填写报名"
+  "navigationBarTitleText": "填写报名",
+  "navigationBarBackgroundColor": "#F7F3EC",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#F7F3EC"
 }

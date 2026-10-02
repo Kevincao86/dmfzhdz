@@ -421,6 +421,7 @@ Page({
     showWxLoginSheet: false,
     wxLoginNick: '',
     wxLoginAvatar: '',
+    wxNickInputType: 'nickname',
     wxLoginSubmitting: false,
     statApplied: 0,
     statInProgress: 0,
@@ -726,12 +727,18 @@ Page({
     return false
   },
   onOpenWxLoginSheet() {
-    const wx = wxAccount.readWxAccount()
+    const wxAcc = wxAccount.readWxAccount()
+    let nickType = 'nickname'
+    try {
+      const dev = wx.getDeviceInfo ? wx.getDeviceInfo() : wx.getSystemInfoSync()
+      if (dev && dev.platform === 'devtools') nickType = 'text'
+    } catch (_) {}
     setTabBarHidden(this, true)
     this.setData({
       showWxLoginSheet: true,
-      wxLoginNick: wx?.wxNickName || '',
-      wxLoginAvatar: wx?.wxAvatarUrl || '',
+      wxNickInputType: nickType,
+      wxLoginNick: wxAcc?.wxNickName || '',
+      wxLoginAvatar: wxAcc?.wxAvatarUrl || '',
     })
   },
   onGoLoginPage() {
@@ -782,12 +789,12 @@ Page({
       nick = resolved.nick
       avatar = resolved.avatar
     } catch (_) {}
-    if (!nick) {
-      wx.showToast({ title: '请填写微信昵称', icon: 'none' })
-      return
-    }
-    if (wxProfileDisplay.isPlaceholderWxNick(nick)) {
-      wx.showToast({ title: '请点击昵称框选用微信昵称', icon: 'none' })
+    if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
+      wx.showToast({
+        title: this.data.wxNickInputType === 'text' ? '请先填写昵称' : '请点昵称框选用微信昵称',
+        icon: 'none',
+        duration: 2200,
+      })
       return
     }
     const identity = userProfile.readIdentity()
