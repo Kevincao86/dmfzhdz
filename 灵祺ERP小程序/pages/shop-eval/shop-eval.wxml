@@ -32,6 +32,10 @@
     </view>
   </view>
 
+  <view class="card form-note" wx:if="{{boundCount >= 2}}">
+    <text>该账号已绑定 {{boundCount}} 家门店。点击评估后选择按总品牌分析，或筛选其中 1 家。分析提升按同一次选择来写。</text>
+  </view>
+
   <view class="eval-top">
     <view class="eval-left">
       <view class="card ident">
@@ -170,5 +174,29 @@
       </view>
     </view>
   </view>
+  <view class="chooser-mask" wx:if="{{chooser}}" catchtouchmove="true">
+    <view class="chooser-sheet" catchtap="true">
+      <block wx:if="{{chooser === 'mode'}}">
+        <text class="chooser-title">这个账号绑定了 {{boundCount}} 家门店</text>
+        <text class="chooser-sub">选择这次评估的范围。分析提升会按同样的范围来写。</text>
+        <view class="chooser-btn chooser-btn--main" bindtap="onChooseBrand">按总品牌分析</view>
+        <view class="chooser-btn" bindtap="onOpenStorePick">分析单门店</view>
+        <view class="chooser-cancel" bindtap="onCloseChooser">取消</view>
+      </block>
+      <block wx:else>
+        <text class="chooser-title">选择 1 家门店</text>
+        <input class="form-input" placeholder="按店名或地址筛选" value="{{storeQuery}}" bindinput="onStoreQuery" />
+        <scroll-view class="chooser-list" scroll-y>
+          <view class="chooser-store" wx:for="{{filteredStores}}" wx:key="id" data-id="{{item.id}}" bindtap="onPickStore">
+            <text class="chooser-store-name">{{item.name}}</text>
+            <text class="chooser-store-addr" wx:if="{{item.address}}">{{item.address}}</text>
+          </view>
+          <text class="chooser-empty" wx:if="{{!filteredStores.length}}">没有匹配的门店</text>
+        </scroll-view>
+        <view class="chooser-cancel" bindtap="onBackChooser">返回</view>
+      </block>
+    </view>
+  </view>
+
   <site-icp-footer />
 </view>

@@ -17,7 +17,20 @@ export type ShopEvalInput = {
   storeCount?: number
   brandName?: string
   storeNames?: string
+  /** brand：按绑定账号总品牌；store：只评其中一家绑定门店 */
+  evalFocus?: 'brand' | 'store' | ''
+  storeId?: string
   signals?: ShopEvalSignals
+}
+
+export type ShopEvalBoundStore = {
+  id: string
+  name: string
+  address?: string
+  city?: string
+  phone?: string
+  businessHours?: string
+  brandName?: string
 }
 
 export type ShopEvalSignals = {
@@ -225,8 +238,9 @@ export const SHOP_EVAL_GRADES_CHAIN = [
 
 export const SHOP_EVAL_GRADES = SHOP_EVAL_GRADES_SINGLE
 
-export function shopEvalScopeOf(raw?: Pick<ShopEvalInput, 'scope' | 'storeCount'> | null): ShopEvalScope {
-  if (raw?.scope === 'chain' || Number(raw?.storeCount) >= 2) return 'chain'
+export function shopEvalScopeOf(raw?: Pick<ShopEvalInput, 'scope' | 'storeCount' | 'evalFocus'> | null): ShopEvalScope {
+  if (raw?.evalFocus === 'store') return 'single'
+  if (raw?.evalFocus === 'brand' || raw?.scope === 'chain' || Number(raw?.storeCount) >= 2) return 'chain'
   return 'single'
 }
 
@@ -312,6 +326,8 @@ function normalizeInput(raw: ShopEvalInput) {
       category: String(raw?.category || '').trim(),
       mapNote: String(raw?.mapNote || '').trim(),
       publicNote: String(raw?.publicNote || '').trim(),
+      evalFocus: raw?.evalFocus === 'brand' || raw?.evalFocus === 'store' ? raw.evalFocus : '',
+      storeId: String(raw?.storeId || '').trim(),
       signals: raw?.signals,
     },
   }
@@ -335,6 +351,7 @@ function shopFacts(spec: PlatformSpec, row: ReturnType<typeof normalizeInput>['r
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, '未填写，不要编造')}`,
     `经营分类：${filledOr(row.category, '未填写')}`,
+    `评估范围：${row.evalFocus === 'brand' ? '用户指定按总品牌' : row.evalFocus === 'store' ? '用户指定只分析这一家绑定门店' : '未指定'}`,
     `高德定位：${filledOr(row.mapNote, '未返回')}`,
     `公开检索：${filledOr(row.publicNote, '未返回')}`,
   ]
@@ -456,7 +473,10 @@ function ownerId() {
 }
 
 function slotId(row: ReturnType<typeof normalizeInput>['row']) {
-  return [row.platformId, row.storeName, row.address, row.category].join('|')
+  const base = [row.platformId, row.storeName, row.address, row.category].join('|')
+  if (row.evalFocus === 'brand') return ['brand', row.brandName, base].join('|')
+  if (row.evalFocus === 'store') return ['store', row.storeId || row.storeName, base].join('|')
+  return base
 }
 
 function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
@@ -493,19 +513,14 @@ type ShopEvalProfile = {
   storeName: string
   address: string
   category: string
+  evalFocus?: 'brand' | 'store' | ''
+  storeId?: string
 }
 
-function profileFromRow(row: {
-  storeCount?: number
-  scope?: ShopEvalScope | string
-  storeNames?: string
-  brandName?: string
-  storeName?: string
-  address?: string
-  category?: string
-}): ShopEvalProfile {
-  const storeCount = Math.max(0, Math.round(Number(row.storeCount) || 0))
-  const scope: ShopEvalScope = row.scope === 'chain' || storeCount >= 2 ? 'chain' : 'single'
+function profileFromRow(row: ReturnType<typeof normalizeInput>['row']): ShopEvalProfile {
+  const focus = row.evalFocus === 'brand' || row.evalFocus === 'store' ? row.evalFocus : ''
+  const storeCount = focus === 'store' ? 1 : Math.max(0, Math.round(Number(row.storeCount) || 0))
+  const scope: ShopEvalScope = focus === 'store' ? 'single' : focus === 'brand' || row.scope === 'chain' || storeCount >= 2 ? 'chain' : 'single'
   return {
     storeCount,
     scope,
@@ -514,6 +529,8 @@ function profileFromRow(row: {
     storeName: String(row.storeName || ''),
     address: String(row.address || ''),
     category: String(row.category || ''),
+    evalFocus: focus,
+    storeId: String(row.storeId || ''),
   }
 }
 
@@ -531,7 +548,7 @@ function savedFromCache(cached: Record<string, unknown> | null): {
     if (sections.length) advice = { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections }
   }
   const rawProfile = cached.profile
-  const profile = rawProfile && typeof rawProfile === 'object' ? profileFromRow(rawProfile as ShopEvalProfile) : null
+  const profile = rawProfile && typeof rawProfile === 'object' ? profileFromRow(rawProfile as ReturnType<typeof normalizeInput>['row']) : null
   return {
     score: scoreFromPublic(cached, indicators),
     advice,
@@ -631,11 +648,83 @@ export function resolveShopEvalFromStores(
       .filter(Boolean)
       .join('、'),
     storeName: String(first?.name || '').trim(),
+    evalFocus: count >= 2 ? '' : undefined,
     address: String(first?.address || '').trim(),
     phone: String(first?.phone || '').trim(),
     businessHours: String(first?.businessHours || '').trim(),
     city: String(first?.city || '').trim(),
   }
+}
+
+function inferBoundBrandLabel(store: ShopEvalBoundStore) {
+  const fromApi = String(store.brandName || '').trim()
+  if (fromApi) return fromApi
+  const title = String(store.name || '').trim()
+  const paren = title.match(/^(.+?)[（(]([^)）]{1,24}店)[)）]\s*$/)
+  if (paren?.[1]?.trim()) return paren[1].trim()
+  const dot = title.match(/^(.+?)[·•—－-]([^·•—－-]{1,24}店)\s*$/)
+  if (dot?.[1]?.trim()) return dot[1].trim()
+  return title
+}
+
+/** 绑定账号里多家门店时，归出总品牌名称和门店数 */
+export function boundEvalBrandTarget(stores: ShopEvalBoundStore[]) {
+  const list = (Array.isArray(stores) ? stores : []).filter((store) => String(store?.name || '').trim())
+  const groups = new Map<string, ShopEvalBoundStore[]>()
+  const labels = new Map<string, string>()
+  for (const store of list) {
+    const label = inferBoundBrandLabel(store)
+    const key = label.toLowerCase().replace(/\s+/g, '')
+    const bucket = groups.get(key) || []
+    bucket.push(store)
+    groups.set(key, bucket)
+    labels.set(key, label)
+  }
+  let bestKey = ''
+  let best: ShopEvalBoundStore[] = []
+  for (const [key, bucket] of groups) {
+    if (bucket.length > best.length) {
+      best = bucket
+      bestKey = key
+    }
+  }
+  const members = best.length >= 2 ? best : list
+  const brandName = String((best.length >= 2 ? labels.get(bestKey) : '') || labels.get(bestKey) || list[0]?.name || '').trim()
+  return {
+    brandName,
+    storeCount: members.length,
+    storeNames: members
+      .slice(0, 8)
+      .map((store) => String(store.name || '').trim())
+      .filter(Boolean)
+      .join('、'),
+    anchor: members[0] || null,
+  }
+}
+
+export function splitCnRegion(address: string, cityHint?: string) {
+  let rest = String(address || '').replace(/\s+/g, '')
+  let province = ''
+  let city = ''
+  let district = ''
+  const provinceMatch = rest.match(/^(.+?(?:省|自治区|特别行政区))/)
+  if (provinceMatch) {
+    province = provinceMatch[1]
+    rest = rest.slice(province.length)
+  }
+  const cityMatch = rest.match(/^(.+?(?:市|自治州|地区|盟))/)
+  if (cityMatch) {
+    city = cityMatch[1]
+    rest = rest.slice(city.length)
+  }
+  const districtMatch = rest.match(/^(.+?(?:区|县|旗))/)
+  if (districtMatch) {
+    district = districtMatch[1]
+    rest = rest.slice(district.length)
+  }
+  if (!province && /^(北京市|上海市|天津市|重庆市)/.test(city)) province = city
+  if (!city && cityHint) city = String(cityHint).trim()
+  return { province, city, district, detail: rest }
 }
 
 export function readSavedShopEval(raw: ShopEvalInput, storage: StorageLike) {
@@ -837,13 +926,19 @@ async function searchPublicBrand(row: { brandName: string; storeName: string; ci
   return titles
 }
 
-function publicScoreSystem() {
+function publicScoreSystem(focus?: string) {
   const names = PUBLIC_EVAL_INDICATORS.map((item) => item.name).join('、')
+  const chainRule =
+    focus === 'store'
+      ? '用户这次只评估绑定账号里的 1 家门店。按单门店写。即使高德或检索里还有同名分店，也不要改成连锁品牌。'
+      : focus === 'brand'
+        ? '用户这次按绑定账号的总品牌评估。按连锁品牌写，家数以档案里的连锁门店数为准。禁止写成单门店、形象未立、线上运营完全空白、线上经营基本空白。'
+        : '高德同名门店达到 2 家时，这是连锁品牌。禁止写成单门店、形象未立、线上运营完全空白、线上经营基本空白。'
   return [
     '你在给商家写线上运营打分，用「你」来写，对象是这个品牌或这家店。',
     '只根据下面的门店档案、高德同名门店和公开检索标题来写。检索标题里有的事实优先写进去。',
     '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。高德给出的同名门店数量可以写。',
-    '高德同名门店达到 2 家时，这是连锁品牌。禁止写成单门店、形象未立、线上运营完全空白、线上经营基本空白。',
+    chainRule,
     '品牌资产与口碑、门店标准化按品牌在本地的公开认知和门店数量写。没绑定平台账号，只说明这一家地址的后台数据还没接进来，不能把品牌口碑打到 40 分以下。',
     '短视频与团购、平台基础搭建：检索里有团购、探店、点评、榜单时按已有线上内容写；没有时写这一家地址的货盘这次没核对到，分数放在 40 到 60，不要打到个位数。',
     '数据复盘可以低，因为用户还没绑定门店账号，后台数还没进来。',
@@ -936,10 +1031,17 @@ export async function hydrateShopEval(raw: ShopEvalInput, storage: StorageLike) 
   return savedFromCache(fresh.data)
 }
 
-function erpAdviceSystem() {
+function erpAdviceSystem(focus?: string) {
   const modules = ERP_SOLUTION_MODULES.join('、')
+  const rangeRule =
+    focus === 'store'
+      ? '用户这次只提升这一家绑定门店。方案只写这一家，不要要求全品牌各店统一。'
+      : focus === 'brand'
+        ? '用户这次按总品牌提升。多家门店不统一时，写各店如何对齐。'
+        : ''
   return [
     '你在给商家写灵祺 ERP 里能直接去做的改法，用「你」来写。',
+    rangeRule,
     '前面的打分来自公开渠道。这里不要再复述网评，要落到系统功能。',
     `只能使用这些功能：${modules}。不要写系统里没有的会员储值、社群积分商城。`,
     '私域和复购写到线索跟进、评价管理、活动中心。核销和升单写到财务对账、店铺分析与投流、商品与套餐。多店不统一写到店铺装修、商品与套餐、评价管理。',
@@ -970,12 +1072,12 @@ export async function evaluateShop(
     ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n')
     : '这次没有抓到检索标题。'
   const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请给出定位、六项得分和点评、三条优势、四条短板、一句话总结。`
-  let j = await askJson(opts.askText, publicScoreSystem(), user)
+  let j = await askJson(opts.askText, publicScoreSystem(row.evalFocus), user)
   const evidenceNote = `${row.mapNote}\n${row.publicNote}\n${material}`
-  if (collapsedChainText(JSON.stringify(j), row.storeCount) || (row.storeCount >= 3 && brandScoreLow(j))) {
+  if (row.evalFocus !== 'store' && (collapsedChainText(JSON.stringify(j), row.storeCount) || (row.storeCount >= 3 && brandScoreLow(j)))) {
     j = await askJson(
       opts.askText,
-      publicScoreSystem(),
+      publicScoreSystem(row.evalFocus),
       `${user}\n纠正：高德已给出同城同名门店 ${row.storeCount} 家，这是连锁品牌。重写定位、优势和品牌资产、门店标准化，禁止出现单门店、形象未立、线上完全空白。短板只写这一家地址还没接进来的后台数据和这次没核对到的团购货盘。`,
     )
   }
@@ -1015,7 +1117,7 @@ export async function adviseShop(
   const gaps = (score.gaps || []).map((item, index) => `${index + 1}. ${item}`).join('\n')
   const j = await askJson(
     opts.askText,
-    erpAdviceSystem(),
+    erpAdviceSystem(row.evalFocus),
     `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n分项：\n${lines}\n短板：\n${gaps}\n请按四条短板，给出灵祺 ERP 里对应功能的改法。`,
   )
   const advice: ShopEvalAdvice = {

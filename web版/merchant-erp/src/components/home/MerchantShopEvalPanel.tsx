@@ -4,6 +4,7 @@ import { useMembership } from '../../context/MembershipContext'
 import { MEMBERSHIP_UPGRADE_HREF } from '../../lib/membershipPlan'
 import {
   adviseShop,
+  boundEvalBrandTarget,
   evaluateShop,
   formatVerifyYuan,
   hydrateShopEval,
@@ -15,7 +16,9 @@ import {
   shopEvalGrade,
   shopEvalGrades,
   shopEvalScopeOf,
+  splitCnRegion,
   type ShopEvalAdvice,
+  type ShopEvalBoundStore,
   type ShopEvalInput,
   type ShopEvalPlatformId,
   type ShopEvalScore,
@@ -169,11 +172,27 @@ export default function MerchantShopEvalPanel() {
   const platformBound = boundIds.includes(platformId)
   const canEval = Boolean(formName.trim() && province && cityName && district && detailAddress.trim() && categoryLabel)
   const paid = plan !== 'free'
+  const [boundStores, setBoundStores] = useState<ShopEvalBoundStore[]>([])
+  const [chooser, setChooser] = useState<null | 'mode' | 'store'>(null)
+  const [storeQuery, setStoreQuery] = useState('')
   const [quota, setQuota] = useState<{ paid: boolean; remaining: number; limit: number } | null>(null)
   const adviceKind = 'shop_eval_advice' as ErpPointsSpendKind
   const grade = score ? shopEvalGrade(score.score, scope) : null
   const grades = shopEvalGrades(scope)
   const displayName = formName.trim() || (input.brandName && scope === 'chain' ? input.brandName : input.storeName)
+  const scopeText =
+    input.evalFocus === 'brand'
+      ? `总品牌 · ${input.storeCount || boundStores.length || '多'}家`
+      : input.evalFocus === 'store'
+        ? '单门店'
+        : scope === 'chain'
+          ? `连锁品牌 · ${input.storeCount || '多'}家`
+          : '单门店'
+  const shownStores = boundStores.filter((store) => {
+    const q = storeQuery.trim()
+    if (!q) return true
+    return store.name.includes(q) || String(store.address || '').includes(q)
+  })
   const highlightLines = readableLines(score?.highlights)
   const gapLines = readableLines(score?.gaps)
   const gains = score ? shopEvalGainTargets(score, input) : null
@@ -181,10 +200,28 @@ export default function MerchantShopEvalPanel() {
   const shownVerify = useRiseCount(gains?.verify || 0, animateGains && Boolean(gains))
 
   const loadStore = useCallback(async (tab: ShopEvalPlatformId) => {
-    const res = await fetchStoresForPlatform(tab as StorePlatformTab, { page: 1, pageSize: 50 })
+    const res = await fetchStoresForPlatform(tab as StorePlatformTab, { page: 1, pageSize: 100 })
     const items = res.ok ? res.items || [] : []
     const total = res.ok && 'total' in res ? Number(res.total) : items.length
-    const next = resolveShopEvalFromStores(tab, items, total)
+    const mapped: ShopEvalBoundStore[] = items
+      .map((row, index) => ({
+        id: String(row.id || `${row.name || 'store'}-${index}`),
+        name: String(row.name || '').trim(),
+        address: String(row.address || '').trim(),
+        city: String(row.city || '').trim(),
+        phone: String(row.phone || '').trim(),
+        businessHours: String(row.businessHours || '').trim(),
+        brandName: String(row.brandName || '').trim(),
+      }))
+      .filter((row) => row.name)
+    setBoundStores(mapped)
+    const next = resolveShopEvalFromStores(tab, mapped, Math.max(total, mapped.length))
+    if (mapped.length >= 2) {
+      next.scope = 'single'
+      next.storeCount = 1
+      next.evalFocus = ''
+      next.storeNames = ''
+    }
     setInput(next)
     if (!formTouched.current && next.storeName) {
       setFormName(next.storeName)
@@ -237,8 +274,9 @@ export default function MerchantShopEvalPanel() {
       setAnimateScore(false)
       setAnimateGains(Boolean(saved?.score))
       const profile = saved?.profile
-      if (profile && profile.storeCount >= 2) {
+      if (profile && profile.evalFocus !== 'store' && profile.storeCount >= 2) {
         setInput((prev) => {
+          if (prev.evalFocus === 'store') return prev
           if (prev.scope === 'chain' && (prev.storeCount || 0) >= profile.storeCount) return prev
           return {
             ...prev,
@@ -299,9 +337,49 @@ export default function MerchantShopEvalPanel() {
     setDistricts(data?.names || [])
   }
 
-  async function onEvaluate() {
-    if (!canEval || evaluating || advising) return
+  function rememberSnap(snap: { formName: string; province: string; cityName: string; district: string; detailAddress: string }) {
+    formTouched.current = true
+    setFormName(snap.formName)
+    setProvince(snap.province)
+    setCityName(snap.cityName)
+    setDistrict(snap.district)
+    setDetailAddress(snap.detailAddress)
+    if (snap.province) {
+      void postLocate({ action: 'districts', keywords: snap.province })
+        .then((data) => setCities(data.names || []))
+        .catch(() => setCities([]))
+    }
+    if (snap.cityName) {
+      void postLocate({ action: 'districts', keywords: snap.cityName })
+        .then((data) => setDistricts(data.names || []))
+        .catch(() => setDistricts([]))
+    }
+  }
+
+  function snapFromStore(store: ShopEvalBoundStore, name?: string) {
+    const region = splitCnRegion(store.address || '', store.city)
+    return {
+      formName: name || store.name,
+      province: region.province || province,
+      cityName: region.city || cityName,
+      district: region.district || district,
+      detailAddress: region.detail || store.address || detailAddress,
+    }
+  }
+
+  async function runEvaluate(draft: ShopEvalInput, snap?: { formName: string; province: string; cityName: string; district: string; detailAddress: string }) {
+    const name = (snap?.formName ?? formName).trim()
+    const prov = snap?.province ?? province
+    const city = snap?.cityName ?? cityName
+    const dist = snap?.district ?? district
+    const detail = (snap?.detailAddress ?? detailAddress).trim()
+    const address = [prov, city, dist, detail].filter(Boolean).join('')
+    if (!name || !prov || !city || !dist || !detail || !categoryLabel) {
+      setErr('请补全名称、省市区、详细地址和分类')
+      return
+    }
     setEvaluating(true)
+    setAdvice(null)
     setErr('')
     try {
       const gate = await postLocate({ action: 'eval-quota' })
@@ -314,28 +392,62 @@ export default function MerchantShopEvalPanel() {
       }
       const located = await postLocate({
         action: 'locate',
-        address: fullAddress,
-        city: cityName,
+        address,
+        city,
         category: categoryLabel,
-        storeName: formName.trim(),
+        storeName: name,
       })
       const brandCount = Number(located.brandCount) || 0
       const brandNames = Array.isArray(located.brandNames) ? located.brandNames : []
       const titles = Array.isArray(located.publicTitles) ? located.publicTitles : []
-      const nextInput: ShopEvalInput = {
-        ...input,
-        platformId,
-        storeName: formName.trim(),
-        brandName: formName.trim(),
-        storeNames: brandNames.slice(0, 8).join('、'),
-        storeCount: brandCount,
-        scope: brandCount >= 2 ? 'chain' : 'single',
-        city: cityName,
-        address: fullAddress,
-        category: categoryLabel,
-        mapNote: [located.mapNote, located.brandNote].filter(Boolean).join('\n'),
-        publicNote: titles.join('\n'),
-      }
+      const note = [located.mapNote, located.brandNote].filter(Boolean).join('\n')
+      const focus = draft.evalFocus
+      const nextInput: ShopEvalInput =
+        focus === 'store'
+          ? {
+              ...draft,
+              platformId,
+              evalFocus: 'store',
+              scope: 'single',
+              storeCount: 1,
+              storeName: name,
+              storeNames: '',
+              city,
+              address,
+              category: categoryLabel,
+              mapNote: note,
+              publicNote: titles.join('\n'),
+            }
+          : focus === 'brand'
+            ? {
+                ...draft,
+                platformId,
+                evalFocus: 'brand',
+                scope: 'chain',
+                storeCount: Math.max(Number(draft.storeCount) || 0, brandCount, boundStores.length, 2),
+                storeName: draft.brandName || name,
+                brandName: draft.brandName || name,
+                storeNames: draft.storeNames || brandNames.slice(0, 8).join('、'),
+                city,
+                address,
+                category: categoryLabel,
+                mapNote: note,
+                publicNote: titles.join('\n'),
+              }
+            : {
+                ...draft,
+                platformId,
+                storeName: name,
+                brandName: name,
+                storeNames: brandNames.slice(0, 8).join('、'),
+                storeCount: brandCount,
+                scope: brandCount >= 2 ? 'chain' : 'single',
+                city,
+                address,
+                category: categoryLabel,
+                mapNote: note,
+                publicNote: titles.join('\n'),
+              }
       setInput(nextInput)
       const next = await evaluateShop(nextInput, { force: true, storage, askText })
       setAnimateScore(true)
@@ -353,6 +465,62 @@ export default function MerchantShopEvalPanel() {
     } finally {
       setEvaluating(false)
     }
+  }
+
+  function onEvaluate() {
+    if (!canEval || evaluating || advising) return
+    if (boundStores.length >= 2) {
+      setStoreQuery('')
+      setChooser('mode')
+      return
+    }
+    void runEvaluate(input)
+  }
+
+  function onChooseBrand() {
+    const target = boundEvalBrandTarget(boundStores)
+    const snap = target.anchor
+      ? snapFromStore(target.anchor, target.brandName)
+      : { formName: target.brandName, province, cityName, district, detailAddress }
+    rememberSnap(snap)
+    setChooser(null)
+    void runEvaluate(
+      {
+        ...input,
+        evalFocus: 'brand',
+        scope: 'chain',
+        storeCount: Math.max(target.storeCount, 2),
+        brandName: target.brandName,
+        storeName: target.brandName,
+        storeNames: target.storeNames,
+        storeId: '',
+        phone: target.anchor?.phone || '',
+        businessHours: target.anchor?.businessHours || '',
+      },
+      snap,
+    )
+  }
+
+  function onPickBoundStore(store: ShopEvalBoundStore) {
+    const target = boundEvalBrandTarget(boundStores)
+    const snap = snapFromStore(store)
+    rememberSnap(snap)
+    setChooser(null)
+    void runEvaluate(
+      {
+        ...input,
+        evalFocus: 'store',
+        scope: 'single',
+        storeCount: 1,
+        storeId: store.id,
+        storeName: store.name,
+        brandName: target.brandName,
+        storeNames: '',
+        phone: store.phone || '',
+        businessHours: store.businessHours || '',
+      },
+      snap,
+    )
   }
 
   async function onAdvise() {
@@ -522,6 +690,14 @@ export default function MerchantShopEvalPanel() {
         </div>
       </div>
 
+      {boundStores.length >= 2 ? (
+        <p className="border-b border-slate-100 px-5 py-3 text-sm text-slate-600">
+          该账号已绑定 {boundStores.length} 家门店。点击评估后选择按总品牌分析，或筛选其中 1 家。分析提升按同一次选择来写。
+          {input.evalFocus === 'brand' ? ` 当前：总品牌 ${input.brandName || ''}`.trim() : null}
+          {input.evalFocus === 'store' ? ` 当前：${input.storeName || ''}` : null}
+        </p>
+      ) : null}
+
       <div className="grid gap-4 p-5 lg:grid-cols-2">
         <div className="flex items-start gap-4 rounded-2xl bg-[#f6f8fb] p-4">
           {displayName ? (
@@ -537,7 +713,7 @@ export default function MerchantShopEvalPanel() {
             <p className="text-lg font-bold text-slate-900">{displayName || '尚未读取到门店'}</p>
             <p className="mt-1 text-sm text-slate-500">
               <span className="mr-2 inline-flex rounded-full bg-[#1E3A5F]/10 px-2 py-0.5 text-xs font-semibold text-[#1E3A5F]">
-                {scope === 'chain' ? `连锁品牌 · ${input.storeCount || '多'}家` : '单门店'}
+                {scopeText}
               </span>
               {meta.name}
             </p>
@@ -759,6 +935,66 @@ export default function MerchantShopEvalPanel() {
           ))}
         </div>
       </div>
+
+      {chooser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setChooser(null)}>
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {chooser === 'mode' ? (
+              <>
+                <p className="text-lg font-bold text-slate-900">这个账号绑定了 {boundStores.length} 家门店</p>
+                <p className="mt-1 text-sm text-slate-500">选择这次评估的范围。分析提升会按同样的范围来写。</p>
+                <button
+                  type="button"
+                  className="mt-4 w-full rounded-xl bg-[#1E3A5F] px-4 py-3 text-sm font-semibold text-white"
+                  onClick={onChooseBrand}
+                >
+                  按总品牌分析
+                </button>
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-800"
+                  onClick={() => {
+                    setStoreQuery('')
+                    setChooser('store')
+                  }}
+                >
+                  分析单门店
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-bold text-slate-900">选择 1 家门店</p>
+                <input
+                  value={storeQuery}
+                  onChange={(event) => setStoreQuery(event.target.value)}
+                  placeholder="按店名或地址筛选"
+                  className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                />
+                <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+                  {shownStores.map((store) => (
+                    <button
+                      key={store.id}
+                      type="button"
+                      className="block w-full rounded-xl bg-slate-50 px-3 py-2 text-left hover:bg-slate-100"
+                      onClick={() => onPickBoundStore(store)}
+                    >
+                      <span className="block text-sm font-semibold text-slate-900">{store.name}</span>
+                      {store.address ? <span className="mt-0.5 block text-xs text-slate-500">{store.address}</span> : null}
+                    </button>
+                  ))}
+                  {!shownStores.length ? <p className="py-6 text-center text-sm text-slate-500">没有匹配的门店</p> : null}
+                </div>
+                <button type="button" className="mt-3 text-sm text-slate-500" onClick={() => setChooser('mode')}>
+                  返回
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       <style>{`
         .shop-eval-scan {
