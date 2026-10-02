@@ -4,7 +4,52 @@
 @import '../../styles/mp-beautify.wxss';
 
 .mine-page {
-  background: var(--lq-bg);
+  background: #f7f3ec;
+}
+
+.mine-page .wb-hero,
+.mine-page .lq-hero-header {
+  background: #f7f3ec;
+  box-shadow: none;
+}
+
+.mine-page .wb-name,
+.mine-page .wb-nick-input,
+.mine-page .wb-switch-glyph,
+.mine-page .wb-switch-text {
+  color: #1c1917;
+}
+
+.mine-page .wb-sub,
+.mine-page .wb-id,
+.mine-page .wb-greeting {
+  color: #78716c;
+}
+
+.mine-page .wb-role-pill,
+.mine-page .profile-badge {
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.mine-page .profile-badge--muted {
+  color: #78716c;
+  background: #efe8dc;
+}
+
+.mine-page .wb-switch-btn,
+.mine-page .wb-switch-btn--hover {
+  background: #fffdf8;
+  border: 1rpx solid #efe8dc;
+}
+
+.mine-page .wb-avatar {
+  border-color: #fffdf8;
+}
+
+.mine-page .wb-avatar--ph {
+  background: #efe8dc;
 }
 
 .mine-scroll {
@@ -655,9 +700,14 @@
   top: 0;
   bottom: 0;
   z-index: 10000;
-  background: rgba(45, 27, 78, 0.35);
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  background: transparent;
+}
+
+.id-sheet-mask-bg {
+  flex: 1;
+  background: rgba(45, 27, 78, 0.35);
 }
 
 .id-sheet {

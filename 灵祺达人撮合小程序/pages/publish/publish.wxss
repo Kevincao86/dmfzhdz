@@ -8,12 +8,9 @@
   overflow: hidden;
 }
 
-.pub-page--mode {
-  background: linear-gradient(165deg, #e0e7ff 0%, #f4f3f8 45%, #faf8ff 100%);
-}
-
+.pub-page--mode,
 .pub-page--form {
-  background: linear-gradient(180deg, #dde4ff 0%, #ede9fe 28%, #f5f3ff 60%, #faf8ff 100%);
+  background: #f7f3ec;
 }
 
 .pub-form-host {

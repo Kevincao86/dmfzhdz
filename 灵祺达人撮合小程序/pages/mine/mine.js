@@ -728,15 +728,10 @@ Page({
   },
   onOpenWxLoginSheet() {
     const wxAcc = wxAccount.readWxAccount()
-    let nickType = 'nickname'
-    try {
-      const dev = wx.getDeviceInfo ? wx.getDeviceInfo() : wx.getSystemInfoSync()
-      if (dev && dev.platform === 'devtools') nickType = 'text'
-    } catch (_) {}
     setTabBarHidden(this, true)
     this.setData({
       showWxLoginSheet: true,
-      wxNickInputType: nickType,
+      wxNickInputType: 'nickname',
       wxLoginNick: wxAcc?.wxNickName || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || '',
     })
@@ -791,7 +786,7 @@ Page({
     } catch (_) {}
     if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
       wx.showToast({
-        title: this.data.wxNickInputType === 'text' ? '请先填写昵称' : '请点昵称框选用微信昵称',
+        title: '请点昵称框，选用键盘上的微信昵称',
         icon: 'none',
         duration: 2200,
       })

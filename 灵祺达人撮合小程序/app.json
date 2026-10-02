@@ -95,7 +95,7 @@
     "navigationBarTitleText": "灵祺星选平台",
     "navigationBarBackgroundColor": "#7c4dff",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f7f6fb",
+    "backgroundColor": "#F7F3EC",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {

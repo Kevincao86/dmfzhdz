@@ -15,9 +15,9 @@ page {
   --lq-gradient-header: linear-gradient(180deg, #7c4dff 0%, #7c4dff 100%);
   --lq-gradient-deep: linear-gradient(180deg, #5b3fd4 0%, #7c4dff 100%);
   --lq-gradient-tab: linear-gradient(180deg, #7c4dff 0%, #7c4dff 100%);
-  --lq-gradient-tab-track: linear-gradient(90deg, #f3eeff 0%, #f7f6fb 100%);
-  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f6fb 100%);
-  --lq-bg: #f7f6fb;
+  --lq-gradient-tab-track: linear-gradient(90deg, #f3eeff 0%, #f7f3ec 100%);
+  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f3ec 100%);
+  --lq-bg: #f7f3ec;
   --lq-surface: #ffffff;
   --lq-card: #ffffff;
   --lq-text: #14181f;
@@ -39,7 +39,7 @@ page {
   --lq-header-pad-bottom: 32rpx;
   /* Tab 首页顶栏 / Banner：默认达人蓝（身份 class 可覆盖） */
   --lq-home-nav: #7c4dff;
-  --lq-home-bg: #f7f6fb;
+  --lq-home-bg: #f7f3ec;
   --lq-home-banner: linear-gradient(180deg, #7c4dff 0%, #7c4dff 100%);
 }
 

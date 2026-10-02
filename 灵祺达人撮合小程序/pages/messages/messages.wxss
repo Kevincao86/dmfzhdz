@@ -4,7 +4,21 @@
 @import '../../styles/notification-inbox.wxss';
 
 .msg-page {
-  background: var(--lq-bg);
+  background: #f7f3ec;
+}
+
+.msg-page .msg-nav,
+.msg-page .lq-hero-header--home {
+  background: #f7f3ec;
+  box-shadow: none;
+}
+
+.msg-page .msg-nav-title {
+  color: #1c1917;
+}
+
+.msg-page .msg-nav-sub {
+  color: #78716c;
 }
 
 .msg-ntf-scroll {

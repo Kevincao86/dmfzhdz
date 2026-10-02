@@ -149,10 +149,10 @@
     class="id-sheet-mask"
     wx:if="{{showWxLoginSheet}}"
     catchtouchmove="noopSheetTap"
-    bindtap="onCloseWxLoginSheet"
   >
-    <view class="id-sheet wx-login-sheet" catchtap="noopSheetTap">
-      <view class="id-sheet-static" catchtap="noopSheetTap">
+    <view class="id-sheet-mask-bg" bindtap="onCloseWxLoginSheet"></view>
+    <view class="id-sheet wx-login-sheet">
+      <view class="id-sheet-static">
         <view class="id-sheet-head">
           <text class="id-sheet-title">微信登录 / 注册</text>
           <text class="id-sheet-close" bindtap="onCloseWxLoginSheet">×</text>
@@ -173,14 +173,15 @@
         </button>
         <input
           class="wx-login-nick-input"
-          type="{{wxNickInputType}}"
-          placeholder="{{wxNickInputType === 'text' ? '填写昵称' : '点击选用微信昵称'}}"
+          type="nickname"
+          placeholder="点击选用微信昵称"
           value="{{wxLoginNick}}"
           bindinput="onNicknameInput"
+          bindblur="onNicknameInput"
           bindnicknamereview="onNicknameReview"
         />
       </view>
-      <view class="id-sheet-foot" catchtap="noopSheetTap">
+      <view class="id-sheet-foot">
         <button
           class="btn-primary wx-login-submit"
           loading="{{wxLoginSubmitting}}"

@@ -17,9 +17,9 @@
   --lq-gradient-header: linear-gradient(180deg, #7c4dff 0%, #7c4dff 100%);
   --lq-gradient-deep: linear-gradient(180deg, #5b3fd4 0%, #7c4dff 100%);
   --lq-gradient-tab: linear-gradient(180deg, #7c4dff 0%, #7c4dff 100%);
-  --lq-gradient-tab-track: linear-gradient(90deg, #f3eeff 0%, #f7f6fb 100%);
-  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f6fb 100%);
-  --lq-bg: #f7f6fb;
+  --lq-gradient-tab-track: linear-gradient(90deg, #f3eeff 0%, #f7f3ec 100%);
+  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f3ec 100%);
+  --lq-bg: #f7f3ec;
   --lq-border: rgba(124, 77, 255, 0.16);
   --lq-shadow: 0 8rpx 28rpx rgba(20, 24, 31, 0.04);
   --lq-shadow-card: 0 8rpx 24rpx rgba(20, 24, 31, 0.04);
@@ -30,7 +30,7 @@
   --lq-chip-on-border: #c4b5fd;
   --lq-active-tint: rgba(124, 77, 255, 0.12);
   --lq-home-nav: #7c4dff;
-  --lq-home-bg: #f7f6fb;
+  --lq-home-bg: #f7f3ec;
   --lq-home-banner: linear-gradient(180deg, #7c4dff 0%, #7c4dff 100%);
 }
 
@@ -47,9 +47,9 @@
   --lq-gradient-header: linear-gradient(180deg, #5b67f1 0%, #5b67f1 100%);
   --lq-gradient-deep: linear-gradient(180deg, #3f4ad4 0%, #5b67f1 100%);
   --lq-gradient-tab: linear-gradient(180deg, #5b67f1 0%, #5b67f1 100%);
-  --lq-gradient-tab-track: linear-gradient(90deg, #eef0ff 0%, #f7f6fb 100%);
-  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f6fb 100%);
-  --lq-bg: #f7f6fb;
+  --lq-gradient-tab-track: linear-gradient(90deg, #eef0ff 0%, #f7f3ec 100%);
+  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f3ec 100%);
+  --lq-bg: #f7f3ec;
   --lq-border: rgba(91, 103, 241, 0.16);
   --lq-shadow: 0 8rpx 28rpx rgba(20, 24, 31, 0.04);
   --lq-shadow-card: 0 8rpx 24rpx rgba(20, 24, 31, 0.04);
@@ -60,7 +60,7 @@
   --lq-chip-on-border: #c7cdff;
   --lq-active-tint: rgba(91, 103, 241, 0.12);
   --lq-home-nav: #5b67f1;
-  --lq-home-bg: #f7f6fb;
+  --lq-home-bg: #f7f3ec;
   --lq-home-banner: linear-gradient(180deg, #5b67f1 0%, #5b67f1 100%);
 }
 
@@ -77,9 +77,9 @@
   --lq-gradient-header: linear-gradient(180deg, #9b6dff 0%, #9b6dff 100%);
   --lq-gradient-deep: linear-gradient(180deg, #7a4fe0 0%, #9b6dff 100%);
   --lq-gradient-tab: linear-gradient(180deg, #9b6dff 0%, #9b6dff 100%);
-  --lq-gradient-tab-track: linear-gradient(90deg, #f4eeff 0%, #f7f6fb 100%);
-  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f6fb 100%);
-  --lq-bg: #f7f6fb;
+  --lq-gradient-tab-track: linear-gradient(90deg, #f4eeff 0%, #f7f3ec 100%);
+  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f3ec 100%);
+  --lq-bg: #f7f3ec;
   --lq-border: rgba(155, 109, 255, 0.16);
   --lq-shadow: 0 8rpx 28rpx rgba(20, 24, 31, 0.04);
   --lq-shadow-card: 0 8rpx 24rpx rgba(20, 24, 31, 0.04);
@@ -90,7 +90,7 @@
   --lq-chip-on-border: #d4c4ff;
   --lq-active-tint: rgba(155, 109, 255, 0.12);
   --lq-home-nav: #9b6dff;
-  --lq-home-bg: #f7f6fb;
+  --lq-home-bg: #f7f3ec;
   --lq-home-banner: linear-gradient(180deg, #9b6dff 0%, #9b6dff 100%);
 }
 
@@ -107,9 +107,9 @@
   --lq-gradient-header: linear-gradient(180deg, #5b2dcc 0%, #5b2dcc 100%);
   --lq-gradient-deep: linear-gradient(180deg, #431ea8 0%, #5b2dcc 100%);
   --lq-gradient-tab: linear-gradient(180deg, #5b2dcc 0%, #5b2dcc 100%);
-  --lq-gradient-tab-track: linear-gradient(90deg, #efe8ff 0%, #f7f6fb 100%);
-  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f6fb 100%);
-  --lq-bg: #f7f6fb;
+  --lq-gradient-tab-track: linear-gradient(90deg, #efe8ff 0%, #f7f3ec 100%);
+  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f7f3ec 100%);
+  --lq-bg: #f7f3ec;
   --lq-border: rgba(91, 45, 204, 0.16);
   --lq-shadow: 0 8rpx 28rpx rgba(20, 24, 31, 0.04);
   --lq-shadow-card: 0 8rpx 24rpx rgba(20, 24, 31, 0.04);
@@ -120,6 +120,6 @@
   --lq-chip-on-border: #cbb8ff;
   --lq-active-tint: rgba(91, 45, 204, 0.12);
   --lq-home-nav: #5b2dcc;
-  --lq-home-bg: #f7f6fb;
+  --lq-home-bg: #f7f3ec;
   --lq-home-banner: linear-gradient(180deg, #5b2dcc 0%, #5b2dcc 100%);
 }
