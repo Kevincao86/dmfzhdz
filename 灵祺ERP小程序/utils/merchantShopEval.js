@@ -670,7 +670,7 @@ function profileFromRow(row) {
 
 function savedFromCache(cached) {
   const indicators = mapIndicators(cached && cached.indicators)
-  if (!cached || cached.sourcesSearch !== 'store-search-v3' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
+  if (!cached || cached.sourcesSearch !== 'store-search-v4' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
   const adviceRaw = cached.advice
   let advice = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray(adviceRaw.sections)) {
@@ -1218,8 +1218,9 @@ async function evaluateShop(raw, opts) {
     if (saved) return saved.score
   }
   const sources = await searchPublicBrand(row)
-  const webNotes = sources.length ? '' : await doubaoPublicNotes(opts.askText, row)
-  const material = webNotes || (sources.length ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n') : '无公开团购或探店记录')
+  const webNotes = await doubaoPublicNotes(opts.askText, row)
+  const listed = sources.length ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n') : ''
+  const material = [webNotes, listed].filter(Boolean).join('\n') || '无公开团购或探店记录'
   const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请给出定位、六项得分和点评、三条优势、四条短板、一句话总结。`
   let j = await askJson(opts.askText, publicScoreSystem(row.evalFocus), user)
   const evidenceNote = `${row.mapNote}\n${row.publicNote}\n${material}`
@@ -1237,7 +1238,7 @@ async function evaluateShop(raw, opts) {
   const indicators = applyEvidenceFloors(mapIndicators(j.indicators), row.storeCount, evidenceNote)
   if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators)
-  writeCache(opts.storage, loaded.key, Object.assign({}, score, { sourcesSearch: 'store-search-v3', profile: profileFromRow(row), savedAt: new Date().toISOString() }))
+  writeCache(opts.storage, loaded.key, Object.assign({}, score, { sourcesSearch: 'store-search-v4', profile: profileFromRow(row), savedAt: new Date().toISOString() }))
   void publishShopEval(opts.storage, loaded.key, slotId(row))
   return score
 }

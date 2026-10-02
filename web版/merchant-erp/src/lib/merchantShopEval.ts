@@ -540,7 +540,7 @@ function savedFromCache(cached: Record<string, unknown> | null): {
   profile: ShopEvalProfile | null
 } | null {
   const indicators = mapIndicators(cached?.indicators)
-  if (!cached || cached.sourcesSearch !== 'store-search-v3' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
+  if (!cached || cached.sourcesSearch !== 'store-search-v4' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
   const adviceRaw = cached.advice
   let advice: ShopEvalAdvice | null = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray((adviceRaw as ShopEvalAdvice).sections)) {
@@ -1118,10 +1118,9 @@ export async function evaluateShop(
     if (saved) return saved.score
   }
   const sources = await searchPublicBrand(row)
-  const webNotes = sources.length ? '' : await doubaoPublicNotes(opts.askText, row)
-  const material = webNotes || (sources.length
-    ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n')
-    : '无公开团购或探店记录')
+  const webNotes = await doubaoPublicNotes(opts.askText, row)
+  const listed = sources.length ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n') : ''
+  const material = [webNotes, listed].filter(Boolean).join('\n') || '无公开团购或探店记录'
   const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请给出定位、六项得分和点评、三条优势、四条短板、一句话总结。`
   let j = await askJson(opts.askText, publicScoreSystem(row.evalFocus), user)
   const evidenceNote = `${row.mapNote}\n${row.publicNote}\n${material}`
@@ -1144,7 +1143,7 @@ export async function evaluateShop(
   const score = scoreFromPublic({ ...j, sources }, indicators)
   writeCache(opts.storage, loaded.key, {
     ...score,
-    sourcesSearch: 'store-search-v3',
+    sourcesSearch: 'store-search-v4',
     profile: profileFromRow(row),
     savedAt: new Date().toISOString(),
   })

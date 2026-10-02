@@ -3625,14 +3625,14 @@ async function postDoubaoResponsesSearch(
     body: JSON.stringify({
       model,
       stream: false,
-      tools: [{ type: 'web_search', max_keyword: 3 }],
+      tools: [{ type: 'web_search', max_keyword: 3, limit: 10, sources: ['search_engine', 'douyin', 'toutiao'] }],
       ...(withThinkingOff ? { thinking: { type: 'disabled' } } : {}),
       input: [
         { role: 'system', content: [{ type: 'input_text', text: system }] },
         { role: 'user', content: [{ type: 'input_text', text: user }] },
       ],
     }),
-    signal: AbortSignal.timeout(70_000),
+    signal: AbortSignal.timeout(25_000),
   })
   const data = await readJson(res)
   if (!res.ok) throw new Error(upstreamErrorMessage(data, res.status))
@@ -3641,50 +3641,154 @@ async function postDoubaoResponsesSearch(
   return text
 }
 
-/** 门店评估公开检索：豆包方舟联网，不用搜狗/必应抓页 */
+function htmlToPlain(html: string) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])/gu, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function searchCore(query: string) {
+  const token = (query.match(/[\u4e00-\u9fff]{2,}/u) || [''])[0]
+  return token.replace(/(南湖店|旗舰店|总店|分店)$/u, '').replace(/店$/u, '')
+}
+
+async function runPublicWebSearch(query: string): Promise<string> {
+  const q = query.replace(/\s+/g, ' ').trim().slice(0, 80)
+  if (q.length < 2) return '检索词为空'
+  const core = searchCore(q)
+  try {
+    const res = await fetch(`https://www.sogou.com/web?query=${encodeURIComponent(q)}`, {
+      headers: {
+        Accept: 'text/html',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return `检索没有结果（HTTP ${res.status}）`
+    const html = await res.text()
+    const lines: string[] = []
+    for (const bit of htmlToPlain(html).split(/[。！？]/)) {
+      const line = bit.trim()
+      if (line.length < 12 || line.length > 140) continue
+      if (core.length >= 2 && !line.includes(core)) continue
+      if (!/套餐|团购|抖音|点评|探店|\d+\s*元/.test(line)) continue
+      if (/牛仔裤|羊毛大衣|搜狗搜索|高级搜索|汉语词语|近义词/.test(line)) continue
+      const compact = line.replace(/\s+/g, '')
+      if (!lines.includes(compact)) lines.push(compact)
+      if (lines.length >= 6) break
+    }
+    return lines.length ? lines.map((line, index) => `${index + 1}. ${line}`).join('\n') : '这一条检索没有公开结果'
+  } catch {
+    return '检索超时'
+  }
+}
+
+const DOUBAO_WEB_SEARCH_TOOL = {
+  type: 'function',
+  function: {
+    name: 'web_search',
+    description: '搜索互联网公开信息。查门店、抖音团购套餐、价格、探店、点评时必须调用。',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: '搜索词，带上店名、城市和团购或套餐' },
+      },
+      required: ['query'],
+    },
+  },
+}
+
+async function doubaoFunctionWebSearch(
+  apiKey: string,
+  env: MerchantAiEnv,
+  model: string,
+  system: string,
+  user: string,
+): Promise<string> {
+  const url = `${doubaoArkApiV3Root(env)}/chat/completions`
+  const messages: Array<Record<string, unknown>> = [
+    {
+      role: 'system',
+      content: `${system}\n需要公开信息时必须调用 web_search。只根据工具返回的事实回答，不要编造价格和套餐名。`,
+    },
+    { role: 'user', content: user },
+  ]
+  for (let step = 0; step < 3; step += 1) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        tools: [DOUBAO_WEB_SEARCH_TOOL],
+        tool_choice: step === 0 ? { type: 'function', function: { name: 'web_search' } } : 'auto',
+        temperature: 0,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(45_000),
+    })
+    const data = await readJson(res)
+    if (!res.ok) throw new Error(upstreamErrorMessage(data, res.status))
+    const choice = (data.choices as Array<Record<string, unknown>> | undefined)?.[0]
+    const message = (choice?.message || {}) as Record<string, unknown>
+    const calls = Array.isArray(message.tool_calls) ? (message.tool_calls as Array<Record<string, unknown>>) : []
+    const text = messageContentToText(message) || ''
+    if (!calls.length) {
+      if (text.trim()) return text.trim()
+      throw new Error('豆包联网未返回正文')
+    }
+    messages.push({
+      role: 'assistant',
+      content: typeof message.content === 'string' ? message.content : '',
+      tool_calls: calls,
+    })
+    for (const call of calls.slice(0, 2)) {
+      const fn = (call.function || {}) as Record<string, unknown>
+      let query = user
+      try {
+        const args = JSON.parse(String(fn.arguments || '{}')) as { query?: string }
+        if (args.query && args.query.trim()) query = args.query.trim()
+      } catch {
+        /* 用原问题检索 */
+      }
+      messages.push({
+        role: 'tool',
+        tool_call_id: String(call.id || 'web_search'),
+        content: await runPublicWebSearch(query),
+      })
+    }
+  }
+  throw new Error('豆包联网未返回正文')
+}
+
+/** 豆包联网：先走方舟联网插件；账号未开通时改为对话里调用 web_search 工具 */
 export async function callDoubaoWebSearch(
   apiKey: string,
   env: MerchantAiEnv,
   system: string,
   user: string,
 ): Promise<{ text: string; modelUsed: string }> {
-  const live = await resolveDoubaoLiveChatCandidates(apiKey, env)
-  const models = live.filter(doubaoWebSearchModel).slice(0, 3)
-  const queue = models.length ? models : [doubaoChatModelId(env)]
-  let lastErr = '豆包联网搜索失败'
-  for (const model of queue) {
-    try {
-      const text = await postDoubaoResponsesSearch(apiKey, env, model, system, user, true)
-      return { text, modelUsed: model }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      lastErr = msg
-      try {
-        const text = await postDoubaoResponsesSearch(apiKey, env, model, system, user, false)
-        return { text, modelUsed: model }
-      } catch (again) {
-        lastErr = again instanceof Error ? again.message : String(again)
-      }
-      try {
-        const text = await openAiStyleChat(
-          `${doubaoArkApiV3Root(env)}/chat/completions`,
-          apiKey,
-          model,
-          system,
-          user,
-          {
-            temperature: 0,
-            max_tokens: 1200,
-            tools: [{ type: 'web_search', max_keyword: 3 }],
-          },
-        )
-        if (text.trim()) return { text, modelUsed: model }
-      } catch (chatErr) {
-        lastErr = chatErr instanceof Error ? chatErr.message : String(chatErr)
-      }
-    }
+  const model =
+    [doubaoChatModelId(env), 'doubao-seed-2-0-lite-260215'].find((id) => doubaoWebSearchModel(id)) ||
+    'doubao-seed-2-0-lite-260215'
+  try {
+    const text = await postDoubaoResponsesSearch(apiKey, env, model, system, user, true)
+    return { text, modelUsed: model }
+  } catch {
+    const text = await doubaoFunctionWebSearch(apiKey, env, model, system, user)
+    return { text, modelUsed: model }
   }
-  throw new Error(lastErr)
 }
 
 export async function merchantAgentChatFromMessages(
