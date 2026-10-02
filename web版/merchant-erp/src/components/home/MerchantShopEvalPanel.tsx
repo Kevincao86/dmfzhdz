@@ -217,16 +217,42 @@ export default function MerchantShopEvalPanel() {
     setBoundStores(mapped)
     const next = resolveShopEvalFromStores(tab, mapped, Math.max(total, mapped.length))
     if (mapped.length >= 2) {
-      next.scope = 'single'
-      next.storeCount = 1
-      next.evalFocus = ''
-      next.storeNames = ''
-    }
-    setInput(next)
-    if (!formTouched.current && next.storeName) {
+      const target = boundEvalBrandTarget(mapped)
+      const anchor = target.anchor
+      const region = anchor ? splitCnRegion(anchor.address || '', anchor.city) : { province: '', city: '', district: '', detail: '' }
+      next.evalFocus = 'brand'
+      next.scope = 'chain'
+      next.storeCount = Math.max(target.storeCount, mapped.length, 2)
+      next.brandName = target.brandName
+      next.storeName = target.brandName
+      next.storeNames = target.storeNames
+      next.storeId = ''
+      next.city = region.city || anchor?.city || next.city
+      next.address = [region.province, region.city, region.district, region.detail || anchor?.address || ''].filter(Boolean).join('')
+      next.phone = anchor?.phone || next.phone
+      next.businessHours = anchor?.businessHours || next.businessHours
+      if (!formTouched.current) {
+        setFormName(target.brandName)
+        if (region.province) setProvince(region.province)
+        if (region.city) setCityName(region.city)
+        if (region.district) setDistrict(region.district)
+        if (region.detail || anchor?.address) setDetailAddress(region.detail || anchor?.address || '')
+        if (region.province) {
+          void postLocate({ action: 'districts', keywords: region.province })
+            .then((data) => setCities(data.names || []))
+            .catch(() => setCities([]))
+        }
+        if (region.city) {
+          void postLocate({ action: 'districts', keywords: region.city })
+            .then((data) => setDistricts(data.names || []))
+            .catch(() => setDistricts([]))
+        }
+      }
+    } else if (!formTouched.current && next.storeName) {
       setFormName(next.storeName)
       if (next.address) setDetailAddress(next.address)
     }
+    setInput(next)
   }, [])
 
   useEffect(() => {
@@ -241,7 +267,23 @@ export default function MerchantShopEvalPanel() {
   }, [])
 
   useEffect(() => {
-    if (!platformBound) return
+    formTouched.current = false
+  }, [platformId])
+
+  useEffect(() => {
+    if (!platformBound) {
+      setBoundStores([])
+      setInput((prev) => ({
+        ...prev,
+        platformId,
+        evalFocus: '',
+        scope: 'single',
+        storeCount: 1,
+        storeNames: '',
+        storeId: '',
+      }))
+      return
+    }
     void loadStore(platformId)
   }, [platformId, platformBound, loadStore])
 
@@ -469,11 +511,6 @@ export default function MerchantShopEvalPanel() {
 
   function onEvaluate() {
     if (!canEval || evaluating || advising) return
-    if (boundStores.length >= 2) {
-      setStoreQuery('')
-      setChooser('mode')
-      return
-    }
     void runEvaluate(input)
   }
 
@@ -484,21 +521,23 @@ export default function MerchantShopEvalPanel() {
       : { formName: target.brandName, province, cityName, district, detailAddress }
     rememberSnap(snap)
     setChooser(null)
-    void runEvaluate(
-      {
-        ...input,
-        evalFocus: 'brand',
-        scope: 'chain',
-        storeCount: Math.max(target.storeCount, 2),
-        brandName: target.brandName,
-        storeName: target.brandName,
-        storeNames: target.storeNames,
-        storeId: '',
-        phone: target.anchor?.phone || '',
-        businessHours: target.anchor?.businessHours || '',
-      },
-      snap,
-    )
+    setScore(null)
+    setAdvice(null)
+    setDisplayScore(0)
+    setInput({
+      ...input,
+      evalFocus: 'brand',
+      scope: 'chain',
+      storeCount: Math.max(target.storeCount, boundStores.length, 2),
+      brandName: target.brandName,
+      storeName: target.brandName,
+      storeNames: target.storeNames,
+      storeId: '',
+      phone: target.anchor?.phone || '',
+      businessHours: target.anchor?.businessHours || '',
+      city: snap.cityName,
+      address: [snap.province, snap.cityName, snap.district, snap.detailAddress].filter(Boolean).join(''),
+    })
   }
 
   function onPickBoundStore(store: ShopEvalBoundStore) {
@@ -506,21 +545,23 @@ export default function MerchantShopEvalPanel() {
     const snap = snapFromStore(store)
     rememberSnap(snap)
     setChooser(null)
-    void runEvaluate(
-      {
-        ...input,
-        evalFocus: 'store',
-        scope: 'single',
-        storeCount: 1,
-        storeId: store.id,
-        storeName: store.name,
-        brandName: target.brandName,
-        storeNames: '',
-        phone: store.phone || '',
-        businessHours: store.businessHours || '',
-      },
-      snap,
-    )
+    setScore(null)
+    setAdvice(null)
+    setDisplayScore(0)
+    setInput({
+      ...input,
+      evalFocus: 'store',
+      scope: 'single',
+      storeCount: 1,
+      storeId: store.id,
+      storeName: store.name,
+      brandName: target.brandName,
+      storeNames: '',
+      phone: store.phone || '',
+      businessHours: store.businessHours || '',
+      city: snap.cityName,
+      address: [snap.province, snap.cityName, snap.district, snap.detailAddress].filter(Boolean).join(''),
+    })
   }
 
   async function onAdvise() {
@@ -690,12 +731,34 @@ export default function MerchantShopEvalPanel() {
         </div>
       </div>
 
-      {boundStores.length >= 2 ? (
-        <p className="border-b border-slate-100 px-5 py-3 text-sm text-slate-600">
-          该账号已绑定 {boundStores.length} 家门店。点击评估后选择按总品牌分析，或筛选其中 1 家。分析提升按同一次选择来写。
-          {input.evalFocus === 'brand' ? ` 当前：总品牌 ${input.brandName || ''}`.trim() : null}
-          {input.evalFocus === 'store' ? ` 当前：${input.storeName || ''}` : null}
-        </p>
+      {platformBound && boundStores.length >= 2 ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-5 py-3">
+          <button
+            type="button"
+            onClick={onChooseBrand}
+            className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+              input.evalFocus !== 'store' ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            总品牌 · {input.storeCount || boundStores.length}家
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStoreQuery('')
+              setChooser('store')
+            }}
+            className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+              input.evalFocus === 'store' ? 'bg-[#1E3A5F] text-white' : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            筛选门店
+          </button>
+          <span className="text-sm text-slate-500">
+            {input.evalFocus === 'store' ? `当前单店：${input.storeName || formName}` : `当前按总品牌：${input.brandName || formName}`}
+            。分析提升跟着这个选择走。
+          </span>
+        </div>
       ) : null}
 
       <div className="grid gap-4 p-5 lg:grid-cols-2">
@@ -987,8 +1050,8 @@ export default function MerchantShopEvalPanel() {
                   ))}
                   {!shownStores.length ? <p className="py-6 text-center text-sm text-slate-500">没有匹配的门店</p> : null}
                 </div>
-                <button type="button" className="mt-3 text-sm text-slate-500" onClick={() => setChooser('mode')}>
-                  返回
+                <button type="button" className="mt-3 text-sm text-slate-500" onClick={() => setChooser(null)}>
+                  关闭
                 </button>
               </>
             )}

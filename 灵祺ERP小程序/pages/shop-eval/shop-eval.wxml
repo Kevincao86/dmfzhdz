@@ -33,7 +33,11 @@
   </view>
 
   <view class="card form-note" wx:if="{{boundCount >= 2}}">
-    <text>该账号已绑定 {{boundCount}} 家门店。点击评估后选择按总品牌分析，或筛选其中 1 家。分析提升按同一次选择来写。</text>
+    <view class="focus-row">
+      <view class="focus-btn {{scopeLabel.indexOf('总品牌') === 0 ? 'focus-btn--on' : ''}}" bindtap="onChooseBrand">总品牌 · {{boundCount}}家</view>
+      <view class="focus-btn {{scopeLabel === '单门店' ? 'focus-btn--on' : ''}}" bindtap="onOpenStorePick">筛选门店</view>
+    </view>
+    <text class="focus-hint">绑定后默认按总品牌。点「筛选门店」改为其中 1 家，分析提升跟着当前选择走。</text>
   </view>
 
   <view class="eval-top">
@@ -193,7 +197,7 @@
           </view>
           <text class="chooser-empty" wx:if="{{!filteredStores.length}}">没有匹配的门店</text>
         </scroll-view>
-        <view class="chooser-cancel" bindtap="onBackChooser">返回</view>
+        <view class="chooser-cancel" bindtap="onBackChooser">关闭</view>
       </block>
     </view>
   </view>

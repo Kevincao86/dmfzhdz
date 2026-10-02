@@ -380,7 +380,19 @@ Page({
 
   async loadStore(forcedId) {
     const platformId = forcedId || this.data.platformId
-    if (!readPlatformToken(platformId)) return
+    if (!readPlatformToken(platformId)) {
+      this._boundStores = []
+      this._input = Object.assign({}, this._input || {}, {
+        platformId,
+        evalFocus: '',
+        scope: 'single',
+        storeCount: 1,
+        storeNames: '',
+        storeId: '',
+      })
+      this.setData({ boundStores: [], filteredStores: [], boundCount: 0, scopeLabel: scopeText(this._input) })
+      return
+    }
     let items = []
     let total = 0
     try {
@@ -401,11 +413,29 @@ Page({
       .filter((row) => row.name)
     this._boundStores = mapped
     const input = evalApi.resolveShopEvalFromStores(platformId, mapped, Math.max(total, mapped.length))
+    let brandSnap = null
     if (mapped.length >= 2) {
-      input.scope = 'single'
-      input.storeCount = 1
-      input.evalFocus = ''
-      input.storeNames = ''
+      const target = evalApi.boundEvalBrandTarget(mapped)
+      const anchor = target.anchor
+      const region = anchor ? evalApi.splitCnRegion(anchor.address || '', anchor.city) : null
+      const nextRegion = region && region.province && region.city && region.district ? [region.province, region.city, region.district] : []
+      input.evalFocus = 'brand'
+      input.scope = 'chain'
+      input.storeCount = Math.max(target.storeCount, mapped.length, 2)
+      input.brandName = target.brandName
+      input.storeName = target.brandName
+      input.storeNames = target.storeNames
+      input.storeId = ''
+      input.city = (region && region.city) || (anchor && anchor.city) || ''
+      input.address = nextRegion.join('') + ((region && region.detail) || (anchor && anchor.address) || '')
+      input.phone = anchor && anchor.phone ? anchor.phone : ''
+      input.businessHours = anchor && anchor.businessHours ? anchor.businessHours : ''
+      brandSnap = {
+        formName: target.brandName,
+        region: nextRegion.length === 3 ? nextRegion : this.data.region,
+        regionText: nextRegion.length === 3 ? nextRegion.join(' ') : this.data.regionText,
+        detailAddress: (region && region.detail) || (anchor && anchor.address) || this.data.detailAddress,
+      }
     }
     this.setData({
       boundStores: mapped,
@@ -413,7 +443,8 @@ Page({
       boundCount: Math.max(mapped.length, total),
     })
     if (evalApi.hydrateShopEval) await evalApi.hydrateShopEval(input, storage)
-    if (this.data.platformId !== platformId || formReady(this.data)) return
+    if (this.data.platformId !== platformId) return
+    if (formReady(this.data) && (this._formTouched || !brandSnap)) return
     const saved = evalApi.readSavedShopEval(input, storage)
     const viewed = withChain(input, saved && saved.profile)
     const scope = evalApi.shopEvalScopeOf(viewed)
@@ -423,13 +454,9 @@ Page({
     const advice = saved && saved.advice
     const grade = score ? evalApi.shopEvalGrade(score.score, scope) : null
     this._score = score || null
-    const displayName = String(this.data.formName || '').trim() || (scope === 'chain' && viewed.brandName ? viewed.brandName : viewed.storeName)
-    if (!this._formTouched && input.storeName) {
-      this.setData({
-        formName: input.storeName,
-        detailAddress: this.data.detailAddress || input.address || '',
-      })
-    }
+    const filled = !this._formTouched && brandSnap ? brandSnap : !this._formTouched && input.storeName ? { formName: input.storeName, detailAddress: this.data.detailAddress || input.address || '' } : null
+    const displayName = (filled && filled.formName) || String(this.data.formName || '').trim() || (scope === 'chain' && viewed.brandName ? viewed.brandName : viewed.storeName)
+    if (filled) this.setData(filled)
     this.setData({
       platformName: meta.name,
       evalTitle: meta.title,
@@ -441,7 +468,7 @@ Page({
       grades: evalApi.shopEvalGrades(scope),
       avatarLetter: letterOf(displayName),
       basis: [viewed.category, viewed.address].filter(Boolean).join(' · ') || evalApi.describeShopEvalBasis(viewed),
-      canEval: formReady(Object.assign({}, this.data, !this._formTouched && input.storeName ? { formName: input.storeName, detailAddress: this.data.detailAddress || input.address || '' } : {})),
+      canEval: formReady(Object.assign({}, this.data, filled || {})),
       scoreReady: Boolean(score),
       displayScore: score ? score.score : 0,
       searchLevel: score ? score.searchLevel : '',
@@ -568,10 +595,6 @@ Page({
 
   async onEvaluate() {
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
-    if ((this._boundStores || []).length >= 2) {
-      this.setData({ chooser: 'mode', storeQuery: '', filteredStores: this._boundStores })
-      return
-    }
     await this.runEvaluate(this._input || {})
   },
 
@@ -584,7 +607,7 @@ Page({
   },
 
   onBackChooser() {
-    this.setData({ chooser: 'mode' })
+    this.setData({ chooser: '' })
   },
 
   onStoreQuery(e) {
@@ -611,21 +634,22 @@ Page({
       detailAddress: (region && region.detail) || (anchor && anchor.address) || this.data.detailAddress,
     }
     this.applySnap(snap)
-    this.setData({ chooser: '' })
-    void this.runEvaluate(
-      Object.assign({}, this._input || {}, {
-        evalFocus: 'brand',
-        scope: 'chain',
-        storeCount: Math.max(target.storeCount, 2),
-        brandName: target.brandName,
-        storeName: target.brandName,
-        storeNames: target.storeNames,
-        storeId: '',
-        phone: anchor && anchor.phone ? anchor.phone : '',
-        businessHours: anchor && anchor.businessHours ? anchor.businessHours : '',
-      }),
-      snap,
-    )
+    const next = Object.assign({}, this._input || {}, {
+      evalFocus: 'brand',
+      scope: 'chain',
+      storeCount: Math.max(target.storeCount, stores.length, 2),
+      brandName: target.brandName,
+      storeName: target.brandName,
+      storeNames: target.storeNames,
+      storeId: '',
+      city: snap.region[1] || '',
+      address: snap.region.join('') + String(snap.detailAddress || ''),
+      phone: anchor && anchor.phone ? anchor.phone : '',
+      businessHours: anchor && anchor.businessHours ? anchor.businessHours : '',
+    })
+    this._input = next
+    this._score = null
+    this.setData(Object.assign({ chooser: '', scoreReady: false, displayScore: 0, adviceReady: false, sections: [], showGrade: false }, identityPatch(next, null)))
   },
 
   onPickStore(e) {
@@ -643,21 +667,22 @@ Page({
       detailAddress: region.detail || store.address || this.data.detailAddress,
     }
     this.applySnap(snap)
-    this.setData({ chooser: '' })
-    void this.runEvaluate(
-      Object.assign({}, this._input || {}, {
-        evalFocus: 'store',
-        scope: 'single',
-        storeCount: 1,
-        storeId: store.id,
-        storeName: store.name,
-        brandName: target.brandName,
-        storeNames: '',
-        phone: store.phone || '',
-        businessHours: store.businessHours || '',
-      }),
-      snap,
-    )
+    const next = Object.assign({}, this._input || {}, {
+      evalFocus: 'store',
+      scope: 'single',
+      storeCount: 1,
+      storeId: store.id,
+      storeName: store.name,
+      brandName: target.brandName,
+      storeNames: '',
+      city: snap.region[1] || '',
+      address: snap.region.join('') + String(snap.detailAddress || ''),
+      phone: store.phone || '',
+      businessHours: store.businessHours || '',
+    })
+    this._input = next
+    this._score = null
+    this.setData(Object.assign({ chooser: '', scoreReady: false, displayScore: 0, adviceReady: false, sections: [], showGrade: false }, identityPatch(next, null)))
   },
 
   applySnap(snap) {

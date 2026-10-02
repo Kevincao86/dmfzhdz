@@ -31,6 +31,35 @@
   color: #475569;
 }
 
+.focus-row {
+  display: flex;
+  gap: 16rpx;
+}
+
+.focus-btn {
+  flex: 1;
+  padding: 16rpx 12rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #334155;
+  background: #f1f5f9;
+}
+
+.focus-btn--on {
+  color: #fff;
+  background: #0891b2;
+}
+
+.focus-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: #64748b;
+}
+
 .chooser-mask {
   position: fixed;
   left: 0;
