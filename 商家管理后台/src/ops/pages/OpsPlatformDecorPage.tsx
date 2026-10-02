@@ -7,6 +7,7 @@ import {
   PLATFORM_DECOR_SLOT_LABELS,
   PLATFORM_DECOR_SLOT_SIZE_HINTS,
   isDecorVideoMedia,
+  isLaunchSplashSlot,
   type PlatformDecorFreq,
   type PlatformDecorLinkType,
   type PlatformDecorMediaType,
@@ -62,6 +63,7 @@ function emptyItem(slotKey: string): RegistryPlatformDecorItem {
     linkType: 'none',
     freq: 'daily',
     identities: ['all'],
+    ...(isLaunchSplashSlot(slotKey) ? { playSeconds: 3 as const } : {}),
     priority: 100,
     updatedAt: nowIsoLocal(),
   }
@@ -208,7 +210,7 @@ export default function OpsPlatformDecorPage() {
         <p className="ops-muted mt-1 text-sm">
           {kind === 'popup'
             ? '活动海报首页弹窗：与公告弹窗互斥，优先紧急/入选/档期类通知。支持 once / daily / always 频控。素材支持静图、GIF、短视频（OSS）。'
-            : 'Banner / 条幅按 slotKey 投放。同一槽位取 priority 最小且在有效期内的一条。素材支持静图、GIF、短视频（OSS）。'}
+            : 'Banner / 条幅按 slotKey 投放。同一槽位取 priority 最小且在有效期内的一条。开屏海报在打开小程序时全屏播放，时长 3 秒或 5 秒，到时关闭，也可点跳过。素材支持静图、GIF、短视频（OSS）。'}
         </p>
         <ul className="ops-size-hint-box space-y-1">
           {slotOptions.map((k) => (
@@ -250,6 +252,7 @@ export default function OpsPlatformDecorPage() {
                   <p className="ops-muted truncate text-xs">
                     {PLATFORM_DECOR_SLOT_LABELS[it.slotKey] || it.slotKey}
                     {isDecorVideoMedia(it) ? ' · 视频' : ''}
+                    {isLaunchSplashSlot(it.slotKey) ? ` · ${it.playSeconds === 5 ? 5 : 3}秒` : ''}
                     {it.enabled ? '' : ' · 已停用'}
                   </p>
                   {PLATFORM_DECOR_SLOT_SIZE_HINTS[it.slotKey] ? (
@@ -296,7 +299,13 @@ export default function OpsPlatformDecorPage() {
             <select
               className="ops-field mt-1"
               value={editing.slotKey}
-              onChange={(e) => patchItem(editing.id, { slotKey: e.target.value })}
+              onChange={(e) => {
+                const slotKey = e.target.value
+                patchItem(editing.id, {
+                  slotKey,
+                  ...(isLaunchSplashSlot(slotKey) ? { playSeconds: editing.playSeconds === 5 ? 5 : 3 } : {}),
+                })
+              }}
             >
               {slotOptions.map((k) => (
                 <option key={k} value={k}>
@@ -412,6 +421,22 @@ export default function OpsPlatformDecorPage() {
               />
             </label>
           </div>
+
+          {isLaunchSplashSlot(editing.slotKey) ? (
+            <label className="ops-label">
+              播放时长
+              <select
+                className="ops-field mt-1"
+                value={editing.playSeconds === 5 ? 5 : 3}
+                onChange={(e) =>
+                  patchItem(editing.id, { playSeconds: Number(e.target.value) === 5 ? 5 : 3 })
+                }
+              >
+                <option value={3}>3 秒（到时关闭，可跳过）</option>
+                <option value={5}>5 秒（到时关闭，可跳过）</option>
+              </select>
+            </label>
+          ) : null}
 
           {kind === 'popup' ? (
             <label className="ops-label">

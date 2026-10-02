@@ -1,3 +1,5 @@
+<view>
+<launch-splash bind:done="onLaunchSplashDone" />
 <scroll-view scroll-y class="login-welcome" enhanced show-scrollbar="{{false}}" style="{{navBandStyle}}">
   <view class="welcome-head">
     <image class="welcome-head__logo" src="{{logoSrc}}" mode="aspectFit" />
@@ -145,4 +147,5 @@
       <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onConfirmBindPhone">{{bindMergeToken ? '确定加入' : (bindNeedCode ? '确认绑定' : '绑定并进入')}}</button>
     </view>
   </view>
+</view>
 </view>

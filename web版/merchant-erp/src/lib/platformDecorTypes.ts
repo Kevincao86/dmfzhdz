@@ -11,6 +11,8 @@ export type PlatformDecorIdentity = 'all' | 'pr' | 'talent' | 'shoot' | 'edit'
 /** 计划内 P0/P1 槽位 */
 export const PLATFORM_DECOR_SLOT_KEYS = [
   'mp.home.popup',
+  'mp.launch.splash',
+  'erp.launch.splash',
   'mp.home.banner',
   'mp.mine.entry',
   'mp.hall.strip',
@@ -28,6 +30,8 @@ export type PlatformDecorSlotKey = (typeof PLATFORM_DECOR_SLOT_KEYS)[number]
 
 export const PLATFORM_DECOR_SLOT_LABELS: Record<string, string> = {
   'mp.home.popup': '小程序 · 首页弹窗',
+  'mp.launch.splash': '达人小程序 · 开屏海报',
+  'erp.launch.splash': '商家小程序 · 开屏海报',
   'mp.home.banner': '小程序 · 首页 Banner',
   'mp.mine.entry': '小程序 · 我的推广上方',
   'mp.hall.strip': '小程序 · 大厅顶细条',
@@ -46,6 +50,8 @@ export const PLATFORM_DECOR_SLOT_LABELS: Record<string, string> = {
  */
 export const PLATFORM_DECOR_SLOT_SIZE_HINTS: Record<string, string> = {
   'mp.home.popup': '建议 750×1000（竖版 3:4，居中弹窗）',
+  'mp.launch.splash': '建议 750×1334（竖版 9:16，打开达人小程序时全屏）',
+  'erp.launch.splash': '建议 750×1334（竖版 9:16，打开商家小程序时全屏）',
   'mp.home.banner': '建议 750×320（横版 Banner，约 21:9）',
   'mp.mine.entry': '建议 750×180（横条）',
   'mp.hall.strip': '建议 750×96（细条）',
@@ -79,6 +85,8 @@ export type RegistryPlatformDecorItem = {
   endAt?: string
   /** 仅弹窗频控 */
   freq?: PlatformDecorFreq
+  /** 仅开屏海报：播放秒数，到时关闭，期间可跳过 */
+  playSeconds?: 3 | 5
   priority: number
   updatedAt?: string
 }
@@ -95,6 +103,14 @@ export function isDecorVideoMedia(item: {
     .toLowerCase()
     .split(/[?#]/)[0]
   return /\.(mp4|webm|mov|m4v)$/.test(u)
+}
+
+export function isLaunchSplashSlot(slotKey: string): boolean {
+  return slotKey === 'mp.launch.splash' || slotKey === 'erp.launch.splash'
+}
+
+export function normalizePlaySeconds(raw: unknown): 3 | 5 {
+  return Number(raw) === 5 ? 5 : 3
 }
 
 export type RegistryPlatformDecoration = {

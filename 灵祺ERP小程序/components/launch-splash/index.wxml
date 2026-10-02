@@ -1,0 +1,23 @@
+<view wx:if="{{phase === 'show'}}" class="launch-splash">
+  <video
+    wx:if="{{isVideo}}"
+    class="launch-splash__media"
+    src="{{imageUrl}}"
+    autoplay
+    muted
+    object-fit="cover"
+    controls="{{false}}"
+    show-center-play-btn="{{false}}"
+    show-play-btn="{{false}}"
+    enable-progress-gesture="{{false}}"
+    bindtap="onTapPoster"
+  />
+  <image
+    wx:else
+    class="launch-splash__media"
+    src="{{imageUrl}}"
+    mode="aspectFill"
+    bindtap="onTapPoster"
+  />
+  <view class="launch-splash__skip" style="{{skipStyle}}" catchtap="onSkip">跳过 {{remain}}</view>
+</view>

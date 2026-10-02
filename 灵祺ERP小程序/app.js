@@ -24,14 +24,7 @@ App({
       }).catch(() => {
         if (!devAuth.isDevSession()) void sessionSync.syncFromCloud({ force: true })
       })
-      try {
-        if (wx.getStorageSync('meoo_just_logged_out') !== '1') {
-          wx.switchTab({
-            url: '/pages/functions/functions',
-            fail: () => {},
-          })
-        }
-      } catch (_) {}
+      // 已登录进入工作台改由登录页开屏海报结束后再跳转
     } else {
       this.globalData.accessToken = null
     }

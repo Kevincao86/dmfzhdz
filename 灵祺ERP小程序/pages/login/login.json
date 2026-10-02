@@ -2,5 +2,7 @@
   "navigationStyle": "custom",
   "navigationBarTextStyle": "black",
   "backgroundColor": "#e9f6f8",
-  "usingComponents": {}
+  "usingComponents": {
+    "launch-splash": "/components/launch-splash/index"
+  }
 }

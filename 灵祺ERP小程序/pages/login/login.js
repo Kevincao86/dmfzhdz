@@ -85,11 +85,26 @@ Page({
     this._applyNavPadding()
     this._syncModeHint()
     void api.bootstrapSupabaseConfig()
+    this._waitSplash = true
+    this._splashSafety = setTimeout(() => this.onLaunchSplashDone(), 8000)
+  },
+
+  onLaunchSplashDone() {
+    if (!this._waitSplash) return
+    this._waitSplash = false
+    if (this._splashSafety) {
+      clearTimeout(this._splashSafety)
+      this._splashSafety = null
+    }
     this._enterWorkspaceIfLoggedIn()
   },
 
   onUnload() {
     this._clearCooldownTimers()
+    if (this._splashSafety) {
+      clearTimeout(this._splashSafety)
+      this._splashSafety = null
+    }
   },
 
   onShow() {
@@ -104,6 +119,7 @@ Page({
         return
       }
     } catch (_) {}
+    if (this._waitSplash) return
     this._enterWorkspaceIfLoggedIn()
   },
 

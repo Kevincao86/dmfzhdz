@@ -1,4 +1,7 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#e9f6f8"
+  "backgroundColor": "#e9f6f8",
+  "usingComponents": {
+    "launch-splash": "/components/launch-splash/index"
+  }
 }

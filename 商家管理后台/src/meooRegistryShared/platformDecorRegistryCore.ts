@@ -1,10 +1,12 @@
 import type { RegistryFile } from './opsRegistryTypes.js'
-import type {
-  PlatformDecorFreq,
-  PlatformDecorIdentity,
-  PlatformDecorLinkType,
-  RegistryPlatformDecorItem,
-  RegistryPlatformDecoration,
+import {
+  isLaunchSplashSlot,
+  normalizePlaySeconds,
+  type PlatformDecorFreq,
+  type PlatformDecorIdentity,
+  type PlatformDecorLinkType,
+  type RegistryPlatformDecorItem,
+  type RegistryPlatformDecoration,
 } from './platformDecorTypes.js'
 
 function nowIso(): string {
@@ -63,6 +65,7 @@ export function normalizeDecorItem(raw: unknown): RegistryPlatformDecorItem | nu
     startAt: String(o.startAt || '').trim() || undefined,
     endAt: String(o.endAt || '').trim() || undefined,
     freq: normalizeFreq(o.freq),
+    ...(isLaunchSplashSlot(slotKey) ? { playSeconds: normalizePlaySeconds(o.playSeconds) } : {}),
     priority: Number.isFinite(Number(o.priority)) ? Number(o.priority) : 100,
     updatedAt: String(o.updatedAt || '').trim() || nowIso(),
   }

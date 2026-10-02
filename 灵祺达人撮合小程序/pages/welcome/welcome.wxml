@@ -1,4 +1,5 @@
 <view class="welcome-page" style="{{navBandStyle}}">
+  <launch-splash />
   <view class="welcome-head">
     <image class="welcome-head__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
     <text class="welcome-head__title">灵祺星选</text>
