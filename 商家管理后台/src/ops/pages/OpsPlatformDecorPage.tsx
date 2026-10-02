@@ -43,12 +43,13 @@ function toDatetimeLocalValue(iso?: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** datetime-local → ISO（本地时区） */
-function fromDatetimeLocalValue(local: string): string | undefined {
+/** datetime-local → ISO（本地时区）。未填完的中间值返回空串，避免把选择器弹回空白 */
+function fromDatetimeLocalValue(local: string): string | undefined | '' {
   const v = String(local || '').trim()
   if (!v) return undefined
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return ''
   const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return undefined
+  if (Number.isNaN(d.getTime())) return ''
   return d.toISOString()
 }
 
@@ -454,28 +455,32 @@ export default function OpsPlatformDecorPage() {
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="ops-label">
+            <div className="ops-label">
               开始时间
               <input
                 type="datetime-local"
                 className="ops-field mt-1"
                 value={toDatetimeLocalValue(editing.startAt)}
-                onChange={(e) =>
-                  patchItem(editing.id, { startAt: fromDatetimeLocalValue(e.target.value) })
-                }
+                onChange={(e) => {
+                  const next = fromDatetimeLocalValue(e.target.value)
+                  if (next === '') return
+                  patchItem(editing.id, { startAt: next })
+                }}
               />
-            </label>
-            <label className="ops-label">
+            </div>
+            <div className="ops-label">
               结束时间
               <input
                 type="datetime-local"
                 className="ops-field mt-1"
                 value={toDatetimeLocalValue(editing.endAt)}
-                onChange={(e) =>
-                  patchItem(editing.id, { endAt: fromDatetimeLocalValue(e.target.value) })
-                }
+                onChange={(e) => {
+                  const next = fromDatetimeLocalValue(e.target.value)
+                  if (next === '') return
+                  patchItem(editing.id, { endAt: next })
+                }}
               />
-            </label>
+            </div>
             <label className="ops-label">
               优先级（小优先）
               <input

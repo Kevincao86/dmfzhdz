@@ -108,6 +108,21 @@ html[data-theme='dark'] .ops-sidebar {
   outline-offset: 1px;
 }
 
+/* 暗色下原生日期框不声明 color-scheme 时，日历按钮点不开、选中文字也看不见 */
+input[type='datetime-local'].ops-field {
+  color-scheme: light;
+  min-height: 2.5rem;
+}
+
+html[data-theme='dark'] input[type='datetime-local'].ops-field {
+  color-scheme: dark;
+}
+
+input[type='datetime-local'].ops-field::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 1;
+}
+
 .ops-label {
   display: block;
   font-size: 0.875rem;
