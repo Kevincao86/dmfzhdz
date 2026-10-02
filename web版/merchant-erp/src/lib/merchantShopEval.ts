@@ -346,8 +346,8 @@ function shopFacts(spec: PlatformSpec, row: ReturnType<typeof normalizeInput>['r
     `分店示例：${filledOr(row.storeNames, spec.scope === 'chain' ? '未列出' : '无')}`,
     `城市：${filledOr(row.city, '未填写')}`,
     `地址：${filledOr(row.address, '未填写')}`,
-    `电话：${filledOr(row.phone, '未填写')}`,
-    `营业时间：${filledOr(row.businessHours, '未填写')}`,
+    `电话：${filledOr(row.phone, '商家档案未填。公开检索里有这一家的号码就写入平台基础搭建')}`,
+    `营业时间：${filledOr(row.businessHours, '商家档案未填。公开检索里有这一家的钟点就写入平台基础搭建。不要把店名里的24时当成营业时间')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, /\d+\s*元|套餐/.test(row.publicNote) ? '公开检索里已经有抖音团购价格，写进短视频与团购，禁止写成未上架' : '未填写，不要编造')}`,
     `经营分类：${filledOr(row.category, '未填写')}`,
@@ -540,7 +540,7 @@ function savedFromCache(cached: Record<string, unknown> | null): {
   profile: ShopEvalProfile | null
 } | null {
   const indicators = mapIndicators(cached?.indicators)
-  if (!cached || cached.sourcesSearch !== 'store-search-v4' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
+  if (!cached || cached.sourcesSearch !== 'store-search-v5' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
   const adviceRaw = cached.advice
   let advice: ShopEvalAdvice | null = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray((adviceRaw as ShopEvalAdvice).sections)) {
@@ -910,11 +910,11 @@ async function doubaoPublicNotes(
   try {
     const text = await askText(
       [
-        '你在用方舟联网检索这一家店。只写检索结果里明确出现的店名、地址、套餐名和价格。',
-        '每条一行，最多 8 行。没出现的价格不要写。禁止写其他品牌、行业参考价和大概区间。',
-        '一条都没有时只输出：无公开团购或探店记录。',
+        '你在用方舟联网检索这一家店。只写检索结果里明确属于这一家的店名、地址、营业时间、联系电话、套餐名和价格。',
+        '每条一行，最多 8 行。其他分店的电话和营业时间不要写。没出现的不要编造，不要根据店名里的「24时」推测全天营业。',
+        '禁止写其他品牌、行业参考价和大概区间。一条都没有时只输出：无公开团购或探店记录。',
       ].join(''),
-      `店名：${name}\n城市：${row.city || ''}\n地址：${row.address || ''}\n分类：${row.category || ''}\n请联网检索团购、探店和点评。`,
+      `店名：${name}\n城市：${row.city || ''}\n地址：${row.address || ''}\n分类：${row.category || ''}\n请联网检索这一家的营业时间、联系电话、团购、探店和点评。`,
       { webSearch: true },
     )
     const lines = String(text || '')
@@ -990,6 +990,7 @@ function publicScoreSystem(focus?: string) {
     chainRule,
     '品牌资产与口碑、门店标准化按品牌在本地的公开认知和门店数量写。没绑定平台账号，只说明这一家地址的后台数据还没接进来，不能把品牌口碑打到 40 分以下。',
     '短视频与团购：检索里出现套餐名、价格或抖音时，点评必须写出套餐和价格，并写明这是已经公开的抖音团购。禁止写暂未上架、未上架、没上架、未检索到、没查到、货盘未启动。',
+    '平台基础搭建：公开检索里出现这一家的营业时间或电话时，点评必须写出具体钟点和号码，禁止写成未完善、未填写、没有电话。没有检索到时，写这次联网没有检索到这一家的营业时间或电话，禁止写成抖音平台上没有、均未完善。其他分店的电话不要写到这一家。',
     '数据复盘可以低，因为用户还没绑定门店账号，后台数还没进来。',
     '周边同类店是别的餐厅，不能用来证明这家没有客流。不要编造距离和门店数量。',
     '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
@@ -1142,7 +1143,7 @@ export async function evaluateShop(
   const score = scoreFromPublic({ ...j, sources }, indicators)
   writeCache(opts.storage, loaded.key, {
     ...score,
-    sourcesSearch: 'store-search-v4',
+    sourcesSearch: 'store-search-v5',
     profile: profileFromRow(row),
     savedAt: new Date().toISOString(),
   })
