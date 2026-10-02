@@ -3528,7 +3528,7 @@ export async function streamBuiltinAgentChatFromMessages(
             model,
             messages: oaiMessages,
             temperature: 0.65,
-            extraBody: qwenAgentChatExtra(model),
+            extraBody: { ...qwenAgentChatExtra(model), enable_search: true },
             timeoutMs: AGENT_STREAM_TIMEOUT_MS,
             signal,
           })) {
@@ -3782,7 +3782,7 @@ export async function merchantAgentChatFromMessages(
     return { text: polishVisibleAssistantText(text), modelUsed }
   }
   const { text, modelUsed } = await withUpstreamChatTimeoutMs(AGENT_STREAM_TIMEOUT_MS, () =>
-    callQwenChat(key, eff, system, user),
+    callQwenChat(key, eff, system, user, opts?.webSearch ? { enable_search: true } : undefined),
   )
   return { text: polishVisibleAssistantText(text), modelUsed }
 }

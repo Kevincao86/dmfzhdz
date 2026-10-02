@@ -1,8 +1,15 @@
 /** OpenAI 兼容 Chat Completions（原生 fetch，避免 SDK 与部分厂商鉴权差异） */
 
 export type OpenAiCompatMessage = {
-  role: 'system' | 'user' | 'assistant'
+  role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
+  tool_call_id?: string
+  name?: string
+  tool_calls?: Array<{
+    id: string
+    type: 'function'
+    function: { name: string; arguments: string }
+  }>
 }
 
 export async function openAiCompatChatFetch(opts: {

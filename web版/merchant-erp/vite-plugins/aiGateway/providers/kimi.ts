@@ -7,6 +7,11 @@ import {
 } from './directLlmEnv.js'
 import { openAiCompatChatFetch, type OpenAiCompatMessage } from './openAiCompatibleFetch.js'
 
+const KIMI_WEB_SEARCH_TOOL = {
+  type: 'builtin_function',
+  function: { name: '$web_search' },
+} as const
+
 function toMessages(messages: AIChatRequest['messages']): OpenAiCompatMessage[] {
   return messages.map((m) => {
     if (m.role === 'tool') return { role: 'user', content: `[tool]\n${m.content}` }
@@ -44,31 +49,83 @@ export async function chatKimi(req: AIChatRequest, env: Record<string, string>):
   const bases = moonshotChatBaseCandidates(env)
   const messages = toMessages(req.messages)
   const temperature = req.temperature ?? 0.6
+  const tools = [...(req.tools ?? []), KIMI_WEB_SEARCH_TOOL]
 
   const attempt = async (): Promise<AIChatResponse | null> => {
     let lastErr = 'Kimi: 请求失败'
     for (const baseURL of bases) {
       for (const model of models) {
         try {
-          const completion = await openAiCompatChatFetch({
-            baseURL,
-            apiKey,
-            model,
-            messages,
-            temperature,
-            ...(req.tools?.length
-              ? { tools: req.tools, tool_choice: req.tool_choice }
-              : {}),
-          })
-          return {
-            provider: 'kimi',
-            model: completion.model,
-            content: completion.content,
-            raw: completion.raw,
-            ...(completion.tool_calls?.length ? { tool_calls: completion.tool_calls } : {}),
+          let roundMessages = messages
+          for (let round = 0; round < 3; round += 1) {
+            const completion = await openAiCompatChatFetch({
+              baseURL,
+              apiKey,
+              model,
+              messages: roundMessages,
+              temperature,
+              tools,
+              tool_choice: req.tools?.length ? req.tool_choice : 'auto',
+            })
+            const calls = completion.tool_calls ?? []
+            const searchCalls = calls.filter((call) => call.function.name === '$web_search')
+            const otherCalls = calls.filter((call) => call.function.name !== '$web_search')
+            if (!searchCalls.length) {
+              return {
+                provider: 'kimi',
+                model: completion.model,
+                content: completion.content,
+                raw: completion.raw,
+                ...(otherCalls.length ? { tool_calls: otherCalls } : {}),
+              }
+            }
+            roundMessages = [
+              ...roundMessages,
+              {
+                role: 'assistant',
+                content: completion.content || '',
+                tool_calls: calls,
+              },
+              ...searchCalls.map((call) => ({
+                role: 'tool' as const,
+                tool_call_id: call.id,
+                name: '$web_search',
+                content: call.function.arguments || '{}',
+              })),
+            ]
+            if (otherCalls.length && round === 2) {
+              return {
+                provider: 'kimi',
+                model: completion.model,
+                content: completion.content,
+                raw: completion.raw,
+                tool_calls: otherCalls,
+              }
+            }
           }
+          lastErr = 'Kimi: 联网搜索未返回正文'
         } catch (e) {
           lastErr = e instanceof Error ? e.message : String(e)
+          if (!/builtin_function|\$web_search|tools/i.test(lastErr)) continue
+          try {
+            const completion = await openAiCompatChatFetch({
+              baseURL,
+              apiKey,
+              model,
+              messages,
+              temperature,
+              ...(req.tools?.length ? { tools: req.tools, tool_choice: req.tool_choice } : {}),
+            })
+            return {
+              provider: 'kimi',
+              model: completion.model,
+              content: completion.content,
+              raw: completion.raw,
+              ...(completion.tool_calls?.length ? { tool_calls: completion.tool_calls } : {}),
+            }
+          } catch (retryErr) {
+            lastErr = retryErr instanceof Error ? retryErr.message : String(retryErr)
+          }
         }
       }
     }

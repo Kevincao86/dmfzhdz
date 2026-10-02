@@ -29,7 +29,9 @@ export async function chatQwenAgent(req: AIChatRequest, env: Record<string, stri
   const mo = req.model?.trim() || undefined
   let qwenErr = ''
   try {
-    const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'qwen', mo, system, user)
+    const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'qwen', mo, system, user, {
+      webSearch: true,
+    })
     return {
       provider: 'qwen',
       model: modelUsed,

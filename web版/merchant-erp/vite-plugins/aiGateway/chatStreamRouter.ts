@@ -4,9 +4,6 @@ import { registryEntry } from '../../src/services/ai/modelRegistry.js'
 import { assertDistinctFromTokenMix, looksLikeJwtCredential } from '../../src/lib/aiVendorKeyValidate.js'
 import { looksLikeMinimaxJwtKey } from '../merchantRegistryVendorEnv.js'
 import {
-  moonshotChatBaseCandidates,
-  moonshotChatModelCandidates,
-  resolveMoonshotApiKey,
   minimaxChatBaseCandidates,
   minimaxChatModelCandidates,
   resolveMinimaxApiKey,
@@ -117,36 +114,11 @@ async function streamKimi(
   onDelta: AiStreamDeltaHandler,
   signal?: AbortSignal,
 ): Promise<{ model: string }> {
-  const apiKey = resolveMoonshotApiKey(env)
-  if (!apiKey) throw new Error('MOONSHOT_API_KEY 未配置')
-  if (looksLikeJwtCredential(apiKey)) {
-    throw new Error('Kimi Key 须为 sk- 开头 API Key，勿填 JWT')
-  }
-  assertDistinctFromTokenMix('Kimi', apiKey, env.TOKENMIX_API_KEY)
-  const models = moonshotChatModelCandidates(env, req.model)
-  const bases = moonshotChatBaseCandidates(env)
-  const messages = toOpenAiMessages(req.messages)
-  const baseURL = bases[0]
-  const model = models[0]
-  if (!baseURL || !model) throw new Error('Kimi: 未配置模型或 Base URL')
-  try {
-    await consumeGenerator(
-      openAiCompatChatStream({
-        url: `${baseURL.replace(/\/$/, '')}/chat/completions`,
-        apiKey,
-        model,
-        messages,
-        temperature: req.temperature ?? 0.6,
-        extraBody: agentStreamExtra(),
-        timeoutMs: AGENT_STREAM_TIMEOUT_MS,
-        signal,
-      }),
-      onDelta,
-    )
-    return { model }
-  } catch (e) {
-    throw new Error(e instanceof Error ? e.message : String(e))
-  }
+  if (signal?.aborted) throw new Error('Kimi: 已取消')
+  const { chatKimi } = await import('./providers/kimi.js')
+  const res = await chatKimi({ ...req, tools: undefined, tool_choice: undefined }, env)
+  if (res.content) onDelta({ content: res.content })
+  return { model: res.model }
 }
 
 async function streamAimodelserver(
