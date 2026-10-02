@@ -3625,14 +3625,14 @@ async function postDoubaoResponsesSearch(
     body: JSON.stringify({
       model,
       stream: false,
-      tools: [{ type: 'web_search', max_keyword: 3, limit: 10, sources: ['search_engine', 'douyin', 'toutiao'] }],
+      tools: [{ type: 'web_search', max_keyword: 3, limit: 10, sources: ['search_engine'] }],
       ...(withThinkingOff ? { thinking: { type: 'disabled' } } : {}),
       input: [
         { role: 'system', content: [{ type: 'input_text', text: system }] },
         { role: 'user', content: [{ type: 'input_text', text: user }] },
       ],
     }),
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(60_000),
   })
   const data = await readJson(res)
   if (!res.ok) throw new Error(upstreamErrorMessage(data, res.status))
