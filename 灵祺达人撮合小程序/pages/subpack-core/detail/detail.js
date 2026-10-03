@@ -32,8 +32,6 @@ const subpageNav = require('../../../utils/subpageNav.js')
 const mpTargetedRecruit = require('../../../utils/mpTargetedRecruit.js')
 const mpTargetedRecruitApi = require('../../../utils/mpTargetedRecruitApi.js')
 const participant = require('../../../utils/participant.js')
-const switchWorkIdentity = require('../../../utils/switchWorkIdentity.js')
-const identityTypes = require('../../../utils/identityTypes.js')
 
 function padTimeHm(raw) {
   const s = String(raw || '').trim()
@@ -1700,34 +1698,10 @@ Page({
       })
       return
     }
-    const target = switchWorkIdentity.claimSwitchTarget(verdict.code)
-    if (!target) {
-      wx.showToast({ title: verdict.message || '当前不能报名', icon: 'none' })
-      return
-    }
-    const label = identityTypes.workIdentityLabel(target)
     wx.showModal({
-      title: '当前身份不能报名',
-      content: `${verdict.message}。切换为「${label}」后可以继续，不用重新登录。`,
-      confirmText: '切换',
-      success: async (res) => {
-        if (!res.confirm) return
-        wx.showLoading({ title: '切换中', mask: true })
-        try {
-          const result = await switchWorkIdentity.applyWorkIdentitySwitch(target)
-          wx.hideLoading()
-          if (!result || result.needsReLogin) {
-            wx.showToast({ title: (result && result.cloudWarning) || '请重新登录', icon: 'none' })
-            return
-          }
-          const member = memberStore.readMember()
-          if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, target)) return
-          this.goApply()
-        } catch (e) {
-          wx.hideLoading()
-          wx.showToast({ title: '切换失败', icon: 'none' })
-        }
-      },
+      title: '当前版本不能报名',
+      content: verdict.message || '当前账号版本不能报名这条招募。身份在注册时已确定。',
+      showCancel: false,
     })
   },
   goApply() {
@@ -1735,7 +1709,7 @@ Page({
     const v = this.data.view
     if (v && v.isFormRelay) {
     if (userProfile.readIdentity() === 'pr') {
-      this.offerClaimIdentitySwitch({ code: 'wrong_identity', message: '请切换为达人身份后再报名' })
+      this.offerClaimIdentitySwitch({ code: 'wrong_identity', message: '当前是 PR 版本，不能报名。身份在注册时已确定。' })
       return
     }
     if (!auth.isLoggedIn()) {

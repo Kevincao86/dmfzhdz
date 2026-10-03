@@ -26,10 +26,17 @@
   <view class="login-stack">
     <view class="login-shell">
       <view class="login-main">
-        <view class="login-id-badge" wx:if="{{loginIdentity}}">
-          <image class="login-id-badge__icon" src="{{loginIdentityIcon}}" mode="aspectFit" />
-          <text class="login-id-badge__text">登录身份 · {{loginIdentityLabel}}</text>
-          <view class="login-id-badge__check">✓</view>
+        <view class="login-id-pick" wx:if="{{tab==='wx' || tab==='reg'}}">
+          <text class="login-id-pick__hint">新用户请选择身份，选定后不可更改</text>
+          <view class="login-id-pick__row">
+            <view
+              wx:for="{{identityOptions}}"
+              wx:key="id"
+              class="login-id-chip {{newIdentity===item.id ? 'login-id-chip--on' : ''}}"
+              data-id="{{item.id}}"
+              bindtap="onPickNewIdentity"
+            >{{item.label}}</view>
+          </view>
         </view>
 
         <view class="login-tabs lq-gradient-tabs">

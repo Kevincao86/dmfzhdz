@@ -34,11 +34,9 @@ import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import VisitScheduleTalentPanel from '../components/mp/VisitScheduleTalentPanel'
 import VisitPublishLinkPanel from '../components/mp/VisitPublishLinkPanel'
 import TalentUploadedVideoPreviewModal from '../components/mp/TalentUploadedVideoPreviewModal'
-import { getWorkIdentity, workIdentityLabel } from '../lib/mpWorkIdentity'
-import { applyWorkIdentitySwitch } from '../lib/switchWorkIdentity'
-import { triggerShellRefresh } from '../lib/shellRefresh'
+import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
-import { claimBlockHint, claimIdentityForOrder, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
+import { claimBlockHint, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
 import { isIceSlotsFull } from '../lib/mpRecruitment/iceOrderStats'
 import {
   formatSignupCountdownText,
@@ -204,7 +202,6 @@ export default function RecruitmentDetailPage() {
       ? claimBlockHint(mpRaw, workIdentity)
       : ''
   const claimCode = claimVerdict.ok ? '' : claimVerdict.code
-  const canSwitchToClaim = claimCode !== '' && claimCode !== 'slots_full' && claimCode !== 'targeted_invite_only'
   const formRelaySourceUrl = (() => {
     const meta =
       mpRaw?.mpPublishMeta && typeof mpRaw.mpPublishMeta === 'object'
@@ -340,26 +337,11 @@ export default function RecruitmentDetailPage() {
     }
   }
 
-  async function switchClaimIdentity() {
-    if (!mpRaw) return false
-    const next = claimIdentityForOrder(mpRaw)
-    const result = await applyWorkIdentitySwitch(next)
-    if (result.needsReLogin) {
-      nav(`/login?role=${next}`)
-      return false
-    }
-    clearMpRegistryCache()
-    triggerShellRefresh()
-    setIdentityEpoch((n) => n + 1)
-    return true
-  }
-
   function goApply() {
     if (!view || !id) return
     if (view.isFormRelay) {
       if (role === 'pr') {
-        const ok = window.confirm('请切换为达人身份再打开原表。现在切换？不用退出登录。')
-        if (ok) void switchClaimIdentity()
+        window.alert('当前是 PR 版本，不能打开原表报名。身份在注册时已确定。')
         return
       }
       openFormRelaySource()
@@ -376,20 +358,7 @@ export default function RecruitmentDetailPage() {
         return
       }
       if (!verdict.ok && verdict.code !== 'slots_full' && mpRaw) {
-        const next = claimIdentityForOrder(mpRaw)
-        const ok = window.confirm(`${applyGateHint}\n\n切换为「${workIdentityLabel(next)}」后继续报名？不用退出登录。`)
-        if (!ok) return
-        void switchClaimIdentity().then((switched) => {
-          if (!switched || !view || !id) return
-          const meta = mpRaw?.mpPublishMeta as { applyFormTemplateId?: string } | undefined
-          const q = new URLSearchParams({
-            platform: view.platform,
-            merchantOrderNo: view.merchantOrderNo,
-          })
-          if (view.isIce) q.set('ice', '1')
-          if (meta?.applyFormTemplateId) q.set('templateId', meta.applyFormTemplateId)
-          nav(`/recruitment/${encodeURIComponent(id)}/apply?${q}`)
-        })
+        window.alert(applyGateHint || '当前版本不能报名。身份在注册时已确定。')
         return
       }
       window.alert(applyGateHint)
@@ -891,11 +860,6 @@ export default function RecruitmentDetailPage() {
           {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed && applyGateHint ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               <p>{applyGateHint}</p>
-              {canSwitchToClaim ? (
-                <button type="button" className="mt-2 font-semibold text-violet-700" onClick={goApply}>
-                  切换身份并报名
-                </button>
-              ) : null}
               {claimCode === 'targeted_invite_only' ? (
                 <button type="button" className="mt-2 font-semibold text-violet-700" onClick={goApply}>
                   前往我的邀约
@@ -914,12 +878,7 @@ export default function RecruitmentDetailPage() {
 
           {role === 'pr' ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
-              <p>
-                当前是 PR 身份，不能报名。切换为「{workIdentityLabel(claimIdentityForOrder(mpRaw))}」后可以报名，不用退出登录。
-              </p>
-              <button type="button" className="mt-2 font-semibold text-violet-700" onClick={() => void switchClaimIdentity()}>
-                切换身份
-              </button>
+              <p>当前是 PR 版本，不能报名。身份在注册时已确定。</p>
             </div>
           ) : null}
               </div>

@@ -3,7 +3,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import PlatformDecorDrHost from './PlatformDecorDrHost'
 import ThemeToggle from './ThemeToggle'
-import IdentitySwitchPanel from './IdentitySwitchPanel'
 import AppTopBar from './AppTopBar'
 import { clearSession, getAccount, getActiveRole } from '../lib/mpSession'
 import { clearMpRegistryCache } from '../lib/mpApi'
@@ -132,7 +131,7 @@ export default function AppShell() {
 
           <div className="xx-header-actions">
             <div className="xx-header-tools flex">
-              <IdentitySwitchPanel />
+              <span className="px-3 text-sm text-[var(--shell-muted)]">{WORK_EDITION_LABEL[getWorkIdentity()]}</span>
               <ThemeToggle />
               <button type="button" className="xx-logout-btn xx-logout-btn--inline" onClick={logout}>
                 退出

@@ -62,14 +62,10 @@ function ensureMemberProfileForApplyOrRedirect(member, workIdentity) {
   const err = validateMemberProfileForApply(member, workIdentity)
   if (!err) return true
   if (String(workIdentity || '').trim() === 'pr') {
-    const switchWorkIdentity = require('./switchWorkIdentity.js')
     wx.showModal({
-      title: '切换身份',
-      content: '报名需要达人、拍摄或剪辑身份，切换后不用重新登录。',
-      confirmText: '去切换',
-      success(res) {
-        if (res.confirm) void switchWorkIdentity.promptPickIdentity()
-      },
+      title: '当前版本不能报名',
+      content: '当前是 PR 版本，不能报名。身份在注册时已确定。',
+      showCancel: false,
     })
     return false
   }

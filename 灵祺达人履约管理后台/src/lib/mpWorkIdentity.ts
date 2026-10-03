@@ -29,6 +29,15 @@ export function workIdentityToAccountRole(id: MpWorkIdentity): 'talent' | 'pr' {
   return id === 'pr' ? 'pr' : 'talent'
 }
 
+export function identityFromAccount(
+  account?: { workIdentity?: string | null; activeRole?: string | null } | null,
+): MpWorkIdentity {
+  const raw = account?.workIdentity
+  if (raw === 'talent' || raw === 'shoot' || raw === 'edit' || raw === 'pr') return raw
+  if (account?.activeRole === 'pr') return 'pr'
+  return 'talent'
+}
+
 export function getWorkIdentity(): MpWorkIdentity {
   const v = localStorage.getItem(KEY)
   if (v === 'pr' || v === 'shoot' || v === 'edit') return v

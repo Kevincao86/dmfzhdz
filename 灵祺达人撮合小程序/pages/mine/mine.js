@@ -739,21 +739,6 @@ Page({
   onGoLoginPage() {
     guestRoutes.redirectToLogin('/pages/mine/mine')
   },
-  async onSwitchIdentity() {
-    if (!auth.isLoggedIn()) {
-      wx.reLaunch({ url: '/pages/welcome/welcome' })
-      return
-    }
-    const prev = userProfile.readIdentity()
-    const result = await switchWorkIdentity.promptPickIdentity()
-    if (!result || result.workId === prev) return
-    if (result.needsReLogin) {
-      wx.showToast({ title: result.cloudWarning || '请重新登录', icon: 'none' })
-      return
-    }
-    if (result.cloudWarning) wx.showToast({ title: result.cloudWarning, icon: 'none' })
-    wx.reLaunch({ url: '/pages/index/index' })
-  },
   onCloseWxLoginSheet() {
     this.setData({ showWxLoginSheet: false })
     setTabBarHidden(this, false)
@@ -792,32 +777,14 @@ Page({
       })
       return
     }
-    const identity = userProfile.readIdentity()
-    if (!identityTypes.isWorkIdentity(identity)) {
-      wx.showToast({ title: '请先选择登录身份', icon: 'none' })
+    if (!auth.isLoggedIn()) {
       wx.navigateTo({ url: '/pages/login/login' })
       return
     }
     wxProfileDisplay.writeWxProfileCache({ wxNickName: nick, wxAvatarUrl: avatar })
     this.setData({ wxLoginSubmitting: true, profileNick: nick, avatarUrl: avatar, displayName: nick })
     try {
-      const role = identityTypes.accountRoleForWorkIdentity(identity)
-      let data
-      if (auth.isLoggedIn()) {
-        await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
-      } else {
-        data = await auth.wxLogin({
-          role,
-          wxNickName: nick,
-          wxAvatarUrl: avatar,
-        })
-        await switchWorkIdentity.applyWorkIdentityAfterLogin(
-          (data && data.token) || auth.readSessionToken(),
-          auth.readAccount() || (data && data.account),
-          identity,
-        )
-        await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
-      }
+      await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
       try {
         await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
       } catch (_) {}

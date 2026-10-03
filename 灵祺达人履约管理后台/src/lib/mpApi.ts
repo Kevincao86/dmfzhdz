@@ -344,12 +344,14 @@ export async function phoneRegister(input: {
   smsCode: string
   password: string
   role: 'talent' | 'pr'
+  workIdentity?: 'talent' | 'pr' | 'shoot' | 'edit'
 }) {
   const data = await mpAuthRequest('register', {
     phone: input.phone.trim(),
     smsCode: input.smsCode.trim(),
     password: input.password,
-    role: input.role,
+    role: input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent',
+    workIdentity: input.workIdentity,
   })
   return {
     token: String(data.token),

@@ -14,12 +14,7 @@ import type { MpAccount } from '../lib/mpSession'
 import { enterDevPreview } from '../lib/mpSession'
 import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
-import {
-  parseWorkIdentityQuery,
-  setWorkIdentity,
-  workIdentityToAccountRole,
-  type MpWorkIdentity,
-} from '../lib/mpWorkIdentity'
+import { workIdentityToAccountRole } from '../lib/mpWorkIdentity'
 import TalentLoginAuthPanel, { type LoginTab } from './login/TalentLoginAuthPanel'
 
 const AUTH_SHELL = cn(
@@ -30,17 +25,10 @@ const AUTH_SHELL = cn(
 
 const REMEMBER_SCOPE = 'fulfillment'
 
-function parseLoginWorkIdentity(raw: string | null): MpWorkIdentity | null {
-  if (!raw) return null
-  const id = parseWorkIdentityQuery(raw)
-  return raw === id ? id : null
-}
-
 export default function LoginPage() {
   const nav = useNavigate()
   const [params] = useSearchParams()
-  const roleFromUrl = parseLoginWorkIdentity(params.get('role'))
-  const workIdentity = roleFromUrl ?? 'talent'
+  const workIdentity = 'talent' as const
 
   const [tab, setTab] = useState<LoginTab>('password')
   const [loginName, setLoginName] = useState('')
@@ -57,11 +45,6 @@ export default function LoginPage() {
       setRememberPassword(true)
     }
   }, [])
-
-  useEffect(() => {
-    if (!roleFromUrl) nav('/', { replace: true })
-    else setWorkIdentity(roleFromUrl)
-  }, [roleFromUrl, nav])
 
   async function onPasswordLogin() {
     setErr('')
@@ -92,8 +75,6 @@ export default function LoginPage() {
     enterDevPreview(workIdentityToAccountRole(workIdentity))
     nav('/hall', { replace: true })
   }
-
-  if (!roleFromUrl) return null
 
   return (
     <div
@@ -152,7 +133,7 @@ export default function LoginPage() {
         />
         <p className="mt-4 text-center text-sm text-slate-600">
           还没有账号？{' '}
-          <Link to={`/register?role=${workIdentity}`} className="font-semibold text-violet-600 underline">
+          <Link to="/register" className="font-semibold text-violet-600 underline">
             手机号注册
           </Link>
         </p>

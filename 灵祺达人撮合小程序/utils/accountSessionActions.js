@@ -6,7 +6,7 @@ function goLogin() {
 }
 
 function goWelcome() {
-  wx.reLaunch({ url: '/pages/welcome/welcome' })
+  wx.reLaunch({ url: '/pages/login/login' })
 }
 
 /** 切换账号：清除会话与缓存，前往登录页换号 */
@@ -24,11 +24,11 @@ function switchAccount() {
   })
 }
 
-/** 退出登录：清除会话与微信展示信息，回到开屏选身份 */
+/** 退出登录：清除会话与微信展示信息，回到登录页 */
 function logout() {
   wx.showModal({
     title: '退出登录',
-    content: '退出后将清除本机全部报名、资料与消息缓存，避免串到其他账号；需重新选择身份进入。',
+    content: '退出后将清除本机全部报名、资料与消息缓存，避免串到其他账号。',
     confirmText: '退出',
     confirmColor: '#dc2626',
     success(res) {

@@ -18,6 +18,17 @@ function readIdentity() {
   }
 }
 
+function adoptAccountIdentity(account) {
+  const raw = account && account.workIdentity
+  const id = identityTypes.isWorkIdentity(raw)
+    ? raw
+    : account && account.activeRole === 'pr'
+      ? 'pr'
+      : 'talent'
+  writeIdentity(id)
+  return id
+}
+
 function writeIdentity(id) {
   wx.setStorageSync(
     IDENTITY_KEY,
@@ -104,6 +115,7 @@ module.exports = {
   IDENTITIES,
   readIdentity,
   writeIdentity,
+  adoptAccountIdentity,
   identityLabel,
   isSupplierIdentity,
   readPrProfile,

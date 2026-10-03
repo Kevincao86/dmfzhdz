@@ -1,19 +1,10 @@
-import { ensureIdentity } from './mpApi'
-import {
-  DEV_PREVIEW_TOKEN,
-  getAccount,
-  getActiveRole,
-  getToken,
-  isDevPreviewSession,
-  setActiveRole,
-  setSession,
-  type MpAccount,
-} from './mpSession'
+import { setActiveRole, setSession, type MpAccount } from './mpSession'
 import { readMember, writeMember } from './mpSync/talentMember'
 import { emptyAllProfiles } from './mpSync/talentPlatformProfiles'
 import { emptyPrProfile, readPrProfile, writePrProfile } from './mpSync/userProfile'
 import {
   getWorkIdentity,
+  identityFromAccount,
   setWorkIdentity,
   workIdentityToAccountRole,
   type MpWorkIdentity,
@@ -24,10 +15,6 @@ export type WorkIdentitySwitchResult = {
   cloudWarning?: string
   /** 会话失效时需以目标身份重新登录以完成 ID 注册 */
   needsReLogin?: boolean
-}
-
-function isSessionCloudError(msg: string): boolean {
-  return /invalid_session|account_not_found|invalid_credentials/i.test(msg)
 }
 
 function supplierTagsForWorkId(workId: MpWorkIdentity): string[] {
@@ -85,104 +72,24 @@ function syncLocalProfilesFromAccount(account: MpAccount, workId?: MpWorkIdentit
   }
 }
 
-function workIdentityForApi(workId: MpWorkIdentity): 'talent' | 'shoot' | 'edit' | undefined {
-  if (workId === 'shoot' || workId === 'edit') return workId
-  if (workId === 'talent') return 'talent'
-  return undefined
-}
-
-function identitySatisfied(workId: MpWorkIdentity, account: MpAccount): boolean {
-  const role = workIdentityToAccountRole(workId)
-  if (role === 'pr') return Boolean(account.lingqiPrId)
-  if (workId === 'shoot') return Boolean(account.lingqiShootTeamId)
-  if (workId === 'edit') return Boolean(account.lingqiEditTeamId)
-  return Boolean(account.lingqiTalentId)
-}
-
-/** 同一账号切换工作台身份（达人/拍摄/剪辑/PR），并自动注册对应系统 ID */
-export async function applyWorkIdentitySwitch(next: MpWorkIdentity): Promise<WorkIdentitySwitchResult> {
-  const prev = getWorkIdentity()
-  const accountRole = workIdentityToAccountRole(next)
-  if (next === prev) {
-    if (getActiveRole() !== accountRole) setActiveRole(accountRole)
-    return { workId: prev }
-  }
-
-  setWorkIdentity(next)
-
-  if (isDevPreviewSession()) {
-    const acc = getAccount()
-    if (acc) {
-      const updated: MpAccount = {
-        ...acc,
-        activeRole: accountRole,
-        lingqiTalentId: acc.lingqiTalentId || 'T-DEV-001',
-        lingqiPrId: acc.lingqiPrId || 'PR-DEV-001',
-      }
-      setSession(DEV_PREVIEW_TOKEN, updated)
-      setActiveRole(accountRole)
-      syncLocalProfilesFromAccount(updated, next)
-    }
-    return { workId: next }
-  }
-
-  const token = getToken()
-  if (!token) {
-    setActiveRole(accountRole)
-    return {
-      workId: next,
-      needsReLogin: true,
-      cloudWarning: '请重新登录以完成身份注册',
-    }
-  }
-
-  try {
-    const { account } = await ensureIdentity(accountRole, workIdentityForApi(next))
-    setSession(token, account)
-    setActiveRole(accountRole)
-    syncLocalProfilesFromAccount(account, next)
-    if (!identitySatisfied(next, account)) {
-      return {
-        workId: next,
-        cloudWarning: '已切换身份，团队 ID 同步中，请稍后刷新',
-      }
-    }
-    return { workId: next }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    if (isSessionCloudError(msg)) {
-      setActiveRole(accountRole)
-      const acc = getAccount()
-      if (acc) syncLocalProfilesFromAccount(acc, next)
-      return {
-        workId: next,
-        needsReLogin: true,
-        cloudWarning: '登录已过期，请重新登录以完成身份注册',
-      }
-    }
-    throw e
+/** 身份在注册时确定，登录后不能再切换 */
+export async function applyWorkIdentitySwitch(_next: MpWorkIdentity): Promise<WorkIdentitySwitchResult> {
+  return {
+    workId: getWorkIdentity(),
+    cloudWarning: '身份在注册时已确定，不能切换',
   }
 }
 
-/** 登录成功后绑定工作台身份并生成对应 ID */
+/** 登录成功后采用账号库里的身份 */
 export async function applyWorkIdentityAfterLogin(
   token: string,
   account: MpAccount,
-  workId: MpWorkIdentity,
+  _workId?: MpWorkIdentity,
 ): Promise<MpAccount> {
-  const accountRole = workIdentityToAccountRole(workId)
+  const workId = identityFromAccount(account)
   setWorkIdentity(workId)
-  setSession(token, account)
-  setActiveRole(accountRole)
-  try {
-    const { account: next } = await ensureIdentity(accountRole, workIdentityForApi(workId))
-    setSession(token, next)
-    setActiveRole(accountRole)
-    syncLocalProfilesFromAccount(next, workId)
-    return next
-  } catch {
-    setActiveRole(accountRole)
-    syncLocalProfilesFromAccount(account, workId)
-    return account
-  }
+  setSession(token, { ...account, workIdentity: workId })
+  setActiveRole(workIdentityToAccountRole(workId))
+  syncLocalProfilesFromAccount(account, workId)
+  return account
 }

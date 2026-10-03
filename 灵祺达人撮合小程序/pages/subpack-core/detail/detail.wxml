@@ -504,7 +504,7 @@
       wx:if="{{!applied && isPr}}"
       class="detail-bottom-v2__cta detail-bottom-v2__cta--muted"
       bindtap="goApply"
-    >请切换身份后再报名</button>
+    >当前版本不能报名</button>
     <button
       wx:elif="{{applied && showCheckInBtn}}"
       class="detail-bottom-v2__cta {{checkInReady ? '' : 'detail-bottom-v2__cta--muted'}}"

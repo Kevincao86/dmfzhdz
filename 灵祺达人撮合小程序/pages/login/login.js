@@ -46,16 +46,12 @@ function openLegalPrompt(page, workId, action) {
   })
 }
 
-function requireLoginIdentity(page) {
-  const id = identityTypes.isWorkIdentity(page.data.loginIdentity)
-    ? page.data.loginIdentity
-    : userProfile.readIdentity()
+function requireNewIdentity(page) {
+  const id = page.data.newIdentity
   if (!identityTypes.isWorkIdentity(id)) {
-    page.setData({ err: '请返回开屏页重新选择身份' })
+    page.setData({ err: '请先选择新用户身份，选定后不可更改' })
     return null
   }
-  userProfile.writeIdentity(id)
-  syncLoginIdentityFromProfile(page)
   return id
 }
 
@@ -69,25 +65,9 @@ function syncLoginIdentityFromProfile(page) {
   })
 }
 
-async function applyLoginIdentity(data, workId) {
-  const role = identityTypes.accountRoleForWorkIdentity(workId)
-  if (data && data.token && data.account) {
-    const already = data.account.activeRole === role
-    if (!already) {
-      try {
-        await auth.switchRole(role)
-      } catch (_) {}
-    }
-    await switchWorkIdentity.applyWorkIdentityAfterLogin(
-      data.token || auth.readSessionToken(),
-      auth.readAccount() || data.account,
-      workId,
-    )
-  } else {
-    try {
-      await switchWorkIdentity.ensureWorkIdentityIfNeeded()
-    } catch (_) {}
-  }
+async function applyLoginIdentity(data) {
+  const account = (data && data.account) || auth.readAccount()
+  if (account) userProfile.adoptAccountIdentity(account)
 }
 
 function navigateAfterLogin(page) {
@@ -208,6 +188,8 @@ Page({
   ],
   data: {
     tab: 'wx',
+    newIdentity: '',
+    identityOptions: identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id]),
     loginIdentity: '',
     loginIdentityLabel: '',
     loginIdentityIcon: '',
@@ -404,7 +386,7 @@ Page({
     wx.navigateBack({
       delta: 1,
       fail: () => {
-        wx.reLaunch({ url: '/pages/welcome/welcome' })
+        wx.switchTab({ url: '/pages/index/index' })
       },
     })
   },
@@ -523,8 +505,14 @@ Page({
     wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
   },
 
+  onPickNewIdentity(e) {
+    const id = e.currentTarget.dataset.id
+    if (!identityTypes.isWorkIdentity(id)) return
+    this.setData({ newIdentity: id, err: '' })
+  },
+
   onWxLogin() {
-    const workId = requireLoginIdentity(this)
+    const workId = requireNewIdentity(this)
     if (!workId) return
     if (!this.data.legalAgreed) {
       openLegalPrompt(this, workId, 'wx')
@@ -632,6 +620,7 @@ Page({
       const role = identityTypes.accountRoleForWorkIdentity(workId)
       const data = await auth.wxLogin({
         role,
+        workIdentity: workId,
         wxNickName: nick,
         wxAvatarUrl: avatar,
         code,
@@ -652,7 +641,7 @@ Page({
           duration: 2500,
         })
       }
-      await applyLoginIdentity(data, workId)
+      await applyLoginIdentity(data)
       await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar, {
         alreadyPersisted: true,
         skipRemote: true,
@@ -678,20 +667,18 @@ Page({
   },
 
   async onPwdLogin() {
-    const workId = requireLoginIdentity(this)
-    if (!workId) return
     if (!this.data.legalAgreed) {
-      openLegalPrompt(this, workId, 'pwd')
+      openLegalPrompt(this, 'talent', 'pwd')
       return
     }
-    await this.doPwdLogin(workId)
+    await this.doPwdLogin()
   },
 
   async doPwdLogin(workId) {
     this.setData({ loading: true, err: '' })
     try {
       const data = await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
-      await applyLoginIdentity(data, workId)
+      await applyLoginIdentity(data)
       await navigateAfterLogin(this)
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '登录失败' })
@@ -728,13 +715,11 @@ Page({
   },
 
   async onSmsLogin() {
-    const workId = requireLoginIdentity(this)
-    if (!workId) return
     if (!this.data.legalAgreed) {
-      openLegalPrompt(this, workId, 'sms')
+      openLegalPrompt(this, 'talent', 'sms')
       return
     }
-    await this.doSmsLogin(workId)
+    await this.doSmsLogin()
   },
 
   async doSmsLogin(workId) {
@@ -750,7 +735,7 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       const data = await auth.smsLogin(this.data.smsPhone, this.data.smsLoginCode)
-      await applyLoginIdentity(data, workId)
+      await applyLoginIdentity(data)
       await navigateAfterLogin(this)
     } catch (e) {
       const msg = e && e.message ? e.message : '登录失败'
@@ -790,7 +775,7 @@ Page({
   },
 
   async onRegister() {
-    const workId = requireLoginIdentity(this)
+    const workId = requireNewIdentity(this)
     if (!workId) return
     if (!this.data.legalAgreed) {
       openLegalPrompt(this, workId, 'reg')
@@ -821,9 +806,10 @@ Page({
         smsCode: this.data.regSmsCode,
         password: this.data.regPassword,
         role,
+        workIdentity: workId,
       })
       wx.showToast({ title: '注册成功', icon: 'success' })
-      await applyLoginIdentity(data, workId)
+      await applyLoginIdentity(data)
       await navigateAfterLogin(this)
     } catch (e) {
       this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
@@ -854,7 +840,7 @@ Page({
       })
     })
     if (!confirmed) return
-    const workId = this.data.pendingWorkIdForBind || requireLoginIdentity(this)
+    const workId = this.data.pendingWorkIdForBind || userProfile.readIdentity()
     if (!workId) return
     this.setData({ loading: true, err: '' })
     try {
@@ -862,7 +848,7 @@ Page({
         phone,
         platform: 'wx',
       })
-      await applyLoginIdentity(data, workId)
+      await applyLoginIdentity(data)
       this.setData({
         showPhoneBindSheet: false,
         bindPhone: '',

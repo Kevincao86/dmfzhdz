@@ -121,6 +121,9 @@ function syncLocalProfilesFromAccount(account) {
 
 function afterAuthSuccess(data) {
   if (!data || !data.account) return data
+  try {
+    require('./userProfile.js').adoptAccountIdentity(data.account)
+  } catch (_) {}
   syncLocalProfilesFromAccount(data.account)
   return data
 }

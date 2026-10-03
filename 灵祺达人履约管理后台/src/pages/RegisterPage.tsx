@@ -4,23 +4,22 @@ import { cn } from '../cn'
 import { phoneRegister, sendRegisterSms } from '../lib/mpApi'
 import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
 import { formatMpApiErr } from '../lib/mpApiErrors'
-import {
-  parseWorkIdentityQuery,
-  setWorkIdentity,
-  workIdentityToAccountRole,
-  WORK_EDITION_LABEL,
-} from '../lib/mpWorkIdentity'
+import { WORK_EDITION_LABEL, workIdentityToAccountRole, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 
 function normalizePhone(raw: string) {
   const digits = raw.replace(/\D/g, '')
   return /^1\d{10}$/.test(digits) ? digits : ''
 }
 
+const IDENTITY_OPTIONS: MpWorkIdentity[] = ['talent', 'shoot', 'edit', 'pr']
+
 export default function RegisterPage() {
   const nav = useNavigate()
   const [params] = useSearchParams()
-  const workIdentity = parseWorkIdentityQuery(params.get('role'))
-  const accountRole = workIdentityToAccountRole(workIdentity)
+  const preset = params.get('role')
+  const [workIdentity, setWorkIdentity] = useState<MpWorkIdentity>(
+    preset === 'pr' || preset === 'shoot' || preset === 'edit' || preset === 'talent' ? preset : 'talent',
+  )
 
   const [phone, setPhone] = useState('')
   const [smsCode, setSmsCode] = useState('')
@@ -80,7 +79,8 @@ export default function RegisterPage() {
         phone: p,
         smsCode: smsCode.trim(),
         password,
-        role: accountRole,
+        role: workIdentityToAccountRole(workIdentity),
+        workIdentity,
       })
       await applyWorkIdentityAfterLogin(token, account, workIdentity)
       nav('/hall', { replace: true })
@@ -102,10 +102,25 @@ export default function RegisterPage() {
         onSubmit={onSubmit}
         className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-xl backdrop-blur-xl space-y-4"
       >
-        <h1 className="text-xl font-bold">注册 · {WORK_EDITION_LABEL[workIdentity]}</h1>
-        <p className="text-sm text-slate-500">
-          手机号将作为登录账号；切换身份请退出登录，在首页重新选择身份后登录
-        </p>
+        <h1 className="text-xl font-bold">注册</h1>
+        <p className="text-sm text-slate-500">手机号将作为登录账号。身份选定后不可更改，登录时自动进入对应版本。</p>
+        <div className="flex flex-wrap gap-2">
+          {IDENTITY_OPTIONS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={cn(
+                'rounded-full border px-3 py-1.5 text-sm',
+                workIdentity === id
+                  ? 'border-violet-600 bg-violet-50 font-semibold text-violet-700'
+                  : 'border-slate-200 text-slate-700',
+              )}
+              onClick={() => setWorkIdentity(id)}
+            >
+              {WORK_EDITION_LABEL[id]}
+            </button>
+          ))}
+        </div>
 
         <label className="block text-sm">
           <span className="text-slate-600">手机号</span>
@@ -165,7 +180,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-slate-500">
           已有账号？{' '}
-          <Link to={`/login?role=${workIdentity}`} className="text-violet-600 underline">
+          <Link to="/login" className="text-violet-600 underline">
             去登录
           </Link>
         </p>

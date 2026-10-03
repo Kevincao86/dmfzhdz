@@ -135,68 +135,24 @@ async function finalizeAccountForWorkId(workId, account) {
 /** 进入资料页 / 登录后：按当前工作台身份 ensure 并刷新团队/达人 ID */
 async function ensureWorkIdentityIfNeeded() {
   if (!auth.isLoggedIn()) return null
-  const workId = userProfile.readIdentity()
-  if (workId !== 'shoot' && workId !== 'edit' && workId !== 'talent') return auth.readAccount()
-  const accountRole = identityTypes.accountRoleForWorkIdentity(workId)
   try {
-    await auth.ensureIdentity(accountRole, workIdentityForApi(workId))
-  } catch (_) {
-    try {
-      await auth.refreshSession()
-    } catch (_2) {}
-  }
-  return finalizeAccountForWorkId(workId, auth.readAccount())
-}
-
-async function applyWorkIdentitySwitch(next) {
-  const prev = userProfile.readIdentity()
-  if (!next || next === prev) return { workId: prev }
-
-  const accountRole = identityTypes.accountRoleForWorkIdentity(next)
-  userProfile.writeIdentity(next)
-
-  if (!auth.isLoggedIn()) {
-    return { workId: next, needsReLogin: true, cloudWarning: '请登录以完成身份注册' }
-  }
-
-  try {
-    try {
-      await auth.ensureIdentity(accountRole, workIdentityForApi(next))
-    } catch (e) {
-      const msg = String(e?.message || e)
-      if (/invalid_session|account_not_found|invalid_credentials/i.test(msg)) {
-        return { workId: next, needsReLogin: true, cloudWarning: '登录已过期，请重新登录' }
-      }
-    }
-    const account = await finalizeAccountForWorkId(next, auth.readAccount())
-    if (account && !identitySatisfied(next, account)) {
-      return {
-        workId: next,
-        cloudWarning: '已切换身份，团队 ID 同步中，请稍后刷新',
-      }
-    }
-    return { workId: next }
-  } catch (e) {
-    const msg = String(e?.message || e)
-    if (/invalid_session|account_not_found|invalid_credentials/i.test(msg)) {
-      return { workId: next, needsReLogin: true, cloudWarning: '登录已过期，请重新登录' }
-    }
-    throw e
-  }
-}
-
-async function applyWorkIdentityAfterLogin(token, account, workId) {
-  const accountRole = identityTypes.accountRoleForWorkIdentity(workId)
-  userProfile.writeIdentity(workId)
-  auth.writeSession(token, account)
-  if (identitySatisfied(workId, account)) {
-    syncLocalProfilesFromAccount(account, workId)
-    return account
-  }
-  try {
-    await auth.ensureIdentity(accountRole, workIdentityForApi(workId))
+    await auth.refreshSession()
   } catch (_) {}
-  return finalizeAccountForWorkId(workId, auth.readAccount()) || account
+  const account = auth.readAccount()
+  if (account) userProfile.adoptAccountIdentity(account)
+  return account
+}
+
+async function applyWorkIdentitySwitch() {
+  const prev = userProfile.readIdentity()
+  return { workId: prev, cloudWarning: '身份在注册时已确定，不能切换' }
+}
+
+async function applyWorkIdentityAfterLogin(token, account) {
+  const fixed = userProfile.adoptAccountIdentity(account)
+  auth.writeSession(token, account)
+  syncLocalProfilesFromAccount(account, fixed)
+  return auth.readAccount() || account
 }
 
 function claimSwitchTarget(code) {
@@ -206,34 +162,10 @@ function claimSwitchTarget(code) {
   return ''
 }
 
-/** 不退出登录，直接换工作台身份 */
 function promptPickIdentity() {
-  const list = identityTypes.WORK_ID_LIST.slice()
   const current = userProfile.readIdentity()
-  const labels = list.map((id) => identityTypes.workIdentityLabel(id) + (id === current ? '（当前）' : ''))
-  return new Promise((resolve) => {
-    wx.showActionSheet({
-      itemList: labels,
-      success: async (res) => {
-        const next = list[res.tapIndex]
-        if (!next || next === current) {
-          resolve({ workId: current })
-          return
-        }
-        wx.showLoading({ title: '切换中', mask: true })
-        try {
-          const result = await applyWorkIdentitySwitch(next)
-          wx.hideLoading()
-          resolve(result)
-        } catch (e) {
-          wx.hideLoading()
-          wx.showToast({ title: '切换失败', icon: 'none' })
-          resolve(null)
-        }
-      },
-      fail: () => resolve(null),
-    })
-  })
+  wx.showToast({ title: '身份在注册时已确定', icon: 'none' })
+  return Promise.resolve({ workId: current, cloudWarning: '身份在注册时已确定，不能切换' })
 }
 
 module.exports = {

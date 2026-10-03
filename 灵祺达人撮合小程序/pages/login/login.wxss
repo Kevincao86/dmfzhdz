@@ -269,6 +269,34 @@
   background: var(--lq-surface);
 }
 
+.login-id-pick {
+  margin: 0 8rpx 24rpx;
+}
+.login-id-pick__hint {
+  display: block;
+  margin-bottom: 16rpx;
+  font-size: 24rpx;
+  color: #78716c;
+}
+.login-id-pick__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+.login-id-chip {
+  padding: 12rpx 22rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #efe8dc;
+  background: #fffdf8;
+  font-size: 26rpx;
+  color: #1c1917;
+}
+.login-id-chip--on {
+  border-color: #6d28d9;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-weight: 600;
+}
 .login-id-badge {
   display: flex;
   align-items: center;

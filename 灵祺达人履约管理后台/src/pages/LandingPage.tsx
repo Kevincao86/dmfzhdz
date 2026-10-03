@@ -4,16 +4,12 @@ import { ChevronDown } from 'lucide-react'
 import LoginPortalNav from '@merchant/components/login/LoginPortalNav'
 import { cn } from '../cn'
 import { getToken } from '../lib/mpSession'
-import WorkIdentityToggle from '../components/WorkIdentityToggle'
-import { getWorkIdentity, setWorkIdentity, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import LandingOssImage from '../components/LandingOssImage'
 import LandingHeroBackground from './landing/LandingHeroBackground'
-import LandingRolePicker from './landing/LandingRolePicker'
 import LandingSection3 from './landing/LandingSection3'
 import {
   MARKETING_BY_ROLE,
-  ROLE_LABEL,
   SECTION2_CARDS,
   SECTION4_STEPS,
 } from './landing/landingCopy'
@@ -30,8 +26,7 @@ export default function LandingPage() {
   const nav = useNavigate()
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [activeSection, setActiveSection] = useState(0)
-  const [role, setRole] = useState<MpWorkIdentity>(() => getWorkIdentity())
-  const [loginPickerOpen, setLoginPickerOpen] = useState(false)
+  const role = 'talent' as const
 
   useEffect(() => {
     if (getToken()) nav('/hall', { replace: true })
@@ -43,17 +38,6 @@ export default function LandingPage() {
     const idx = Math.round(el.scrollTop / el.clientHeight)
     setActiveSection(Math.min(SECTION_COUNT - 1, Math.max(0, idx)))
   }, [])
-
-  function onRoleChange(next: MpWorkIdentity) {
-    setRole(next)
-    setWorkIdentity(next)
-  }
-
-  function goLogin(picked: MpWorkIdentity) {
-    setWorkIdentity(picked)
-    setLoginPickerOpen(false)
-    nav(`/login?role=${picked}`)
-  }
 
   const m = MARKETING_BY_ROLE[role]
 
@@ -86,7 +70,7 @@ export default function LandingPage() {
               />
               <button
                 type="button"
-                onClick={() => setLoginPickerOpen(true)}
+                onClick={() => nav('/login')}
                 className="rounded-full bg-white px-6 py-2 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-white/95"
               >
                 登录
@@ -106,18 +90,19 @@ export default function LandingPage() {
 
           <div className="absolute bottom-8 right-6 z-20 w-[min(100%,340px)] sm:right-10 lg:right-14">
             <p className="mb-3 text-right text-xs text-white/60">{m.cta}</p>
-            <WorkIdentityToggle
-              identity={role}
-              onChange={onRoleChange}
-              variant="dark"
-              className="border border-white/20 bg-black/35 backdrop-blur-md"
-            />
             <button
               type="button"
-              onClick={() => goLogin(role)}
+              onClick={() => nav('/login')}
               className="mt-3 w-full rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 py-3 text-sm font-semibold text-white shadow-lg transition hover:opacity-95"
             >
-              以{ROLE_LABEL[role]}进入登录
+              登录
+            </button>
+            <button
+              type="button"
+              onClick={() => nav('/register')}
+              className="mt-2 w-full rounded-xl border border-white/30 bg-white/10 py-2.5 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/15"
+            >
+              注册
             </button>
             <button
               type="button"
@@ -228,7 +213,7 @@ export default function LandingPage() {
               </ul>
               <button
                 type="button"
-                onClick={() => setLoginPickerOpen(true)}
+                onClick={() => nav('/login')}
                 className="mt-8 rounded-full bg-white px-8 py-2.5 text-sm font-semibold text-slate-900 hover:bg-white/90"
               >
                 立即登录
@@ -279,11 +264,6 @@ export default function LandingPage() {
         ))}
       </nav>
 
-      <LandingRolePicker
-        open={loginPickerOpen}
-        onClose={() => setLoginPickerOpen(false)}
-        onPick={goLogin}
-      />
     </div>
   )
 }

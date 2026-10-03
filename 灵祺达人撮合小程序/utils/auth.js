@@ -110,6 +110,7 @@ async function wxLogin(opts = {}) {
     code,
     stableDevOpenId: accountMemberSync.ensureStableDevOpenId(),
     role: opts.role || 'talent',
+    workIdentity: opts.workIdentity,
     wxNickName: nick,
     wxAvatarUrl: avatar,
     registerTalent: opts.registerTalent,
@@ -131,12 +132,13 @@ async function smsLogin(phone, smsCode) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
-async function phoneRegister({ phone, smsCode, password, role }) {
+async function phoneRegister({ phone, smsCode, password, role, workIdentity }) {
   const data = await authPost('register', {
     phone: String(phone || '').trim(),
     smsCode: String(smsCode || '').trim(),
     password: String(password || ''),
-    role: role === 'pr' ? 'pr' : 'talent',
+    role: role === 'pr' || workIdentity === 'pr' ? 'pr' : 'talent',
+    workIdentity,
   })
   return accountMemberSync.afterAuthSuccess(data)
 }
@@ -213,9 +215,9 @@ async function ensureIdentity(role, workIdentity) {
   if (data.account) {
     writeSession(readSessionToken(), data.account)
     try {
-      const switchWorkIdentity = require('./switchWorkIdentity.js')
-      const wid = workIdentity || require('./userProfile.js').readIdentity()
-      switchWorkIdentity.syncLocalProfilesFromAccount(data.account, wid)
+      const userProfile = require('./userProfile.js')
+      const wid = userProfile.adoptAccountIdentity(data.account)
+      require('./switchWorkIdentity.js').syncLocalProfilesFromAccount(data.account, wid)
     } catch (_) {}
   }
   return accountMemberSync.afterAuthSuccess(data)

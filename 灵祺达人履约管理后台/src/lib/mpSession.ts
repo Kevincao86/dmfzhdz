@@ -1,5 +1,5 @@
 import { onAccountLogin, onAccountLogout } from './mpAccountLocalScope'
-import { getWorkIdentity, workIdentityToAccountRole } from './mpWorkIdentity'
+import { identityFromAccount, setWorkIdentity, workIdentityToAccountRole } from './mpWorkIdentity'
 
 export type MpAccountRole = 'talent' | 'pr'
 
@@ -88,21 +88,26 @@ export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || ''
 }
 
-/** 工作台身份与账号角色不一致时，以本地 workIdentity 为准（避免侧栏 PR、页面仍达人） */
+/** 登录版本以账号库为准，写回本地身份 */
 export function reconcileActiveRoleWithWorkIdentity(account?: MpAccount | null): MpAccountRole {
-  const localRole = workIdentityToAccountRole(getWorkIdentity())
   const acc = account || getAccount()
-  if (acc && acc.activeRole !== localRole) {
-    acc.activeRole = localRole
+  const workId = identityFromAccount(acc)
+  setWorkIdentity(workId)
+  const role = workIdentityToAccountRole(workId)
+  if (acc) {
+    acc.activeRole = role
+    acc.workIdentity = workId
     localStorage.setItem(ACCOUNT_KEY, JSON.stringify(acc))
   }
-  localStorage.setItem(ROLE_KEY, localRole)
-  return localRole
+  localStorage.setItem(ROLE_KEY, role)
+  return role
 }
 
 /** 仅更新本地账号快照，不触发注册表拉取（避免 profile 回写时递归） */
 export function persistAccount(account: MpAccount) {
-  const merged = { ...account, activeRole: workIdentityToAccountRole(getWorkIdentity()) }
+  const workId = identityFromAccount(account)
+  setWorkIdentity(workId)
+  const merged = { ...account, activeRole: workIdentityToAccountRole(workId), workIdentity: workId }
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify(merged))
   localStorage.setItem(ROLE_KEY, merged.activeRole)
 }

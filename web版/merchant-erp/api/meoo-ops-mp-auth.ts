@@ -294,10 +294,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     if (action === 'wx_login') {
       const roleRaw = pickAuthField(req, body, 'role')
+      const workRaw = pickAuthField(req, body, 'workIdentity')
       const { token, account, isNew } = await mpAuthWxLogin(supabaseUrl, serviceRole, {
         code: pickAuthField(req, body, 'code'),
         stableDevOpenId: pickAuthField(req, body, 'stableDevOpenId'),
         role: roleRaw === 'pr' ? 'pr' : 'talent',
+        workIdentity:
+          workRaw === 'talent' || workRaw === 'pr' || workRaw === 'shoot' || workRaw === 'edit'
+            ? workRaw
+            : undefined,
         wxNickName: pickAuthField(req, body, 'wxNickName'),
         wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
         registerTalent: body.registerTalent as never,
@@ -310,10 +315,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     if (action === 'dy_login') {
       const roleRaw = pickAuthField(req, body, 'role')
+      const workRaw = pickAuthField(req, body, 'workIdentity')
       const { token, account, isNew } = await mpAuthDyLogin(supabaseUrl, serviceRole, {
         code: pickAuthField(req, body, 'code'),
         stableDevOpenId: pickAuthField(req, body, 'stableDevOpenId'),
         role: roleRaw === 'pr' ? 'pr' : 'talent',
+        workIdentity:
+          workRaw === 'talent' || workRaw === 'pr' || workRaw === 'shoot' || workRaw === 'edit'
+            ? workRaw
+            : undefined,
         wxNickName: pickAuthField(req, body, 'wxNickName'),
         wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
         registerTalent: body.registerTalent as never,
@@ -489,11 +499,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     if (action === 'register') {
       const roleRaw = pickAuthField(req, body, 'role')
+      const workRaw = pickAuthField(req, body, 'workIdentity')
       const { token, account, isNew } = await mpAuthPhoneRegister(supabaseUrl, serviceRole, {
         phone: String(body.phone || body.loginName || ''),
         smsCode: String(body.smsCode || ''),
         password: String(body.password || ''),
         role: roleRaw === 'pr' ? 'pr' : 'talent',
+        workIdentity:
+          workRaw === 'talent' || workRaw === 'pr' || workRaw === 'shoot' || workRaw === 'edit'
+            ? workRaw
+            : undefined,
         wxNickName: pickAuthField(req, body, 'wxNickName'),
         wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
       })

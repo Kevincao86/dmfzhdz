@@ -53,10 +53,6 @@
             <text class="wb-sub">{{displaySub}}</text>
             <text class="wb-id" wx:if="{{identityIdLine}}">{{identityIdLine}}</text>
           </view>
-          <view class="wb-switch-btn" bindtap="onSwitchIdentity" hover-class="wb-switch-btn--hover">
-            <text class="wb-switch-glyph">⇄</text>
-            <text class="wb-switch-text">切换</text>
-          </view>
         </view>
       </view>
       <text class="wb-greeting" wx:if="{{greeting}}">{{greeting}}</text>

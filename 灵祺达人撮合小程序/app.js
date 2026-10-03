@@ -2,10 +2,29 @@ const config = require('./utils/config.js')
 const mpRuntime = require('./utils/mpRuntime.js')
 const mpPrivacyAuthorize = require('./utils/mpPrivacyAuthorize.js')
 
-function isWelcomeRoute() {
+function currentRoute() {
   const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
-  const route = pages.length ? String(pages[pages.length - 1].route || '') : ''
-  return route === 'pages/welcome/welcome' || route === ''
+  return pages.length ? String(pages[pages.length - 1].route || '') : ''
+}
+
+function isWelcomeRoute() {
+  const route = currentRoute()
+  return route === '' || route === 'pages/login/login' || route === 'pages/legal/legal'
+}
+
+function redirectIfLoginRequired() {
+  try {
+    const route = currentRoute()
+    if (route === 'pages/login/login' || route === 'pages/legal/legal' || route === 'pages/register/register') return
+    const auth = require('./utils/auth.js')
+    if (auth.isLoggedIn()) {
+      const acc = auth.readAccount()
+      if (acc) require('./utils/userProfile.js').adoptAccountIdentity(acc)
+      return
+    }
+    if (require('./utils/mpGuestRoutes.js').isGuestBrowsing()) return
+    wx.reLaunch({ url: '/pages/login/login' })
+  } catch (_) {}
 }
 
 function redirectIfPhoneBindRequired() {
@@ -50,6 +69,7 @@ App({
   onLaunch() {
     mpRuntime.resetRuntimeCache()
     mpRuntime.applyRuntimeConfig(config)
+    redirectIfLoginRequired()
 
     mpPrivacyAuthorize.registerAppPrivacyHandler(this)
 
@@ -91,6 +111,7 @@ App({
     setTimeout(runDeferredStartup, 1200)
   },
   onShow() {
+    redirectIfLoginRequired()
     if (isWelcomeRoute()) return
 
     const now = Date.now()

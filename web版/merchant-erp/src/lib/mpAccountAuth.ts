@@ -353,6 +353,43 @@ export function mpAccountIdentities(account: MpAccountRow) {
   }
 }
 
+export type MpFixedWorkIdentity = 'talent' | 'pr' | 'shoot' | 'edit'
+
+/** 登录版本：PR 账号优先，其次拍摄/剪辑，达人库或未写身份视为达人。不改库。 */
+export function resolveFixedWorkIdentity(
+  account: {
+    active_role?: string | null
+    lingqi_talent_id?: string | null
+    registry_member_id?: string | null
+    lingqi_pr_id?: string | null
+    registry_pr_id?: string | null
+  },
+  member?: {
+    workIdentity?: string | null
+    lingqiShootTeamId?: string | null
+    lingqiEditTeamId?: string | null
+  } | null,
+): MpFixedWorkIdentity {
+  if (account.active_role === 'pr') return 'pr'
+  if (member?.workIdentity === 'shoot' || String(member?.lingqiShootTeamId || '').trim()) return 'shoot'
+  if (member?.workIdentity === 'edit' || String(member?.lingqiEditTeamId || '').trim()) return 'edit'
+  const hasPr = Boolean(String(account.lingqi_pr_id || '').trim() || String(account.registry_pr_id || '').trim())
+  const hasTalent = Boolean(
+    String(account.lingqi_talent_id || '').trim() || String(account.registry_member_id || '').trim(),
+  )
+  if (hasPr && !hasTalent) return 'pr'
+  return 'talent'
+}
+
+function accountIdentityEstablished(account: MpAccountRow): boolean {
+  return Boolean(
+    String(account.lingqi_talent_id || '').trim() ||
+      String(account.registry_member_id || '').trim() ||
+      String(account.lingqi_pr_id || '').trim() ||
+      String(account.registry_pr_id || '').trim(),
+  )
+}
+
 export function accountToClientPayload(
   account: MpAccountRow,
   extras?: {
@@ -408,7 +445,7 @@ export async function accountPayloadWithMemberExtras(
     const data = await io.load()
     const memberId = String(acc.registry_member_id || '').trim()
     const phoneKey = accountPhoneKey(acc)
-    const member =
+    let member =
       (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
       (data.mpTalentMembers ?? []).find(
         (m) => {
@@ -425,6 +462,7 @@ export async function accountPayloadWithMemberExtras(
         lingqiEditTeamId: member.lingqiEditTeamId || null,
         workIdentity: member.workIdentity || null,
       }
+      extras.workIdentity = resolveFixedWorkIdentity(acc, member)
       if (acc.active_role !== 'pr') {
         extras.prFeatureAccess = resolveEffectiveFeatureAccess(
           'talent',
@@ -438,6 +476,7 @@ export async function accountPayloadWithMemberExtras(
       }
     }
     // 达人/拍摄/剪辑身份保留达人会员权限。仅有 PR 编号时不能覆盖，否则专业版达人评估会被 PR 套餐关掉。
+    if (!member) extras.workIdentity = resolveFixedWorkIdentity(acc, null)
     if (acc.active_role === 'pr' || (!extras.prFeatureAccess && (acc.lingqi_pr_id || acc.registry_pr_id))) {
       const pr = findRegistryPrForAccount(data, acc)
       extras.prFeatureAccess = pr
@@ -809,6 +848,8 @@ export type MpAuthWxLoginInput = {
   /** 首次登录可携带注册资料 */
   registerTalent?: RegistryMpTalentMember
   registerPr?: RegistryMpPrUser
+  /** 仅新注册写入；老账号忽略 */
+  workIdentity?: MpFixedWorkIdentity
 }
 
 export async function mpAuthWxLogin(
@@ -820,7 +861,9 @@ export async function mpAuthWxLogin(
   const { openid } = await wxCodeToOpenId(input.code, input.stableDevOpenId)
   let account = await findAccountByOpenId(rest, openid)
   let isNew = false
-  const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
+  const requestedRole: MpAccountRole =
+    input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent'
+  let role: MpAccountRole = requestedRole
 
   if (!account) {
     isNew = true
@@ -837,6 +880,7 @@ export async function mpAuthWxLogin(
     })
     account = (await findAccountById(rest, account.id))!
   }
+  if (!isNew) role = account.active_role === 'pr' ? 'pr' : 'talent'
 
   account = await provisionRegistryForAccount(
     supabaseUrl,
@@ -846,6 +890,17 @@ export async function mpAuthWxLogin(
     input.wxNickName || '',
     input.wxAvatarUrl || '',
   )
+
+  if (isNew && (input.workIdentity === 'shoot' || input.workIdentity === 'edit')) {
+    account = await mpAuthEnsureIdentity(
+      supabaseUrl,
+      serviceRole,
+      account.id,
+      'talent',
+      input.workIdentity,
+      { initial: true },
+    )
+  }
 
   if (role === 'talent' && input.registerTalent) {
     const saved = await syncRegistryMember(supabaseUrl, serviceRole, account, input.registerTalent)
@@ -880,7 +935,7 @@ export async function mpAuthDyLogin(
   const { openid: dyOpenId } = await dyCodeToOpenId(input.code, input.stableDevOpenId)
   let account = await findAccountForDyLogin(rest, dyOpenId)
   let isNew = false
-  const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
+  let role: MpAccountRole = input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent'
 
   if (!account) {
     isNew = true
@@ -897,6 +952,7 @@ export async function mpAuthDyLogin(
     })
     account = (await findAccountById(rest, account.id))!
   }
+  if (!isNew) role = account.active_role === 'pr' ? 'pr' : 'talent'
 
   account = await provisionRegistryForAccount(
     supabaseUrl,
@@ -906,6 +962,17 @@ export async function mpAuthDyLogin(
     input.wxNickName || '',
     input.wxAvatarUrl || '',
   )
+
+  if (isNew && (input.workIdentity === 'shoot' || input.workIdentity === 'edit')) {
+    account = await mpAuthEnsureIdentity(
+      supabaseUrl,
+      serviceRole,
+      account.id,
+      'talent',
+      input.workIdentity,
+      { initial: true },
+    )
+  }
 
   if (role === 'talent' && input.registerTalent) {
     const saved = await syncRegistryMember(supabaseUrl, serviceRole, account, input.registerTalent)
@@ -1274,6 +1341,7 @@ export type MpAuthPhoneRegisterInput = {
   smsCode: string
   password: string
   role?: MpAccountRole
+  workIdentity?: MpFixedWorkIdentity
   wxNickName?: string
   wxAvatarUrl?: string
 }
@@ -1296,7 +1364,7 @@ export async function mpAuthPhoneRegister(
   const existing = await findAccountByLoginName(rest, phone)
   if (existing) throw new Error('login_name_taken')
 
-  const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
+  const role: MpAccountRole = input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent'
   const { hash, salt } = hashPassword(password)
   let account = await insertAccount(rest, {
     openid: null,
@@ -1316,6 +1384,17 @@ export async function mpAuthPhoneRegister(
     input.wxNickName || '',
     input.wxAvatarUrl || '',
   )
+
+  if (input.workIdentity === 'shoot' || input.workIdentity === 'edit') {
+    account = await mpAuthEnsureIdentity(
+      supabaseUrl,
+      serviceRole,
+      account.id,
+      'talent',
+      input.workIdentity,
+      { initial: true },
+    )
+  }
 
   const token = await createSession(rest, account.id)
   return { token, account, isNew: true }
@@ -1432,6 +1511,27 @@ export async function mpAuthBindWxOpenId(
   )
 }
 
+async function fixedIdentityForAccount(
+  supabaseUrl: string,
+  serviceRole: string,
+  account: MpAccountRow,
+): Promise<MpFixedWorkIdentity> {
+  try {
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+    const memberId = String(account.registry_member_id || '').trim()
+    const phoneKey = accountPhoneKey(account)
+    const member =
+      (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
+      (phoneKey.length >= 8
+        ? (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phoneKey)
+        : undefined)
+    return resolveFixedWorkIdentity(account, member || null)
+  } catch {
+    return resolveFixedWorkIdentity(account, null)
+  }
+}
+
 /** 切换/登录后确保当前身份已在注册表生成 ID 并写回账号 */
 export async function mpAuthEnsureIdentity(
   supabaseUrl: string,
@@ -1439,10 +1539,17 @@ export async function mpAuthEnsureIdentity(
   accountId: string,
   role: MpAccountRole,
   workIdentity?: 'talent' | 'shoot' | 'edit',
+  opts?: { initial?: boolean },
 ): Promise<MpAccountRow> {
   const rest = restClient(supabaseUrl, serviceRole)
   let account = await findAccountById(rest, accountId)
   if (!account) throw new Error('account_not_found')
+  const requested: MpFixedWorkIdentity =
+    role === 'pr' ? 'pr' : workIdentity === 'shoot' || workIdentity === 'edit' ? workIdentity : 'talent'
+  if (!opts?.initial && accountIdentityEstablished(account)) {
+    const current = await fixedIdentityForAccount(supabaseUrl, serviceRole, account)
+    if (current !== requested) return account
+  }
   const nick = account.wx_nick_name || account.login_name || ''
   account = await provisionRegistryForAccount(
     supabaseUrl,
@@ -1739,7 +1846,7 @@ export async function mpAuthDyOAuthComplete(
   const workIdentity = isErpPortal
     ? portal
     : normalizeDyOAuthWorkIdentity(parsed.workIdentity)
-  const role: MpAccountRole = workIdentity === 'pr' ? 'pr' : 'talent'
+  let role: MpAccountRole = workIdentity === 'pr' ? 'pr' : 'talent'
 
   let account = await findAccountByOpenId(rest, openid)
   let isNew = false
@@ -1758,6 +1865,7 @@ export async function mpAuthDyOAuthComplete(
     })
     account = (await findAccountById(rest, account.id))!
   }
+  if (!isNew && !isErpPortal) role = account.active_role === 'pr' ? 'pr' : 'talent'
 
   if (!isErpPortal) {
     account = await provisionRegistryForAccount(
@@ -1769,8 +1877,15 @@ export async function mpAuthDyOAuthComplete(
       oauth.avatarUrl || account.wx_avatar_url || '',
     )
 
-    if (role === 'talent' && (workIdentity === 'shoot' || workIdentity === 'edit')) {
-      account = await mpAuthEnsureIdentity(supabaseUrl, serviceRole, account.id, role, workIdentity)
+    if (isNew && role === 'talent' && (workIdentity === 'shoot' || workIdentity === 'edit')) {
+      account = await mpAuthEnsureIdentity(
+        supabaseUrl,
+        serviceRole,
+        account.id,
+        role,
+        workIdentity,
+        { initial: true },
+      )
     }
   }
 
@@ -1787,7 +1902,8 @@ export async function mpAuthDyOAuthComplete(
     session_token: token,
   })
 
-  return { token, account, workIdentity, isNew, portal, erpSession }
+  const fixedWorkIdentity = isErpPortal ? workIdentity : await fixedIdentityForAccount(supabaseUrl, serviceRole, account)
+  return { token, account, workIdentity: fixedWorkIdentity, isNew, portal, erpSession }
 }
 
 export async function assertOpenIdNotRegistered(
