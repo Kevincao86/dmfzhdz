@@ -33,6 +33,47 @@ const mpTargetedRecruit = require('../../../utils/mpTargetedRecruit.js')
 const mpTargetedRecruitApi = require('../../../utils/mpTargetedRecruitApi.js')
 const participant = require('../../../utils/participant.js')
 
+function isGenericErpTaskLine(line) {
+  return /商家通过 ERP 发起招募|达人报名后由商家在 ERP 反选|商家 ERP 普通招募/.test(String(line || ''))
+}
+
+/** 智能体/商家单的招募正文在 Brief 或主推里；「Brief:」整段不能丢掉 */
+function collectTalentRecruitLines(mp, view) {
+  const raw = [mp && mp.recruitmentInfo, mp && mp.merchantRequirements, view && view.recruitmentInfo]
+    .filter(Boolean)
+    .join('\n')
+  const lines = []
+  const seen = new Set()
+  const push = (s) => {
+    const t = String(s || '').replace(/\s+/g, ' ').trim()
+    if (!t || t === '—' || t === '详见招募信息' || seen.has(t)) return
+    if (isGenericErpTaskLine(t)) return
+    seen.add(t)
+    lines.push(t)
+  }
+  for (const part of raw.split(/[\n\r；;]+/)) {
+    let t = String(part || '').trim()
+    if (!t) continue
+    const brief = t.match(/^(?:模式|Brief|brief)[:：]\s*(.+)$/i)
+    if (brief) {
+      push(brief[1])
+      continue
+    }
+    if (/^(预算金额|预算|桌数|商家订单|ERP|MO-|策略|档位|分配|达人佣金|费用模式)[:：]/i.test(t)) continue
+    if (/^预算/i.test(t) && /[¥￥\d]/.test(t)) continue
+    const main = t.match(/主推[:：]\s*([^；;]+)/)
+    const tags = t.match(/标签[:：]\s*([^；;]+)/)
+    if (main || tags || /^【智能体/.test(t)) {
+      if (main) push(`主推：${main[1].trim()}`)
+      if (tags && tags[1].trim() && tags[1].trim() !== '—') push(`标签：${tags[1].trim()}`)
+      continue
+    }
+    if (/^(平台|城市)[:：]/.test(t)) continue
+    push(t)
+  }
+  return lines
+}
+
 function padTimeHm(raw) {
   const s = String(raw || '').trim()
   const m = s.match(/^(\d{1,2}):(\d{2})$/)
@@ -160,12 +201,22 @@ function buildDetailDisplayFields(view, mp, opts) {
     Date.now(),
   )
   const detailStatusLabel = mpOrderStatus.statusLabel(effectiveStatus) || '招募中'
-  const taskDetailLines =
-    view && Array.isArray(view.taskDetailLines) && view.taskDetailLines.length
+  const recruitLines = collectTalentRecruitLines(mp, view)
+  const taskOnly = (view && Array.isArray(view.taskDetailLines) ? view.taskDetailLines : []).filter(
+    (line) => !isGenericErpTaskLine(line),
+  )
+  const taskSeen = new Set(recruitLines)
+  for (const line of taskOnly) {
+    const t = String(line || '').trim()
+    if (!t || taskSeen.has(t)) continue
+    taskSeen.add(t)
+    recruitLines.push(t)
+  }
+  const taskDetailLines = recruitLines.length
+    ? recruitLines
+    : view && Array.isArray(view.taskDetailLines)
       ? view.taskDetailLines
-      : view && Array.isArray(view.recruitmentInfoLines)
-        ? view.recruitmentInfoLines
-        : []
+      : []
   let coverImage = ''
   try {
     const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
