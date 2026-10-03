@@ -3,13 +3,11 @@
 .page-func-v2 {
   min-height: 100vh;
   box-sizing: border-box;
-  background: #2f6fed;
+  background: #f5f6f8;
 }
 
-.func-blue {
-  padding: 0 32rpx 88rpx;
-  background: linear-gradient(180deg, #2f6fed 0%, #6aa4ff 100%);
-  text-align: center;
+.func-top {
+  background: #ffffff;
 }
 
 .func-nav-slot {
@@ -22,36 +20,17 @@
 }
 
 .func-h1 {
-  font-size: 36rpx;
+  font-size: 40rpx;
   font-weight: 800;
-  color: #ffffff;
+  color: #111827;
   letter-spacing: 1rpx;
 }
 
-.func-p {
-  display: block;
-  margin-top: 4rpx;
-  padding: 0 24rpx 8rpx;
-  font-size: 22rpx;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.func-sheet {
-  margin-top: -48rpx;
-  min-height: 70vh;
-  padding: 28rpx 20rpx 24rpx;
-  background: #f4f8fc;
-  border-radius: 36rpx 36rpx 0 0;
-  box-sizing: border-box;
-}
-
 .guest-banner {
-  margin: 0 8rpx 20rpx;
+  margin: 20rpx 24rpx 0;
   padding: 22rpx 24rpx;
   border-radius: 24rpx;
   background: #ffffff;
-  border: 1rpx solid #d6e4fb;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
@@ -69,56 +48,50 @@
   font-weight: 600;
 }
 
-.func-group {
-  margin-bottom: 8rpx;
+.func-block {
+  margin: 20rpx 24rpx 0;
 }
+
+.func-group-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 0 8rpx 12rpx;
+}
+
+.func-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #2f6fed;
+}
+
+.dot-blue { background: #2f6fed; }
+.dot-green { background: #22c55e; }
+.dot-amber { background: #f59e0b; }
+.dot-pink { background: #ec4899; }
+.dot-violet { background: #8b5cf6; }
+.dot-slate { background: #94a3b8; }
 
 .func-group-title {
-  display: block;
-  margin: 8rpx 12rpx 4rpx;
-  font-size: 26rpx;
+  font-size: 28rpx;
   font-weight: 700;
-  color: #1e3a5f;
+  color: #111827;
 }
 
-.func-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+.func-card {
+  background: #ffffff;
+  border-radius: 28rpx;
+  padding: 12rpx 8rpx 8rpx;
+  box-shadow: 0 8rpx 28rpx rgba(15, 23, 42, 0.04);
 }
 
-.func-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 18rpx 6rpx 16rpx;
-  box-sizing: border-box;
-}
-
-.func-well {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 26rpx;
-  background: #e7f0ff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.page-func-v2 .func-label {
+  color: #334155;
+  font-weight: 500;
 }
 
 .func-ic {
   width: 48rpx;
   height: 48rpx;
-}
-
-.func-label {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  width: 100%;
-  margin-top: 10rpx;
-  font-size: 22rpx;
-  line-height: 1.3;
-  font-weight: 600;
-  color: #1e3a5f;
-  text-align: center;
 }

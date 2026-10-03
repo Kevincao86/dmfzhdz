@@ -1,6 +1,6 @@
 {
   "navigationBarTitleText": "商品编辑",
-  "navigationBarBackgroundColor": "#2f6fed",
-  "navigationBarTextStyle": "white",
-  "backgroundColor": "#f4f8fc"
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#f5f6f8"
 }

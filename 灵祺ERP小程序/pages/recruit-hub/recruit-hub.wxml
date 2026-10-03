@@ -11,11 +11,11 @@
 
   <view class="func-grid hub-grid">
     <navigator url="/pages/recruit-flow/recruit-flow" class="func-cell" hover-class="none">
-      <view class="func-well"><text class="hub-mark">①</text></view>
+      <view class="func-well well-blue"><text class="hub-mark">①</text></view>
       <text class="func-label">五步流程</text>
     </navigator>
     <navigator url="/pages/recruitment/recruitment" class="func-cell" hover-class="none">
-      <view class="func-well"><text class="hub-mark">◎</text></view>
+      <view class="func-well well-green"><text class="hub-mark">◎</text></view>
       <text class="func-label">查看达人订单</text>
     </navigator>
   </view>

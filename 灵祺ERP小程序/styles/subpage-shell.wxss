@@ -6,7 +6,7 @@
   min-height: 100vh;
   padding: 20rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  background: #f4f8fc;
+  background: #f5f6f8;
 }
 
 /* 页头 Hero */
@@ -279,7 +279,7 @@ textarea,
 .legal-page {
   min-height: 100vh;
   box-sizing: border-box;
-  background: #f4f8fc !important;
+  background: #f5f6f8 !important;
 }
 
 .func-grid {
@@ -296,14 +296,21 @@ textarea,
 }
 
 .func-well {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 26rpx;
-  background: #e7f0ff;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 28rpx;
+  background: #e8f1ff;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
+.well-blue { background: #e8f1ff; }
+.well-green { background: #e8f8ee; }
+.well-amber { background: #fff4e5; }
+.well-violet { background: #f3e8ff; }
+.well-pink { background: #fde8f3; }
+.well-teal { background: #e6faf6; }
 
 .func-label {
   display: -webkit-box;

@@ -1,7 +1,7 @@
 {
   "navigationStyle": "custom",
-  "navigationBarTextStyle": "white",
-  "backgroundColor": "#2f6fed",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#f5f6f8",
   "usingComponents": {},
   "enableShareAppMessage": true,
   "enableShareTimeline": true

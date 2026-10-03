@@ -1,18 +1,20 @@
 <scroll-view scroll-y class="page-func-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
-  <view class="func-blue" style="padding-top: {{statusBarHeight}}px">
+  <view class="func-top" style="padding-top: {{statusBarHeight}}px">
     <view class="func-nav-slot">
       <text class="func-h1">商家能力中心</text>
     </view>
-    <text class="func-p">知识库 · 店铺 · 商品 · 运营 · AI 创作 · 投流 · 线索 · 财务</text>
   </view>
-  <view class="func-sheet">
-    <view wx:if="{{guestMode}}" class="guest-banner" bindtap="onGoLogin">
-      <text class="guest-banner-t">游客浏览中 · 可先查看功能模块</text>
-      <text class="guest-banner-a">登录后使用完整能力 ›</text>
-    </view>
-    <block wx:for="{{sections}}" wx:key="id">
-      <view class="func-group">
+  <view wx:if="{{guestMode}}" class="guest-banner" bindtap="onGoLogin">
+    <text class="guest-banner-t">游客浏览中 · 可先查看功能模块</text>
+    <text class="guest-banner-a">登录后使用完整能力 ›</text>
+  </view>
+  <block wx:for="{{sections}}" wx:key="id">
+    <view class="func-block">
+      <view class="func-group-head">
+        <view class="func-dot {{item.dotClass}}"></view>
         <text class="func-group-title">{{item.title}}</text>
+      </view>
+      <view class="func-card">
         <view class="func-grid">
           <view
             wx:for="{{item.items}}"
@@ -22,14 +24,14 @@
             data-url="{{cell.url}}"
             bindtap="onOpenCell"
           >
-            <view class="func-well">
+            <view class="func-well {{cell.wellClass}}">
               <image class="func-ic" src="{{cell.iconSrc}}" mode="aspectFit" />
             </view>
             <text class="func-label">{{cell.title}}</text>
           </view>
         </view>
       </view>
-    </block>
-    <site-icp-footer />
-  </view>
+    </view>
+  </block>
+  <site-icp-footer />
 </scroll-view>

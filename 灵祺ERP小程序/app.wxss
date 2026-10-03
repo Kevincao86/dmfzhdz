@@ -4,12 +4,12 @@
 @import './styles/mp-legacy.wxss';
 
 page {
-  background: #f4f8fc;
+  background: #f5f6f8;
   color: #1e3a5f;
   font-size: 28rpx;
   --lq-primary: #2f6fed;
   --lq-primary-soft: rgba(47, 111, 237, 0.12);
-  --lq-bg: #f4f8fc;
+  --lq-bg: #f5f6f8;
   --lq-card: #ffffff;
   --lq-text: #1e3a5f;
   --lq-muted: #64748b;

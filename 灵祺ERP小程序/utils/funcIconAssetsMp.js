@@ -65,10 +65,11 @@ const ICON_BUILDERS = {
     ),
 }
 
-function iconDataUri(_tone, key) {
+function iconDataUri(tone, key) {
   const build = ICON_BUILDERS[key]
   if (!build) return ''
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(build(NAVY))}`
+  const color = tone && String(tone).charAt(0) === '#' ? tone : NAVY
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(build(color))}`
 }
 
 module.exports = { iconDataUri, TONE_COLORS }
