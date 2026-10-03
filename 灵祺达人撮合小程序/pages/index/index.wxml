@@ -1,4 +1,5 @@
 <view class="home-page page-with-bar page-shell-fixed home-page--v1 {{lqThemeClass}}">
+  <launch-splash />
   <view class="home-sticky-top">
     <view class="home-hero-shell lq-hero-header lq-hero-header--home" style="{{navTopStyle}}">
       <view class="home-top-v1">

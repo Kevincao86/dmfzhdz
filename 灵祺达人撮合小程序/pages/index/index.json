@@ -3,5 +3,7 @@
   "navigationBarTitleText": "灵祺星选平台",
   "disableScroll": true,
   "enablePullDownRefresh": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "launch-splash": "/components/launch-splash/index"
+  }
 }

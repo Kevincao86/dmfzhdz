@@ -21,6 +21,14 @@ Component({
     },
     detached() {
       this.clearTick()
+      if (this._giveUp) {
+        clearTimeout(this._giveUp)
+        this._giveUp = null
+      }
+      if (this._ownsClaim && !this._settled) {
+        claimed = false
+        this._ownsClaim = false
+      }
     },
   },
 
@@ -43,11 +51,19 @@ Component({
         return
       }
       claimed = true
-      const giveUp = setTimeout(() => this.finish(), 5000)
+      this._ownsClaim = true
+      this._giveUp = setTimeout(() => {
+        this._settled = true
+        this.finish()
+      }, 5000)
       mpPlatformDecor
         .fetchDecorItemWithMeta(SLOT_KEY)
         .then((item) => {
-          clearTimeout(giveUp)
+          if (this._giveUp) {
+            clearTimeout(this._giveUp)
+            this._giveUp = null
+          }
+          this._settled = true
           if (this._ended || !item || !item.imageUrl) {
             this.finish()
             return
@@ -71,7 +87,11 @@ Component({
           }, 1000)
         })
         .catch(() => {
-          clearTimeout(giveUp)
+          if (this._giveUp) {
+            clearTimeout(this._giveUp)
+            this._giveUp = null
+          }
+          this._settled = true
           this.finish()
         })
     },

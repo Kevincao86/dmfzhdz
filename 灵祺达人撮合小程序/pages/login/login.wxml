@@ -1,4 +1,5 @@
 <view class="login-page {{lqThemeClass}}">
+  <launch-splash />
   <view class="login-hero" style="{{navBandStyle}}">
     <image class="login-hero__bg" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
     <view class="login-hero__cosmos" aria-hidden="true">
