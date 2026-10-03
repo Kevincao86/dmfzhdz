@@ -66,6 +66,20 @@ function applyHandledMapFromSync(remote) {
   writeHandledMap({ ...local, ...incoming }, { skipSync: true })
 }
 
+function selectionHandledKeys(row) {
+  if (!row) return []
+  const keys = []
+  const dedupe = String(row.dedupeKey || '').trim()
+  if (dedupe) keys.push(dedupe)
+  const mp = String(row.mpOrderId || '').trim()
+  const app = String(row.applicantId || '').trim()
+  if (mp && app) keys.push(`sel-${mp}-${app}`)
+  if (mp) keys.push(`sel-order-${mp}`)
+  const id = String(row.id || '').trim()
+  if (id) keys.push(id)
+  return [...new Set(keys)]
+}
+
 function noticeActionKey(row) {
   if (!row) return ''
   if (row.dedupeKey) return String(row.dedupeKey)
@@ -112,9 +126,17 @@ function isOpsBroadcastNotice(row) {
 }
 
 function getHandledAction(row) {
+  const map = readHandledMap()
+  if (isSelectionNotice(row)) {
+    for (const key of selectionHandledKeys(row)) {
+      const hit = String(map[key] || '')
+      if (hit) return hit
+    }
+    return ''
+  }
   const key = noticeActionKey(row)
   if (!key) return ''
-  return String(readHandledMap()[key] || '')
+  return String(map[key] || '')
 }
 
 function isPinned(row) {
@@ -127,10 +149,11 @@ function isPinned(row) {
 }
 
 function markHandled(row, action) {
-  const key = noticeActionKey(row)
-  if (!key) return
+  const keys = isSelectionNotice(row) ? selectionHandledKeys(row) : [noticeActionKey(row)].filter(Boolean)
+  if (!keys.length) return
   const map = readHandledMap()
-  map[key] = action === 'joined' ? 'joined' : 'confirmed'
+  const val = action === 'joined' ? 'joined' : 'confirmed'
+  for (const key of keys) map[key] = val
   writeHandledMap(map)
 }
 
