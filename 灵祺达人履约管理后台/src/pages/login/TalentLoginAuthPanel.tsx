@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ShieldCheck } from 'lucide-react'
 import RememberPasswordRow from '@merchant/components/login/RememberPasswordRow'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
@@ -72,6 +73,7 @@ export default function TalentLoginAuthPanel({
   onRememberPasswordChange,
   bindPending,
 }: Props) {
+  const nav = useNavigate()
   const [scanChannel, setScanChannel] = useState<ScanChannel>('douyin')
   const [wxQrPayload, setWxQrPayload] = useState('')
   const [wxTicket, setWxTicket] = useState('')
@@ -247,7 +249,7 @@ export default function TalentLoginAuthPanel({
           <button
             type="button"
             className={`pb-2 text-sm font-semibold ${tab === 'register' ? 'text-slate-900' : 'text-slate-400'}`}
-            onClick={() => onTabChange('register')}
+            onClick={() => nav('/register')}
           >
             注册
           </button>
