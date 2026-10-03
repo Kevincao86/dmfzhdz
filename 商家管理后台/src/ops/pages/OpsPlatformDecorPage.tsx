@@ -4,11 +4,11 @@ import { fetchRegistry } from '../opsRegistryApi'
 import { resolvePlatformDecoration } from '../../meooRegistryShared/platformDecorRegistryCore.js'
 import {
   MP_HOME_BANNER_MAX,
-  MP_HOME_BANNER_SLOT,
   PLATFORM_DECOR_SLOT_KEYS,
   PLATFORM_DECOR_SLOT_LABELS,
   PLATFORM_DECOR_SLOT_SIZE_HINTS,
   normalizeCarouselSeconds,
+  isCarouselBannerSlot,
   isDecorVideoMedia,
   isLaunchSplashSlot,
   type PlatformDecorFreq,
@@ -200,7 +200,7 @@ function emptyItem(slotKey: string): RegistryPlatformDecorItem {
     freq: 'daily',
     identities: ['all'],
     ...(isLaunchSplashSlot(slotKey) ? { playSeconds: 3 as const } : {}),
-    ...(slotKey === MP_HOME_BANNER_SLOT ? { carouselSeconds: 4 } : {}),
+    ...(isCarouselBannerSlot(slotKey) ? { carouselSeconds: 4 } : {}),
     priority: 100,
     updatedAt: nowIsoLocal(),
   }
@@ -280,13 +280,13 @@ export default function OpsPlatformDecorPage() {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch, updatedAt: nowIsoLocal() } : it)))
   }
 
-  function homeBannerCount(list: RegistryPlatformDecorItem[]) {
-    return list.filter((it) => it.slotKey === MP_HOME_BANNER_SLOT).length
+  function bannerCount(list: RegistryPlatformDecorItem[], slotKey: string) {
+    return list.filter((it) => it.slotKey === slotKey).length
   }
 
   function onAdd() {
     const slotKey = slotOptions[0] || 'mp.home.popup'
-    if (slotKey === MP_HOME_BANNER_SLOT && homeBannerCount(items) >= MP_HOME_BANNER_MAX) {
+    if (isCarouselBannerSlot(slotKey) && bannerCount(items, slotKey) >= MP_HOME_BANNER_MAX) {
       window.alert(`首页海报轮播最多 ${MP_HOME_BANNER_MAX} 张`)
       return
     }
@@ -327,8 +327,8 @@ export default function OpsPlatformDecorPage() {
   }
 
   async function onSave() {
-    if (homeBannerCount(items) > MP_HOME_BANNER_MAX) {
-      setMsg(`达人小程序首页海报最多 ${MP_HOME_BANNER_MAX} 张，请删除多余素材后再保存`)
+    if (bannerCount(items, 'mp.home.banner') > MP_HOME_BANNER_MAX || bannerCount(items, 'erp.mp.home.banner') > MP_HOME_BANNER_MAX) {
+      setMsg(`首页海报最多 ${MP_HOME_BANNER_MAX} 张，请删除多余素材后再保存`)
       return
     }
     setSaving(true)
@@ -359,7 +359,7 @@ export default function OpsPlatformDecorPage() {
         <p className="ops-muted mt-1 text-sm">
           {kind === 'popup'
             ? '活动海报首页弹窗：与公告弹窗互斥，优先紧急/入选/档期类通知。支持 once / daily / always 频控。素材支持静图、GIF、短视频（OSS）。'
-            : `达人小程序首页海报最多 ${MP_HOME_BANNER_MAX} 张，当前 ${homeBannerCount(items)}/${MP_HOME_BANNER_MAX}。都启用后按优先级从小到大轮播，每张单独设置跳转，整组共用一个轮播时长。其它广告位仍取优先级最小的一条。开屏海报在打开小程序时全屏播放，时长 3 秒或 5 秒，到时关闭，也可点跳过。素材支持静图、GIF、短视频（OSS）。`}
+            : `达人小程序首页海报最多 ${MP_HOME_BANNER_MAX} 张（当前 ${bannerCount(items, 'mp.home.banner')}），商家小程序首页海报同样最多 ${MP_HOME_BANNER_MAX} 张（当前 ${bannerCount(items, 'erp.mp.home.banner')}）。都启用后按优先级从小到大轮播，每张单独设置跳转，整组共用一个轮播时长。其它广告位仍取优先级最小的一条。开屏海报在打开小程序时全屏播放，时长 3 秒或 5 秒，到时关闭，也可点跳过。素材支持静图、GIF、短视频（OSS）。`}
         </p>
         <ul className="ops-size-hint-box space-y-1">
           {slotOptions.map((k) => (
@@ -402,10 +402,10 @@ export default function OpsPlatformDecorPage() {
                     {PLATFORM_DECOR_SLOT_LABELS[it.slotKey] || it.slotKey}
                     {isDecorVideoMedia(it) ? ' · 视频' : ''}
                     {isLaunchSplashSlot(it.slotKey) ? ` · ${it.playSeconds === 5 ? 5 : 3}秒` : ''}
-                    {it.slotKey === MP_HOME_BANNER_SLOT
+                    {isCarouselBannerSlot(it.slotKey)
                       ? ` · 每张 ${normalizeCarouselSeconds(it.carouselSeconds)} 秒`
                       : ''}
-                    {it.slotKey === MP_HOME_BANNER_SLOT && it.linkType !== 'none' && it.linkValue
+                    {isCarouselBannerSlot(it.slotKey) && it.linkType !== 'none' && it.linkValue
                       ? ' · 已设跳转'
                       : ''}
                     {it.enabled ? '' : ' · 已停用'}
@@ -456,9 +456,9 @@ export default function OpsPlatformDecorPage() {
               value={editing.slotKey}
               onChange={(e) => {
                 const slotKey = e.target.value
-                if (slotKey === MP_HOME_BANNER_SLOT) {
+                if (isCarouselBannerSlot(slotKey)) {
                   const others = items.filter(
-                    (it) => it.slotKey === MP_HOME_BANNER_SLOT && it.id !== editing.id,
+                    (it) => it.slotKey === slotKey && it.id !== editing.id,
                   ).length
                   if (others >= MP_HOME_BANNER_MAX) {
                     window.alert(`首页海报轮播最多 ${MP_HOME_BANNER_MAX} 张，请先删除一张`)
@@ -466,12 +466,12 @@ export default function OpsPlatformDecorPage() {
                   }
                 }
                 const sharedSeconds =
-                  items.find((it) => it.slotKey === MP_HOME_BANNER_SLOT && it.id !== editing.id)
+                  items.find((it) => it.slotKey === slotKey && it.id !== editing.id)
                     ?.carouselSeconds ?? 4
                 patchItem(editing.id, {
                   slotKey,
                   ...(isLaunchSplashSlot(slotKey) ? { playSeconds: editing.playSeconds === 5 ? 5 : 3 } : {}),
-                  ...(slotKey === MP_HOME_BANNER_SLOT
+                  ...(isCarouselBannerSlot(slotKey)
                     ? { carouselSeconds: normalizeCarouselSeconds(editing.carouselSeconds ?? sharedSeconds) }
                     : {}),
                 })
@@ -591,11 +591,11 @@ export default function OpsPlatformDecorPage() {
               />
             </label>
           </div>
-          {editing.slotKey === MP_HOME_BANNER_SLOT ? (
+          {isCarouselBannerSlot(editing.slotKey) ? (
             <p className="ops-hint">这一张单独跳转。最多 {MP_HOME_BANNER_MAX} 张，下面的秒数整组共用。</p>
           ) : null}
 
-          {editing.slotKey === MP_HOME_BANNER_SLOT ? (
+          {isCarouselBannerSlot(editing.slotKey) ? (
             <label className="ops-label">
               轮播时长（秒）
               <input
@@ -608,7 +608,7 @@ export default function OpsPlatformDecorPage() {
                   const carouselSeconds = normalizeCarouselSeconds(e.target.value)
                   setItems((prev) =>
                     prev.map((it) =>
-                      it.slotKey === MP_HOME_BANNER_SLOT
+                      it.slotKey === editing.slotKey
                         ? { ...it, carouselSeconds, updatedAt: nowIsoLocal() }
                         : it,
                     ),

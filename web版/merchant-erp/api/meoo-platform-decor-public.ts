@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'missing_slotKey' })
       return
     }
-    if (slotKey === 'mp.home.banner') {
+    if (slotKey === 'mp.home.banner' || slotKey === 'erp.mp.home.banner') {
       const items = listActiveDecorForSlot(data, slotKey, { identity })
       sendJson(res, 200, { ok: true, item: items[0] || null, items })
       return

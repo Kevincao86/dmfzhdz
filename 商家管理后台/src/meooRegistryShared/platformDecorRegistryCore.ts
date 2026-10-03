@@ -1,7 +1,7 @@
 import type { RegistryFile } from './opsRegistryTypes.js'
 import {
+  isCarouselBannerSlot,
   isLaunchSplashSlot,
-  MP_HOME_BANNER_SLOT,
   normalizeCarouselSeconds,
   normalizePlaySeconds,
   type PlatformDecorFreq,
@@ -68,7 +68,7 @@ export function normalizeDecorItem(raw: unknown): RegistryPlatformDecorItem | nu
     endAt: String(o.endAt || '').trim() || undefined,
     freq: normalizeFreq(o.freq),
     ...(isLaunchSplashSlot(slotKey) ? { playSeconds: normalizePlaySeconds(o.playSeconds) } : {}),
-    ...(slotKey === MP_HOME_BANNER_SLOT
+    ...(isCarouselBannerSlot(slotKey)
       ? { carouselSeconds: normalizeCarouselSeconds(o.carouselSeconds) }
       : {}),
     priority: Number.isFinite(Number(o.priority)) ? Number(o.priority) : 100,

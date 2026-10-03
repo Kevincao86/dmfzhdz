@@ -327,7 +327,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               json(res, 400, { ok: false, error: 'missing_slotKey' })
               return
             }
-            if (slotKey === 'mp.home.banner') {
+            if (slotKey === 'mp.home.banner' || slotKey === 'erp.mp.home.banner') {
               const items = listActiveDecorForSlot(data, slotKey, { identity })
               json(res, 200, { ok: true, item: items[0] || null, items })
               return
