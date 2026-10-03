@@ -1,4 +1,6 @@
 const HANDLED_KEY = 'meoo_inbox_selection_handled_v1'
+/** 不放进按账号清空的事务键：换号/刷新会话清掉 handled 表时，已点过的单号仍要留着 */
+const ACK_KEY = 'meoo_sel_popup_ack_v1'
 const scope = require('./mpAccountLocalScope.js')
 
 function storageKey() {
@@ -66,6 +68,18 @@ function applyHandledMapFromSync(remote) {
   writeHandledMap({ ...local, ...incoming }, { skipSync: true })
 }
 
+/** 站内信 id 每次写入都会变；正文「单号 MP-RO-…」才是同一张入选卡。 */
+function orderTokensFromNotice(row) {
+  const text = [row && row.title, row && row.body, row && row.mpOrderId].filter(Boolean).join('\n')
+  const found = []
+  const labeled = /单号\s*([A-Za-z0-9][A-Za-z0-9_-]{3,})/g
+  const coded = /MP-(?:RO|ICE|USER)-\d+/g
+  let m
+  while ((m = labeled.exec(text))) found.push(m[1])
+  while ((m = coded.exec(text))) found.push(m[0])
+  return [...new Set(found)]
+}
+
 function selectionHandledKeys(row) {
   if (!row) return []
   const keys = []
@@ -75,6 +89,7 @@ function selectionHandledKeys(row) {
   const app = String(row.applicantId || '').trim()
   if (mp && app) keys.push(`sel-${mp}-${app}`)
   if (mp) keys.push(`sel-order-${mp}`)
+  for (const token of orderTokensFromNotice(row)) keys.push(`sel-order-${token}`)
   const id = String(row.id || '').trim()
   if (id) keys.push(id)
   return [...new Set(keys)]
@@ -125,12 +140,42 @@ function isOpsBroadcastNotice(row) {
   return row.noticeType === 'ops_broadcast'
 }
 
+const sessionAck = new Set()
+
+function readAckSet() {
+  const set = new Set(sessionAck)
+  try {
+    const raw = wx.getStorageSync(ACK_KEY)
+    const list = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (Array.isArray(list)) {
+      for (const item of list) {
+        const key = String(item || '').trim()
+        if (key) set.add(key)
+      }
+    }
+  } catch (_) {}
+  return set
+}
+
+function writeAckTokens(tokens) {
+  const extra = (tokens || []).map((x) => String(x || '').trim()).filter(Boolean)
+  if (!extra.length) return
+  for (const token of extra) sessionAck.add(token)
+  try {
+    const set = readAckSet()
+    wx.setStorageSync(ACK_KEY, JSON.stringify([...set].slice(-200)))
+  } catch (_) {}
+}
+
 function getHandledAction(row) {
   const map = readHandledMap()
   if (isSelectionNotice(row)) {
-    for (const key of selectionHandledKeys(row)) {
+    const keys = selectionHandledKeys(row)
+    const ack = readAckSet()
+    for (const key of keys) {
       const hit = String(map[key] || '')
       if (hit) return hit
+      if (ack.has(key)) return 'confirmed'
     }
     return ''
   }
@@ -155,6 +200,7 @@ function markHandled(row, action) {
   const val = action === 'joined' ? 'joined' : 'confirmed'
   for (const key of keys) map[key] = val
   writeHandledMap(map)
+  if (isSelectionNotice(row)) writeAckTokens(keys)
 }
 
 function isSelectionPopupDismissed(row) {
@@ -234,6 +280,8 @@ module.exports = {
   isSchedulePopupDismissed,
   isOpsBroadcastPopupDismissed,
   markHandled,
+  orderTokensFromNotice,
+  selectionHandledKeys,
   exportHandledMapForSync,
   applyHandledMapFromSync,
   sortRows,

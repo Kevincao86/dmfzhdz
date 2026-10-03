@@ -270,6 +270,8 @@ function rowSeenKeys(row) {
   const mp = String(row.mpOrderId || '').trim()
   const created = String(row.createdAt || '').trim()
   if (title && (mp || created)) keys.push(`${title}|${mp}|${created}`)
+  const tokens = inboxNoticeState.orderTokensFromNotice(row)
+  for (let i = 0; i < tokens.length; i++) keys.push(`sel-order-${tokens[i]}`)
   return keys
 }
 
@@ -356,7 +358,12 @@ function dedupeSelectionInboxRows(rows) {
     }
     const mp = String(row.mpOrderId || '').trim()
     const app = String(row.applicantId || '').trim()
-    const key = mp && app ? `sel-${mp}-${app}` : String(row.id || i)
+    const orderToken = inboxNoticeState.orderTokensFromNotice(row)[0] || ''
+    const key = orderToken
+      ? `sel-order-${orderToken}`
+      : mp && app
+        ? `sel-${mp}-${app}`
+        : String(row.id || i)
     const prev = byKey.get(key)
     if (!prev) {
       byKey.set(key, row)

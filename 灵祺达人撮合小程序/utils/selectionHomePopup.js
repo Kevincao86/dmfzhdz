@@ -23,6 +23,42 @@ function normalizeSelectionRow(row) {
   return { ...row, mpOrderId, applicantId, dedupeKey }
 }
 
+let lastPending = null
+let loadEpoch = 0
+
+function beginLoad() {
+  return loadEpoch
+}
+
+function loadEpochStill(token) {
+  return token === loadEpoch
+}
+
+function preferText(primary, fallback) {
+  const a = String(primary || '').trim()
+  if (a) return a
+  return String(fallback || '').trim()
+}
+
+function mergeNotice(row, cached) {
+  const fromRow = normalizeSelectionRow(row)
+  const fromCache = normalizeSelectionRow(cached)
+  if (!fromRow && !fromCache) return null
+  const base = { ...(fromCache || {}), ...(fromRow || {}) }
+  return normalizeSelectionRow({
+    ...base,
+    id: preferText(fromRow && fromRow.id, fromCache && fromCache.id),
+    title: preferText(fromRow && fromRow.title, fromCache && fromCache.title),
+    body: preferText(fromRow && fromRow.body, fromCache && fromCache.body),
+    mpOrderId: preferText(fromRow && fromRow.mpOrderId, fromCache && fromCache.mpOrderId),
+    applicantId: preferText(fromRow && fromRow.applicantId, fromCache && fromCache.applicantId),
+    dedupeKey: preferText(fromRow && fromRow.dedupeKey, fromCache && fromCache.dedupeKey),
+    imageUrl: preferText(fromRow && fromRow.imageUrl, fromCache && fromCache.imageUrl),
+    noticeType: (fromRow && fromRow.noticeType) || (fromCache && fromCache.noticeType) || 'selection',
+    fromSelection: !!((fromRow && fromRow.fromSelection) || (fromCache && fromCache.fromSelection)),
+  })
+}
+
 function pickPendingSelection(rows) {
   const list = (rows || [])
     .map((r) => enrichRow(normalizeSelectionRow(r)))
@@ -51,25 +87,35 @@ async function loadPendingSelectionNotice() {
   } else {
     rows = inboxNoticeState.sortRows(rows.map(enrichRow))
   }
-  return pickPendingSelection(rows)
+  const pending = pickPendingSelection(rows)
+  lastPending = pending
+  return pending
 }
 
 function dismissSelectionNotice(row) {
-  const normalized = normalizeSelectionRow(row)
-  if (!normalized || !inboxNoticeState.noticeActionKey(normalized)) return
+  loadEpoch += 1
+  const normalized = mergeNotice(row, lastPending)
+  lastPending = null
+  if (!normalized) return
+  if (!inboxNoticeState.isSelectionNotice(normalized) && !inboxNoticeState.noticeActionKey(normalized)) return
   inboxNoticeState.markHandled(normalized, 'confirmed')
-  if (normalized.id) messagesStore.markInboxSeen([normalized.id])
+  const seenKeys = inboxNoticeState.selectionHandledKeys(normalized)
+  if (seenKeys.length) messagesStore.markInboxSeen(seenKeys)
   if (normalized.fromSelection && normalized.dedupeKey) {
     talentInboxMatch.markSelectionNoticeSent(normalized.dedupeKey)
   }
   try {
     wx.showToast({ title: '可在「我的-消息通知-入选」查看群码', icon: 'none', duration: 2500 })
   } catch (_) {}
+  try {
+    void require('./mpAccountClientSync.js').flushClientStateSync()
+  } catch (_) {}
 }
 
 function toPopupPayload(row) {
-  const normalized = normalizeSelectionRow(row)
+  const normalized = mergeNotice(row, lastPending)
   if (!normalized) return null
+  lastPending = normalized
   return {
     id: normalized.id,
     title: normalized.title || '恭喜入选招募',
@@ -83,6 +129,8 @@ function toPopupPayload(row) {
 }
 
 module.exports = {
+  beginLoad,
+  loadEpochStill,
   loadPendingSelectionNotice,
   dismissSelectionNotice,
   toPopupPayload,

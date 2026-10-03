@@ -545,10 +545,14 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
           await require('../../utils/mpAccountClientSync.js').ensureClientStatePulled()
         } catch (_) {}
       }
+      const loadToken = selectionHomePopup.beginLoad()
       const row = await selectionHomePopup.loadPendingSelectionNotice()
+      if (!selectionHomePopup.loadEpochStill(loadToken)) return
       if (!row || this.data.showSelectionPopup || this.data.showPriceSheet) return
+      if (require('../../utils/inboxNoticeState.js').isSelectionPopupDismissed(row)) return
       const payload = selectionHomePopup.toPopupPayload(row)
-      if (!payload) return
+      if (!payload || !selectionHomePopup.loadEpochStill(loadToken)) return
+      this._selectionPopupRow = row
       this.setData({ showSelectionPopup: true, selectionPopup: payload })
     } catch (e) {
       console.warn('[index] selection popup', e)
@@ -557,8 +561,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     }
   },
   onSelectionPopupDismiss() {
-    const row = this.data.selectionPopup
-    if (row) selectionHomePopup.dismissSelectionNotice(row)
+    const row = this._selectionPopupRow || this.data.selectionPopup
+    this._selectionPopupRow = null
+    selectionHomePopup.dismissSelectionNotice(row)
     this.setData({ showSelectionPopup: false, selectionPopup: null })
     void this.tryShowSchedulePopup()
   },
