@@ -69,7 +69,7 @@ Page({
 
   async onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 3 })
+      this.getTabBar().setData({ selected: 1 })
     }
     if (!agent) return
     if (!api.isRealAuthed()) {
