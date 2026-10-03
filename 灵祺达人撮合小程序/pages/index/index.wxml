@@ -293,7 +293,14 @@
       <view wx:else class="sel-popup-qr sel-popup-qr--empty">
         <text>群二维码加载中，也可在「我的 → 消息通知」查看</text>
       </view>
-      <button class="sel-popup-btn" bindtap="onSelectionPopupDismiss">我知道了</button>
+      <view
+        class="sel-popup-btn"
+        catchtap="onSelectionPopupDismiss"
+        data-id="{{selectionPopup.id}}"
+        data-title="{{selectionPopup.title}}"
+        data-body="{{selectionPopup.body}}"
+        data-mp="{{selectionPopup.mpOrderId}}"
+      >我知道了</view>
     </view>
   </view>
   <view

@@ -70,9 +70,12 @@ function applyHandledMapFromSync(remote) {
 
 /** 站内信 id 每次写入都会变；正文「单号 MP-RO-…」才是同一张入选卡。 */
 function orderTokensFromNotice(row) {
-  const text = [row && row.title, row && row.body, row && row.mpOrderId].filter(Boolean).join('\n')
+  const text = [row && row.title, row && row.body, row && row.mpOrderId]
+    .filter(Boolean)
+    .join('\n')
+    .replace(/\s+/g, '')
   const found = []
-  const labeled = /单号\s*([A-Za-z0-9][A-Za-z0-9_-]{3,})/g
+  const labeled = /单号([A-Za-z0-9][A-Za-z0-9_-]{3,})/g
   const coded = /MP-(?:RO|ICE|USER)-\d+/g
   let m
   while ((m = labeled.exec(text))) found.push(m[1])

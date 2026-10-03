@@ -764,15 +764,28 @@ async function fetchTalentInboxFromSyncRegistry() {
   throw lastErr || new Error('sync_registry_inbox_failed')
 }
 
-/** 优先 talent_inbox；ECS 未部署时回退 sync-registry（与星选 Web 一致） */
+function isSessionRejectedMessage(msg) {
+  return /登录已过期|invalid_session|unauthorized|http_401|\b401\b/i.test(String(msg || ''))
+}
+
+/** 优先 talent_inbox；登录失效时不要再拉整库（开发者工具 12 秒会超时） */
 async function fetchTalentInboxSlice() {
+  if (!auth.isLoggedIn()) return []
   try {
-    const raw = await api.post(HALL_POST, { action: 'talent_inbox' }, registerAuthHeaders())
+    const raw = await api.post(
+      HALL_POST,
+      { action: 'talent_inbox', sessionToken: auth.readSessionToken() },
+      registerAuthHeaders(),
+    )
     if (raw && raw.ok !== false && Array.isArray(raw.mpTalentInbox)) {
       return raw.mpTalentInbox
     }
   } catch (e) {
     const msg = String(e && e.message ? e.message : e)
+    if (isSessionRejectedMessage(msg)) {
+      console.warn('[mp] talent_inbox', msg.slice(0, 160))
+      return []
+    }
     if (!/unknown_action|http_400|404|not_found|暂未|未更新/i.test(msg)) {
       console.warn('[mp] talent_inbox', msg.slice(0, 160))
     }

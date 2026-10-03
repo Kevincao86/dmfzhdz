@@ -560,10 +560,17 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       this._selectionPopupLoading = false
     }
   },
-  onSelectionPopupDismiss() {
-    const row = this._selectionPopupRow || this.data.selectionPopup
+  onSelectionPopupDismiss(e) {
+    const ds = (e && e.currentTarget && e.currentTarget.dataset) || {}
+    const stored = this._selectionPopupRow || this.data.selectionPopup || {}
     this._selectionPopupRow = null
-    selectionHomePopup.dismissSelectionNotice(row)
+    selectionHomePopup.dismissSelectionNotice({
+      ...stored,
+      id: stored.id || ds.id || '',
+      title: stored.title || ds.title || '',
+      body: stored.body || ds.body || '',
+      mpOrderId: stored.mpOrderId || ds.mp || '',
+    })
     this.setData({ showSelectionPopup: false, selectionPopup: null })
     void this.tryShowSchedulePopup()
   },

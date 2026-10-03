@@ -24,6 +24,7 @@ function normalizeSelectionRow(row) {
 }
 
 let lastPending = null
+let lastLoadedRows = []
 let loadEpoch = 0
 
 function beginLoad() {
@@ -87,6 +88,7 @@ async function loadPendingSelectionNotice() {
   } else {
     rows = inboxNoticeState.sortRows(rows.map(enrichRow))
   }
+  lastLoadedRows = Array.isArray(rows) ? rows : []
   const pending = pickPendingSelection(rows)
   lastPending = pending
   return pending
@@ -94,16 +96,32 @@ async function loadPendingSelectionNotice() {
 
 function dismissSelectionNotice(row) {
   loadEpoch += 1
-  const normalized = mergeNotice(row, lastPending)
-  lastPending = null
-  if (!normalized) return
-  if (!inboxNoticeState.isSelectionNotice(normalized) && !inboxNoticeState.noticeActionKey(normalized)) return
-  inboxNoticeState.markHandled(normalized, 'confirmed')
-  const seenKeys = inboxNoticeState.selectionHandledKeys(normalized)
-  if (seenKeys.length) messagesStore.markInboxSeen(seenKeys)
-  if (normalized.fromSelection && normalized.dedupeKey) {
-    talentInboxMatch.markSelectionNoticeSent(normalized.dedupeKey)
+  const batch = []
+  const primary = mergeNotice(row, lastPending)
+  if (primary) batch.push(primary)
+  for (let i = 0; i < lastLoadedRows.length; i++) {
+    const item = lastLoadedRows[i]
+    if (item && inboxNoticeState.isSelectionNotice(item)) batch.push(item)
   }
+  lastPending = null
+  lastLoadedRows = []
+  const seenSig = new Set()
+  let dismissed = 0
+  for (let i = 0; i < batch.length; i++) {
+    const normalized = normalizeSelectionRow(batch[i])
+    if (!normalized || !inboxNoticeState.isSelectionNotice(normalized)) continue
+    const sig = inboxNoticeState.selectionHandledKeys(normalized).join('|')
+    if (!sig || seenSig.has(sig)) continue
+    seenSig.add(sig)
+    inboxNoticeState.markHandled(normalized, 'confirmed')
+    const seenKeys = inboxNoticeState.selectionHandledKeys(normalized)
+    if (seenKeys.length) messagesStore.markInboxSeen(seenKeys)
+    if (normalized.fromSelection && normalized.dedupeKey) {
+      talentInboxMatch.markSelectionNoticeSent(normalized.dedupeKey)
+    }
+    dismissed += 1
+  }
+  if (!dismissed) return
   try {
     wx.showToast({ title: '可在「我的-消息通知-入选」查看群码', icon: 'none', duration: 2500 })
   } catch (_) {}

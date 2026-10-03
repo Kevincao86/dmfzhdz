@@ -631,6 +631,7 @@
   font-size: 30rpx;
   font-weight: 700;
   color: #fff;
+  text-align: center;
   background: var(--lq-gradient);
   box-shadow: var(--lq-shadow-tab);
 }
