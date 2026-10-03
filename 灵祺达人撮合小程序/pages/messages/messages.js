@@ -95,8 +95,11 @@ Page({
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
     participant.clearParticipantOverride()
     this.applyIdentityCopy()
+    const refreshGroups = this._refreshGroupsOnShow
+    this._refreshGroupsOnShow = false
     if (this._suppressShowReload) {
       this._suppressShowReload = false
+      if (refreshGroups) void this.reloadGroupSessionsNow()
       return
     }
     if (!this._messagesBootstrapped) {
@@ -104,7 +107,10 @@ Page({
       return
     }
     const now = Date.now()
-    if (this._lastMsgReloadAt && now - this._lastMsgReloadAt < 20000) return
+    if (this._lastMsgReloadAt && now - this._lastMsgReloadAt < 20000) {
+      if (refreshGroups) void this.reloadGroupSessionsNow()
+      return
+    }
     this._lastMsgReloadAt = now
     if (chat.canChat()) {
       void this.reloadChatSessionsQuiet()
@@ -114,6 +120,17 @@ Page({
         if (this.data.msgTab === 'group') this.applySearch()
       })
     }
+  },
+  reloadGroupSessionsNow() {
+    if (!api.hasApi()) return Promise.resolve()
+    return this.loadGroupSessions()
+      .then(() => {
+        this.applySearch()
+        void refreshMessagesTabBadge(this)
+      })
+      .catch((e) => {
+        console.warn('[messages] reloadGroupSessionsNow', e)
+      })
   },
   async reloadChatSessionsQuiet() {
     if (!chat.canChat()) return
@@ -392,7 +409,20 @@ Page({
   openGroupChat(e) {
     const mpOrderId = e.currentTarget.dataset.mpOrderId
     if (!mpOrderId) return
-    this._suppressShowReload = true
+    const clearUnread = (list) =>
+      (list || []).map((s) =>
+        String(s.mpOrderId) === String(mpOrderId) ? { ...s, unread: 0 } : s,
+      )
+    this.setData(
+      {
+        allGroupSessions: clearUnread(this.data.allGroupSessions),
+        groupSessions: clearUnread(this.data.groupSessions),
+      },
+      () => {
+        void refreshMessagesTabBadge(this)
+      },
+    )
+    this._refreshGroupsOnShow = true
     wx.navigateTo({
       url: `/pages/subpack-pr/order-group-chat/order-group-chat?mpOrderId=${encodeURIComponent(mpOrderId)}`,
     })

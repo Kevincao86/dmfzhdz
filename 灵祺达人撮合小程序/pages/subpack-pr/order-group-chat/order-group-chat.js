@@ -40,9 +40,18 @@ Page({
   },
   onHide() {
     this.stopPoll()
+    this.persistRead()
   },
   onUnload() {
     this.stopPoll()
+    this.persistRead()
+  },
+  persistRead() {
+    const orderId = String(this._mpOrderId || '').trim()
+    if (!orderId) return
+    const maxTs = (this.data.messages || []).reduce((max, m) => Math.max(max, Number(m && m.ts) || 0), 0)
+    if (maxTs > 0) groupReadState.markRead(orderId, maxTs)
+    void chatBadgeWatcher.refreshNow({ minIntervalMs: 0 })
   },
   onBack() {
     wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/messages/messages' }) })
@@ -80,10 +89,12 @@ Page({
     if (ui.length) {
       this._sinceTs = Math.max(this._sinceTs, ...ui.map((m) => m.ts || 0))
     }
-    if (this._mpOrderId && ui.length) {
-      const maxTs = Math.max(...ui.map((m) => m.ts || 0))
-      groupReadState.markRead(this._mpOrderId, maxTs)
-      void chatBadgeWatcher.refreshNow()
+    const orderId = String((group && group.mpOrderId) || this._mpOrderId || '').trim()
+    if (orderId) this._mpOrderId = orderId
+    if (orderId && ui.length) {
+      const maxTs = Math.max(...ui.map((m) => Number(m.ts) || 0))
+      groupReadState.markRead(orderId, maxTs)
+      void chatBadgeWatcher.refreshNow({ minIntervalMs: 0 })
     }
     const closed = group.status === 'closed' || body.canSend === false
     this.setData({
