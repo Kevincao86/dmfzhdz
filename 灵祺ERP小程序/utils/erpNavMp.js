@@ -8,7 +8,7 @@ const TASK_NAV = {
   optimize_local_ads: '/pages/ads-manage/ads-manage',
   follow_local_lead: '/pages/leads-center/leads-center',
   sync_platform: '/pages/product-list/product-list',
-  analyze_exception: '/pages/dashboard/dashboard',
+  analyze_exception: '/pages/biz-overview/biz-overview',
   generate_copywriting: '/pages/ai-content/ai-content',
   file_tax: '/pages/finance-tax/finance-tax',
   general: '/pages/functions/functions',

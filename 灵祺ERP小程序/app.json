@@ -3,6 +3,7 @@
     "pages/login/login",
     "pages/functions/functions",
     "pages/dashboard/dashboard",
+    "pages/biz-overview/biz-overview",
     "pages/shop-eval/shop-eval",
     "pages/ai-agent/ai-agent",
     "pages/mine/mine",
@@ -72,12 +73,12 @@
     "backgroundColor": "#ffffff",
     "list": [
       {
-        "pagePath": "pages/functions/functions",
-        "text": "功能"
-      },
-      {
         "pagePath": "pages/dashboard/dashboard",
         "text": "首页"
+      },
+      {
+        "pagePath": "pages/functions/functions",
+        "text": "功能"
       },
       {
         "pagePath": "pages/shop-eval/shop-eval",

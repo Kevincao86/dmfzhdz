@@ -128,7 +128,7 @@ Page({
       if (wx.getStorageSync('meoo_just_logged_out')) return false
     } catch (_) {}
     if (!api.getBearerToken()) return false
-    const dest = this._redirect && this._redirect.startsWith('/') ? this._redirect : '/pages/functions/functions'
+    const dest = this._redirect && this._redirect.startsWith('/') ? this._redirect : '/pages/dashboard/dashboard'
     if (dest === '/pages/functions/functions' || dest === '/pages/dashboard/dashboard' || dest === '/pages/ai-agent/ai-agent' || dest === '/pages/mine/mine') {
       wx.switchTab({
         url: dest,
@@ -143,8 +143,8 @@ Page({
   onGuestBrowse() {
     api.enterGuestBrowse()
     wx.switchTab({
-      url: '/pages/functions/functions',
-      fail: () => wx.reLaunch({ url: '/pages/functions/functions' }),
+      url: '/pages/dashboard/dashboard',
+      fail: () => wx.reLaunch({ url: '/pages/dashboard/dashboard' }),
     })
   },
 
@@ -382,7 +382,7 @@ Page({
     if (redirect) {
       const path = redirect.split('?')[0]
       if (tabPaths.some((p) => path === p || path.endsWith(p))) {
-        wx.switchTab({ url: path, fail: () => wx.switchTab({ url: '/pages/functions/functions' }) })
+        wx.switchTab({ url: path, fail: () => wx.switchTab({ url: '/pages/dashboard/dashboard' }) })
         return
       }
       wx.redirectTo({
@@ -390,13 +390,13 @@ Page({
         fail: () =>
           wx.navigateTo({
             url: redirect,
-            fail: () => wx.switchTab({ url: '/pages/functions/functions' }),
+            fail: () => wx.switchTab({ url: '/pages/dashboard/dashboard' }),
           }),
       })
       return
     }
     wx.switchTab({
-      url: '/pages/functions/functions',
+      url: '/pages/dashboard/dashboard',
       fail: () => {
         wx.showToast({ title: '进入工作台失败，请重试', icon: 'none' })
       },

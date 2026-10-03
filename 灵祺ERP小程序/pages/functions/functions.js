@@ -30,6 +30,7 @@ Page({
     ]
     const dots = {
       knowledge: 'dot-blue',
+      overview: 'dot-blue',
       store: 'dot-green',
       product: 'dot-amber',
       ops: 'dot-pink',
@@ -72,7 +73,7 @@ Page({
       } catch (_) {}
     }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 0 })
+      this.getTabBar().setData({ selected: 1 })
     }
   },
 

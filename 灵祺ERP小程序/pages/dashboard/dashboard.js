@@ -1,580 +1,159 @@
-const api = require('../../utils/api.js')
-const devAuth = require('../../utils/devAuth.js')
-const merchant = require('../../utils/merchantApi.js')
-const dashboardMp = require('../../utils/dashboardMp.js')
-const shop = require('../../utils/shopAnalysisApiMp.js')
-const sessionSync = require('../../utils/merchantSessionSyncMp.js')
-const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
+const config = require('../../utils/config.js')
 
-const YDAY_CACHE_KEY = 'meoo_dash_yesterday_analysis_v2'
-const YDAY_AUTO_KEY = 'meoo_dash_yday_auto_v1'
+const SLOT_KEY = 'erp.mp.home.banner'
 
-const RANGE_TABS = [
-  { id: 'today', label: '今日', apiRange: 'realtime' },
-  { id: 'day7', label: '7日', apiRange: 'day7' },
-  { id: 'day30', label: '30日', apiRange: 'day30' },
+const FALLBACK_POSTERS = [
+  {
+    key: 'fallback-shop',
+    imageUrl: '/images/home/poster-shop.jpg',
+    isVideo: false,
+    title: '看清今天的生意',
+    linkType: 'mp_path',
+    linkValue: '/pages/biz-overview/biz-overview',
+  },
+  {
+    key: 'fallback-analysis',
+    imageUrl: '/images/home/poster-analysis.jpg',
+    isVideo: false,
+    title: '店铺分析',
+    linkType: 'mp_path',
+    linkValue: '/pages/store-analysis/store-analysis',
+  },
+  {
+    key: 'fallback-store',
+    imageUrl: '/images/home/poster-store.jpg',
+    isVideo: false,
+    title: '门店评估',
+    linkType: 'mp_path',
+    linkValue: '/pages/shop-eval/shop-eval',
+  },
 ]
 
-const EMPTY_KPIS = [
-  { label: '营收金额', value: '—', delta: '', deltaUp: true, iconKey: 'shop' },
-  { label: '核销总金额', value: '—', delta: '', deltaUp: true, iconKey: 'list' },
-  { label: '退款金额', value: '—', delta: '', deltaUp: true, iconKey: 'star' },
-  { label: '成交券数', value: '—', delta: '', deltaUp: true, iconKey: 'user' },
-  { label: '退款券数', value: '—', delta: '', deltaUp: true, iconKey: 'list' },
+const ENTRIES = [
+  {
+    id: 'overview',
+    title: '经营概览',
+    imageUrl: '/images/home/entry-overview.jpg',
+    url: '/pages/biz-overview/biz-overview',
+    tab: false,
+  },
+  {
+    id: 'analysis',
+    title: '店铺分析',
+    imageUrl: '/images/home/entry-analysis.jpg',
+    url: '/pages/store-analysis/store-analysis',
+    tab: false,
+  },
+  {
+    id: 'shop',
+    title: '门店评估',
+    imageUrl: '/images/home/entry-eval.jpg',
+    url: '/pages/shop-eval/shop-eval',
+    tab: true,
+  },
 ]
 
-/** 仅 DEV_SKIP 预览模式使用 */
-const PREVIEW_BY_RANGE = {
-  today: {
-    kpis: [
-      { label: '成交额', value: '¥12,480', delta: '较昨日 +12.5%', deltaUp: true, iconKey: 'shop' },
-      { label: '核销单', value: '326', delta: '较昨日 +8.3%', deltaUp: true, iconKey: 'list' },
-      { label: '转化率', value: '12.6%', delta: '较昨日 +0.8%', deltaUp: true, iconKey: 'star' },
-      { label: '在途招募', value: '18', delta: '较昨日 +2', deltaUp: true, iconKey: 'user' },
-    ],
-  },
-  day7: {
-    kpis: [
-      { label: '成交额', value: '¥86,320', delta: '较上周期 +9.1%', deltaUp: true, iconKey: 'shop' },
-      { label: '核销单', value: '2,148', delta: '较上周期 +6.4%', deltaUp: true, iconKey: 'list' },
-      { label: '转化率', value: '11.4%', delta: '较上周期 +0.6%', deltaUp: true, iconKey: 'star' },
-      { label: '在途招募', value: '24', delta: '较上周期 +5', deltaUp: true, iconKey: 'user' },
-    ],
-  },
-  day30: {
-    kpis: [
-      { label: '成交额', value: '¥328,600', delta: '较上周期 +15.2%', deltaUp: true, iconKey: 'shop' },
-      { label: '核销单', value: '8,926', delta: '较上周期 +11.8%', deltaUp: true, iconKey: 'list' },
-      { label: '转化率', value: '13.1%', delta: '较上周期 +1.2%', deltaUp: true, iconKey: 'star' },
-      { label: '在途招募', value: '31', delta: '较上周期 +7', deltaUp: true, iconKey: 'user' },
-    ],
-  },
+function isVideoUrl(item) {
+  if (!item) return false
+  if (String(item.mediaType || '').toLowerCase() === 'video') return true
+  if (String(item.mediaType || '').toLowerCase() === 'image') return false
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(String(item.imageUrl || ''))
 }
 
-function chartTitleFor(rangeId) {
-  if (rangeId === 'day30') return '近30日成交趋势'
-  if (rangeId === 'day7') return '近7日成交趋势'
-  return '今日成交趋势'
-}
-
-function formatConversion(raw) {
-  const n = Number(raw)
-  if (!Number.isFinite(n) || n <= 0) return '—'
-  const text = String(Math.round(n * 10) / 10)
-  return text.endsWith('%') ? text : `${text}%`
-}
-
-function enrichKpis(kpis) {
-  return kpis.map((k) => ({
-    ...k,
-    iconSrc: iconDataUri('cyan', k.iconKey),
-  }))
-}
-
-function shanghaiNowParts(date) {
-  const d = date || new Date()
-  const ymd = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
-  const hour = Number(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: 'Asia/Shanghai',
-      hour: '2-digit',
-      hourCycle: 'h23',
-    }).format(d),
-  )
-  return { ymd, hour: Number.isFinite(hour) ? hour : 0 }
-}
-
-function addDaysYmd(ymd, delta) {
-  const ms = new Date(`${ymd}T12:00:00+08:00`).getTime() + delta * 86400000
-  return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
-}
-
-/** 10:00 前沿用上一档；10:00 起分析昨天，缓存到次日 10:00 */
-function yesterdayRefreshSlot(now) {
-  const { ymd, hour } = shanghaiNowParts(now)
-  if (hour >= 10) return { slot: ymd, targetDate: addDaysYmd(ymd, -1) }
-  return { slot: addDaysYmd(ymd, -1), targetDate: addDaysYmd(ymd, -2) }
-}
-
-function dashTenantKey() {
-  try {
-    return String(wx.getStorageSync('meoo_active_tenant_id') || wx.getStorageSync('meoo_login_name') || '').trim()
-  } catch (_) {
-    return ''
+function openDecorLink(item) {
+  if (!item) return
+  const type = String(item.linkType || 'none')
+  const val = String(item.linkValue || '').trim()
+  if (type === 'none' || !val) return
+  if (type === 'mp_path') {
+    const url = val.startsWith('/') ? val : `/${val}`
+    wx.navigateTo({
+      url,
+      fail: () => {
+        wx.switchTab({ url: url.split('?')[0], fail: () => {} })
+      },
+    })
+    return
+  }
+  if (type === 'web_url') {
+    wx.setClipboardData({ data: val })
   }
 }
 
-function readYesterdayCache(slot, tenant) {
-  try {
-    const raw = wx.getStorageSync(YDAY_CACHE_KEY)
-    const row = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {}
-    if (!row || row.slot !== slot || row.tenant !== tenant) return null
-    if (!Array.isArray(row.sections) || !row.sections.length) return null
-    return row
-  } catch (_) {
-    return null
-  }
-}
-
-function writeYesterdayCache(row) {
-  try {
-    wx.setStorageSync(YDAY_CACHE_KEY, row)
-  } catch (_) {}
-}
-
-function readYdayAuto() {
-  try {
-    return wx.getStorageSync(YDAY_AUTO_KEY) === '1'
-  } catch (_) {
-    return false
-  }
-}
-
-function writeYdayAuto(on) {
-  try {
-    if (on) wx.setStorageSync(YDAY_AUTO_KEY, '1')
-    else wx.removeStorageSync(YDAY_AUTO_KEY)
-  } catch (_) {}
-}
-
-const YDAY_AI_SYSTEM = [
-  '你是资深本地生活店铺经营顾问。请只根据给出的昨日数据写中文分析，禁止编造未提供的数字。',
-  '输出只能使用这五个标题，格式为「一、标题」：',
-  '一、经营总览',
-  '二、客群洞察',
-  '三、商品与退款',
-  '四、评价口碑',
-  '五、行动建议',
-  '每节 3～5 条，用「· 」开头。数据不足的节写明「昨日数据不足」，不要猜测。',
-].join('\n')
-
-function pointsFromTokenUsage(usage, model) {
-  const prompt = Math.max(0, Math.floor(Number(usage && usage.prompt_tokens) || 0))
-  const completion = Math.max(0, Math.floor(Number(usage && usage.completion_tokens) || 0))
-  if (prompt + completion <= 0) return 1
-  const m = String(model || '').toLowerCase()
-  let inPerK = 0.0008
-  let outPerK = 0.002
-  if (/flash|turbo/.test(m)) {
-    inPerK = 0.0003
-    outPerK = 0.0006
-  } else if (/max/.test(m)) {
-    inPerK = 0.0024
-    outPerK = 0.0096
-  } else if (/mini|haiku/.test(m)) {
-    inPerK = 0.001
-    outPerK = 0.004
-  } else if (/gpt-4o|claude|gemini|grok/.test(m)) {
-    inPerK = 0.02
-    outPerK = 0.06
-  }
-  const costYuan = (prompt / 1000) * inPerK + (completion / 1000) * outPerK
-  return Math.max(1, Math.ceil(costYuan / 0.01))
-}
-
-function sectionsFromReport(text) {
-  const raw = String(text || '').trim()
-  if (!raw) return []
-  const parts = raw.split(/\n(?=[一二三四五六七八九十]、)/).map((s) => s.trim()).filter(Boolean)
-  const sections = parts.map((block, i) => {
-    const lines = block.split('\n')
-    const title = lines[0].replace(/^[一二三四五六七八九十]、/, '').trim()
-    const body = lines.slice(1).join('\n').trim() || lines[0]
-    return { id: String(i), title: body === lines[0] ? '' : title, body }
+function fetchHomeBanners() {
+  const base = String(config.MERCHANT_API_BASE_URL || '')
+    .trim()
+    .replace(/\/$/, '')
+  if (!base) return Promise.resolve([])
+  const url = `${base}/api/meoo-platform-decor-public?slotKey=${encodeURIComponent(SLOT_KEY)}`
+  return new Promise((resolve) => {
+    wx.request({
+      url,
+      method: 'GET',
+      timeout: 4000,
+      success(res) {
+        const data = res.data || {}
+        const raw = Array.isArray(data.items) && data.items.length ? data.items : data.item ? [data.item] : []
+        resolve(
+          raw
+            .filter((it) => it && it.imageUrl)
+            .slice(0, 5)
+            .map((it) => ({
+              key: String(it.id || it.imageUrl),
+              imageUrl: it.imageUrl,
+              isVideo: isVideoUrl(it),
+              title: String(it.title || '').trim() === SLOT_KEY ? '' : String(it.title || '').trim(),
+              linkType: it.linkType || 'none',
+              linkValue: it.linkValue || '',
+              carouselSeconds: it.carouselSeconds,
+            })),
+        )
+      },
+      fail() {
+        resolve([])
+      },
+    })
   })
-  return sections.filter((s) => s.body)
-}
-
-function formatYuanExact(n) {
-  const x = Number(n)
-  if (!Number.isFinite(x)) return '—'
-  const fixed = x.toFixed(2)
-  const parts = fixed.split('.')
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-  return `¥${parts.join('.')}`
-}
-
-function factsForYesterday(targetDate, summary, adviceFacts) {
-  const s = summary || {}
-  const yuan = (n) => (n == null || n === '' ? '未知' : n)
-  return [
-    `统计日期：${targetDate}（昨日）`,
-    '平台：全部已绑定平台',
-    '门店范围：全部门店',
-    `营收金额：${yuan(s.salesAmountYuan)} 元`,
-    `核销总金额：${yuan(s.verifyAmountYuan)} 元`,
-    `退款金额：${yuan(s.refundAmountYuan)} 元`,
-    `成交券数：${s.couponCount == null ? '未知' : s.couponCount}`,
-    `退款券数：${s.refundCouponCount == null ? '未知' : s.refundCouponCount}`,
-    adviceFacts ? String(adviceFacts) : '',
-    '请输出完整五节分析。数字必须与上面给出的金额和券数一致，禁止把有数写成 0。',
-  ]
-    .filter(Boolean)
-    .join('\n')
-}
-
-function summaryHasBiz(summary) {
-  const s = summary || {}
-  return (
-    (Number(s.orderCount) || 0) > 0 ||
-    (Number(s.salesAmountYuan) || 0) > 0 ||
-    (Number(s.verifyAmountYuan) || 0) > 0 ||
-    (Number(s.refundAmountYuan) || 0) > 0 ||
-    (Number(s.couponCount) || 0) > 0 ||
-    (Number(s.refundCouponCount) || 0) > 0
-  )
-}
-
-function ydayMetricsFromSummary(summary) {
-  const s = summary || {}
-  return [
-    { label: '营收金额', value: formatYuanExact(s.salesAmountYuan) },
-    { label: '核销总金额', value: formatYuanExact(s.verifyAmountYuan) },
-    { label: '退款金额', value: formatYuanExact(s.refundAmountYuan) },
-    { label: '成交券数', value: String(Number(s.couponCount) || 0) },
-    { label: '退款券数', value: String(Number(s.refundCouponCount) || 0) },
-  ]
 }
 
 Page({
   data: {
-    loading: false,
-    range: 'today',
-    rangeTabs: RANGE_TABS,
-    heroIconSrc: iconDataUri('cyan', 'shop'),
-    kpis: enrichKpis(EMPTY_KPIS),
-    usePreview: false,
-    chartEmpty: true,
-    chartBars: [],
-    chartHint: '',
-    chartTitle: '趋势分析',
-    ydayTitle: '昨日数据分析',
-    ydayDate: '',
-    ydayHint: '自动分析默认关闭，打开后每天 10:00 分析一次',
-    ydayAuto: false,
-    ydayLoading: false,
-    ydaySections: [],
-    ydayEmpty: '',
-    ydayMetrics: [],
-    scrollInto: '',
-    posters: [
-      { id: 'p1', tone: 'blue', kicker: '经营', title: '看清今天的生意', sub: '营收、核销和成交券', action: 'overview' },
-      { id: 'p2', tone: 'green', kicker: '店铺', title: '店铺分析', sub: '成交客群与经营建议', action: 'analysis' },
-      { id: 'p3', tone: 'violet', kicker: '门店', title: '门店评估', sub: '给门店打分，看改进方向', action: 'shop' },
-    ],
-    entries: [
-      { id: 'overview', title: '经营概览', tone: 'blue', iconSrc: iconDataUri('#2f6fed', 'chart') },
-      { id: 'analysis', title: '店铺分析', tone: 'green', iconSrc: iconDataUri('#22c55e', 'chart') },
-      { id: 'shop', title: '门店评估', tone: 'amber', iconSrc: iconDataUri('#f59e0b', 'pin') },
-    ],
+    posters: FALLBACK_POSTERS,
+    posterInterval: 4000,
+    entries: ENTRIES,
   },
 
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 1 })
+      this.getTabBar().setData({ selected: 0 })
     }
-    if (!api.canAccessPage()) {
-      api.goLogin()
-      return
-    }
-    this.setData({ ydayAuto: readYdayAuto() })
-    void this.loadDash()
-    void this.loadYesterdayAnalysis()
+    this.loadPosters()
   },
 
-  onHomeAction(e) {
-    const action = e.currentTarget.dataset.action
-    if (action === 'overview') {
-      this.setData({ scrollInto: '' }, () => this.setData({ scrollInto: 'overview' }))
+  async loadPosters() {
+    const remote = await fetchHomeBanners()
+    if (!remote.length) {
+      this.setData({ posters: FALLBACK_POSTERS, posterInterval: 4000 })
       return
     }
-    if (action === 'analysis') {
-      wx.navigateTo({ url: '/pages/store-analysis/store-analysis' })
-      return
-    }
-    if (action === 'shop') {
-      wx.switchTab({ url: '/pages/shop-eval/shop-eval' })
-    }
+    const sec = Math.min(30, Math.max(2, Math.round(Number(remote[0].carouselSeconds) || 4)))
+    this.setData({ posters: remote, posterInterval: sec * 1000 })
   },
 
-  onToggleYdayAuto(e) {
-    const on = !!(e.detail && e.detail.value)
-    writeYdayAuto(on)
-    this.setData({
-      ydayAuto: on,
-      ydayHint: on
-        ? '已开启，每天 10:00 自动分析，按实际 token 扣积分'
-        : '已关闭。打开后每天 10:00 才会自动分析',
-    })
-    if (on) void this.loadYesterdayAnalysis()
+  onPosterTap(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const item = (this.data.posters || [])[index]
+    openDecorLink(item)
   },
 
-  onRangeTap(e) {
-    const range = e.currentTarget.dataset.id
-    if (!range || range === this.data.range) return
-    this.setData({ range })
-    void this.loadDash()
-  },
-
-  async loadDash() {
-    const tab = RANGE_TABS.find((t) => t.id === this.data.range) || RANGE_TABS[0]
-    const previewPack = PREVIEW_BY_RANGE[tab.id] || PREVIEW_BY_RANGE.today
-
-    if (devAuth.isDevSkipLogin()) {
-      const demo = [
-        { label: '09-16', value: 80, pct: 55, tip: '¥80' },
-        { label: '09-17', value: 120, pct: 80, tip: '¥120' },
-        { label: '09-18', value: 90, pct: 62, tip: '¥90' },
-        { label: '09-19', value: 150, pct: 100, tip: '¥150' },
-        { label: '09-20', value: 110, pct: 74, tip: '¥110' },
-        { label: '09-21', value: 130, pct: 87, tip: '¥130' },
-        { label: '09-22', value: 140, pct: 93, tip: '¥140' },
-      ]
-      this.setData({
-        loading: false,
-        usePreview: true,
-        kpis: enrichKpis(previewPack.kpis),
-        chartEmpty: false,
-        chartBars: demo,
-        chartHint: '预览数据',
-        chartTitle: chartTitleFor(tab.id),
-      })
+  onEntryTap(e) {
+    const id = e.currentTarget.dataset.id
+    const item = (this.data.entries || []).find((it) => it.id === id)
+    if (!item) return
+    if (item.tab) {
+      wx.switchTab({ url: item.url })
       return
     }
-
-    if (!merchant.hasMerchantApi()) {
-      this.setData({
-        loading: false,
-        usePreview: false,
-        kpis: enrichKpis(EMPTY_KPIS),
-        chartEmpty: true,
-        chartBars: [],
-        chartHint: '登录并绑定平台后可查看趋势',
-        chartTitle: chartTitleFor(tab.id),
-      })
-      return
-    }
-
-    this.setData({ loading: true })
-    const d = await dashboardMp.fetchAggregateDashboard(tab.apiRange)
-    if (!d.connected) {
-      this.setData({
-        loading: false,
-        usePreview: false,
-        kpis: enrichKpis(EMPTY_KPIS),
-        chartEmpty: true,
-        chartBars: [],
-        chartHint: '请先在系统设置绑定至少一个平台',
-        chartTitle: chartTitleFor(tab.id),
-      })
-      return
-    }
-
-    const kpis = enrichKpis([
-      {
-        label: '营收金额',
-        value: formatYuanExact(d.totalRevenue),
-        delta: '',
-        deltaUp: true,
-        iconKey: 'shop',
-      },
-      {
-        label: '核销总金额',
-        value: formatYuanExact(d.totalVerify),
-        delta: '',
-        deltaUp: true,
-        iconKey: 'list',
-      },
-      {
-        label: '退款金额',
-        value: formatYuanExact(d.totalRefund),
-        delta: '',
-        deltaUp: true,
-        iconKey: 'star',
-      },
-      {
-        label: '成交券数',
-        value: String(d.totalOrders || 0),
-        delta: '',
-        deltaUp: true,
-        iconKey: 'user',
-      },
-      {
-        label: '退款券数',
-        value: String(d.totalRefundCoupons || 0),
-        delta: '',
-        deltaUp: true,
-        iconKey: 'list',
-      },
-    ])
-
-    const bars = Array.isArray(d.chartBars) ? d.chartBars : []
-    const hasVal = bars.some((x) => Number(x.value) > 0)
-    this.setData({
-      loading: false,
-      usePreview: false,
-      kpis,
-      chartEmpty: bars.length === 0,
-      chartBars: bars,
-      chartHint: bars.length === 0 ? '暂无趋势点' : hasVal ? '' : '已接通平台，当前区间成交额为 0',
-      chartTitle: chartTitleFor(tab.id),
-    })
-  },
-
-  async fillYesterdayMetrics(targetDate) {
-    try {
-      const summaryRes = await shop.fetchShopAnalysisSummary({
-        startDate: targetDate,
-        endDate: targetDate,
-        platform: 'all',
-      })
-      const summary = (summaryRes && summaryRes.summary) || {}
-      this.setData({
-        ydayDate: targetDate,
-        ydayMetrics: ydayMetricsFromSummary(summary),
-      })
-    } catch (_) {}
-  },
-
-  onManualYesterdayAnalysis() {
-    void this.loadYesterdayAnalysis({ manual: true })
-  },
-
-  async loadYesterdayAnalysis(opts) {
-    const manual = Boolean(opts && opts.manual)
-    const { slot, targetDate } = yesterdayRefreshSlot()
-    const tenant = dashTenantKey()
-    const autoOn = readYdayAuto()
-    const base = {
-      ydayDate: targetDate,
-      ydayHint: autoOn
-        ? '已开启，每天 10:00 自动分析，按实际 token 扣积分'
-        : '已关闭。打开后每天 10:00 才会自动分析',
-    }
-    if (devAuth.isDevSkipLogin()) {
-      this.setData({
-        ...base,
-        ydayLoading: false,
-        ydayEmpty: '',
-        ydaySections: [
-          {
-            id: 'preview',
-            title: '经营总览',
-            body: '预览：昨日成交集中在午后。正式环境由 AI 根据昨日订单分析，按 token 扣积分。',
-          },
-        ],
-      })
-      return
-    }
-    if (!api.isRealAuthed || !api.isRealAuthed() || !merchant.hasMerchantApi()) {
-      this.setData({
-        ...base,
-        ydayLoading: false,
-        ydaySections: [],
-        ydayEmpty: '登录后查看昨日数据分析',
-      })
-      return
-    }
-    if (!manual) {
-      const cached = readYesterdayCache(slot, tenant)
-      if (cached) {
-        this.setData({
-          ...base,
-          ydayLoading: false,
-          ydayEmpty: '',
-          ydayDate: cached.targetDate || targetDate,
-          ydaySections: cached.sections,
-          ydayHint:
-            cached.pointsCharged > 0
-              ? `${autoOn ? '已开启，每天 10:00 自动更新' : '自动分析已关闭'} · 本次已扣 ${cached.pointsCharged} 积分`
-              : base.ydayHint,
-        })
-        void this.fillYesterdayMetrics(targetDate)
-        return
-      }
-      if (!autoOn) {
-        this.setData({
-          ...base,
-          ydayLoading: false,
-          ydaySections: [],
-          ydayEmpty: '自动分析未开启。打开开关后每天 10:00 分析一次，也可点手动分析',
-        })
-        void this.fillYesterdayMetrics(targetDate)
-        return
-      }
-    }
-    if (this._ydayLoading) return
-    this._ydayLoading = true
-    const seq = (this._ydaySeq || 0) + 1
-    this._ydaySeq = seq
-    this.setData({ ...base, ydayLoading: true, ydayEmpty: '', ydaySections: manual ? this.data.ydaySections : [] })
-    try {
-      const summaryRes = await shop.fetchShopAnalysisSummary({
-        startDate: targetDate,
-        endDate: targetDate,
-        platform: 'all',
-      })
-      if (seq !== this._ydaySeq) return
-      const summary = summaryRes.summary || {}
-      const metrics = ydayMetricsFromSummary(summary)
-      this.setData({ ydayMetrics: metrics, ydayDate: targetDate })
-      if (!summaryHasBiz(summary)) {
-        this.setData({
-          ydayLoading: false,
-          ydaySections: [],
-          ydayMetrics: metrics,
-          ydayEmpty: '昨日暂无经营数据，未调用 AI',
-        })
-        return
-      }
-      const token = api.getBearerToken ? api.getBearerToken() : ''
-      let tenantId = tenant
-      try {
-        tenantId = String(wx.getStorageSync(sessionSync.MEOO_ACTIVE_TENANT_ID) || tenant).trim()
-      } catch (_) {}
-      const chat = await merchant.merchantRequestAuth('POST', '/api/meoo-ai-chat', {
-        bearerToken: token,
-        timeoutMs: 90000,
-        data: {
-          provider: 'qwen',
-          stream: false,
-          ...(tenantId ? { tenantId } : {}),
-          ...(token ? { access_token: token } : {}),
-          messages: [
-            { role: 'system', content: YDAY_AI_SYSTEM },
-            { role: 'user', content: factsForYesterday(targetDate, summary, summaryRes.adviceFacts) },
-          ],
-        },
-      })
-      if (seq !== this._ydaySeq) return
-      const data = chat && typeof chat === 'object' ? chat : {}
-      if (data.ok === false) throw new Error(String(data.detail || data.message || data.error || 'AI 分析失败'))
-      const sections = sectionsFromReport(data.content)
-      if (!sections.length) throw new Error('AI 未返回分析内容')
-      const pointsCharged = pointsFromTokenUsage(data.usage, data.model)
-      writeYesterdayCache({
-        slot,
-        tenant,
-        targetDate,
-        sections,
-        pointsCharged,
-        savedAt: Date.now(),
-      })
-      this.setData({
-        ydayLoading: false,
-        ydayEmpty: '',
-        ydayMetrics: metrics,
-        ydaySections: sections,
-        ydayHint: `按 token 扣减 · 本次 ${pointsCharged} 积分`,
-      })
-    } catch (e) {
-      if (seq !== this._ydaySeq) return
-      this.setData({
-        ydayLoading: false,
-        ydayEmpty: e instanceof Error ? e.message : '昨日分析暂时无法生成',
-      })
-    } finally {
-      if (seq === this._ydaySeq) this._ydayLoading = false
-    }
+    wx.navigateTo({ url: item.url })
   },
 })

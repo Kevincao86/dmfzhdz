@@ -1,6 +1,23 @@
 /** 「功能」Tab — 严格对齐商家 Web merchant-erp/src/config/nav.ts NAV_ITEMS */
 const FUNCTION_SECTIONS = [
   {
+    id: 'overview',
+    title: '经营',
+    layout: 'grid3',
+    tone: 'blue',
+    rowDesc: '',
+    sectionIcon: 'chart',
+    items: [
+      {
+        kind: 'link',
+        url: '/pages/biz-overview/biz-overview',
+        title: '经营概览',
+        desc: '营收、核销与昨日分析',
+        iconKey: 'chart',
+      },
+    ],
+  },
+  {
     id: 'knowledge',
     title: '知识库',
     layout: 'row',

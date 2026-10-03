@@ -1,11 +1,4 @@
-<scroll-view
-  scroll-y
-  class="dash-page-v2"
-  enhanced
-  show-scrollbar="{{false}}"
-  scroll-into-view="{{scrollInto}}"
-  scroll-with-animation
->
+<scroll-view scroll-y class="home-page" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
   <swiper
     class="home-poster"
     indicator-dots
@@ -13,14 +6,25 @@
     indicator-active-color="#ffffff"
     circular
     autoplay
-    interval="4000"
+    interval="{{posterInterval}}"
     duration="400"
   >
-    <swiper-item wx:for="{{posters}}" wx:key="id">
-      <view class="home-poster__slide home-poster__slide--{{item.tone}}" data-action="{{item.action}}" bindtap="onHomeAction">
-        <text class="home-poster__kicker">{{item.kicker}}</text>
-        <text class="home-poster__title">{{item.title}}</text>
-        <text class="home-poster__sub">{{item.sub}}</text>
+    <swiper-item wx:for="{{posters}}" wx:key="key">
+      <view class="home-poster__slide" data-index="{{index}}" bindtap="onPosterTap">
+        <video
+          wx:if="{{item.isVideo}}"
+          class="home-poster__img"
+          src="{{item.imageUrl}}"
+          autoplay
+          muted
+          loop
+          show-center-play-btn="{{false}}"
+          show-play-btn="{{false}}"
+          controls="{{false}}"
+          object-fit="cover"
+        />
+        <image wx:else class="home-poster__img" src="{{item.imageUrl}}" mode="aspectFill" />
+        <text wx:if="{{item.title}}" class="home-poster__title">{{item.title}}</text>
       </view>
     </swiper-item>
   </swiper>
@@ -31,99 +35,12 @@
       wx:for="{{entries}}"
       wx:key="id"
       class="home-entry__card"
-      data-action="{{item.id}}"
-      bindtap="onHomeAction"
+      data-id="{{item.id}}"
+      bindtap="onEntryTap"
     >
-      <view class="home-entry__mark home-entry__mark--{{item.tone}}">
-        <image class="home-entry__ic" src="{{item.iconSrc}}" mode="aspectFit" />
-      </view>
+      <image class="home-entry__img" src="{{item.imageUrl}}" mode="aspectFill" />
       <text class="home-entry__title">{{item.title}}</text>
     </view>
   </view>
-
-  <view id="overview" class="dash-head">
-    <view class="dash-head-icon">
-      <image class="dash-hero-ic" src="{{heroIconSrc}}" mode="aspectFit" />
-    </view>
-    <view>
-      <text class="dash-title">经营概览</text>
-      <text class="dash-sub">商家经营数据</text>
-    </view>
-  </view>
-
-  <view class="dash-range-row">
-    <text
-      wx:for="{{rangeTabs}}"
-      wx:key="id"
-      class="dash-range {{range === item.id ? 'on' : ''}}"
-      data-id="{{item.id}}"
-      bindtap="onRangeTap"
-    >{{item.label}}</text>
-  </view>
-
-  <view class="dash-kpi-grid">
-    <view wx:for="{{kpis}}" wx:key="label" class="dash-kpi-card">
-      <view class="dash-kpi-top">
-        <text class="dash-kpi-label">{{item.label}}</text>
-        <view class="dash-kpi-ibox">
-          <image class="dash-kpi-ic" src="{{item.iconSrc}}" mode="aspectFit" />
-        </view>
-      </view>
-      <text class="dash-kpi-value">{{item.value}}</text>
-      <text wx:if="{{item.delta}}" class="dash-kpi-delta {{item.deltaUp ? 'up' : ''}}">{{item.delta}} ▲</text>
-    </view>
-  </view>
-
-  <view class="dash-chart-card">
-    <view class="dash-chart-head">
-      <text class="dash-chart-title">{{chartTitle}}</text>
-    </view>
-    <view wx:if="{{chartEmpty}}" class="dash-chart-ph">
-      <text>{{chartHint || '暂无数据'}}</text>
-    </view>
-    <view wx:else class="dash-chart-wrap">
-      <view class="dash-chart-bars">
-        <view wx:for="{{chartBars}}" wx:key="label" class="dash-bar-col">
-          <text class="dash-bar-tip">{{item.tip}}</text>
-          <view class="dash-bar-track">
-            <view class="dash-bar-fill" style="height: {{item.pct}}%;"></view>
-          </view>
-          <text class="dash-bar-lab">{{item.label}}</text>
-        </view>
-      </view>
-      <text wx:if="{{chartHint}}" class="dash-chart-hint">{{chartHint}}</text>
-    </view>
-  </view>
-
-  <view class="dash-chart-card dash-yday">
-    <view class="dash-chart-head">
-      <text class="dash-chart-title">{{ydayTitle}}</text>
-      <view class="dash-yday-actions">
-        <view class="dash-yday-auto">
-          <text>自动</text>
-          <switch class="dash-yday-switch" checked="{{ydayAuto}}" color="#2f6fed" disabled="{{ydayLoading}}" bindchange="onToggleYdayAuto" />
-        </view>
-        <text class="dash-yday-btn {{ydayLoading ? 'is-off' : ''}}" bindtap="onManualYesterdayAnalysis">{{ydayLoading ? '分析中' : '手动分析'}}</text>
-      </view>
-    </view>
-    <text wx:if="{{ydayDate}}" class="dash-yday-date">{{ydayDate}}</text>
-    <text class="dash-yday-hint">{{ydayHint}}</text>
-    <view wx:if="{{ydayMetrics.length}}" class="dash-yday-metrics">
-      <view wx:for="{{ydayMetrics}}" wx:key="label" class="dash-yday-metric">
-        <text class="dash-yday-metric-label">{{item.label}}</text>
-        <text class="dash-yday-metric-value">{{item.value}}</text>
-      </view>
-    </view>
-    <view wx:if="{{ydayLoading}}" class="dash-yday-empty">正在生成昨日分析…</view>
-    <view wx:elif="{{ydayEmpty}}" class="dash-yday-empty">{{ydayEmpty}}</view>
-    <view wx:else>
-      <view wx:for="{{ydaySections}}" wx:key="id" class="dash-yday-sec">
-        <text wx:if="{{item.title}}" class="dash-yday-sec-title">{{item.title}}</text>
-        <text class="dash-yday-sec-body" user-select>{{item.body}}</text>
-      </view>
-    </view>
-  </view>
-
-  <view wx:if="{{loading}}" class="dash-loading">加载中…</view>
   <site-icp-footer />
 </scroll-view>
