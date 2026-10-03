@@ -24,6 +24,23 @@ const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
 const mpPrivacyPageMixin = require('../../utils/mpPrivacyPageMixin.js')
 const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
 
+/** 定位结果放在页面实例上。列表 setData 若用尚未刷上的 data 当底，会把 filterCity 冲回「全部」。 */
+function rememberHallRegion(page, province, city) {
+  page._hallRegion = {
+    province: String(province || '全部'),
+    city: String(city || '全部'),
+  }
+  page._hallRegionSeq = (page._hallRegionSeq || 0) + 1
+  return page._hallRegionSeq
+}
+
+function reapplyHallRegionSoon(page, seq) {
+  setTimeout(() => {
+    if (!page || page._hallRegionSeq !== seq) return
+    if (typeof page.applyFilters === 'function') page.applyFilters()
+  }, 0)
+}
+
 /** 已选城市时：region 写明了别的市，不能因为门店名里带定位城市就放行 */
 function regionNamesOtherCity(region, cityFilter) {
   const c = String(cityFilter || '').trim()
@@ -249,8 +266,17 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   },
   onLoad() {
     applyNavLayout(this)
-    const regionState = regionFilterPicker.initRegionFilterState('全部', '全部')
-    regionState.regionFilterLabel = '城市'
+    const stored = hallRegionLocate.readStoredFilter()
+    const regionState = regionFilterPicker.initRegionFilterState(
+      stored && stored.province ? stored.province : '全部',
+      stored && stored.city ? stored.city : '全部',
+    )
+    if (regionState.filterProvince === '全部' && regionState.filterCity === '全部') {
+      regionState.regionFilterLabel = '城市'
+    } else {
+      rememberHallRegion(this, regionState.filterProvince, regionState.filterCity)
+    }
+    Object.assign(this.data, regionState)
     this.setData(regionState)
     console.log('[mp] build', mpBuild.ID)
     void this.applyHallLocateFilter()
@@ -276,9 +302,11 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       if (regionState.filterProvince === '全部' && regionState.filterCity === '全部') {
         regionState.regionFilterLabel = '城市'
       }
+      const seq = rememberHallRegion(this, regionState.filterProvince, regionState.filterCity)
       Object.assign(this.data, regionState)
       this.setData(regionState)
       this.applyFilters()
+      reapplyHallRegionSoon(this, seq)
     } catch (e) {
       console.warn('[index] hall locate', e)
     }
@@ -314,9 +342,12 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       this._lastHallIdentity = identity
     }
     const hasRows = Array.isArray(this.data.displayRows) && this.data.displayRows.length > 0
+    const afterHall = () => {
+      if (this._hallRegion) this.applyFilters()
+    }
     if (hasRows && !identityChanged) {
       this.setData(patch)
-      void loadHallList(this)
+      void loadHallList(this).then(afterHall)
       return
     }
     this.setData({ ...patch, loading: !hasRows, err: '' })
@@ -326,6 +357,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     void loadHallList(this)
       .then(() => {
         this._lastHallLoadedAt = Date.now()
+        afterHall()
       })
       .catch((e) => {
         console.error('[index] loadHallList', e)
@@ -631,8 +663,19 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     }
     const kw = String(this.data.searchKeyword || '').trim()
     const pf = this.data.filterPlatform
-    const provf = this.data.filterProvince
-    const cf = this.data.filterCity
+    const pinned = this._hallRegion
+    let provf = this.data.filterProvince
+    let cf = this.data.filterCity
+    if (pinned && (pinned.province !== provf || pinned.city !== cf)) {
+      provf = pinned.province
+      cf = pinned.city
+      const regionState = regionFilterPicker.initRegionFilterState(provf, cf)
+      if (regionState.filterProvince === '全部' && regionState.filterCity === '全部') {
+        regionState.regionFilterLabel = '城市'
+      }
+      Object.assign(this.data, regionState)
+      this.setData(regionState)
+    }
     const priceSel = this.data.priceSelected
     const statusF = this.data.filterStatus
     rows = rows.filter((r) => {
@@ -774,6 +817,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       hallRegionLocate.writeStoredFilter(next.filterProvince, next.filterCity)
       this._hallRegionUserPicked = true
     }
+    rememberHallRegion(this, next.filterProvince, next.filterCity)
     Object.assign(this.data, next)
     this.setData(next)
     this.applyFilters()
