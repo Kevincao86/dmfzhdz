@@ -322,6 +322,15 @@ export function appendTaxFilingRecord(record: TaxFilingRecord): void {
   } catch {
     /* ignore */
   }
+  void import('./merchantDeskSync').then((mod) => mod.scheduleMerchantDeskPush())
+}
+
+export function replaceTaxFilingHistory(list: TaxFilingRecord[]) {
+  try {
+    localStorage.setItem(TAX_FILING_HISTORY_KEY, JSON.stringify((list || []).slice(0, 24)))
+  } catch {
+    /* ignore */
+  }
 }
 
 export function buildTaxExportBlob(

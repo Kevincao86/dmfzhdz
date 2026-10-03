@@ -13,6 +13,7 @@ import {
   mergeAgentUserState,
   readAgentUserState,
   type AgentUserHabitsPayload,
+  type MerchantDeskPayload,
 } from '../vite-plugins/agentUserStateCore.js'
 
 export const config = { maxDuration: 15 }
@@ -54,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ok: true,
       habits: state?.habits ?? null,
       thread: state?.thread ?? null,
+      desk: state?.desk ?? null,
       updatedAt: state?.updatedAt ?? null,
     })
     return
@@ -64,23 +66,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  let body: { habits?: AgentUserHabitsPayload; thread?: unknown[] }
+  let body: { habits?: AgentUserHabitsPayload; thread?: unknown[]; desk?: MerchantDeskPayload }
   try {
-    body = JSON.parse(rawBody(req) || '{}') as { habits?: AgentUserHabitsPayload; thread?: unknown[] }
+    body = JSON.parse(rawBody(req) || '{}') as {
+      habits?: AgentUserHabitsPayload
+      thread?: unknown[]
+      desk?: MerchantDeskPayload
+    }
   } catch {
     sendMerchantJson(res, 400, { ok: false, error: 'invalid_json' })
     return
   }
 
-  const patch: { habits?: AgentUserHabitsPayload; thread?: unknown[] } = {}
+  const patch: { habits?: AgentUserHabitsPayload; thread?: unknown[]; desk?: MerchantDeskPayload } = {}
   if (body.habits && typeof body.habits === 'object') patch.habits = body.habits
   if (Array.isArray(body.thread)) patch.thread = body.thread
+  if (body.desk && typeof body.desk === 'object') patch.desk = body.desk
 
   const state = mergeAgentUserState(scope.tenantId, scope.userId, patch)
   sendMerchantJson(res, 200, {
     ok: true,
     habits: state.habits ?? null,
     thread: state.thread ?? null,
+    desk: state.desk ?? null,
     updatedAt: state.updatedAt,
   })
 }

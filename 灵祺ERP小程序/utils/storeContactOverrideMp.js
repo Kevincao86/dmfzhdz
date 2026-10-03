@@ -35,11 +35,20 @@ function loadAll() {
   }
 }
 
-function saveAll(all) {
+function saveAll(all, opts) {
   try {
     wx.setStorageSync(storageKey(), all)
     wx.setStorageSync(BASE_KEY, all)
   } catch (_) {}
+  if (!opts || opts.push !== false) {
+    try {
+      require('./merchantDeskSyncMp.js').scheduleMerchantDeskPush()
+    } catch (_) {}
+  }
+}
+
+function replaceAll(all) {
+  saveAll(all || {}, { push: false })
 }
 
 function getOverride(platform, poiId) {
@@ -82,4 +91,4 @@ function applyToItem(item, platform) {
   }
 }
 
-module.exports = { getOverride, saveOverride, applyToItem, entryKey }
+module.exports = { getOverride, saveOverride, applyToItem, entryKey, loadAll, replaceAll }

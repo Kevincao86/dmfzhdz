@@ -82,6 +82,7 @@ function collectLocalState() {
     orderFavoriteIds: [...orderFavorites.readIdSet()],
     groupQrCache: mpGroupQr.exportGroupQrCacheForSync(),
     prDouyinLinkeBindings: prDouyinLinkeStore.readPrDouyinLinkeBindings(),
+    talentEvals: require('./talentLocalLifeEval.js').exportTalentEvalsForSync(),
   }
 }
 
@@ -269,6 +270,9 @@ function applyRemoteState(state, epochAtStart) {
   }
   if (state.prDouyinLinkeBindings) {
     prDouyinLinkeStore.applyPrDouyinLinkeBindingsFromSync(state.prDouyinLinkeBindings)
+  }
+  if (state.talentEvals && typeof state.talentEvals === 'object') {
+    require('./talentLocalLifeEval.js').applyTalentEvalsFromSync(state.talentEvals)
   }
 }
 

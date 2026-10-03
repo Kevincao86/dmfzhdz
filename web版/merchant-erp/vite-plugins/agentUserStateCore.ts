@@ -13,11 +13,21 @@ export type AgentUserHabitsPayload = {
   preferredModelPickerKey?: string
 }
 
+export type MerchantDeskPayload = {
+  productLibrary?: unknown[]
+  storeContacts?: Record<string, unknown>
+  taxHistory?: unknown[]
+  briefRecords?: unknown[]
+  briefSelected?: unknown
+  updatedAt?: string
+}
+
 export type AgentUserStateFile = {
   userId: string
   tenantId: string
   habits?: AgentUserHabitsPayload
   thread?: unknown[]
+  desk?: MerchantDeskPayload
   updatedAt: string
 }
 
@@ -48,10 +58,43 @@ export function readAgentUserState(tenantId: string, userId: string): AgentUserS
   }
 }
 
+function rowTime(row: unknown): number {
+  if (!row || typeof row !== 'object') return 0
+  const o = row as Record<string, unknown>
+  const raw = o.updatedAt || o.createdAt || o.submittedAt
+  const n = Date.parse(String(raw || ''))
+  return Number.isFinite(n) ? n : 0
+}
+
+function mergeRows(a: unknown[] | undefined, b: unknown[] | undefined, limit: number): unknown[] {
+  const map = new Map<string, unknown>()
+  for (const row of [...(a || []), ...(b || [])]) {
+    if (!row || typeof row !== 'object') continue
+    const id = String((row as Record<string, unknown>).id || '').trim()
+    if (!id) continue
+    const prev = map.get(id)
+    if (!prev || rowTime(row) >= rowTime(prev)) map.set(id, row)
+  }
+  return [...map.values()].sort((x, y) => rowTime(y) - rowTime(x)).slice(0, limit)
+}
+
+function mergeContacts(
+  a?: Record<string, unknown>,
+  b?: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...(a || {}) }
+  for (const [key, value] of Object.entries(b || {})) {
+    if (!value || typeof value !== 'object') continue
+    const prev = out[key]
+    if (!prev || rowTime(value) >= rowTime(prev)) out[key] = value
+  }
+  return out
+}
+
 export function mergeAgentUserState(
   tenantId: string,
   userId: string,
-  patch: { habits?: AgentUserHabitsPayload; thread?: unknown[] },
+  patch: { habits?: AgentUserHabitsPayload; thread?: unknown[]; desk?: MerchantDeskPayload },
 ): AgentUserStateFile {
   ensureDir()
   const cur = readAgentUserState(tenantId, userId)
@@ -61,6 +104,7 @@ export function mergeAgentUserState(
     updatedAt: new Date().toISOString(),
     habits: cur?.habits,
     thread: cur?.thread,
+    desk: cur?.desk,
   }
   if (patch.habits) {
     next.habits = {
@@ -72,6 +116,17 @@ export function mergeAgentUserState(
   }
   if (patch.thread) {
     next.thread = Array.isArray(patch.thread) ? patch.thread.slice(-40) : patch.thread
+  }
+  if (patch.desk && typeof patch.desk === 'object') {
+    const prev = cur?.desk
+    next.desk = {
+      productLibrary: mergeRows(prev?.productLibrary, patch.desk.productLibrary, 80),
+      storeContacts: mergeContacts(prev?.storeContacts, patch.desk.storeContacts),
+      taxHistory: mergeRows(prev?.taxHistory, patch.desk.taxHistory, 24),
+      briefRecords: mergeRows(prev?.briefRecords, patch.desk.briefRecords, 50),
+      briefSelected: patch.desk.briefSelected ?? prev?.briefSelected ?? null,
+      updatedAt: new Date().toISOString(),
+    }
   }
   fs.writeFileSync(statePath(tenantId, userId), JSON.stringify(next, null, 2), 'utf8')
   return next

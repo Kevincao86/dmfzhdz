@@ -24,6 +24,8 @@ export type MpClientStatePayload = {
   orderFavoriteIds?: string[]
   groupQrCache?: Record<string, string>
   prDouyinLinkeBindings?: PrDouyinLinkeBindingsPayload | null
+  /** 达人账号分析，按平台一份，小程序与星选共用 */
+  talentEvals?: Record<string, Record<string, unknown>>
 }
 
 const MAX_LIST = 80
@@ -286,7 +288,26 @@ export function emptyClientStatePayload(): MpClientStatePayload {
     orderFavoriteIds: [],
     groupQrCache: {},
     prDouyinLinkeBindings: null,
+    talentEvals: {},
   }
+}
+
+function mergeTalentEvals(
+  a?: Record<string, Record<string, unknown>>,
+  b?: Record<string, Record<string, unknown>>,
+): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {}
+  const ids = new Set([...Object.keys(a || {}), ...Object.keys(b || {})])
+  for (const id of ids) {
+    if (!/^[a-z0-9_]{2,32}$/.test(id)) continue
+    const left = a?.[id]
+    const right = b?.[id]
+    const pick = !left ? right : !right ? left : parseTime(right.updatedAt) >= parseTime(left.updatedAt) ? right : left
+    if (!pick || typeof pick.score !== 'number') continue
+    const notes = String(pick.publicNotes || '').slice(0, 1200)
+    out[id] = notes ? { ...pick, publicNotes: notes } : { ...pick }
+  }
+  return out
 }
 
 export function mergeClientStatePayload(
@@ -353,6 +374,10 @@ export function mergeClientStatePayload(
     prDouyinLinkeBindings: mergePrDouyinLinkeBindings(
       s.prDouyinLinkeBindings as PrDouyinLinkeBindingsPayload | null | undefined,
       c.prDouyinLinkeBindings as PrDouyinLinkeBindingsPayload | null | undefined,
+    ),
+    talentEvals: mergeTalentEvals(
+      s.talentEvals as Record<string, Record<string, unknown>> | undefined,
+      c.talentEvals as Record<string, Record<string, unknown>> | undefined,
     ),
   }
 }

@@ -19,9 +19,19 @@ function apiBase(): string {
   return window.location.origin.replace(/\/$/, '')
 }
 
+export type MerchantDeskCloud = {
+  productLibrary?: unknown[]
+  storeContacts?: Record<string, unknown>
+  taxHistory?: unknown[]
+  briefRecords?: unknown[]
+  briefSelected?: unknown
+  updatedAt?: string
+}
+
 export async function pullAgentUserStateFromCloud(): Promise<{
   habits?: AgentUserHabits
   thread?: unknown[]
+  desk?: MerchantDeskCloud
 } | null> {
   const base = apiBase()
   if (!base) return null
@@ -35,9 +45,14 @@ export async function pullAgentUserStateFromCloud(): Promise<{
       ok?: boolean
       habits?: AgentUserHabits
       thread?: unknown[]
+      desk?: MerchantDeskCloud
     }
     if (!data || data.ok === false) return null
-    return { habits: data.habits ?? undefined, thread: data.thread ?? undefined }
+    return {
+      habits: data.habits ?? undefined,
+      thread: data.thread ?? undefined,
+      desk: data.desk ?? undefined,
+    }
   } catch {
     return null
   }
@@ -49,6 +64,34 @@ export function schedulePushAgentUserState(habits: AgentUserHabits, thread?: unk
     pushTimer = null
     void pushAgentUserStateNow(habits, thread)
   }, 600)
+}
+
+export async function pushAgentThreadNow(thread: unknown[]): Promise<void> {
+  const base = apiBase()
+  if (!base) return
+  try {
+    await fetch(`${base}/api/meoo-agent-user-state`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ thread: thread.slice(-40) }),
+    })
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function pushMerchantDeskNow(desk: MerchantDeskCloud): Promise<void> {
+  const base = apiBase()
+  if (!base) return
+  try {
+    await fetch(`${base}/api/meoo-agent-user-state`, {
+      method: 'POST',
+      headers: await authHeaders(),
+      body: JSON.stringify({ desk }),
+    })
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function pushAgentUserStateNow(

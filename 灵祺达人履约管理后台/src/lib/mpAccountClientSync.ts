@@ -19,6 +19,7 @@ import { readPrDouyinLinkeBindings, applyPrDouyinLinkeBindingsFromSync } from '.
 import { applyOrderFavoriteIdsFromSync, readOrderFavoriteIds } from './mpSync/orderFavorites'
 import { applyHandledMapFromSync, exportHandledMapForSync } from './mpSync/inboxNoticeState'
 import { applyGroupQrCacheFromSync, exportGroupQrCacheForSync } from './mpSync/mpGroupQr'
+import { applyTalentEvalsFromSync, exportTalentEvalsForSync } from './talentLocalLifeEval'
 
 const MSG_KEY = 'meoo_talent_messages_v1'
 const NOTIFY_KEY = 'meoo_talent_notifications_v1'
@@ -42,6 +43,7 @@ export type MpClientStatePayload = {
   selectionHandled?: Record<string, string>
   groupQrCache?: Record<string, string>
   prDouyinLinkeBindings?: Record<string, unknown> | null
+  talentEvals?: Record<string, Record<string, unknown>>
 }
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null
@@ -90,6 +92,7 @@ export function collectLocalClientState(): MpClientStatePayload {
     selectionHandled: exportHandledMapForSync(),
     groupQrCache: exportGroupQrCacheForSync(),
     prDouyinLinkeBindings: readPrDouyinLinkeBindings() as unknown as Record<string, unknown>,
+    talentEvals: exportTalentEvalsForSync(),
   }
 }
 
@@ -261,6 +264,9 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
   }
   if (state.prDouyinLinkeBindings) {
     applyPrDouyinLinkeBindingsFromSync(state.prDouyinLinkeBindings)
+  }
+  if (state.talentEvals && typeof state.talentEvals === 'object') {
+    applyTalentEvalsFromSync(state.talentEvals as Record<string, Record<string, unknown>>)
   }
 }
 

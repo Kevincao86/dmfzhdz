@@ -491,6 +491,9 @@ async function syncFromCloud(opts) {
         else if (provider === 'xhs_commercial') applyXhsCommercial(active, tenantId)
       }
       lastSyncAt = Date.now()
+      try {
+        await require('./merchantDeskSyncMp.js').pullMerchantDeskIntoLocal()
+      } catch (_) {}
     } catch (e) {
       lastSyncError = (e && e.message) || '同步失败'
       throw e

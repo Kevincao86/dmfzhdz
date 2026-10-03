@@ -32,8 +32,11 @@ export function readKolBriefRecords(): KolBriefRecord[] {
   }
 }
 
-export function writeKolBriefRecords(rows: KolBriefRecord[]) {
+export function writeKolBriefRecords(rows: KolBriefRecord[], opts?: { push?: boolean }) {
   window.localStorage.setItem(recordsKey(), JSON.stringify(rows.slice(0, 50)))
+  if (opts?.push !== false) {
+    void import('./merchantDeskSync').then((mod) => mod.scheduleMerchantDeskPush())
+  }
 }
 
 export function appendKolBriefRecord(row: KolBriefRecord) {
@@ -54,6 +57,7 @@ export function writeSelectedBriefForRecruitment(payload: SelectedBriefPayload |
   const key = selectedKey()
   if (!payload) window.localStorage.removeItem(key)
   else window.localStorage.setItem(key, JSON.stringify(payload))
+  void import('./merchantDeskSync').then((mod) => mod.scheduleMerchantDeskPush())
 }
 
 export function readSelectedBriefForRecruitment(): SelectedBriefPayload | null {

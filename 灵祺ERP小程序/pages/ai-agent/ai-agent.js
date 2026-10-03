@@ -67,7 +67,7 @@ Page({
     }
   },
 
-  onShow() {
+  async onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 3 })
     }
@@ -82,6 +82,9 @@ Page({
     }
     const sub = decodeJwtSub(api.getBearerToken ? api.getBearerToken() : api.getAccessToken())
     if (sub) agent.setCurrentUserId(sub)
+    try {
+      await agent.syncAgentStateFromCloud()
+    } catch (_) {}
     const messages = (agent.loadThread() || []).map((m) =>
       previewMp && previewMp.ensureRecruitWizard ? previewMp.ensureRecruitWizard(m) : m,
     )

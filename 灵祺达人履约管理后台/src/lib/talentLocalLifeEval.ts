@@ -674,6 +674,30 @@ async function doubaoPublicAccount(spec: PlatformSpec, row: ReturnType<typeof no
   }
 }
 
+const EVAL_SYNC_KEY = 'lq_talent_eval_sync_v1'
+
+function readEvalSyncMap(): Record<string, Record<string, unknown>> {
+  try {
+    const raw = localStorage.getItem(EVAL_SYNC_KEY)
+    const j = raw ? (JSON.parse(raw) as Record<string, Record<string, unknown>>) : {}
+    return j && typeof j === 'object' ? j : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeEvalSyncMap(map: Record<string, Record<string, unknown>>) {
+  localStorage.setItem(EVAL_SYNC_KEY, JSON.stringify(map || {}))
+}
+
+function rememberEvalSync(platformId: string, payload: Record<string, unknown>) {
+  const id = String(platformId || '').trim()
+  if (!id || typeof payload.score !== 'number') return
+  const map = readEvalSyncMap()
+  map[id] = payload
+  writeEvalSyncMap(map)
+}
+
 function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
   return [
     'lq_local_life_eval_v5',
@@ -741,7 +765,41 @@ function readCache(key: string): Record<string, unknown> | null {
 
 function writeCache(key: string, patch: Record<string, unknown>, replace = false) {
   const prev = replace ? {} : readCache(key) || {}
-  localStorage.setItem(key, JSON.stringify({ ...prev, ...patch }))
+  const next = { ...prev, ...patch, updatedAt: new Date().toISOString() }
+  localStorage.setItem(key, JSON.stringify(next))
+  const parts = String(key || '').split('|')
+  rememberEvalSync(parts[1] || '', next)
+  void import('./mpAccountClientSync').then((mod) => mod.scheduleClientStatePush(800)).catch(() => {})
+}
+
+function readEvalCache(row: { platformId: string }) {
+  const key = cacheKey(row)
+  const local = readCache(key)
+  const synced = readEvalSyncMap()[row.platformId]
+  const localAt = Date.parse(String(local?.updatedAt || '')) || 0
+  const syncAt = Date.parse(String(synced?.updatedAt || '')) || 0
+  if (synced && typeof synced.score === 'number' && syncAt >= localAt) {
+    localStorage.setItem(key, JSON.stringify(synced))
+    return synced
+  }
+  return local
+}
+
+export function exportTalentEvalsForSync() {
+  return readEvalSyncMap()
+}
+
+export function applyTalentEvalsFromSync(remote: Record<string, Record<string, unknown>> | null | undefined) {
+  if (!remote || typeof remote !== 'object') return
+  const map = readEvalSyncMap()
+  for (const id of Object.keys(remote)) {
+    const row = remote[id]
+    if (!row || typeof row.score !== 'number') continue
+    const prevAt = Date.parse(String(map[id]?.updatedAt || '')) || 0
+    const nextAt = Date.parse(String(row.updatedAt || '')) || 0
+    if (!map[id] || nextAt >= prevAt) map[id] = row
+  }
+  writeEvalSyncMap(map)
 }
 
 function namedLevel(value: unknown) {
@@ -788,7 +846,7 @@ function savedFromCache(cached: Record<string, unknown> | null): { score: LocalL
 export function readSavedTalentEval(raw: EvalAccountInput) {
   const { row } = normalizeInput(raw)
   if (!row.nickname && !row.accountId) return null
-  return savedFromCache(readCache(cacheKey(row)))
+  return savedFromCache(readEvalCache(row))
 }
 
 function buildScore(spec: PlatformSpec, j: Record<string, unknown>): LocalLifeScore {
@@ -814,7 +872,7 @@ export async function evaluateTalent(raw: EvalAccountInput, opts?: { force?: boo
   if (!row.nickname && !row.accountId) throw new Error(`请先填写${spec.nickLabel}或${spec.accountLabel}`)
   const key = cacheKey(row)
   if (!opts?.force) {
-    const saved = savedFromCache(readCache(key))
+    const saved = savedFromCache(readEvalCache(row))
     if (saved) return saved.score
   }
   const gate = await readTalentEvalQuota()
@@ -846,7 +904,7 @@ export async function adviseTalent(
   const { spec, row } = normalizeInput(raw)
   const key = cacheKey(row)
   if (!opts?.force) {
-    const cachedAdvice = readCache(key)?.advice
+    const cachedAdvice = readEvalCache(row)?.advice
     if (cachedAdvice && typeof cachedAdvice === 'object') {
       const advice = cachedAdvice as LocalLifeAdvice
       if (Array.isArray(advice.sections) && advice.sections.length) {
@@ -856,7 +914,7 @@ export async function adviseTalent(
   }
   await assertTalentPoints('talent_advice')
   const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
-  const notes = String(readCache(key)?.publicNotes || '')
+  const notes = String(readEvalCache(row)?.publicNotes || '')
   const publicBlock = notes ? `公开检索：\n${notes}` : '公开检索：这次没有检索到。'
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,

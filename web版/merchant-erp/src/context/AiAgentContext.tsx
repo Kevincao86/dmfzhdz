@@ -604,6 +604,21 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const saved = loadAgentArchivedSessions<AiAgentArchivedSession>(uid)
       if (saved.length) setArchivedSessions(saved)
       const habits = await hydrateAgentUserHabitsFromCloud(uid)
+      const { pullAgentUserStateFromCloud } = await import('../lib/agentUserStateCloud')
+      const remote = await pullAgentUserStateFromCloud()
+      const thread = Array.isArray(remote?.thread) ? remote.thread : []
+      const usable = thread.filter((row) => {
+        const item = row as { role?: string; content?: string }
+        return (item.role === 'user' || item.role === 'assistant') && String(item.content || '').trim()
+      })
+      if (usable.length) {
+        setMessages(
+          usable.slice(-40).map((row) => {
+            const item = row as { role?: 'user' | 'assistant'; content?: string }
+            return createAgentMessage(item.role === 'user' ? 'user' : 'assistant', String(item.content || ''))
+          }),
+        )
+      }
       if (habits.preferredModelPickerKey) {
         const opts = listAiModelPickerOptionsForPlan(plan)
         if (opts.some((o) => o.key === habits.preferredModelPickerKey)) {
@@ -622,6 +637,18 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveAgentArchivedSessions(authUserIdRef.current, archivedSessions)
   }, [archivedSessions])
+
+  useEffect(() => {
+    const slim = messages
+      .filter((m) => (m.role === 'user' || m.role === 'assistant') && String(m.content || '').trim())
+      .slice(-40)
+      .map((m) => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }))
+    if (!slim.some((m) => m.role === 'user')) return
+    const timer = window.setTimeout(() => {
+      void import('../lib/agentUserStateCloud').then((mod) => mod.pushAgentThreadNow(slim))
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [messages])
 
   useEffect(() => {
     pendingQuoteRef.current = pendingQuote

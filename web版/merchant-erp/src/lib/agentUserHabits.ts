@@ -60,6 +60,7 @@ export async function hydrateAgentUserHabitsFromCloud(userId: string): Promise<A
     const remote = await pullAgentUserStateFromCloud()
     const merged = mergeCloudHabits(local, remote?.habits ?? null)
     saveAgentUserHabits(userId, merged)
+    void import('./merchantDeskSync').then((mod) => mod.pullMerchantDeskIntoLocal())
     return merged
   } catch {
     return local

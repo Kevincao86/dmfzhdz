@@ -460,9 +460,41 @@ function cacheKey(row) {
   return ['lq_local_life_eval_v5', accountScope(), row.platformId].join('|')
 }
 
+const EVAL_SYNC_KEY = 'lq_talent_eval_sync_v1'
+
+function readEvalSyncMap() {
+  try {
+    const raw = wx.getStorageSync(EVAL_SYNC_KEY)
+    const j = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return j && typeof j === 'object' ? j : {}
+  } catch (e) {
+    return {}
+  }
+}
+
+function writeEvalSyncMap(map) {
+  wx.setStorageSync(EVAL_SYNC_KEY, JSON.stringify(map || {}))
+}
+
+function rememberEvalSync(platformId, payload) {
+  const id = String(platformId || '').trim()
+  if (!id || !payload || typeof payload.score !== 'number') return
+  const map = readEvalSyncMap()
+  map[id] = payload
+  writeEvalSyncMap(map)
+}
+
 function loadCache(row) {
   const key = cacheKey(row)
-  return { key, data: readCache(key) }
+  const local = readCache(key)
+  const synced = readEvalSyncMap()[row.platformId]
+  const localAt = Date.parse(local && local.updatedAt) || 0
+  const syncAt = Date.parse(synced && synced.updatedAt) || 0
+  if (synced && typeof synced.score === 'number' && syncAt >= localAt) {
+    wx.setStorageSync(key, JSON.stringify(synced))
+    return { key, data: synced }
+  }
+  return { key, data: local }
 }
 
 async function doubaoPublicAccount(spec, row) {
@@ -594,7 +626,32 @@ function readCache(key) {
 
 function writeCache(key, patch, replace) {
   const prev = replace ? {} : readCache(key) || {}
-  wx.setStorageSync(key, JSON.stringify({ ...prev, ...patch }))
+  const next = Object.assign({}, prev, patch, { updatedAt: new Date().toISOString() })
+  wx.setStorageSync(key, JSON.stringify(next))
+  const platformId = String(key || '').split('|').pop()
+  rememberEvalSync(platformId, next)
+  try {
+    require('./mpAccountClientSync.js').schedulePush(800)
+  } catch (e) {}
+}
+
+function exportTalentEvalsForSync() {
+  return readEvalSyncMap()
+}
+
+function applyTalentEvalsFromSync(remote) {
+  if (!remote || typeof remote !== 'object') return
+  const map = readEvalSyncMap()
+  const ids = Object.keys(remote)
+  for (let i = 0; i < ids.length; i += 1) {
+    const id = ids[i]
+    const row = remote[id]
+    if (!row || typeof row.score !== 'number') continue
+    const prevAt = Date.parse(map[id] && map[id].updatedAt) || 0
+    const nextAt = Date.parse(row.updatedAt) || 0
+    if (!map[id] || nextAt >= prevAt) map[id] = row
+  }
+  writeEvalSyncMap(map)
 }
 
 function namedLevel(value) {
@@ -767,4 +824,6 @@ module.exports = {
   TALENT_EVAL_POINTS: pointsSpend.TALENT_EVAL_POINTS,
   TALENT_ADVICE_POINTS: pointsSpend.TALENT_ADVICE_POINTS,
   readTalentEvalQuota,
+  exportTalentEvalsForSync,
+  applyTalentEvalsFromSync,
 }

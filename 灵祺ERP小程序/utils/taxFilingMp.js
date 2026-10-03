@@ -78,7 +78,18 @@ function appendHistory(record) {
     wx.setStorageSync(historyKey(), list)
     wx.setStorageSync(BASE_KEY, list)
   } catch (_) {}
+  try {
+    require('./merchantDeskSyncMp.js').scheduleMerchantDeskPush()
+  } catch (_) {}
   return list
+}
+
+function replaceHistory(list) {
+  const next = Array.isArray(list) ? list.slice(0, 24) : []
+  try {
+    wx.setStorageSync(historyKey(), next)
+    wx.setStorageSync(BASE_KEY, next)
+  } catch (_) {}
 }
 
 module.exports = {
@@ -87,4 +98,5 @@ module.exports = {
   aggregateRows,
   readHistory,
   appendHistory,
+  replaceHistory,
 }

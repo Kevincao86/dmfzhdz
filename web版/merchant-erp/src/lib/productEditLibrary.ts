@@ -95,7 +95,7 @@ export function loadProductEditLibrary(): ProductEditLibraryRow[] {
   }
 }
 
-function persist(rows: ProductEditLibraryRow[]) {
+function persist(rows: ProductEditLibraryRow[], opts?: { push?: boolean }) {
   try {
     window.localStorage.setItem(libraryStorageKey(), JSON.stringify(rows))
   } catch {
@@ -106,6 +106,13 @@ function persist(rows: ProductEditLibraryRow[]) {
   } catch {
     /* ignore */
   }
+  if (opts?.push !== false) {
+    void import('./merchantDeskSync').then((mod) => mod.scheduleMerchantDeskPush())
+  }
+}
+
+export function replaceProductEditLibrary(rows: ProductEditLibraryRow[]) {
+  persist(Array.isArray(rows) ? rows.slice(0, 80) : [], { push: false })
 }
 
 /** 按 id 覆盖或插入到列表头部（草稿再次保存则更新） */

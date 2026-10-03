@@ -11,10 +11,19 @@ function readRecords() {
   }
 }
 
-function writeRecords(list) {
+function writeRecords(list, opts) {
   try {
     wx.setStorageSync(KEY_RECORDS, JSON.stringify(list.slice(0, 48)))
   } catch (_) {}
+  if (!opts || opts.push !== false) {
+    try {
+      require('./merchantDeskSyncMp.js').scheduleMerchantDeskPush()
+    } catch (_) {}
+  }
+}
+
+function replaceRecords(list) {
+  writeRecords(Array.isArray(list) ? list : [], { push: false })
 }
 
 function appendRecord(rec) {
@@ -33,10 +42,15 @@ function readSelectedBrief() {
   }
 }
 
-function writeSelectedBrief(payload) {
+function writeSelectedBrief(payload, opts) {
   try {
     wx.setStorageSync(KEY_SELECTED, JSON.stringify(payload))
   } catch (_) {}
+  if (!opts || opts.push !== false) {
+    try {
+      require('./merchantDeskSyncMp.js').scheduleMerchantDeskPush()
+    } catch (_) {}
+  }
 }
 
 function clearSelectedBrief() {
@@ -47,6 +61,7 @@ function clearSelectedBrief() {
 
 module.exports = {
   readRecords,
+  replaceRecords,
   appendRecord,
   readSelectedBrief,
   writeSelectedBrief,

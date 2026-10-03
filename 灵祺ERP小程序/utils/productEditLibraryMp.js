@@ -42,10 +42,19 @@ function loadProductEditLibrary() {
   }
 }
 
-function persist(rows) {
+function persist(rows, opts) {
   try {
     wx.setStorageSync(libraryStorageKey(), JSON.stringify(rows))
   } catch (_) {}
+  if (!opts || opts.push !== false) {
+    try {
+      require('./merchantDeskSyncMp.js').scheduleMerchantDeskPush()
+    } catch (_) {}
+  }
+}
+
+function replaceProductEditLibrary(rows) {
+  persist(Array.isArray(rows) ? rows.slice(0, 80) : [], { push: false })
 }
 
 function upsertProductEditLibraryDraft(row) {
@@ -73,4 +82,5 @@ module.exports = {
   BASE_KEY,
   loadProductEditLibrary,
   upsertProductEditLibraryDraft,
+  replaceProductEditLibrary,
 }

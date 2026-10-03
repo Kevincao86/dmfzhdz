@@ -72,6 +72,7 @@ export function saveStoreContactOverride(
     } catch {
       /* ignore */
     }
+    void import('./merchantDeskSync').then((mod) => mod.scheduleMerchantDeskPush())
     return null
   }
   const next: StoreContactOverride = {
@@ -85,7 +86,16 @@ export function saveStoreContactOverride(
   } catch {
     /* ignore */
   }
+  void import('./merchantDeskSync').then((mod) => mod.scheduleMerchantDeskPush())
   return next
+}
+
+export function replaceStoreContactOverrides(all: Record<string, StoreContactOverride>) {
+  try {
+    window.localStorage.setItem(storageKey(), JSON.stringify(all || {}))
+  } catch {
+    /* ignore */
+  }
 }
 
 /** 平台缺省时补上手填；平台已有值不覆盖 */
