@@ -39,7 +39,7 @@ const recruitCoverOssBase = require('../../utils/recruitCoverOssBase.js')
 
 function homeEntryUrl(name) {
   const base = String(recruitCoverOssBase || '').replace(/\/$/, '')
-  return `${base}/home/${name}?v=20261003a`
+  return `${base}/home/${name}?v=20261003b`
 }
 
 const HOME_BANNER_PR = {
