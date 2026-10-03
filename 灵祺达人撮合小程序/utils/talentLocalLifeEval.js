@@ -216,18 +216,36 @@ function levelFromPoints(points) {
 }
 
 function averagePoints(byName, names) {
-  const vals = names.map((name) => byName[name]).filter((n) => Number.isFinite(n))
+  const vals = names.map((name) => pointsFor(byName, name)).filter((n) => Number.isFinite(n))
   if (!vals.length) return null
   return vals.reduce((sum, n) => sum + n, 0) / vals.length
 }
 
+function canonBlockName(name) {
+  return String(name || '').replace(/\s+/g, '')
+}
+
+function pointsFor(byName, name) {
+  const key = canonBlockName(name)
+  if (Number.isFinite(byName[key])) return byName[key]
+  const keys = Object.keys(byName)
+  for (let i = 0; i < keys.length; i += 1) {
+    const hit = keys[i]
+    if (hit && key && (hit.includes(key) || key.includes(hit))) return byName[hit]
+  }
+  return undefined
+}
+
 function scoreFromBlocks(spec, blocks, risk) {
   const byName = {}
-  for (let i = 0; i < blocks.length; i += 1) byName[blocks[i].name] = blocks[i].points
+  for (let i = 0; i < blocks.length; i += 1) {
+    const key = canonBlockName(blocks[i].name)
+    if (key) byName[key] = blocks[i].points
+  }
   let sum = 0
   for (let i = 0; i < spec.blocks.length; i += 1) {
     const block = spec.blocks[i]
-    const points = byName[block.name]
+    const points = pointsFor(byName, block.name)
     if (!Number.isFinite(points)) return null
     sum += (points / 100) * block.weight
   }
@@ -579,6 +597,23 @@ function writeCache(key, patch, replace) {
   wx.setStorageSync(key, JSON.stringify({ ...prev, ...patch }))
 }
 
+function namedLevel(value) {
+  const s = String(value || '').trim()
+  const m = /Lv\s*([0-8])/i.exec(s)
+  return m ? `Lv${m[1]}` : ''
+}
+
+function levelsFromScore(videoLevel, liveLevel, score) {
+  const video = namedLevel(videoLevel)
+  const live = namedLevel(liveLevel)
+  const n = clampScore(score)
+  if ((!video || video === 'Lv0') && (!live || live === 'Lv0') && n >= 15) {
+    const fixed = levelFromPoints(n)
+    return { videoLevel: fixed, liveLevel: fixed }
+  }
+  return { videoLevel: video || 'Lv0', liveLevel: live || 'Lv0' }
+}
+
 function savedFromCache(cached) {
   if (!cached || !cached.videoLevel || !cached.liveLevel || !Array.isArray(cached.situations) || !cached.situations.length) {
     return null
@@ -589,11 +624,12 @@ function savedFromCache(cached) {
     const sections = mapSuggestions(adviceRaw.sections)
     if (sections.length) advice = { lift: clampLift(adviceRaw.lift), sections }
   }
+  const levels = levelsFromScore(cached.videoLevel, cached.liveLevel, cached.score)
   return {
     score: {
       score: clampScore(cached.score),
-      videoLevel: levelText(cached.videoLevel),
-      liveLevel: levelText(cached.liveLevel),
+      videoLevel: levels.videoLevel,
+      liveLevel: levels.liveLevel,
       situations: mapSituations(cached.situations),
       exposureLift: clampExposure(cached.exposureLift),
       salesLift: clampSalesYuan(cached.salesLift),
@@ -609,10 +645,16 @@ function readSavedTalentEval(raw) {
 
 function buildScore(spec, j) {
   const computed = scoreFromBlocks(spec, mapBlockPoints(j && j.blocks), j && j.risk)
+  const score = computed ? computed.score : clampScore(j && j.score)
+  const levels = levelsFromScore(
+    (computed && computed.videoLevel) || namedLevel(j && j.videoLevel),
+    (computed && computed.liveLevel) || namedLevel(j && j.liveLevel),
+    score,
+  )
   return {
-    score: computed ? computed.score : clampScore(j && j.score),
-    videoLevel: (computed && computed.videoLevel) || levelText(j && j.videoLevel),
-    liveLevel: (computed && computed.liveLevel) || levelText(j && j.liveLevel),
+    score,
+    videoLevel: levels.videoLevel,
+    liveLevel: levels.liveLevel,
     situations: mapSituations(j && j.situations),
     exposureLift: clampExposure(j && j.exposureLift),
     salesLift: clampSalesYuan(j && j.salesLift),

@@ -52,6 +52,22 @@
   background: #efe8dc;
 }
 
+.mine-page .wb-membership-panel,
+.mine-page .wb-membership-panel--hover {
+  background: #fffdf8;
+  border: 1rpx solid #efe8dc;
+  box-shadow: none;
+}
+
+.mine-page .wb-membership-kicker,
+.mine-page .wb-membership-plan {
+  color: #1c1917;
+}
+
+.mine-page .wb-membership-exp {
+  color: #78716c;
+}
+
 .mine-scroll {
   padding-bottom: 8rpx;
 }
