@@ -1,4 +1,4 @@
-<view class="agent-page">
+<view class="agent-page" style="{{keyboardHeight ? 'bottom:' + keyboardHeight + 'px;' : ''}}">
   <view class="agent-hero">
     <view class="agent-hero-main">
       <image class="agent-logo" src="{{logoSrc}}" mode="aspectFit" />
@@ -239,10 +239,12 @@
         disabled="{{false}}"
         bindinput="onInput"
         bindfocus="onInputFocus"
+        bindblur="onInputBlur"
+        bindkeyboardheightchange="onKeyboardHeight"
         confirm-type="send"
         bindconfirm="onSend"
-        adjust-position="{{!showPlusPanel}}"
-        cursor-spacing="24"
+        adjust-position="{{false}}"
+        cursor-spacing="0"
       />
       <view
         wx:else

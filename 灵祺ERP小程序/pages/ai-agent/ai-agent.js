@@ -43,6 +43,7 @@ Page({
     voiceMode: false,
     showPlusPanel: false,
     plusActions: composer.PLUS_ACTIONS,
+    keyboardHeight: 0,
   },
 
   onLoad() {
@@ -159,6 +160,23 @@ Page({
 
   onInputFocus() {
     if (this.data.showPlusPanel) this.setData({ showPlusPanel: false })
+  },
+
+  onInputBlur() {
+    if (this.data.keyboardHeight) this.setData({ keyboardHeight: 0 })
+  },
+
+  onKeyboardHeight(e) {
+    const height = Math.max(0, Number(e.detail && e.detail.height) || 0)
+    if (height === this.data.keyboardHeight) return
+    const patch = { keyboardHeight: height }
+    if (height > 0 && this.data.showPlusPanel) patch.showPlusPanel = false
+    this.setData(patch, () => {
+      if (!height || !this.data.hasChat) return
+      const id = lastScrollId(this.data.messages, this.data.sending)
+      if (!id) return
+      this.setData({ scrollTo: '' }, () => this.setData({ scrollTo: id }))
+    })
   },
 
   onNewChat() {
