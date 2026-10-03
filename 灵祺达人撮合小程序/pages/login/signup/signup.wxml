@@ -1,0 +1,77 @@
+<view class="reg-page {{newIdentity ? 'reg-page--' + newIdentity : ''}} {{stageMotion ? 'reg-page--play' : ''}}">
+  <image wx:if="{{stageSrc}}" class="reg-page__bg" src="{{stageSrc}}" mode="aspectFill" />
+  <view class="reg-fx reg-fx--wash"></view>
+  <view class="reg-fx reg-fx--flash"></view>
+  <view class="reg-fx reg-fx--bar reg-fx--bar-top"></view>
+  <view class="reg-fx reg-fx--bar reg-fx--bar-bot"></view>
+
+  <view class="reg-card">
+    <view class="reg-stage">
+      <image wx:if="{{stageSrc}}" class="reg-stage__img" src="{{stageSrc}}" mode="aspectFit" />
+      <view wx:else class="reg-stage__empty">点一个身份，整页会换成这一版</view>
+    </view>
+    <text wx:if="{{stageLine}}" class="reg-stage__line">{{stageLine}}</text>
+    <text class="reg-title">注册{{sceneLabel ? ' · ' + sceneLabel : ''}}</text>
+    <text class="reg-note">{{fromWx ? '微信已登录，请选定身份并绑定手机号，选定后不可更改' : '选定后不可更改，登录后自动进入这一版'}}</text>
+    <view class="reg-picks">
+      <view
+        wx:for="{{identityOptions}}"
+        wx:key="id"
+        class="reg-pick {{newIdentity===item.id ? 'reg-pick--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickIdentity"
+      >{{item.label}}</view>
+    </view>
+
+    <view class="reg-field">
+      <text class="reg-label">手机号</text>
+      <input
+        class="reg-input"
+        type="number"
+        maxlength="11"
+        placeholder="11 位大陆手机号"
+        value="{{phone}}"
+        bindinput="onPhone"
+      />
+    </view>
+    <view class="reg-sms">
+      <input
+        class="reg-input reg-input--flex"
+        type="number"
+        maxlength="6"
+        placeholder="6 位验证码"
+        value="{{smsCode}}"
+        bindinput="onSmsCode"
+      />
+      <button
+        class="reg-sms-btn"
+        disabled="{{smsSending || smsCooldown > 0}}"
+        bindtap="onSendSms"
+      >{{smsCooldown > 0 ? smsCooldown + 's' : '获取验证码'}}</button>
+    </view>
+    <view class="reg-field">
+      <text class="reg-label">密码</text>
+      <input
+        class="reg-input"
+        password
+        placeholder="至少 6 位"
+        value="{{password}}"
+        bindinput="onPassword"
+      />
+    </view>
+
+    <text class="reg-err" wx:if="{{err}}">{{err}}</text>
+    <button class="reg-submit" loading="{{loading}}" disabled="{{loading}}" bindtap="onRegister">注册并进入</button>
+
+    <view class="reg-legal" bindtap="onToggleLegal">
+      <view class="reg-check {{legalAgreed ? 'reg-check--on' : ''}}">
+        <text wx:if="{{legalAgreed}}">✓</text>
+      </view>
+      <text class="reg-legal-txt">我已阅读并同意</text>
+      <text class="reg-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+      <text class="reg-legal-txt">和</text>
+      <text class="reg-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+    </view>
+    <text class="reg-back" bindtap="onBackLogin">已有账号，去登录</text>
+  </view>
+</view>

@@ -2,6 +2,7 @@
   "pages": [
     "pages/index/index",
     "pages/login/login",
+    "pages/login/signup/signup",
     "pages/recommend/recommend",
     "pages/publish/publish",
     "pages/messages/messages",

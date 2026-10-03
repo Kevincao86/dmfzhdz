@@ -28,10 +28,6 @@ const LEGAL_PROMPT_COPY = {
     text: '使用手机验证码登录前，请勾选并同意《用户协议》和《隐私政策》。',
     agree: '同意并登录',
   },
-  reg: {
-    text: '注册前，请勾选并同意《用户协议》和《隐私政策》。',
-    agree: '同意并注册',
-  },
 }
 
 function openLegalPrompt(page, workId, action) {
@@ -44,15 +40,6 @@ function openLegalPrompt(page, workId, action) {
     legalPromptAgreeLabel: copy.agree,
     err: '',
   })
-}
-
-function requireNewIdentity(page) {
-  const id = page.data.newIdentity
-  if (!identityTypes.isWorkIdentity(id)) {
-    page.setData({ err: '请先选择新用户身份，选定后不可更改' })
-    return null
-  }
-  return id
 }
 
 function syncLoginIdentityFromProfile(page) {
@@ -188,16 +175,6 @@ Page({
   ],
   data: {
     tab: 'wx',
-    newIdentity: '',
-    stageMotion: '',
-    stageSrc: '',
-    stageLine: '',
-    identityOptions: [
-      { id: 'talent', label: '我是达人', line: '看带货等级，报名商单', file: 'reg-talent.jpg' },
-      { id: 'shoot', label: '我是拍摄', line: '接拍摄任务，去看课程', file: 'reg-shoot.jpg' },
-      { id: 'edit', label: '我是剪辑', line: '接剪辑任务，交成片', file: 'reg-edit.jpg' },
-      { id: 'pr', label: '我是PR', line: '发布招募，对接达人', file: 'reg-pr.jpg' },
-    ],
     loginIdentity: '',
     loginIdentityLabel: '',
     loginIdentityIcon: '',
@@ -205,9 +182,6 @@ Page({
     password: '',
     smsPhone: '',
     smsLoginCode: '',
-    regPhone: '',
-    regSmsCode: '',
-    regPassword: '',
     smsSending: false,
     smsCooldown: 0,
     loading: false,
@@ -356,8 +330,8 @@ Page({
     })
     wx.showToast({ title: '已切换验证码登录', icon: 'none' })
   },
-  onTabReg() {
-    this.setData({ tab: 'reg', err: '' })
+  onGoSignup() {
+    wx.navigateTo({ url: '/pages/login/signup/signup' })
   },
   onSmsPhone(e) {
     this.setData({ smsPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
@@ -401,15 +375,6 @@ Page({
 
   onLoginName(e) {
     this.setData({ loginName: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
-  },
-  onRegPhone(e) {
-    this.setData({ regPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
-  },
-  onRegSmsCode(e) {
-    this.setData({ regSmsCode: String(e.detail.value || '').replace(/\D/g, '').slice(0, 6) })
-  },
-  onRegPassword(e) {
-    this.setData({ regPassword: e.detail.value })
   },
   onPassword(e) {
     this.setData({ password: e.detail.value })
@@ -513,29 +478,12 @@ Page({
     wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
   },
 
-  onPickNewIdentity(e) {
-    const id = e.currentTarget.dataset.id
-    if (!identityTypes.isWorkIdentity(id)) return
-    const scene = (this.data.identityOptions || []).find((item) => item.id === id)
-    if (!scene) return
-    this.setData({
-      newIdentity: id,
-      stageMotion: '',
-      stageSrc: `/images/register/${scene.file}`,
-      stageLine: scene.line,
-      err: '',
-    })
-    setTimeout(() => this.setData({ stageMotion: id }), 30)
-  },
-
   onWxLogin() {
-    const workId = requireNewIdentity(this)
-    if (!workId) return
     if (!this.data.legalAgreed) {
-      openLegalPrompt(this, workId, 'wx')
+      openLegalPrompt(this, 'talent', 'wx')
       return
     }
-    this.startWxLoginFlow(workId)
+    this.startWxLoginFlow('talent')
   },
 
   onLegalDecline() {
@@ -563,10 +511,6 @@ Page({
     }
     if (action === 'sms') {
       void this.doSmsLogin(workId)
-      return
-    }
-    if (action === 'reg') {
-      void this.doRegister(workId)
       return
     }
     this.startWxLoginFlow(workId)
@@ -634,36 +578,22 @@ Page({
       ])
       avatar = persistedAvatar
       this.setData({ wxAvatarUrl: avatar })
-      const role = identityTypes.accountRoleForWorkIdentity(workId)
       const data = await auth.wxLogin({
-        role,
-        workIdentity: workId,
         wxNickName: nick,
         wxAvatarUrl: avatar,
         code,
       })
-      if (data.isNew) {
-        const acct = auth.readAccount()
-        const id =
-          role === 'pr'
-            ? acct && acct.lingqiPrId
-            : workId === 'shoot'
-              ? acct && acct.lingqiShootTeamId
-              : workId === 'edit'
-                ? acct && acct.lingqiEditTeamId
-                : acct && acct.lingqiTalentId
-        wx.showToast({
-          title: id ? `已创建账号 ${id}` : '已创建灵祺账号',
-          icon: 'none',
-          duration: 2500,
-        })
-      }
+      const account = (data && data.account) || auth.readAccount()
       await applyLoginIdentity(data)
       await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar, {
         alreadyPersisted: true,
         skipRemote: true,
       })
       this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
+      if (data.isNew || auth.needsPhoneBind(account)) {
+        wx.redirectTo({ url: '/pages/login/signup/signup?from=wx' })
+        return
+      }
       resumeOrNavigateAfterLogin(this)
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
@@ -759,77 +689,6 @@ Page({
       this.setData({
         err: /phone_not_registered/i.test(msg) ? '该手机号尚未注册，请先注册' : msg,
       })
-    } finally {
-      this.setData({ loading: false })
-    }
-  },
-
-  async onSendRegSms() {
-    const err = mpPhoneAuth.validatePhoneAccount(this.data.regPhone)
-    if (err) {
-      this.setData({ err })
-      return
-    }
-    this.setData({ smsSending: true, err: '' })
-    try {
-      await auth.sendRegisterSms(this.data.regPhone)
-      wx.showToast({ title: '验证码已发送', icon: 'none' })
-      this.setData({ smsCooldown: 60 })
-      const tick = setInterval(() => {
-        const n = this.data.smsCooldown - 1
-        if (n <= 0) {
-          clearInterval(tick)
-          this.setData({ smsCooldown: 0 })
-        } else {
-          this.setData({ smsCooldown: n })
-        }
-      }, 1000)
-    } catch (e) {
-      this.setData({ err: mpApiErrors.formatMpApiErr(e, '验证码发送失败') })
-    } finally {
-      this.setData({ smsSending: false })
-    }
-  },
-
-  async onRegister() {
-    const workId = requireNewIdentity(this)
-    if (!workId) return
-    if (!this.data.legalAgreed) {
-      openLegalPrompt(this, workId, 'reg')
-      return
-    }
-    await this.doRegister(workId)
-  },
-
-  async doRegister(workId) {
-    const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.regPhone)
-    if (phoneErr) {
-      this.setData({ err: phoneErr })
-      return
-    }
-    if (!/^\d{6}$/.test(this.data.regSmsCode)) {
-      this.setData({ err: '请输入 6 位验证码' })
-      return
-    }
-    if (String(this.data.regPassword || '').length < 6) {
-      this.setData({ err: '密码至少 6 位' })
-      return
-    }
-    this.setData({ loading: true, err: '' })
-    try {
-      const role = identityTypes.accountRoleForWorkIdentity(workId)
-      const data = await auth.phoneRegister({
-        phone: this.data.regPhone,
-        smsCode: this.data.regSmsCode,
-        password: this.data.regPassword,
-        role,
-        workIdentity: workId,
-      })
-      wx.showToast({ title: '注册成功', icon: 'success' })
-      await applyLoginIdentity(data)
-      await navigateAfterLogin(this)
-    } catch (e) {
-      this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
     } finally {
       this.setData({ loading: false })
     }

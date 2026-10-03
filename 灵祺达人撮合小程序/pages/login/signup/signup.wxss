@@ -1,0 +1,393 @@
+.reg-page {
+  position: relative;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 128rpx 28rpx 64rpx;
+  background: #f7f3ec;
+  overflow: hidden;
+}
+
+.reg-page__bg {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.34;
+  z-index: 0;
+}
+
+.reg-fx {
+  position: fixed;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reg-fx--wash,
+.reg-fx--flash {
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.reg-fx--bar {
+  left: 0;
+  right: 0;
+  height: 18vh;
+  background: #1c1917;
+}
+
+.reg-fx--bar-top { top: 0; }
+.reg-fx--bar-bot { bottom: 0; }
+
+.reg-page--play .reg-page__bg {
+  animation: page-bg 820ms ease both;
+}
+
+.reg-page--play .reg-card,
+.reg-page--play .reg-stage__line,
+.reg-page--play .reg-title,
+.reg-page--play .reg-note,
+.reg-page--play .reg-picks,
+.reg-page--play .reg-field,
+.reg-page--play .reg-sms,
+.reg-page--play .reg-submit,
+.reg-page--play .reg-legal,
+.reg-page--play .reg-back {
+  animation-duration: 780ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+.reg-page--play.reg-page--talent .reg-card,
+.reg-page--play.reg-page--talent .reg-stage__line,
+.reg-page--play.reg-page--talent .reg-title,
+.reg-page--play.reg-page--talent .reg-note,
+.reg-page--play.reg-page--talent .reg-picks,
+.reg-page--play.reg-page--talent .reg-field,
+.reg-page--play.reg-page--talent .reg-sms,
+.reg-page--play.reg-page--talent .reg-submit,
+.reg-page--play.reg-page--talent .reg-legal,
+.reg-page--play.reg-page--talent .reg-back {
+  animation-name: page-rise;
+}
+.reg-page--play.reg-page--talent .reg-fx--wash {
+  background: radial-gradient(ellipse 100% 70% at 50% 100%, rgba(245, 200, 76, 0.7), transparent 62%);
+  animation: fx-wash 820ms ease both;
+}
+
+.reg-page--play.reg-page--shoot .reg-card,
+.reg-page--play.reg-page--shoot .reg-stage__line,
+.reg-page--play.reg-page--shoot .reg-title,
+.reg-page--play.reg-page--shoot .reg-note,
+.reg-page--play.reg-page--shoot .reg-picks,
+.reg-page--play.reg-page--shoot .reg-field,
+.reg-page--play.reg-page--shoot .reg-sms,
+.reg-page--play.reg-page--shoot .reg-submit,
+.reg-page--play.reg-page--shoot .reg-legal,
+.reg-page--play.reg-page--shoot .reg-back {
+  animation-name: page-shutter;
+}
+.reg-page--play.reg-page--shoot .reg-fx--flash {
+  background: #fff;
+  animation: fx-flash 700ms ease both;
+}
+
+.reg-page--play.reg-page--edit .reg-card,
+.reg-page--play.reg-page--edit .reg-stage__line,
+.reg-page--play.reg-page--edit .reg-title,
+.reg-page--play.reg-page--edit .reg-note,
+.reg-page--play.reg-page--edit .reg-picks,
+.reg-page--play.reg-page--edit .reg-field,
+.reg-page--play.reg-page--edit .reg-sms,
+.reg-page--play.reg-page--edit .reg-submit,
+.reg-page--play.reg-page--edit .reg-legal,
+.reg-page--play.reg-page--edit .reg-back {
+  animation-name: page-film;
+}
+.reg-page--play.reg-page--edit .reg-fx--bar {
+  animation: fx-bars 860ms ease both;
+}
+
+.reg-page--play.reg-page--pr .reg-card,
+.reg-page--play.reg-page--pr .reg-stage__line,
+.reg-page--play.reg-page--pr .reg-title,
+.reg-page--play.reg-page--pr .reg-note,
+.reg-page--play.reg-page--pr .reg-picks,
+.reg-page--play.reg-page--pr .reg-field,
+.reg-page--play.reg-page--pr .reg-sms,
+.reg-page--play.reg-page--pr .reg-submit,
+.reg-page--play.reg-page--pr .reg-legal,
+.reg-page--play.reg-page--pr .reg-back {
+  animation-name: page-deal;
+}
+.reg-page--play.reg-page--pr .reg-fx--wash {
+  background: linear-gradient(180deg, rgba(109, 40, 217, 0.28), transparent 46%);
+  animation: fx-wash 780ms ease both;
+}
+
+@keyframes page-bg {
+  from { opacity: 0; }
+  to { opacity: 0.34; }
+}
+@keyframes page-rise {
+  from { transform: translateY(36rpx); }
+  to { transform: none; }
+}
+@keyframes page-shutter {
+  from { transform: scale(0.96); }
+  to { transform: none; }
+}
+@keyframes page-film {
+  from { transform: translateX(8%); }
+  to { transform: none; }
+}
+@keyframes page-deal {
+  from { transform: translateY(-40rpx); opacity: 0.35; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes fx-wash {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes fx-flash {
+  0% { opacity: 0.92; }
+  100% { opacity: 0; }
+}
+@keyframes fx-bars {
+  0% { opacity: 1; height: 28vh; }
+  100% { opacity: 0; height: 0; }
+}
+
+.reg-card {
+  position: relative;
+  z-index: 2;
+  padding: 28rpx 28rpx 36rpx;
+  border-radius: 36rpx;
+  background: #fffdf8;
+  border: 1rpx solid #efe8dc;
+}
+
+.reg-stage {
+  height: 280rpx;
+  border-radius: 24rpx;
+  overflow: hidden;
+  background: #f6f1e8;
+}
+
+.reg-stage__img {
+  width: 100%;
+  height: 280rpx;
+  display: block;
+}
+
+.reg-stage__empty {
+  height: 280rpx;
+  display: flex;
+  align-items: flex-end;
+  padding: 24rpx;
+  color: #78716c;
+  font-size: 26rpx;
+}
+
+.reg-stage__line {
+  display: block;
+  margin: 16rpx 4rpx 0;
+  color: #1c1917;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.reg-title {
+  display: block;
+  margin: 20rpx 4rpx 8rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1c1917;
+}
+
+.reg-note {
+  display: block;
+  margin: 0 4rpx 20rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #78716c;
+}
+
+.reg-picks {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.reg-pick {
+  width: 48%;
+  margin-right: 4%;
+  margin-bottom: 12rpx;
+  box-sizing: border-box;
+  padding: 18rpx 16rpx;
+  border-radius: 20rpx;
+  border: 1rpx solid #efe8dc;
+  background: #fff;
+  font-size: 28rpx;
+  color: #1c1917;
+  text-align: center;
+}
+
+.reg-pick:nth-child(2n) {
+  margin-right: 0;
+}
+
+.reg-page--talent .reg-pick--on {
+  border-color: #a16207;
+  color: #a16207;
+  background: #fffdf8;
+}
+.reg-page--talent .reg-submit {
+  background: #a16207;
+  color: #fff;
+}
+
+.reg-page--shoot .reg-pick--on,
+.reg-page--pr .reg-pick--on {
+  border-color: #6d28d9;
+  color: #6d28d9;
+  background: #fffdf8;
+}
+.reg-page--shoot .reg-submit,
+.reg-page--pr .reg-submit {
+  background: #6d28d9;
+  color: #fff;
+}
+
+.reg-page--edit .reg-pick--on {
+  border-color: #44403c;
+  color: #44403c;
+  background: #fffdf8;
+}
+.reg-page--edit .reg-submit {
+  background: #44403c;
+  color: #fff;
+}
+
+.reg-submit::after,
+.reg-sms-btn::after {
+  border: none;
+}
+
+.reg-pick--on {
+  font-weight: 600;
+}
+
+.reg-field {
+  margin-bottom: 16rpx;
+}
+
+.reg-label {
+  display: block;
+  margin-bottom: 8rpx;
+  font-size: 24rpx;
+  color: #57534e;
+}
+
+.reg-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 84rpx;
+  padding: 0 20rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #efe8dc;
+  background: #fff;
+  font-size: 28rpx;
+}
+
+.reg-sms {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.reg-input--flex {
+  flex: 1;
+  width: auto;
+}
+
+.reg-sms-btn {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  height: 84rpx;
+  line-height: 84rpx;
+  padding: 0 20rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #ddd6fe;
+  background: #fff;
+  font-size: 24rpx;
+  color: #6d28d9;
+}
+
+.reg-sms-btn[disabled] {
+  opacity: 0.5;
+}
+
+.reg-err {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  color: #b91c1c;
+}
+
+.reg-submit {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 20rpx;
+  border: 0;
+  background: #6d28d9;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.reg-submit[disabled] {
+  opacity: 0.55;
+}
+
+.reg-legal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: #78716c;
+}
+
+.reg-check {
+  width: 32rpx;
+  height: 32rpx;
+  margin-right: 8rpx;
+  border-radius: 8rpx;
+  border: 1rpx solid #d6d3d1;
+  text-align: center;
+  line-height: 32rpx;
+  font-size: 22rpx;
+  color: #fff;
+}
+
+.reg-check--on {
+  background: #6d28d9;
+  border-color: #6d28d9;
+}
+
+.reg-legal-link {
+  color: #6d28d9;
+}
+
+.reg-back {
+  display: block;
+  margin-top: 20rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #6d28d9;
+}

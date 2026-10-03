@@ -9,13 +9,13 @@ function currentRoute() {
 
 function isWelcomeRoute() {
   const route = currentRoute()
-  return route === '' || route === 'pages/login/login' || route === 'pages/legal/legal'
+  return route === '' || route === 'pages/login/login' || route === 'pages/login/signup/signup' || route === 'pages/legal/legal'
 }
 
 function redirectIfLoginRequired() {
   try {
     const route = currentRoute()
-    if (route === 'pages/login/login' || route === 'pages/legal/legal' || route === 'pages/register/register') return
+    if (route === 'pages/login/login' || route === 'pages/login/signup/signup' || route === 'pages/legal/legal' || route === 'pages/register/register') return
     const auth = require('./utils/auth.js')
     if (auth.isLoggedIn()) {
       const acc = auth.readAccount()
@@ -33,7 +33,7 @@ function redirectIfPhoneBindRequired() {
     if (!auth.isLoggedIn() || !auth.needsPhoneBind()) return
     const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
     const route = pages.length ? String(pages[pages.length - 1].route || '') : ''
-    if (route === 'pages/login/login') return
+    if (route === 'pages/login/login' || route === 'pages/login/signup/signup') return
     wx.reLaunch({ url: '/pages/login/login' })
   } catch (_) {}
 }

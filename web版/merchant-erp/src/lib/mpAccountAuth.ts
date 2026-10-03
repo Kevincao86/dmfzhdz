@@ -1546,7 +1546,7 @@ export async function mpAuthEnsureIdentity(
   if (!account) throw new Error('account_not_found')
   const requested: MpFixedWorkIdentity =
     role === 'pr' ? 'pr' : workIdentity === 'shoot' || workIdentity === 'edit' ? workIdentity : 'talent'
-  if (!opts?.initial && accountIdentityEstablished(account)) {
+  if (!opts?.initial && accountIdentityEstablished(account) && !mpAccountNeedsPhoneBind(account)) {
     const current = await fixedIdentityForAccount(supabaseUrl, serviceRole, account)
     if (current !== requested) return account
   }
