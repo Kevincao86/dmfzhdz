@@ -104,9 +104,11 @@
     <view class="home-entry">
       <view class="home-entry__card home-entry__card--img" data-key="{{entryLeftKey}}" bindtap="goHomeEntry">
         <image class="home-entry__img" src="{{entryLeftUrl}}" mode="aspectFill" />
+        <view class="home-entry__shade"></view>
       </view>
       <view class="home-entry__card home-entry__card--img" data-key="{{entryRightKey}}" bindtap="goHomeEntry">
         <image class="home-entry__img" src="{{entryRightUrl}}" mode="aspectFill" />
+        <view class="home-entry__shade"></view>
       </view>
     </view>
 
