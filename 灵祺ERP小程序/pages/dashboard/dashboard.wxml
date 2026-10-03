@@ -56,20 +56,19 @@
     </block>
   </view>
 
-  <view class="home-card home-card--tap" bindtap="onYesterdayTap">
-    <text class="home-card__title">昨日一句</text>
-    <view class="home-yday">
-      <text class="home-yday__text">{{yesterdayText}}</text>
-      <text class="home-yday__link">查看</text>
+  <view class="home-card">
+    <view class="home-card__head">
+      <text class="home-card__title">达人合作</text>
+      <text class="home-card__action" bindtap="onRecruitPublish">去招募</text>
     </view>
-  </view>
-
-  <view wx:if="{{recruits.length}}" class="home-card">
-    <text class="home-card__title">进行中的招募</text>
-    <view class="home-recruit" wx:for="{{recruits}}" wx:key="id" bindtap="onRecruitTap">
-      <text class="home-recruit__title">{{item.title}}</text>
-      <text class="home-recruit__status">{{item.status}}</text>
-    </view>
+    <view wx:if="{{!recruitLoaded}}" class="home-muted">加载中…</view>
+    <view wx:elif="{{!recruits.length}}" class="home-muted">还没有进行中的招募，发布后达人可报名</view>
+    <block wx:else>
+      <view class="home-recruit" wx:for="{{recruits}}" wx:key="id" bindtap="onRecruitTap">
+        <text class="home-recruit__title">{{item.title}}</text>
+        <text class="home-recruit__status">{{item.status}}</text>
+      </view>
+    </block>
   </view>
 
   <site-icp-footer />

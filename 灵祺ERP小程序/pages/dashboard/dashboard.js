@@ -1,5 +1,4 @@
 const config = require('../../utils/config.js')
-const dashboardMp = require('../../utils/dashboardMp.js')
 const reviews = require('../../utils/reviewsMp.js')
 const ops = require('../../utils/opsRegistryMp.js')
 const rest = require('../../utils/supabaseRest.js')
@@ -85,24 +84,6 @@ function openDecorLink(item) {
   }
 }
 
-function shanghaiYmd(delta) {
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
-  const ms = new Date(`${today}T12:00:00+08:00`).getTime() + delta * 86400000
-  return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
-}
-
-function yesterdayRevenueText(dash) {
-  if (!dash || !dash.connected) return '完成平台授权后显示昨日营收'
-  const ymd = shanghaiYmd(-1)
-  const md = ymd.slice(5)
-  const hit = (dash.trend || []).find((p) => {
-    const d = String((p && p.date) || '')
-    return d === ymd || d === md || d.endsWith(md)
-  })
-  if (!hit) return '昨日营收暂无数据'
-  return `昨日营收 ${dashboardMp.formatCurrencyYuan(hit.payAmount)}`
-}
-
 function recruitTitle(order) {
   const name = String(order.title || order.taskTitle || order.name || order.briefTitle || '').trim()
   if (name) return name
@@ -116,15 +97,6 @@ function recruitStatusLabel(status) {
   if (status === 'accepted') return '已接单'
   if (status === 'pending') return '待接单'
   return ''
-}
-
-async function loadYesterdayLine() {
-  try {
-    const dash = await dashboardMp.fetchAggregateDashboard('day7')
-    return yesterdayRevenueText(dash)
-  } catch (_) {
-    return '昨日营收暂无数据'
-  }
 }
 
 async function loadTodoItems() {
@@ -221,7 +193,7 @@ Page({
     entries: ENTRIES,
     todoLoaded: false,
     todos: [],
-    yesterdayText: '加载中…',
+    recruitLoaded: false,
     recruits: [],
   },
 
@@ -234,11 +206,7 @@ Page({
   },
 
   async loadHomeFeed() {
-    const [yesterdayText, todos, recruit] = await Promise.all([
-      loadYesterdayLine(),
-      loadTodoItems(),
-      loadRecruitHome(),
-    ])
+    const [todos, recruit] = await Promise.all([loadTodoItems(), loadRecruitHome()])
     if (recruit.pending > 0) {
       todos.push({
         id: 'recruit',
@@ -251,7 +219,7 @@ Page({
     this.setData({
       todoLoaded: true,
       todos,
-      yesterdayText,
+      recruitLoaded: true,
       recruits: recruit.active,
     })
   },
@@ -288,11 +256,11 @@ Page({
     if (url) wx.navigateTo({ url })
   },
 
-  onYesterdayTap() {
-    wx.navigateTo({ url: '/pages/biz-overview/biz-overview' })
-  },
-
   onRecruitTap() {
     wx.navigateTo({ url: '/pages/recruitment/recruitment' })
+  },
+
+  onRecruitPublish() {
+    wx.navigateTo({ url: '/pages/recruit-hub/recruit-hub' })
   },
 })
