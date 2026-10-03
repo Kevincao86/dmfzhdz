@@ -1,6 +1,9 @@
 import type { RegistryFile } from './opsRegistryTypes.js'
 import {
   isLaunchSplashSlot,
+  MP_HOME_BANNER_MAX,
+  MP_HOME_BANNER_SLOT,
+  normalizeCarouselSeconds,
   normalizePlaySeconds,
   type PlatformDecorFreq,
   type PlatformDecorIdentity,
@@ -66,6 +69,9 @@ export function normalizeDecorItem(raw: unknown): RegistryPlatformDecorItem | nu
     endAt: String(o.endAt || '').trim() || undefined,
     freq: normalizeFreq(o.freq),
     ...(isLaunchSplashSlot(slotKey) ? { playSeconds: normalizePlaySeconds(o.playSeconds) } : {}),
+    ...(slotKey === MP_HOME_BANNER_SLOT
+      ? { carouselSeconds: normalizeCarouselSeconds(o.carouselSeconds) }
+      : {}),
     priority: Number.isFinite(Number(o.priority)) ? Number(o.priority) : 100,
     updatedAt: String(o.updatedAt || '').trim() || nowIso(),
   }
@@ -130,7 +136,7 @@ export function listActiveDecorForSlot(
   if (!key) return []
   const { items } = resolvePlatformDecoration(data)
   const now = Date.now()
-  return items
+  const list = items
     .filter(
       (it) =>
         it.enabled &&
@@ -139,6 +145,8 @@ export function listActiveDecorForSlot(
         identityMatch(it, opts?.identity),
     )
     .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
+  if (key === MP_HOME_BANNER_SLOT) return list.slice(0, MP_HOME_BANNER_MAX)
+  return list
 }
 
 /** 公开读取：某 slotKey 当前生效的一条（priority 小优先） */

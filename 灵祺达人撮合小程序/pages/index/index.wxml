@@ -73,7 +73,7 @@
       indicator-active-color="#f5c84c"
       circular
       autoplay
-      interval="4000"
+      interval="{{homePosterInterval}}"
       duration="400"
     >
       <swiper-item wx:for="{{homeSlides}}" wx:key="key">

@@ -28,6 +28,16 @@ export const PLATFORM_DECOR_SLOT_KEYS = [
 
 export type PlatformDecorSlotKey = (typeof PLATFORM_DECOR_SLOT_KEYS)[number]
 
+/** 达人小程序首页海报轮播：最多 5 张，共用一个轮播秒数 */
+export const MP_HOME_BANNER_SLOT = 'mp.home.banner'
+export const MP_HOME_BANNER_MAX = 5
+
+export function normalizeCarouselSeconds(raw: unknown): number {
+  const n = Math.round(Number(raw))
+  if (!Number.isFinite(n)) return 4
+  return Math.min(30, Math.max(2, n))
+}
+
 export const PLATFORM_DECOR_SLOT_LABELS: Record<string, string> = {
   'mp.home.popup': '小程序 · 首页弹窗',
   'mp.launch.splash': '达人小程序 · 开屏海报',
@@ -52,7 +62,7 @@ export const PLATFORM_DECOR_SLOT_SIZE_HINTS: Record<string, string> = {
   'mp.home.popup': '建议 750×1000（竖版 3:4，居中弹窗）',
   'mp.launch.splash': '建议 750×1334（竖版 9:16，打开达人小程序时全屏）',
   'erp.launch.splash': '建议 750×1334（竖版 9:16，打开商家小程序时全屏）',
-  'mp.home.banner': '建议 750×420（首页海报，多张按优先级轮播，每张可单独跳转）',
+  'mp.home.banner': '建议 750×420（最多 5 张，按优先级轮播，每张单独跳转，轮播秒数可设）',
   'mp.mine.entry': '建议 750×180（横条）',
   'mp.hall.strip': '建议 750×96（细条）',
   'dr.home.popup': '建议 720×960（竖版 3:4）',
@@ -87,6 +97,8 @@ export type RegistryPlatformDecorItem = {
   freq?: PlatformDecorFreq
   /** 仅开屏海报：播放秒数，到时关闭，期间可跳过 */
   playSeconds?: 3 | 5
+  /** 仅首页海报轮播：每张停留秒数，整组共用 */
+  carouselSeconds?: number
   priority: number
   updatedAt?: string
 }

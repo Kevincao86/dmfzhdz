@@ -187,6 +187,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     decorBanner: null,
     homeSlides: [],
     homeGreeting: '下午好，达人',
+    homePosterInterval: 4000,
     posterPresetUrl: homeBannerAssets.posterDefault,
     kpiRecruitIcon: homeBannerAssets.kpiRecruit,
     kpiUrgentIcon: homeBannerAssets.kpiUrgent,
@@ -322,6 +323,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       trainAds = []
     }
     const slides = []
+    const carouselSec = Number(decor[0] && decor[0].carouselSeconds)
+    const homePosterInterval =
+      carouselSec >= 2 && carouselSec <= 30 ? Math.round(carouselSec * 1000) : 4000
     decor.forEach((item, i) => {
       if (!item || !item.imageUrl) return
       slides.push({
@@ -346,6 +350,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     })
     this.setData({
       homeSlides: slides,
+      homePosterInterval,
       trainAds,
       decorBanner: decor[0] || null,
     })
