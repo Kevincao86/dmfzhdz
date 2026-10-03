@@ -69,6 +69,24 @@ function homeBannerForIdentity(identity) {
   if (identity === 'edit') return HOME_BANNER_EDIT
   return HOME_BANNER_TALENT
 }
+
+function buildHomeGreeting() {
+  const h = new Date().getHours()
+  let hello = '你好'
+  if (h < 5) hello = '夜深了'
+  else if (h < 11) hello = '上午好'
+  else if (h < 14) hello = '中午好'
+  else if (h < 18) hello = '下午好'
+  else hello = '晚上好'
+  let name = '达人'
+  try {
+    const acct = auth.readAccount()
+    const nick = acct && (acct.wxNickName || acct.nickName || acct.nickname)
+    const s = String(nick || '').trim()
+    if (s && s !== '微信用户' && s !== '用户' && s !== '灵祺用户') name = s.slice(0, 12)
+  } catch (_) {}
+  return `${hello}，${name}`
+}
 /** 按微信胶囊位置计算顶栏留白，避免 Logo / 搜索与系统按钮遮挡 */
 function matchHomeCategoryChip(row, chipId) {
   const id = String(chipId || 'all')
@@ -166,6 +184,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     showDecorPopup: false,
     decorPopup: null,
     decorBanner: null,
+    homeSlides: [],
+    homeGreeting: '下午好，达人',
     trainAds: [],
     ...HOME_BANNER_TALENT,
   },
@@ -222,7 +242,12 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     const identity = userProfile.readIdentity()
     const identityChanged = this._lastHallIdentity !== identity
     const tabVis = hallIdentity.hallTabVisibility(identity)
-    const patch = { workIdentity: identity, ...tabVis, ...homeBannerForIdentity(identity) }
+    const patch = {
+      workIdentity: identity,
+      homeGreeting: buildHomeGreeting(),
+      ...tabVis,
+      ...homeBannerForIdentity(identity),
+    }
     if (!tabVis.showPaichianTab && this.data.hallTab === 'paichian') patch.hallTab = 'normal'
     if (identityChanged) {
       patch.paichianSubTab = hallIdentity.defaultPaichianSubTab(identity)
@@ -274,34 +299,88 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     }
   },
   async loadDecorBanner() {
+    const identity = this.data.workIdentity || userProfile.readIdentity() || ''
+    let decor = []
     try {
-      const identity = this.data.workIdentity || userProfile.readIdentity() || ''
-      const item = await mpPlatformDecor.fetchDecorItemWithMeta('mp.home.banner', identity)
-      this.setData({ decorBanner: item && item.imageUrl ? item : null })
+      decor = await mpPlatformDecor.fetchDecorItems('mp.home.banner', identity)
     } catch (_) {
-      this.setData({ decorBanner: null })
+      decor = []
     }
+    let trainAds = []
     try {
       const courses = await mpTraining.listCourses()
-      const trainAds = (Array.isArray(courses) ? courses : [])
+      trainAds = (Array.isArray(courses) ? courses : [])
         .filter((c) => c && String(c.posterMp || '').indexOf('data:image/') === 0)
         .slice(0, 6)
         .map((c) => ({ id: c.id, title: c.title || '培训课程', poster: c.posterMp }))
-      this.setData({ trainAds })
     } catch (_) {
-      this.setData({ trainAds: [] })
+      trainAds = []
     }
+    const slides = []
+    decor.forEach((item, i) => {
+      if (!item || !item.imageUrl) return
+      slides.push({
+        key: `decor-${item.id || i}`,
+        kind: 'decor',
+        imageUrl: item.imageUrl,
+        isVideo: !!item.isVideo,
+        title: '',
+        linkType: item.linkType,
+        linkValue: item.linkValue,
+      })
+    })
+    trainAds.forEach((item) => {
+      slides.push({
+        key: `train-${item.id}`,
+        kind: 'train',
+        id: item.id,
+        imageUrl: item.poster,
+        isVideo: false,
+        title: item.title || '',
+      })
+    })
+    this.setData({
+      homeSlides: slides,
+      trainAds,
+      decorBanner: decor[0] || null,
+    })
   },
-  onTrainAdTap(e) {
-    const id = e.currentTarget.dataset.id
-    const url = id
-      ? `/pages/subpack-mine/mine-training-detail/mine-training-detail?id=${id}`
-      : '/pages/subpack-mine/mine-training/mine-training'
+  onHomeSlideTap(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const item = (this.data.homeSlides || [])[index]
+    if (!item) return
+    if (item.kind === 'train') {
+      const url = item.id
+        ? `/pages/subpack-mine/mine-training-detail/mine-training-detail?id=${item.id}`
+        : '/pages/subpack-mine/mine-training/mine-training'
+      wx.navigateTo({ url })
+      return
+    }
+    mpPlatformDecor.openDecorLink(item)
+  },
+  onFallbackPosterTap() {
+    this.applyHallTab('normal')
+  },
+  goHomeEntry(e) {
+    const key = e.currentTarget.dataset.key
+    if (key === 'publish') {
+      wx.switchTab({ url: '/pages/publish/publish' })
+      return
+    }
+    if (key === 'eval') {
+      wx.navigateTo({ url: '/pages/subpack-mine/mine-local-life-eval/mine-local-life-eval' })
+      return
+    }
+    const identity = this.data.workIdentity || userProfile.readIdentity()
+    const url =
+      identity === 'pr'
+        ? '/pages/subpack-pr/mine-pr-orders/mine-pr-orders'
+        : '/pages/subpack-mine/mine-applications/mine-applications'
+    if (!auth.isLoggedIn()) {
+      require('../../utils/mpGuestRoutes.js').redirectToLogin(url)
+      return
+    }
     wx.navigateTo({ url })
-  },
-  onDecorBannerTap() {
-    const item = this.data.decorBanner
-    if (item) mpPlatformDecor.openDecorLink(item)
   },
   async tryShowDecorPopup() {
     if (

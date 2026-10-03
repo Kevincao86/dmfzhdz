@@ -120,17 +120,17 @@ function identityMatch(
   return ids.includes(id as PlatformDecorIdentity)
 }
 
-/** 公开读取：某 slotKey 当前生效的一条（priority 小优先） */
-export function pickActiveDecorItem(
+/** 公开读取：某 slotKey 当前全部生效素材（priority 小优先），供首页海报轮播 */
+export function listActiveDecorForSlot(
   data: { platformDecoration?: RegistryPlatformDecoration | null },
   slotKey: string,
   opts?: { identity?: string | null },
-): RegistryPlatformDecorItem | null {
+): RegistryPlatformDecorItem[] {
   const key = String(slotKey || '').trim()
-  if (!key) return null
+  if (!key) return []
   const { items } = resolvePlatformDecoration(data)
   const now = Date.now()
-  const list = items
+  return items
     .filter(
       (it) =>
         it.enabled &&
@@ -139,7 +139,15 @@ export function pickActiveDecorItem(
         identityMatch(it, opts?.identity),
     )
     .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
-  return list[0] || null
+}
+
+/** 公开读取：某 slotKey 当前生效的一条（priority 小优先） */
+export function pickActiveDecorItem(
+  data: { platformDecoration?: RegistryPlatformDecoration | null },
+  slotKey: string,
+  opts?: { identity?: string | null },
+): RegistryPlatformDecorItem | null {
+  return listActiveDecorForSlot(data, slotKey, opts)[0] || null
 }
 
 export function listActiveDecorByPrefix(

@@ -343,7 +343,7 @@ export default function OpsPlatformDecorPage() {
         <p className="ops-muted mt-1 text-sm">
           {kind === 'popup'
             ? '活动海报首页弹窗：与公告弹窗互斥，优先紧急/入选/档期类通知。支持 once / daily / always 频控。素材支持静图、GIF、短视频（OSS）。'
-            : 'Banner / 条幅按 slotKey 投放。同一槽位取 priority 最小且在有效期内的一条。开屏海报在打开小程序时全屏播放，时长 3 秒或 5 秒，到时关闭，也可点跳过。素材支持静图、GIF、短视频（OSS）。'}
+            : '达人小程序首页海报（首页海报轮播）可新增多张：都启用后按优先级从小到大轮播，每张单独设置小程序路径或网页跳转。其它广告位仍取优先级最小的一条。开屏海报在打开小程序时全屏播放，时长 3 秒或 5 秒，到时关闭，也可点跳过。素材支持静图、GIF、短视频（OSS）。'}
         </p>
         <ul className="ops-size-hint-box space-y-1">
           {slotOptions.map((k) => (

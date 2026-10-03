@@ -52,17 +52,37 @@ function dismissItem(item) {
   })
 }
 
-async function fetchDecorItem(slotKey, identity) {
+function decorPublicPath(slotKey, identity) {
   const key = String(slotKey || '').trim()
-  if (!key) return null
+  if (!key) return ''
   let path = `/api/meoo-platform-decor-public?slotKey=${encodeURIComponent(key)}`
   if (identity) path += `&identity=${encodeURIComponent(identity)}`
+  return path
+}
+
+async function fetchDecorItem(slotKey, identity) {
+  const path = decorPublicPath(slotKey, identity)
+  if (!path) return null
   try {
     const data = await ecs.get(path)
     if (!data || data.ok === false) return null
     return data.item || null
   } catch (_) {
     return null
+  }
+}
+
+/** 首页海报轮播：返回该槽位全部生效素材，旧接口只有 item 时退回一条 */
+async function fetchDecorItems(slotKey, identity) {
+  const path = decorPublicPath(slotKey, identity)
+  if (!path) return []
+  try {
+    const data = await ecs.get(path)
+    if (!data || data.ok === false) return []
+    const raw = Array.isArray(data.items) && data.items.length ? data.items : data.item ? [data.item] : []
+    return raw.filter((it) => it && it.imageUrl).map((it) => ({ ...it, isVideo: isDecorVideoMedia(it) }))
+  } catch (_) {
+    return []
   }
 }
 
@@ -112,6 +132,7 @@ async function fetchDecorItemWithMeta(slotKey, identity) {
 
 module.exports = {
   fetchDecorItem,
+  fetchDecorItems,
   fetchDecorItemWithMeta,
   shouldShowByFreq,
   dismissItem,

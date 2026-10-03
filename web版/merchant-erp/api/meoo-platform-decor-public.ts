@@ -1,6 +1,6 @@
 /**
  * GET /api/meoo-platform-decor-public?slotKey=mp.home.popup&identity=pr
- * 各端公开读取当前生效的装修素材（单槽一条）
+ * 各端公开读取当前生效的装修素材。首页海报槽位返回全部生效图，供轮播。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -10,6 +10,7 @@ import {
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   listActiveDecorByPrefix,
+  listActiveDecorForSlot,
   pickActiveDecorItem,
 } from '../src/lib/platformDecorRegistryCore.js'
 
@@ -58,6 +59,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     if (!slotKey) {
       sendJson(res, 400, { ok: false, error: 'missing_slotKey' })
+      return
+    }
+    if (slotKey === 'mp.home.banner') {
+      const items = listActiveDecorForSlot(data, slotKey, { identity })
+      sendJson(res, 200, { ok: true, item: items[0] || null, items })
       return
     }
     const item = pickActiveDecorItem(data, slotKey, { identity })

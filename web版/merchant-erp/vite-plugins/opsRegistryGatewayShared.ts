@@ -56,6 +56,7 @@ import type { RegistryTeamIntro } from '../src/lib/teamIntroTypes.js'
 import {
   pickActiveDecorItem,
   listActiveDecorByPrefix,
+  listActiveDecorForSlot,
   setPlatformDecoration,
 } from '../src/lib/platformDecorRegistryCore.js'
 import type { RegistryPlatformDecoration } from '../src/lib/platformDecorTypes.js'
@@ -324,6 +325,11 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             }
             if (!slotKey) {
               json(res, 400, { ok: false, error: 'missing_slotKey' })
+              return
+            }
+            if (slotKey === 'mp.home.banner') {
+              const items = listActiveDecorForSlot(data, slotKey, { identity })
+              json(res, 200, { ok: true, item: items[0] || null, items })
               return
             }
             json(res, 200, { ok: true, item: pickActiveDecorItem(data, slotKey, { identity }) })

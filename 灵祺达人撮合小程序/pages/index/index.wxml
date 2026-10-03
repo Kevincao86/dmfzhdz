@@ -2,108 +2,121 @@
   <view class="home-sticky-top">
     <view class="home-hero-shell lq-hero-header lq-hero-header--home" style="{{navTopStyle}}">
       <view class="home-top-v1">
-        <text class="home-brand-v1" style="{{brandPadStyle}}">灵祺星选</text>
-        <view class="home-search-v2">
-          <text class="home-search-v2__icon" aria-hidden="true">⌕</text>
-          <input
-            class="home-search-v2__input"
-            placeholder="搜索招募名称/品牌/类目"
-            placeholder-class="home-search-v2__ph"
-            value="{{searchKeyword}}"
-            confirm-type="search"
-            bindinput="onSearchInput"
-            bindconfirm="onSearchConfirm"
-          />
-          <view class="home-search-v2__btn" bindtap="onSearchConfirm">搜索</view>
+        <view class="home-greet-row" style="{{brandPadStyle}}">
+          <text class="home-greet">{{homeGreeting}}</text>
+          <text class="home-brand-pill">灵祺星选</text>
+        </view>
+        <view class="home-chip-row">
+          <view
+            class="home-chip {{hallTab === 'normal' ? 'home-chip--on' : ''}}"
+            data-tab="normal"
+            bindtap="onHallTab"
+          >招募</view>
+          <view
+            class="home-chip {{hallTab === 'urgent' ? 'home-chip--on' : ''}}"
+            data-tab="urgent"
+            bindtap="onHallTab"
+          >急单</view>
+          <view
+            wx:if="{{showPaichianTab}}"
+            class="home-chip {{hallTab === 'paichian' ? 'home-chip--on' : ''}}"
+            data-tab="paichian"
+            bindtap="onHallTab"
+          >拍剪</view>
+          <view class="home-search-v2 home-search-v2--inline">
+            <text class="home-search-v2__icon" aria-hidden="true">⌕</text>
+            <input
+              class="home-search-v2__input"
+              placeholder="搜索商单"
+              placeholder-class="home-search-v2__ph"
+              value="{{searchKeyword}}"
+              confirm-type="search"
+              bindinput="onSearchInput"
+              bindconfirm="onSearchConfirm"
+            />
+          </view>
         </view>
       </view>
+    </view>
+  </view>
 
-      <swiper
-        wx:if="{{trainAds.length}}"
-        class="home-decor-banner"
-        indicator-dots
-        circular
-        autoplay
-        interval="4000"
-        duration="400"
-      >
-        <swiper-item wx:for="{{trainAds}}" wx:key="id">
-          <image class="home-decor-banner__img" src="{{item.poster}}" mode="aspectFill" data-id="{{item.id}}" bindtap="onTrainAdTap" />
-          <text class="home-decor-banner__title">{{item.title}}</text>
-        </swiper-item>
-      </swiper>
-      <view class="home-decor-banner" wx:if="{{decorBanner}}" bindtap="onDecorBannerTap">
-        <video
-          wx:if="{{decorBanner.isVideo}}"
-          class="home-decor-banner__img"
-          src="{{decorBanner.imageUrl}}"
-          autoplay
-          muted
-          loop
-          show-center-play-btn="{{false}}"
-          show-play-btn="{{false}}"
-          controls="{{false}}"
-          object-fit="cover"
-        />
-        <image wx:else class="home-decor-banner__img" src="{{decorBanner.imageUrl}}" mode="aspectFill" />
-        <text wx:if="{{decorBanner.title}}" class="home-decor-banner__title">{{decorBanner.title}}</text>
+  <scroll-view class="home-list-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="home-kpi">
+      <view class="home-kpi__pill">
+        <text class="home-kpi__k">在招</text>
+        <text class="home-kpi__n">{{tabCounts.normal || 0}}</text>
+      </view>
+      <view class="home-kpi__pill">
+        <text class="home-kpi__k">急单</text>
+        <text class="home-kpi__n">{{tabCounts.urgent || 0}}</text>
+      </view>
+      <view class="home-kpi__pill">
+        <text class="home-kpi__k">今日新增</text>
+        <text class="home-kpi__n">{{todayCount || 0}}</text>
       </view>
     </view>
 
-    <view class="home-toolbar">
-      <view class="home-desk" bindtap="goVerifyTalent" wx:if="{{!decorBanner}}">
-        <view class="home-desk__head">
-          <view class="home-desk__copy">
-            <text class="home-desk__title">{{bannerTitle}}</text>
-            <text class="home-desk__sub">{{bannerSub}}</text>
-          </view>
-          <view class="home-desk__cta">{{bannerCta}}</view>
+    <swiper
+      wx:if="{{homeSlides.length}}"
+      class="home-poster"
+      indicator-dots
+      indicator-color="rgba(255,255,255,0.55)"
+      indicator-active-color="#f5c84c"
+      circular
+      autoplay
+      interval="4000"
+      duration="400"
+    >
+      <swiper-item wx:for="{{homeSlides}}" wx:key="key">
+        <view class="home-poster__slide" data-index="{{index}}" bindtap="onHomeSlideTap">
+          <video
+            wx:if="{{item.isVideo}}"
+            class="home-poster__img"
+            src="{{item.imageUrl}}"
+            autoplay
+            muted
+            loop
+            show-center-play-btn="{{false}}"
+            show-play-btn="{{false}}"
+            controls="{{false}}"
+            object-fit="cover"
+          />
+          <image wx:else class="home-poster__img" src="{{item.imageUrl}}" mode="aspectFill" />
+          <text wx:if="{{item.title}}" class="home-poster__title">{{item.title}}</text>
         </view>
-        <view class="home-desk__kpis" catchtap="noopSheetTap">
-          <view class="home-desk__kpi home-desk__kpi--hall">
-            <text class="home-desk__kpi-tag">在招</text>
-            <text class="home-desk__kpi-num">{{tabCounts.normal || 0}}</text>
-            <text class="home-desk__kpi-lbl">招募大厅</text>
-          </view>
-          <view class="home-desk__kpi home-desk__kpi--urgent">
-            <text class="home-desk__kpi-tag">加急</text>
-            <text class="home-desk__kpi-num">{{tabCounts.urgent || 0}}</text>
-            <text class="home-desk__kpi-lbl">急单大厅</text>
-          </view>
-          <view class="home-desk__kpi home-desk__kpi--today">
-            <text class="home-desk__kpi-tag">今日</text>
-            <text class="home-desk__kpi-num">{{todayCount || 0}}</text>
-            <text class="home-desk__kpi-lbl">新增招募</text>
-          </view>
-        </view>
+      </swiper-item>
+    </swiper>
+    <view wx:else class="home-poster home-poster--fallback" bindtap="onFallbackPosterTap">
+      <view class="home-poster__copy">
+        <text class="home-poster__headline">今天有新商单</text>
+        <text class="home-poster__sub">按城市和平台去报名</text>
+        <view class="home-poster__cta">去报名</view>
       </view>
+    </view>
 
-      <view class="home-hall-mini">
-        <view
-          class="home-hall-mini__item {{hallTab === 'normal' ? 'home-hall-mini__item--on' : ''}}"
-          data-tab="normal"
-          bindtap="onHallTab"
-        >
-          招募大厅<text wx:if="{{tabCounts.normal}}" class="home-hall-mini__count">{{tabCounts.normal}}</text>
-        </view>
-        <view
-          class="home-hall-mini__item {{hallTab === 'urgent' ? 'home-hall-mini__item--on' : ''}}"
-          data-tab="urgent"
-          bindtap="onHallTab"
-        >
-          急单大厅<text wx:if="{{tabCounts.urgent}}" class="home-hall-mini__count">{{tabCounts.urgent}}</text>
-        </view>
-        <view
-          wx:if="{{showPaichianTab}}"
-          class="home-hall-mini__item {{hallTab === 'paichian' ? 'home-hall-mini__item--on' : ''}}"
-          data-tab="paichian"
-          bindtap="onHallTab"
-        >
-          拍剪任务
-        </view>
+    <view class="home-entry">
+      <view
+        wx:if="{{workIdentity === 'pr'}}"
+        class="home-entry__card"
+        data-key="publish"
+        bindtap="goHomeEntry"
+      >
+        <text class="home-entry__title">发布招募</text>
+        <text class="home-entry__sub">对接认证达人</text>
       </view>
+      <view wx:else class="home-entry__card" data-key="eval" bindtap="goHomeEntry">
+        <text class="home-entry__title">达人账号分析</text>
+        <text class="home-entry__sub">看带货等级</text>
+      </view>
+      <view class="home-entry__card" data-key="apps" bindtap="goHomeEntry">
+        <text class="home-entry__title">{{workIdentity === 'pr' ? '我的发单' : '我的报名'}}</text>
+        <text class="home-entry__sub">{{workIdentity === 'pr' ? '已发布的招募' : '进行中的商单'}}</text>
+      </view>
+    </view>
 
-      <view class="paichian-sub-tabs paichian-sub-tabs--v1" wx:if="{{hallTab === 'paichian' && showPaichianTab}}">
+    <text class="home-feed-title">推荐商单</text>
+
+    <view class="paichian-sub-tabs paichian-sub-tabs--v1" wx:if="{{hallTab === 'paichian' && showPaichianTab}}">
         <view
           wx:if="{{showShootSub}}"
           class="paichian-sub-tab {{paichianSubTab === 'shoot' ? 'paichian-sub-tab--on' : ''}}"
@@ -159,10 +172,7 @@
           </picker>
         </view>
       </scroll-view>
-    </view>
-  </view>
 
-  <scroll-view class="home-list-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
     <view wx:if="{{unconfigured}}" class="card state-warn home-filters-warn">
       <text class="hint">演示模式，连接后台后可查看真实商单</text>
     </view>
