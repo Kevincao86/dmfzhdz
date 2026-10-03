@@ -906,6 +906,13 @@ page {
   box-sizing: border-box;
 }
 
+.home-kpi__icon {
+  width: 72rpx;
+  height: 72rpx;
+  margin: 0 auto 8rpx;
+  display: block;
+}
+
 .home-kpi__k {
   display: block;
   font-size: 22rpx;
@@ -924,7 +931,7 @@ page {
 
 .home-poster {
   position: relative;
-  height: 320rpx;
+  height: 396rpx;
   margin: 20rpx 24rpx 0;
   border-radius: 28rpx;
   overflow: hidden;
@@ -987,7 +994,7 @@ page {
 .home-entry {
   display: flex;
   justify-content: space-between;
-  margin: 20rpx 24rpx 0;
+  margin: 8rpx 24rpx 0;
 }
 
 .home-entry__card {

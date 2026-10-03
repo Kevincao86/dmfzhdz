@@ -43,14 +43,17 @@
   <scroll-view class="home-list-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="home-kpi">
       <view class="home-kpi__pill">
+        <image class="home-kpi__icon" src="/images/home/kpi-recruit.jpg" mode="aspectFit" />
         <text class="home-kpi__k">在招</text>
         <text class="home-kpi__n">{{tabCounts.normal || 0}}</text>
       </view>
       <view class="home-kpi__pill">
+        <image class="home-kpi__icon" src="/images/home/kpi-urgent.jpg" mode="aspectFit" />
         <text class="home-kpi__k">急单</text>
         <text class="home-kpi__n">{{tabCounts.urgent || 0}}</text>
       </view>
       <view class="home-kpi__pill">
+        <image class="home-kpi__icon" src="/images/home/kpi-today.jpg" mode="aspectFit" />
         <text class="home-kpi__k">今日新增</text>
         <text class="home-kpi__n">{{todayCount || 0}}</text>
       </view>
@@ -86,14 +89,11 @@
         </view>
       </swiper-item>
     </swiper>
-    <view wx:else class="home-poster home-poster--fallback" bindtap="onFallbackPosterTap">
-      <view class="home-poster__copy">
-        <text class="home-poster__headline">今天有新商单</text>
-        <text class="home-poster__sub">按城市和平台去报名</text>
-        <view class="home-poster__cta">去报名</view>
-      </view>
+    <view wx:else class="home-poster" bindtap="onFallbackPosterTap">
+      <image class="home-poster__img" src="/images/home/poster-default.jpg" mode="aspectFill" />
     </view>
 
+    <text class="home-feed-title">常用入口</text>
     <view class="home-entry">
       <view
         wx:if="{{workIdentity === 'pr'}}"
