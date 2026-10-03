@@ -84,6 +84,10 @@
         "type": "glob"
       },
       {
+        "value": "images/register/**",
+        "type": "glob"
+      },
+      {
         "value": "images/auth/**",
         "type": "glob"
       },

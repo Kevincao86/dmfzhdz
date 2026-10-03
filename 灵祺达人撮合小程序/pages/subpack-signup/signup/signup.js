@@ -25,7 +25,7 @@ function applyIdentity(page, id, restartMotion) {
   page.setData({
     newIdentity: scene.id,
     stageMotion: '',
-    stageSrc: `/images/register/${scene.file}`,
+    stageSrc: `/pages/subpack-signup/images/${scene.file}`,
     stageLine: scene.line,
     sceneLabel: scene.label,
     err: '',
@@ -39,7 +39,7 @@ Page({
     identityOptions: IDENTITY_OPTIONS,
     newIdentity: DEFAULT_IDENTITY.id,
     stageMotion: '',
-    stageSrc: `/images/register/${DEFAULT_IDENTITY.file}`,
+    stageSrc: `/pages/subpack-signup/images/${DEFAULT_IDENTITY.file}`,
     stageLine: DEFAULT_IDENTITY.line,
     sceneLabel: DEFAULT_IDENTITY.label,
     phone: '',

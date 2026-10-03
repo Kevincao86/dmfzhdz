@@ -331,7 +331,7 @@ Page({
     wx.showToast({ title: '已切换验证码登录', icon: 'none' })
   },
   onGoSignup() {
-    wx.navigateTo({ url: '/pages/login/signup/signup' })
+    wx.navigateTo({ url: '/pages/subpack-signup/signup/signup' })
   },
   onSmsPhone(e) {
     this.setData({ smsPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
@@ -591,7 +591,7 @@ Page({
       })
       this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
       if (data.isNew || auth.needsPhoneBind(account)) {
-        wx.redirectTo({ url: '/pages/login/signup/signup?from=wx' })
+        wx.redirectTo({ url: '/pages/subpack-signup/signup/signup?from=wx' })
         return
       }
       resumeOrNavigateAfterLogin(this)
