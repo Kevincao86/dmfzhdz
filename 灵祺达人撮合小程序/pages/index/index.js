@@ -24,6 +24,23 @@ const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
 const mpPrivacyPageMixin = require('../../utils/mpPrivacyPageMixin.js')
 const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
 
+/** 已选城市时：region 写明了别的市，不能因为门店名里带定位城市就放行 */
+function regionNamesOtherCity(region, cityFilter) {
+  const c = String(cityFilter || '').trim()
+  if (!c || c === '全部' || c === '全部城市') return false
+  const short = c.replace(/市$/, '')
+  const named = []
+  const re = /([\u4e00-\u9fa5]{2,8})市/g
+  const text = String(region || '')
+  let m
+  while ((m = re.exec(text))) {
+    const raw = m[1].includes('省') ? m[1].split('省').pop() : m[1]
+    if (raw && raw.length >= 2) named.push(`${raw}市`)
+  }
+  if (!named.length) return false
+  return !named.some((name) => name === c || name.replace(/市$/, '') === short)
+}
+
 const HOME_CATEGORY_CHIPS = [
   { id: 'all', label: '全部' },
   { id: 'visit', label: '探店' },
@@ -259,6 +276,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       if (regionState.filterProvince === '全部' && regionState.filterCity === '全部') {
         regionState.regionFilterLabel = '城市'
       }
+      Object.assign(this.data, regionState)
       this.setData(regionState)
       this.applyFilters()
     } catch (e) {
@@ -620,6 +638,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     rows = rows.filter((r) => {
       if (!listKeywordSearch.matchListKeyword(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, pf)) return false
+      if (regionNamesOtherCity(r.region, cf)) return false
       if (!hallFilters.matchRegionFilter(r.region, r.storeName, provf, cf)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
       if (!listFilters.matchHallStatus(r, statusF)) return false
@@ -632,6 +651,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         if (!showDemoOrders() && r && r.isMock) return false
         if (!listKeywordSearch.matchListKeyword(r, kw)) return false
         if (!hallFilters.matchPlatform(r.platform, pf)) return false
+        if (regionNamesOtherCity(r.region, cf)) return false
         if (!hallFilters.matchRegionFilter(r.region, r.storeName, provf, cf)) return false
         if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
         if (!listFilters.matchHallTabCountStatus(r, statusF)) return false
@@ -754,6 +774,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       hallRegionLocate.writeStoredFilter(next.filterProvince, next.filterCity)
       this._hallRegionUserPicked = true
     }
+    Object.assign(this.data, next)
     this.setData(next)
     this.applyFilters()
   },
