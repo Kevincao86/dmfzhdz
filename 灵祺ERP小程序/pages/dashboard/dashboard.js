@@ -1,4 +1,9 @@
 const config = require('../../utils/config.js')
+const dashboardMp = require('../../utils/dashboardMp.js')
+const reviews = require('../../utils/reviewsMp.js')
+const ops = require('../../utils/opsRegistryMp.js')
+const rest = require('../../utils/supabaseRest.js')
+const { readPlatformToken } = require('../../utils/platformTokensMp.js')
 
 const SLOT_KEY = 'erp.mp.home.banner'
 
@@ -80,6 +85,99 @@ function openDecorLink(item) {
   }
 }
 
+function shanghaiYmd(delta) {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+  const ms = new Date(`${today}T12:00:00+08:00`).getTime() + delta * 86400000
+  return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+}
+
+function yesterdayRevenueText(dash) {
+  if (!dash || !dash.connected) return '完成平台授权后显示昨日营收'
+  const ymd = shanghaiYmd(-1)
+  const md = ymd.slice(5)
+  const hit = (dash.trend || []).find((p) => {
+    const d = String((p && p.date) || '')
+    return d === ymd || d === md || d.endsWith(md)
+  })
+  if (!hit) return '昨日营收暂无数据'
+  return `昨日营收 ${dashboardMp.formatCurrencyYuan(hit.payAmount)}`
+}
+
+function recruitTitle(order) {
+  const name = String(order.title || order.taskTitle || order.name || order.briefTitle || '').trim()
+  if (name) return name
+  const customer = String(order.customerName || '').trim()
+  if (customer) return customer
+  const id = String(order.id || '').trim()
+  return id ? `招募单 ${id.slice(0, 8)}` : '招募单'
+}
+
+function recruitStatusLabel(status) {
+  if (status === 'accepted') return '已接单'
+  if (status === 'pending') return '待接单'
+  return ''
+}
+
+async function loadYesterdayLine() {
+  try {
+    const dash = await dashboardMp.fetchAggregateDashboard('day7')
+    return yesterdayRevenueText(dash)
+  } catch (_) {
+    return '昨日营收暂无数据'
+  }
+}
+
+async function loadTodoItems() {
+  const items = []
+  const plats = ['douyin', 'meituan'].filter((id) => readPlatformToken(id))
+  if (plats.length) {
+    const rows = await Promise.all(
+      plats.map((id) => reviews.fetchReviewsList(id, 'all', 'unreplied').catch(() => ({ ok: false, items: [] }))),
+    )
+    let unreplied = 0
+    for (const row of rows) {
+      if (!row || !row.ok) continue
+      const fromStats = Number(row.stats && (row.stats.unreplied ?? row.stats.unrepliedCount))
+      if (Number.isFinite(fromStats) && fromStats >= 0) unreplied += fromStats
+      else unreplied += (row.items || []).filter((x) => x && !x.replied).length
+    }
+    if (unreplied > 0) {
+      items.push({
+        id: 'reviews',
+        title: '评价待回复',
+        count: unreplied,
+        url: '/pages/reviews-list/reviews-list',
+        dot: 'dot-amber',
+      })
+    }
+  }
+  return items
+}
+
+async function loadRecruitHome() {
+  try {
+    const tid = await rest.fetchPrimaryTenantId()
+    const merchantName = String((await rest.fetchTenantMerchantName(tid).catch(() => '')) || '').trim()
+    const reg = await ops.fetchRegistry()
+    let list = Array.isArray(reg.recruitmentOrders) ? reg.recruitmentOrders : []
+    if (merchantName) {
+      list = list.filter((o) => String(o.customerName || '').trim() === merchantName)
+    }
+    const pending = list.filter((o) => o && o.status === 'pending')
+    const active = list
+      .filter((o) => o && (o.status === 'pending' || o.status === 'accepted'))
+      .slice(0, 2)
+      .map((o) => ({
+        id: String(o.id || recruitTitle(o)),
+        title: recruitTitle(o),
+        status: recruitStatusLabel(o.status),
+      }))
+    return { pending: pending.length, active }
+  } catch (_) {
+    return { pending: 0, active: [] }
+  }
+}
+
 function fetchHomeBanners() {
   const base = String(config.MERCHANT_API_BASE_URL || '')
     .trim()
@@ -121,6 +219,10 @@ Page({
     posters: FALLBACK_POSTERS,
     posterInterval: 4000,
     entries: ENTRIES,
+    todoLoaded: false,
+    todos: [],
+    yesterdayText: '加载中…',
+    recruits: [],
   },
 
   onShow() {
@@ -128,6 +230,30 @@ Page({
       this.getTabBar().setData({ selected: 0 })
     }
     this.loadPosters()
+    this.loadHomeFeed()
+  },
+
+  async loadHomeFeed() {
+    const [yesterdayText, todos, recruit] = await Promise.all([
+      loadYesterdayLine(),
+      loadTodoItems(),
+      loadRecruitHome(),
+    ])
+    if (recruit.pending > 0) {
+      todos.push({
+        id: 'recruit',
+        title: '招募待接单',
+        count: recruit.pending,
+        url: '/pages/recruitment/recruitment',
+        dot: 'dot-violet',
+      })
+    }
+    this.setData({
+      todoLoaded: true,
+      todos,
+      yesterdayText,
+      recruits: recruit.active,
+    })
   },
 
   async loadPosters() {
@@ -155,5 +281,18 @@ Page({
       return
     }
     wx.navigateTo({ url: item.url })
+  },
+
+  onTodoTap(e) {
+    const url = String(e.currentTarget.dataset.url || '')
+    if (url) wx.navigateTo({ url })
+  },
+
+  onYesterdayTap() {
+    wx.navigateTo({ url: '/pages/biz-overview/biz-overview' })
+  },
+
+  onRecruitTap() {
+    wx.navigateTo({ url: '/pages/recruitment/recruitment' })
   },
 })

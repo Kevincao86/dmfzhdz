@@ -42,5 +42,35 @@
       <text class="home-entry__title">{{item.title}}</text>
     </view>
   </view>
+  <view class="home-card">
+    <text class="home-card__title">今日待办</text>
+    <view wx:if="{{!todoLoaded}}" class="home-muted">加载中…</view>
+    <view wx:elif="{{!todos.length}}" class="home-muted">今天没有待处理</view>
+    <block wx:else>
+      <view class="home-todo" wx:for="{{todos}}" wx:key="id" data-url="{{item.url}}" bindtap="onTodoTap">
+        <view class="home-todo__dot {{item.dot}}"></view>
+        <text class="home-todo__title">{{item.title}}</text>
+        <text class="home-todo__count">{{item.count}}</text>
+        <text class="home-todo__chev">›</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="home-card home-card--tap" bindtap="onYesterdayTap">
+    <text class="home-card__title">昨日一句</text>
+    <view class="home-yday">
+      <text class="home-yday__text">{{yesterdayText}}</text>
+      <text class="home-yday__link">查看</text>
+    </view>
+  </view>
+
+  <view wx:if="{{recruits.length}}" class="home-card">
+    <text class="home-card__title">进行中的招募</text>
+    <view class="home-recruit" wx:for="{{recruits}}" wx:key="id" bindtap="onRecruitTap">
+      <text class="home-recruit__title">{{item.title}}</text>
+      <text class="home-recruit__status">{{item.status}}</text>
+    </view>
+  </view>
+
   <site-icp-footer />
 </scroll-view>
