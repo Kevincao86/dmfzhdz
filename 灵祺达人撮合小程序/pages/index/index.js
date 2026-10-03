@@ -34,6 +34,7 @@ const HOME_CATEGORY_CHIPS = [
 ]
 
 const mpCdnAssets = require('../../utils/mpCdnAssets.js')
+const homeBannerAssets = require('../../utils/homeBannerAssets.js')
 
 const HOME_BANNER_PR = {
   bannerTitle: '灵祺星选 PR 工作台',
@@ -186,6 +187,10 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     decorBanner: null,
     homeSlides: [],
     homeGreeting: '下午好，达人',
+    posterPresetUrl: homeBannerAssets.posterDefault,
+    kpiRecruitIcon: homeBannerAssets.kpiRecruit,
+    kpiUrgentIcon: homeBannerAssets.kpiUrgent,
+    kpiTodayIcon: homeBannerAssets.kpiToday,
     trainAds: [],
     ...HOME_BANNER_TALENT,
   },

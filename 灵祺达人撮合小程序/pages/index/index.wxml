@@ -43,19 +43,25 @@
   <scroll-view class="home-list-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="home-kpi">
       <view class="home-kpi__pill">
-        <image class="home-kpi__icon" src="/images/home/kpi-recruit.jpg" mode="aspectFit" />
-        <text class="home-kpi__k">在招</text>
-        <text class="home-kpi__n">{{tabCounts.normal || 0}}</text>
+        <image class="home-kpi__icon" src="{{kpiRecruitIcon}}" mode="aspectFit" />
+        <view class="home-kpi__copy">
+          <text class="home-kpi__k">在招</text>
+          <text class="home-kpi__n">{{tabCounts.normal || 0}}</text>
+        </view>
       </view>
       <view class="home-kpi__pill">
-        <image class="home-kpi__icon" src="/images/home/kpi-urgent.jpg" mode="aspectFit" />
-        <text class="home-kpi__k">急单</text>
-        <text class="home-kpi__n">{{tabCounts.urgent || 0}}</text>
+        <image class="home-kpi__icon" src="{{kpiUrgentIcon}}" mode="aspectFit" />
+        <view class="home-kpi__copy">
+          <text class="home-kpi__k">急单</text>
+          <text class="home-kpi__n">{{tabCounts.urgent || 0}}</text>
+        </view>
       </view>
       <view class="home-kpi__pill">
-        <image class="home-kpi__icon" src="/images/home/kpi-today.jpg" mode="aspectFit" />
-        <text class="home-kpi__k">今日新增</text>
-        <text class="home-kpi__n">{{todayCount || 0}}</text>
+        <image class="home-kpi__icon" src="{{kpiTodayIcon}}" mode="aspectFit" />
+        <view class="home-kpi__copy">
+          <text class="home-kpi__k">今日新增</text>
+          <text class="home-kpi__n">{{todayCount || 0}}</text>
+        </view>
       </view>
     </view>
 
@@ -90,7 +96,7 @@
       </swiper-item>
     </swiper>
     <view wx:else class="home-poster" bindtap="onFallbackPosterTap">
-      <image class="home-poster__img" src="/images/home/poster-default.jpg" mode="aspectFill" />
+      <image class="home-poster__img" src="{{posterPresetUrl}}" mode="aspectFill" />
     </view>
 
     <text class="home-feed-title">常用入口</text>

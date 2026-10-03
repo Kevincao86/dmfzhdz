@@ -183,6 +183,10 @@ async function main() {
     'hero-shoot.png',
     'hero-edit.png',
     'home-banner-clouds.png',
+    'poster-default.jpg',
+    'kpi-recruit.jpg',
+    'kpi-urgent.jpg',
+    'kpi-today.jpg',
   ]
   for (const name of homeFiles) {
     const local = path.join(homeDir, name)

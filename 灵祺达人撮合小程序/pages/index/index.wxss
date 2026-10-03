@@ -898,19 +898,27 @@ page {
 }
 
 .home-kpi__pill {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   width: 31%;
-  padding: 16rpx 8rpx 14rpx;
-  text-align: center;
+  padding: 16rpx 12rpx;
+  text-align: left;
   background: #f7f3ec;
   border-radius: 20rpx;
   box-sizing: border-box;
 }
 
 .home-kpi__icon {
-  width: 72rpx;
-  height: 72rpx;
-  margin: 0 auto 8rpx;
-  display: block;
+  width: 64rpx;
+  height: 64rpx;
+  flex-shrink: 0;
+  margin-right: 8rpx;
+}
+
+.home-kpi__copy {
+  min-width: 0;
+  flex: 1;
 }
 
 .home-kpi__k {

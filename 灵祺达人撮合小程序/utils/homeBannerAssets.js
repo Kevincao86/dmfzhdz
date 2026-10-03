@@ -37,10 +37,21 @@ function bannerUrl(fileName) {
   return withCacheBust(`${cdnBase()}/home/${fileName}`)
 }
 
+/** 首页预设海报与数字图标：包内不打包，直接走 OSS */
+function ossHomeUrl(fileName) {
+  const oss = ossBase()
+  if (oss) return withCacheBust(`${oss}/home/${fileName}`)
+  return withCacheBust(`${cdnBase()}/home/${fileName}`)
+}
+
 module.exports = {
   heroTalent: bannerUrl('hero-talent.png'),
   heroTalentSearch: bannerUrl('hero-talent-v2-search.png'),
   heroShoot: bannerUrl('hero-shoot.png'),
   heroEdit: bannerUrl('hero-edit.png'),
   homeBannerClouds: bannerUrl('home-banner-clouds.png'),
+  posterDefault: ossHomeUrl('poster-default.jpg'),
+  kpiRecruit: ossHomeUrl('kpi-recruit.jpg'),
+  kpiUrgent: ossHomeUrl('kpi-urgent.jpg'),
+  kpiToday: ossHomeUrl('kpi-today.jpg'),
 }
