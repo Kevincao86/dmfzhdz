@@ -5,7 +5,7 @@
 }
 
 .home-poster {
-  height: 320rpx;
+  height: 396rpx;
   margin: 20rpx 24rpx 0;
   border-radius: 28rpx;
   overflow: hidden;
