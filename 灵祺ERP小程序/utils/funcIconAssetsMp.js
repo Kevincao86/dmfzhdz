@@ -1,36 +1,13 @@
-/** 功能页图标 — AI PNG 走 CDN/OSS，缺省回退 SVG data-uri */
-const { assetUrl } = require('./mpStaticAssets.js')
+/** 功能页图标 — 统一深蓝线稿 */
+const NAVY = '#1e3a5f'
 
 const TONE_COLORS = {
-  cyan: '#0284c7',
-  orange: '#ea580c',
-  violet: '#7c3aed',
-  blue: '#2563eb',
-  teal: '#0d9488',
-  amber: '#d97706',
-}
-
-const AI_ICON_KEYS = {
-  shop: true,
-  paint: true,
-  chart: true,
-  plus: true,
-  list: true,
-  mic: true,
-  star: true,
-  chat: true,
-  gift: true,
-  pin: true,
-  ai: true,
-  play: true,
-  trend: true,
-  user: true,
-  wallet: true,
-  bell: true,
-  headset: true,
-  crown: true,
-  bind: true,
-  switchUser: true,
+  cyan: NAVY,
+  orange: NAVY,
+  violet: NAVY,
+  blue: NAVY,
+  teal: NAVY,
+  amber: NAVY,
 }
 
 function svgWrap(color, inner) {
@@ -88,14 +65,10 @@ const ICON_BUILDERS = {
     ),
 }
 
-function iconDataUri(tone, key) {
-  if (AI_ICON_KEYS[key]) {
-    return assetUrl(`func-icons/${key}.png`)
-  }
-  const color = TONE_COLORS[tone] || '#334155'
+function iconDataUri(_tone, key) {
   const build = ICON_BUILDERS[key]
   if (!build) return ''
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(build(color))}`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(build(NAVY))}`
 }
 
 module.exports = { iconDataUri, TONE_COLORS }

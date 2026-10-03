@@ -1,6 +1,6 @@
 .sm-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   padding-bottom: 48rpx;
   box-sizing: border-box;
 }
@@ -9,14 +9,14 @@
   margin: 16rpx 24rpx;
   padding: 28rpx 24rpx;
   border-radius: 28rpx;
-  background: linear-gradient(160deg, #ecfeff 0%, #f0fdfa 50%, #fff 100%);
+  background: linear-gradient(160deg, #f4f7fb 0%, #f0fdfa 50%, #fff 100%);
 }
 
 .sm-title {
   display: block;
   font-size: 40rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sm-sub {
@@ -61,7 +61,7 @@
   background: #f8fafc;
   border-radius: 16rpx;
   font-size: 28rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sm-btn.save-name {
@@ -97,7 +97,7 @@
 }
 
 .sm-btn {
-  background: #0891b2 !important;
+  background: #1e3a5f !important;
   color: #fff !important;
   border-radius: 999rpx !important;
   font-size: 24rpx !important;
@@ -109,7 +109,7 @@
 }
 
 .sm-btn.primary {
-  background: #0284c7 !important;
+  background: #1e3a5f !important;
 }
 
 .sm-meta {
@@ -129,7 +129,7 @@
 .sm-card-title {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sm-empty {
@@ -157,14 +157,14 @@
   margin-right: 8rpx;
   padding: 0 10rpx;
   border-radius: 8rpx;
-  background: #ecfeff;
+  background: #f4f7fb;
   font-size: 20rpx;
   color: #0e7490;
 }
 
 .sm-item-name {
   font-size: 28rpx;
-  color: #0f172a;
+  color: #1e3a5f;
   font-weight: 600;
 }
 
@@ -172,7 +172,7 @@
   flex-shrink: 0;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0891b2;
+  color: #1e3a5f;
 }
 
 .sm-del {
@@ -203,5 +203,5 @@
   font-size: 32rpx;
   font-weight: 700;
   margin-bottom: 20rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }

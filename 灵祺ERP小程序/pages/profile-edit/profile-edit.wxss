@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 28rpx;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
 }
 .pe-card {
   background: #fff;
@@ -15,7 +15,7 @@
   display: block;
   font-size: 34rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 .pe-desc {
   display: block;
@@ -28,7 +28,7 @@
   display: block;
   font-size: 28rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 .pe-guest-d {
   display: block;
@@ -85,7 +85,7 @@
 .pe-avatar-tip {
   display: block;
   font-size: 28rpx;
-  color: #0284c7;
+  color: #1e3a5f;
   font-weight: 600;
   padding: 8rpx 0;
 }
@@ -102,7 +102,7 @@
   border-radius: 16rpx;
   background: #f1f5f9;
   font-size: 28rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 .pe-disabled {
   color: #94a3b8;
@@ -126,14 +126,14 @@
   border: none;
 }
 .btn-v2.primary {
-  background: #0284c7;
+  background: #1e3a5f;
   color: #fff;
 }
 .pe-sec {
   display: block;
   font-size: 30rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   margin-bottom: 8rpx;
 }
 .pe-err {
@@ -180,9 +180,9 @@
   color: #94a3b8;
 }
 .bind-tile.on {
-  background: #ecfeff;
+  background: #f4f7fb;
   border-color: #a5f3fc;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 .bind-ico {
   width: 56rpx;
@@ -190,12 +190,12 @@
   line-height: 56rpx;
   text-align: center;
   border-radius: 14rpx;
-  background: #e0f2fe;
+  background: #eef2f6;
   font-size: 26rpx;
-  color: #0369a1;
+  color: #3d5270;
 }
 .bind-ico.dark {
-  background: #0f172a;
+  background: #1e3a5f;
   color: #fff;
 }
 .bind-st {
@@ -225,7 +225,7 @@
   font-size: 22rpx;
   color: #0e7490;
   background: #fff;
-  border: 1rpx solid #bae6fd;
+  border: 1rpx solid #d5dde6;
   border-radius: 16rpx;
   display: flex;
   align-items: center;
@@ -266,7 +266,7 @@
 }
 .pw-tab.on {
   background: #fff;
-  color: #0f172a;
+  color: #1e3a5f;
   font-weight: 600;
 }
 .pe-card-last {

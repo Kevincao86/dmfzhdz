@@ -1,6 +1,6 @@
 .sv-root {
   height: 100vh;
-  background: linear-gradient(180deg, #ecfeff 0%, #f0f9ff 280rpx, #f8fafc 100%);
+  background: #e8edf2;
   box-sizing: border-box;
 }
 
@@ -16,7 +16,7 @@
   width: 8rpx;
   height: 88rpx;
   border-radius: 8rpx;
-  background: linear-gradient(180deg, #06b6d4, #0891b2);
+  background: linear-gradient(180deg, #1e3a5f, #1e3a5f);
 }
 
 .sv-header-row {
@@ -32,10 +32,10 @@
   line-height: 64rpx;
   text-align: center;
   border-radius: 18rpx;
-  background: linear-gradient(135deg, #cffafe, #a5f3fc);
+  background: linear-gradient(135deg, #e8edf2, #a5f3fc);
   color: #0e7490;
   font-weight: 800;
-  box-shadow: 0 8rpx 24rpx rgba(8, 145, 178, 0.18);
+  box-shadow: 0 8rpx 24rpx rgba(30, 58, 95, 0.18);
 }
 
 .sv-header-titles {
@@ -47,12 +47,12 @@
 .sv-header-title {
   font-size: 40rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-header-sub {
   font-size: 22rpx;
-  color: #0891b2;
+  color: #1e3a5f;
   font-weight: 600;
 }
 
@@ -81,7 +81,7 @@
   margin: 0 28rpx 12rpx;
   padding: 16rpx 20rpx;
   border-radius: 16rpx;
-  background: #ecfeff;
+  background: #f4f7fb;
   border: 1rpx solid #a5f3fc;
   display: flex;
   flex-direction: column;
@@ -124,15 +124,15 @@
 }
 
 .sv-quick-card.on {
-  border-color: #67e8f9;
-  background: #ecfeff;
+  border-color: #1e3a5f;
+  background: #f4f7fb;
 }
 
 .sv-quick-lab {
   display: block;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-quick-desc {
@@ -160,7 +160,7 @@
 
 .sv-main-tab.active {
   color: #fff;
-  background: linear-gradient(135deg, #06b6d4, #0891b2);
+  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
   border-color: transparent;
   font-weight: 700;
 }
@@ -178,7 +178,7 @@
   display: block;
   font-size: 34rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-cabin-h2 {
@@ -205,7 +205,7 @@
   display: inline-block;
   padding: 8rpx 16rpx;
   border-radius: 999rpx;
-  background: #ecfeff;
+  background: #f4f7fb;
   color: #0e7490;
   font-size: 22rpx;
   font-weight: 600;
@@ -269,14 +269,14 @@
 }
 
 .sv-chip.cyan {
-  background: #ecfeff;
+  background: #f4f7fb;
   color: #0e7490;
   font-weight: 700;
   border: 1rpx solid #a5f3fc;
 }
 
 .sv-chip.dark {
-  background: #0f172a;
+  background: #1e3a5f;
   color: #fff;
 }
 
@@ -296,14 +296,14 @@
 }
 
 .sv-dd-item.on {
-  background: #ecfeff;
+  background: #f4f7fb;
 }
 
 .sv-dd-title {
   display: block;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-dd-desc {
@@ -351,15 +351,15 @@
   background: #f8fafc;
   border: 1rpx solid #e2e8f0;
   font-size: 26rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-longform-box {
   margin: 8rpx 0 20rpx;
   padding: 16rpx;
   border-radius: 20rpx;
-  background: #f0f9ff;
-  border: 1rpx solid #bae6fd;
+  background: #f4f7fb;
+  border: 1rpx solid #d5dde6;
 }
 
 .sv-check-row {
@@ -372,7 +372,7 @@
   display: block;
   font-size: 26rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-check-sub {
@@ -404,7 +404,7 @@
 .sv-script-title {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-script-acts {
@@ -414,11 +414,11 @@
 
 .sv-link {
   font-size: 24rpx;
-  color: #0891b2;
+  color: #1e3a5f;
 }
 
 .sv-link.cyan {
-  color: #0891b2;
+  color: #1e3a5f;
   font-weight: 700;
 }
 
@@ -443,7 +443,7 @@
 
 .sv-script-idx {
   font-weight: 800;
-  color: #0891b2;
+  color: #1e3a5f;
   font-size: 24rpx;
 }
 
@@ -513,8 +513,8 @@
 }
 
 .sv-radio-dot.on {
-  border-color: #0891b2;
-  background: radial-gradient(circle, #06b6d4 40%, transparent 45%);
+  border-color: #1e3a5f;
+  background: radial-gradient(circle, #1e3a5f 40%, transparent 45%);
 }
 
 .sv-alert {
@@ -532,7 +532,7 @@
 }
 
 .sv-alert.hint {
-  background: #ecfeff;
+  background: #f4f7fb;
   color: #0e7490;
   border: 1rpx solid #a5f3fc;
 }
@@ -552,9 +552,9 @@
 }
 
 .sv-btn-cyan {
-  background: linear-gradient(135deg, #22d3ee, #0891b2);
+  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
   color: #fff;
-  box-shadow: 0 12rpx 28rpx -10rpx rgba(8, 145, 178, 0.55);
+  box-shadow: 0 12rpx 28rpx -10rpx rgba(30, 58, 95, 0.55);
 }
 
 .sv-btn-cyan.sm,
@@ -572,18 +572,18 @@
 }
 
 .sv-btn-dark {
-  background: #0f172a;
+  background: #1e3a5f;
   color: #fff;
 }
 
 .sv-btn-outline {
   background: #fff;
-  color: #0f172a;
+  color: #1e3a5f;
   border: 1rpx solid #cbd5e1 !important;
 }
 
 .sv-btn-violet {
-  background: linear-gradient(135deg, #67e8f9, #0891b2);
+  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
   color: #fff;
 }
 
@@ -593,7 +593,7 @@
 }
 
 .sv-btn-ai {
-  background: #ecfeff;
+  background: #f4f7fb;
   color: #0e7490;
   font-size: 24rpx;
   padding: 0 20rpx;
@@ -635,7 +635,7 @@
 }
 
 .sv-pane-icon.cyan {
-  background: #cffafe;
+  background: #e8edf2;
   color: #0e7490;
 }
 
@@ -643,7 +643,7 @@
   display: block;
   font-size: 32rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-pane-sub {
@@ -698,7 +698,7 @@
   line-height: 48rpx;
   text-align: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #22d3ee, #0891b2);
+  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
   color: #fff;
   font-weight: 800;
   font-size: 24rpx;
@@ -718,7 +718,7 @@
 .sv-flow-time {
   display: block;
   font-size: 22rpx;
-  color: #0891b2;
+  color: #1e3a5f;
   font-weight: 700;
 }
 
@@ -736,7 +736,7 @@
   gap: 20rpx;
   margin-top: 10rpx;
   font-size: 24rpx;
-  color: #0891b2;
+  color: #1e3a5f;
 }
 
 .sv-flow-connector {
@@ -745,7 +745,7 @@
   top: 48rpx;
   bottom: -8rpx;
   width: 4rpx;
-  background: linear-gradient(180deg, #67e8f9, #bae6fd);
+  background: linear-gradient(180deg, #1e3a5f, #d5dde6);
 }
 
 .sv-actions {
@@ -788,7 +788,7 @@
   display: inline-block;
   padding: 4rpx 12rpx;
   border-radius: 999rpx;
-  background: #ecfeff;
+  background: #f4f7fb;
   color: #0e7490;
   font-size: 20rpx;
   margin-bottom: 8rpx;
@@ -798,7 +798,7 @@
   display: block;
   font-size: 30rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-case-sub {
@@ -836,9 +836,9 @@
 }
 
 .sv-mood.on {
-  background: #0891b2;
+  background: #1e3a5f;
   color: #fff;
-  border-color: #0891b2;
+  border-color: #1e3a5f;
 }
 
 .sv-music-row {
@@ -856,7 +856,7 @@
   display: block;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-music-desc {
@@ -901,8 +901,8 @@
   line-height: 48rpx;
   text-align: center;
   border-radius: 14rpx;
-  background: #ecfeff;
-  color: #0891b2;
+  background: #f4f7fb;
+  color: #1e3a5f;
   font-weight: 800;
 }
 
@@ -954,7 +954,7 @@
   line-height: 40rpx;
   text-align: center;
   border-radius: 50%;
-  background: #0891b2;
+  background: #1e3a5f;
   color: #fff;
   font-size: 22rpx;
   font-weight: 700;
@@ -987,12 +987,12 @@
 }
 
 .sv-mat-tab.on {
-  background: #0891b2;
+  background: #1e3a5f;
   color: #fff;
 }
 
 .sv-mat-tab.violet.on {
-  background: #0891b2;
+  background: #1e3a5f;
 }
 
 .sv-warn-box {
@@ -1015,14 +1015,14 @@
   padding: 28rpx 20rpx;
   margin-bottom: 12rpx;
   border-radius: 18rpx;
-  border: 2rpx dashed #67e8f9;
-  background: #ecfeff;
+  border: 2rpx dashed #1e3a5f;
+  background: #f4f7fb;
   text-align: center;
 }
 
 .sv-upload-zone.violet {
   border-color: #c4b5fd;
-  background: #f5f3ff;
+  background: #e8edf2;
 }
 
 .sv-upload-zone.muted {
@@ -1033,7 +1033,7 @@
   display: block;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-upload-hint {
@@ -1076,7 +1076,7 @@
 
 .sv-queue-name {
   flex: 1;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .sv-queue-phase {
@@ -1142,7 +1142,7 @@
 }
 
 .sv-batch-n.on {
-  background: #0891b2;
+  background: #1e3a5f;
   color: #fff;
 }
 
@@ -1172,7 +1172,7 @@
   width: 100%;
   margin: 12rpx 0;
   border-radius: 16rpx;
-  background: #0f172a;
+  background: #1e3a5f;
 }
 
 .sv-video.dark {
@@ -1183,7 +1183,7 @@
   margin: 0 28rpx 24rpx;
   padding: 24rpx;
   border-radius: 24rpx;
-  background: #0f172a;
+  background: #1e3a5f;
   color: #e2e8f0;
 }
 

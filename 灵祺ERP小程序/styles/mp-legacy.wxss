@@ -1,7 +1,7 @@
 /* 功能子页通用列表（来自灵祺小程序 app.wxss） */
 .mp-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef6ff 0%, #f8fafc 30%);
+  background: #e8edf2;
   display: flex;
   flex-direction: column;
 }
@@ -24,7 +24,7 @@
 
 .mp-tab.active {
   color: #fff;
-  background: linear-gradient(95deg, #0ea5e9, #06b6d4);
+  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
   border-color: transparent;
 }
 
@@ -32,8 +32,8 @@
   margin: 8rpx 24rpx 0;
   padding: 16rpx 20rpx;
   border-radius: 16rpx;
-  background: rgba(56, 189, 248, 0.1);
-  color: #0369a1;
+  background: rgba(30, 58, 95, 0.1);
+  color: #3d5270;
   font-size: 22rpx;
   line-height: 1.45;
 }
@@ -57,7 +57,7 @@
 .mp-list-title {
   font-size: 28rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e3a5f;
   display: block;
 }
 
@@ -129,7 +129,7 @@
 }
 
 .meoo-btn-primary {
-  background: linear-gradient(95deg, #0ea5e9, #06b6d4 45%, #14b8a6);
+  background: linear-gradient(95deg, #1e3a5f, #1e3a5f 45%, #14b8a6);
   color: #fff;
   border-radius: 16rpx;
   height: 88rpx;
@@ -141,7 +141,7 @@
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  box-shadow: 0 8rpx 24rpx rgba(14, 165, 233, 0.28);
+  box-shadow: 0 8rpx 24rpx rgba(30, 58, 95, 0.28);
 }
 .meoo-btn-primary::after { border: none; }
 
@@ -166,7 +166,7 @@
   border: 1rpx solid rgba(148, 163, 184, 0.45);
   border-radius: 16rpx;
   padding: 20rpx 24rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .meoo-label {
@@ -187,13 +187,13 @@
   padding-bottom: 48rpx;
   box-sizing: border-box;
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef6ff 0%, #f3f6fb 35%);
+  background: linear-gradient(180deg, #e8edf2 0%, #e8edf2 35%);
 }
 
 .voice-hero-title {
   font-size: 34rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   display: block;
 }
 
@@ -208,7 +208,7 @@
 .edit-section-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e3a5f;
   margin: 32rpx 0 16rpx;
   display: block;
 }

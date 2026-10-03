@@ -1,6 +1,6 @@
 .ads-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   box-sizing: border-box;
 }
 
@@ -10,10 +10,10 @@
   justify-content: space-between;
   margin: 16rpx 24rpx 12rpx;
   padding: 28rpx 24rpx;
-  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7fb 100%);
   border-radius: 28rpx;
-  border: 1rpx solid rgba(14, 165, 233, 0.12);
-  box-shadow: 0 12rpx 36rpx rgba(14, 165, 233, 0.08);
+  border: 1rpx solid rgba(30, 58, 95, 0.12);
+  box-shadow: 0 12rpx 36rpx rgba(30, 58, 95, 0.08);
 }
 
 .ads-channel-row {
@@ -53,7 +53,7 @@
   padding: 20rpx;
   background: #fff;
   border-radius: 24rpx;
-  border: 1rpx solid rgba(124, 58, 237, 0.12);
+  border: 1rpx solid rgba(30, 58, 95, 0.12);
 }
 
 .ads-pane-row,
@@ -79,14 +79,14 @@
 
 .ads-pane.on {
   color: #fff;
-  background: #7c3aed;
-  border-color: #7c3aed;
+  background: #1e3a5f;
+  border-color: #1e3a5f;
   font-weight: 700;
 }
 
 .ads-mode.on {
-  color: #5b21b6;
-  background: #ede9fe;
+  color: #1e3a5f;
+  background: #eef2f6;
   border-color: #c4b5fd;
   font-weight: 650;
 }
@@ -96,7 +96,7 @@
 }
 
 .ads-ai-run {
-  background: #7c3aed !important;
+  background: #1e3a5f !important;
   color: #fff !important;
   border-radius: 999rpx !important;
 }
@@ -128,7 +128,7 @@
   display: block;
   font-size: 36rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .ads-sub {
@@ -199,7 +199,7 @@
 .ads-today-title {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .ads-today-more {
@@ -221,7 +221,7 @@
   display: block;
   font-size: 32rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .ads-kpi-lab {
@@ -357,7 +357,7 @@
 .ads-card-name {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .ads-more {
@@ -418,7 +418,7 @@
   margin-top: 4rpx;
   font-size: 24rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .ads-card-foot {

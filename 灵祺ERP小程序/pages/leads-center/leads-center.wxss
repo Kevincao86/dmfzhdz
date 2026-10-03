@@ -1,6 +1,6 @@
 .leads-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   display: flex;
   flex-direction: column;
 }
@@ -44,7 +44,7 @@
   gap: 10rpx;
   padding: 14rpx 18rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   border: 1rpx solid #e2e8f0;
 }
 
@@ -64,7 +64,7 @@
   gap: 6rpx;
   padding: 14rpx 20rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   border: 1rpx solid #e2e8f0;
   font-size: 24rpx;
   color: #475569;
@@ -85,7 +85,7 @@
   margin: 12rpx 24rpx;
   padding: 24rpx 12rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
   box-shadow: 0 12rpx 32rpx rgba(37, 99, 235, 0.25);
 }
 
@@ -135,7 +135,7 @@
 }
 
 .leads-tab.on {
-  color: #2563eb;
+  color: #1e3a5f;
   font-weight: 700;
 }
 
@@ -146,7 +146,7 @@
   right: 0;
   bottom: 0;
   height: 4rpx;
-  background: #2563eb;
+  background: #1e3a5f;
 }
 
 .leads-list {
@@ -216,7 +216,7 @@
 .leads-name {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .leads-tag {
@@ -227,8 +227,8 @@
 }
 
 .leads-tag-new {
-  color: #2563eb;
-  background: #dbeafe;
+  color: #1e3a5f;
+  background: #eef2f6;
 }
 
 .leads-tag-follow {
@@ -330,7 +330,7 @@
 .leads-btn-primary {
   margin: 0 !important;
   border-radius: 999rpx !important;
-  background: linear-gradient(95deg, #2563eb, #0ea5e9) !important;
+  background: linear-gradient(95deg, #1e3a5f, #1e3a5f) !important;
   color: #fff !important;
 }
 

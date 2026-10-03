@@ -1,6 +1,6 @@
 .op-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   padding-bottom: 48rpx;
 }
 
@@ -8,14 +8,14 @@
   margin: 16rpx 24rpx;
   padding: 28rpx 24rpx;
   border-radius: 28rpx;
-  background: linear-gradient(160deg, #f0f9ff 0%, #e0f2fe 45%, #fff 100%);
+  background: linear-gradient(160deg, #f4f7fb 0%, #eef2f6 45%, #fff 100%);
 }
 
 .op-title {
   display: block;
   font-size: 40rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .op-sub {
@@ -56,7 +56,7 @@
 }
 
 .op-chip.on {
-  background: #0891b2;
+  background: #1e3a5f;
   color: #fff;
 }
 
@@ -69,7 +69,7 @@
   background: #f8fafc;
   border-radius: 16rpx;
   font-size: 28rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .op-picker {
@@ -81,7 +81,7 @@
   background: #f8fafc;
   border-radius: 16rpx;
   font-size: 28rpx;
-  color: #0f172a;
+  color: #1e3a5f;
   box-sizing: border-box;
 }
 
@@ -94,12 +94,12 @@
   background: #f8fafc;
   border-radius: 16rpx;
   font-size: 28rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .op-btn {
   margin-top: 20rpx;
-  background: #0891b2 !important;
+  background: #1e3a5f !important;
   color: #fff !important;
   border-radius: 999rpx !important;
   font-size: 28rpx !important;
@@ -122,7 +122,7 @@
   display: block;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   margin-bottom: 12rpx;
 }
 

@@ -21,7 +21,7 @@
 
   <view class="rev-ai-bar">
     <view class="rev-ai-toggle">
-      <switch checked="{{aiAutoReply}}" bindchange="onAiToggle" color="#6366f1" disabled="{{autoReplyBusy}}" />
+      <switch checked="{{aiAutoReply}}" bindchange="onAiToggle" color="#1e3a5f" disabled="{{autoReplyBusy}}" />
       <view class="rev-ai-toggle-txt">
         <text class="rev-ai-toggle-title">24小时智能自动回复</text>
         <text class="rev-ai-toggle-sub">开启后同步/载入时对未回复评价自动生成并提交</text>

@@ -116,7 +116,7 @@
   <view wx:if="{{err}}" class="dh-err">{{err}}</view>
   <view wx:if="{{resultUrl}}" class="dh-card">
     <text class="dh-card-title">成片预览</text>
-    <video src="{{resultUrl}}" controls object-fit="contain" style="width:100%;height:520rpx;background:#0f172a" />
+    <video src="{{resultUrl}}" controls object-fit="contain" style="width:100%;height:520rpx;background:#1e3a5f" />
     <button class="dh-btn" bindtap="saveAlbum">保存到相册</button>
   </view>
 </scroll-view>

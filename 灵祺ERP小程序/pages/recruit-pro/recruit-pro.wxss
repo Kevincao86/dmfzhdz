@@ -2,7 +2,7 @@
   height: 100vh;
   box-sizing: border-box;
   padding: 20rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, #f0f9ff 0%, #f8fafc 42%);
+  background: #e8edf2;
 }
 
 .pro-back {
@@ -15,7 +15,7 @@
 .pro-h1 {
   font-size: 40rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
   display: block;
   margin-bottom: 22rpx;
 }
@@ -73,14 +73,14 @@
 }
 
 .pro-mode.on {
-  border-color: #2563eb;
+  border-color: #1e3a5f;
   background: #eff6ff;
 }
 
 .pro-mode-title {
   font-size: 26rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   display: block;
 }
 
@@ -128,7 +128,7 @@
 }
 
 .pro-chip.on {
-  border-color: #2563eb;
+  border-color: #1e3a5f;
   color: #1d4ed8;
   background: #eff6ff;
 }
@@ -157,7 +157,7 @@
 }
 
 .pro-chip-inline.on {
-  border-color: #2563eb;
+  border-color: #1e3a5f;
   background: #eff6ff;
   color: #1d4ed8;
 }
@@ -179,7 +179,7 @@
 
 .pro-link {
   font-size: 24rpx;
-  color: #2563eb;
+  color: #1e3a5f;
 }
 
 .pro-check-row {
@@ -192,7 +192,7 @@
 
 .pro-check-glyph {
   font-size: 34rpx;
-  color: #0284c7;
+  color: #1e3a5f;
   line-height: 1;
 }
 
@@ -239,7 +239,7 @@
 .pro-submit {
   margin-top: 36rpx;
   border-radius: 16rpx;
-  background: linear-gradient(95deg, #2563eb, #0ea5e9);
+  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
   color: #fff;
   font-weight: 700;
   font-size: 30rpx;
@@ -284,7 +284,7 @@
 .pro-modal-title {
   font-size: 30rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
   margin-bottom: 16rpx;
   display: block;
 }
@@ -292,7 +292,7 @@
 .pro-modal-ok {
   margin-top: 20rpx;
   border-radius: 14rpx;
-  background: #2563eb;
+  background: #1e3a5f;
   color: #fff;
   font-weight: 600;
 }

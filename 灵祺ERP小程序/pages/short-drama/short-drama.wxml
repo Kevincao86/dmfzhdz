@@ -104,7 +104,7 @@
 
   <view wx:if="{{resultUrl}}" class="op-card">
     <text class="op-card-title">成片预览</text>
-    <video src="{{resultUrl}}" controls object-fit="contain" style="width:100%;height:520rpx;background:#0f172a" />
+    <video src="{{resultUrl}}" controls object-fit="contain" style="width:100%;height:520rpx;background:#1e3a5f" />
     <button class="op-btn" bindtap="saveAlbum">保存到相册</button>
     <button class="op-btn-ghost" bindtap="copyResult">复制链接</button>
   </view>

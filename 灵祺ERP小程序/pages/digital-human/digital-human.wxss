@@ -1,6 +1,6 @@
 .dh-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   padding-bottom: 48rpx;
 }
 
@@ -8,14 +8,14 @@
   margin: 16rpx 24rpx;
   padding: 28rpx 24rpx;
   border-radius: 28rpx;
-  background: linear-gradient(160deg, #fff7ed 0%, #ffedd5 45%, #fff 100%);
+  background: linear-gradient(160deg, #e8edf2 0%, #eef2f6 45%, #fff 100%);
 }
 
 .dh-title {
   display: block;
   font-size: 40rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .dh-sub {
@@ -114,7 +114,7 @@
 
 .dh-wiz.on {
   color: #c2410c;
-  background: #fff7ed;
+  background: #e8edf2;
   font-weight: 700;
 }
 
@@ -160,7 +160,7 @@
   padding: 8rpx 10rpx 0;
   font-size: 24rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .dh-av-tag {
@@ -202,7 +202,7 @@
 .dh-out {
   display: block;
   font-size: 26rpx;
-  color: #0f172a;
+  color: #1e3a5f;
   line-height: 1.55;
 }
 

@@ -1,6 +1,6 @@
 .plist-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   box-sizing: border-box;
 }
 
@@ -31,7 +31,7 @@
 }
 
 .plist-tab.on {
-  color: #0284c7;
+  color: #1e3a5f;
   font-weight: 700;
 }
 
@@ -42,7 +42,7 @@
   right: 0;
   bottom: 0;
   height: 4rpx;
-  background: #0891b2;
+  background: #1e3a5f;
   border-radius: 4rpx 4rpx 0 0;
 }
 
@@ -75,12 +75,12 @@
 
 .plist-btn-refresh {
   background: #fff;
-  color: #0284c7;
-  border: 2rpx solid #7dd3fc;
+  color: #1e3a5f;
+  border: 2rpx solid #d5dde6;
 }
 
 .plist-btn-sync {
-  background: linear-gradient(95deg, #0ea5e9, #06b6d4);
+  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
   color: #fff;
   border: none;
 }
@@ -154,7 +154,7 @@
 .plist-search-input {
   flex: 1;
   font-size: 24rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .plist-store-pill {
@@ -217,7 +217,7 @@
 .plist-name {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -231,7 +231,7 @@
 .plist-price {
   font-size: 32rpx;
   font-weight: 800;
-  color: #0284c7;
+  color: #1e3a5f;
 }
 
 .plist-badge {
@@ -243,13 +243,13 @@
 }
 
 .plist-badge-onsale {
-  color: #0369a1;
-  background: #e0f2fe;
+  color: #3d5270;
+  background: #eef2f6;
 }
 
 .plist-badge-review {
   color: #c2410c;
-  background: #ffedd5;
+  background: #eef2f6;
 }
 
 .plist-badge-draft {

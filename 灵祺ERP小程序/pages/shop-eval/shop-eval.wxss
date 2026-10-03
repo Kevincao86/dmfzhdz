@@ -11,7 +11,7 @@
   border-radius: 16rpx;
   background: #f8fafc;
   font-size: 28rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .form-row {
@@ -49,7 +49,7 @@
 
 .focus-btn--on {
   color: #fff;
-  background: #0891b2;
+  background: #1e3a5f;
 }
 
 .focus-hint {
@@ -85,7 +85,7 @@
   display: block;
   font-size: 34rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .chooser-sub {
@@ -103,13 +103,13 @@
   text-align: center;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   background: #f1f5f9;
 }
 
 .chooser-btn--main {
   color: #fff;
-  background: #0891b2;
+  background: #1e3a5f;
 }
 
 .chooser-cancel {
@@ -133,7 +133,7 @@
   display: block;
   font-size: 28rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .chooser-store-addr {
@@ -155,7 +155,7 @@
   min-height: 100vh;
   padding: 16rpx 24rpx calc(24rpx + var(--tab-bar-pad));
   box-sizing: border-box;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 280rpx, #f8fafc 100%);
+  background: #e8edf2;
 }
 
 .plats {
@@ -198,8 +198,8 @@
 }
 
 .plat--on {
-  background: #0891b2;
-  border-color: #0891b2;
+  background: #1e3a5f;
+  border-color: #1e3a5f;
 }
 
 .plat--on .plat-name {
@@ -238,7 +238,7 @@
   font-size: 28rpx;
   line-height: 42rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .report-line {
@@ -251,7 +251,7 @@
   flex-shrink: 0;
   font-size: 26rpx;
   font-weight: 700;
-  color: #0369a1;
+  color: #3d5270;
 }
 
 .metric {
@@ -269,13 +269,13 @@
 .metric-name {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .metric-score {
   font-size: 34rpx;
   font-weight: 800;
-  color: #0369a1;
+  color: #3d5270;
 }
 
 .metric-bar {
@@ -289,7 +289,7 @@
 .metric-fill {
   height: 10rpx;
   border-radius: 999rpx;
-  background: #0369a1;
+  background: #3d5270;
 }
 
 .metric-comment {
@@ -347,7 +347,7 @@
   height: 88rpx;
   border-radius: 50%;
   margin-bottom: 16rpx;
-  background: #0891b2;
+  background: #1e3a5f;
   color: #fff;
   font-size: 36rpx;
   font-weight: 800;
@@ -362,7 +362,7 @@
   display: block;
   font-size: 32rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .scope {
@@ -370,7 +370,7 @@
   margin-top: 10rpx;
   padding: 4rpx 12rpx;
   border-radius: 999rpx;
-  background: #e0f2fe;
+  background: #eef2f6;
   color: #0e7490;
   font-size: 20rpx;
   font-weight: 700;
@@ -404,8 +404,8 @@
   width: 220rpx;
   height: 220rpx;
   border-radius: 50%;
-  border: 8rpx solid rgba(8, 145, 178, 0.16);
-  border-top-color: #0891b2;
+  border: 8rpx solid rgba(30, 58, 95, 0.16);
+  border-top-color: #1e3a5f;
   animation: eval-spin 0.75s linear infinite;
   box-sizing: border-box;
 }
@@ -456,7 +456,7 @@
   display: block;
   font-size: 22rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .grade-label {
@@ -484,7 +484,7 @@
   font-size: 24rpx;
   font-weight: 700;
   color: #fff;
-  background: #0891b2;
+  background: #1e3a5f;
 }
 
 .btn-sub {
@@ -528,7 +528,7 @@
   height: 0;
   border-left: 14rpx solid transparent;
   border-right: 14rpx solid transparent;
-  border-bottom: 22rpx solid #0891b2;
+  border-bottom: 22rpx solid #1e3a5f;
   animation: arrow-rise 1.05s ease-in-out infinite;
 }
 
@@ -549,24 +549,24 @@
 }
 
 .advice--now {
-  background: #f0f9ff;
-  box-shadow: inset 0 0 0 2rpx #7dd3fc;
+  background: #f4f7fb;
+  box-shadow: inset 0 0 0 2rpx #d5dde6;
 }
 
 .advice-title {
   display: block;
   font-size: 28rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
   margin-bottom: 12rpx;
 }
 
 .advice-title--now {
-  color: #0369a1;
+  color: #3d5270;
 }
 
 .advice--plan {
-  background: #fff7ed;
+  background: #e8edf2;
   box-shadow: inset 0 0 0 2rpx #fb923c;
 }
 
@@ -592,25 +592,25 @@
 }
 
 .plate--now {
-  background: #e0f2fe;
+  background: #eef2f6;
 }
 
 .plate--on {
-  background: #e0f2fe;
-  box-shadow: inset 0 0 0 2rpx #0891b2;
+  background: #eef2f6;
+  box-shadow: inset 0 0 0 2rpx #1e3a5f;
 }
 
 .plate-no {
   font-size: 22rpx;
   font-weight: 800;
-  color: #0891b2;
+  color: #1e3a5f;
 }
 
 .plate-name {
   display: block;
   font-size: 26rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .plate-line {
@@ -652,7 +652,7 @@
 }
 
 .plan-block--find {
-  background: #e0f2fe;
+  background: #eef2f6;
 }
 
 .plan-block--adjust {
@@ -660,7 +660,7 @@
 }
 
 .plan-block--soon {
-  background: #ffedd5;
+  background: #eef2f6;
 }
 
 .plan-tag {
@@ -673,18 +673,18 @@
 }
 
 .plan-block--find .plan-tag {
-  color: #0369a1;
-  background: #bae6fd;
+  color: #3d5270;
+  background: #d5dde6;
 }
 
 .plan-block--adjust .plan-tag {
-  color: #6d28d9;
+  color: #1e3a5f;
   background: #e9d5ff;
 }
 
 .plan-block--soon .plan-tag {
   color: #c2410c;
-  background: #fed7aa;
+  background: #d5dde6;
 }
 
 .plan-text {

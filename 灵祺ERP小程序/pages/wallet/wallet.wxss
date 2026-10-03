@@ -1,6 +1,6 @@
 .wallet-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e0f2fe 0%, #f3f6fb 280rpx);
+  background: linear-gradient(180deg, #eef2f6 0%, #e8edf2 280rpx);
   padding: 0 28rpx;
   box-sizing: border-box;
 }
@@ -21,7 +21,7 @@
   align-items: center;
   gap: 6rpx;
   font-size: 24rpx;
-  color: #0284c7;
+  color: #1e3a5f;
 }
 
 .wallet-nav-ico {
@@ -58,7 +58,7 @@
   margin-top: 8rpx;
   font-size: 48rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .wallet-card-hint {
@@ -135,9 +135,9 @@
 
 .wallet-points-card {
   padding: 36rpx 28rpx 28rpx;
-  background: linear-gradient(180deg, #f0f9ff 0%, #fff 100%);
+  background: linear-gradient(180deg, #f4f7fb 0%, #fff 100%);
   border-radius: 28rpx;
-  box-shadow: 0 12rpx 32rpx rgba(14, 165, 233, 0.12);
+  box-shadow: 0 12rpx 32rpx rgba(30, 58, 95, 0.12);
   text-align: center;
 }
 
@@ -157,7 +157,7 @@
 .wallet-points-val {
   font-size: 64rpx;
   font-weight: 800;
-  color: #0284c7;
+  color: #1e3a5f;
   line-height: 1;
 }
 
@@ -172,7 +172,7 @@
   height: 88rpx;
   line-height: 88rpx;
   border-radius: 999rpx;
-  background: linear-gradient(95deg, #0ea5e9, #38bdf8) !important;
+  background: linear-gradient(95deg, #1e3a5f, #1e3a5f) !important;
   color: #fff !important;
   font-size: 28rpx;
   font-weight: 700;
@@ -208,7 +208,7 @@
 .wallet-info-main {
   font-size: 26rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .wallet-info-sub {
@@ -233,7 +233,7 @@
   display: block;
   font-size: 26rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   margin-bottom: 12rpx;
 }
 
@@ -302,7 +302,7 @@
   display: block;
   font-size: 30rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   margin-bottom: 16rpx;
 }
 
@@ -323,9 +323,9 @@
 }
 
 .wallet-tier.on {
-  border-color: #0ea5e9;
-  background: #e0f2fe;
-  color: #0284c7;
+  border-color: #1e3a5f;
+  background: #eef2f6;
+  color: #1e3a5f;
   font-weight: 700;
 }
 
@@ -358,8 +358,8 @@
   flex: 1;
   margin: 0;
   border-radius: 999rpx;
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #eef2f6;
+  color: #3d5270;
   font-size: 24rpx;
   display: flex;
   align-items: center;
@@ -413,14 +413,14 @@
   flex: 1;
   margin: 0;
   border-radius: 999rpx;
-  background: linear-gradient(95deg, #0ea5e9, #38bdf8);
+  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
   color: #fff;
 }
 
 .wallet-btn-link {
   margin-top: 12rpx;
   background: transparent;
-  color: #0284c7;
+  color: #1e3a5f;
   font-size: 24rpx;
 }
 

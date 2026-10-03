@@ -1,7 +1,7 @@
 {
   "navigationBarTitleText": "达人池确认",
-  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarBackgroundColor": "#e8edf2",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#f8fafc",
+  "backgroundColor": "#e8edf2",
   "usingComponents": {}
 }

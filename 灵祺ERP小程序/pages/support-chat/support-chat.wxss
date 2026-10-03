@@ -1,6 +1,6 @@
 .support-chat-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 40%, #f8fafc 100%);
+  background: #e8edf2;
   display: flex;
   flex-direction: column;
 }
@@ -31,7 +31,7 @@
   background: #fff;
 }
 .ava-me {
-  background: #0891b2;
+  background: #1e3a5f;
   color: #fff;
   font-size: 22rpx;
   display: flex;
@@ -47,7 +47,7 @@
   box-sizing: border-box;
 }
 .bubble-user {
-  background: #0891b2;
+  background: #1e3a5f;
   border-color: transparent;
 }
 .bubble-text {
@@ -75,9 +75,9 @@
 .support-human-btn {
   height: 72rpx;
   border-radius: 12rpx;
-  background: #fff7ed;
+  background: #e8edf2;
   color: #9a3412;
-  border: 1rpx solid #fed7aa;
+  border: 1rpx solid #d5dde6;
   display: flex;
   align-items: center;
   justify-content: center;

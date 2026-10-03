@@ -1,6 +1,6 @@
 .fin-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
 }
 
 .fin-hero {
@@ -21,7 +21,7 @@
   display: block;
   font-size: 40rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .fin-sub {
@@ -112,7 +112,7 @@
 .fin-card-title {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .fin-tag {
@@ -124,7 +124,7 @@
 
 .fin-tag-pending {
   color: #c2410c;
-  background: #ffedd5;
+  background: #eef2f6;
 }
 
 .fin-tag-done {
@@ -172,7 +172,7 @@
   display: block;
   font-size: 24rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .fin-grid-warn {
@@ -195,7 +195,7 @@
   padding: 8rpx 28rpx 12rpx;
   font-size: 30rpx;
   font-weight: 800;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .fin-quick-grid {

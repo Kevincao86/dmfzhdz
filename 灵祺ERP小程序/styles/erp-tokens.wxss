@@ -1,19 +1,19 @@
 /**
- * 商家 ERP 小程序设计 token（对齐 Web --erp-accent #0891b2）
+ * 商家 ERP 小程序设计 token（对齐 Web --erp-accent #1e3a5f）
  * 各页可直接使用 .erp-* 类；app.wxss 已全局引入。
  */
 page {
-  --erp-accent: #0891b2;
-  --erp-accent-strong: #0284c7;
-  --erp-accent-soft: rgba(8, 145, 178, 0.12);
-  --erp-accent-grad: linear-gradient(135deg, #0891b2 0%, #0284c7 100%);
-  --erp-bg: #f8fafc;
-  --erp-bg-grad: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 220rpx, #f8fafc 100%);
+  --erp-accent: #1e3a5f;
+  --erp-accent-strong: #1e3a5f;
+  --erp-accent-soft: rgba(30, 58, 95, 0.12);
+  --erp-accent-grad: linear-gradient(135deg, #1e3a5f 0%, #1e3a5f 100%);
+  --erp-bg: #e8edf2;
+  --erp-bg-grad: #e8edf2;
   --erp-surface: #ffffff;
-  --erp-text: #0f172a;
-  --erp-text-secondary: #334155;
-  --erp-muted: #64748b;
-  --erp-border: rgba(15, 23, 42, 0.06);
+  --erp-text: #1e3a5f;
+  --erp-text-secondary: #3d5270;
+  --erp-muted: #5b6b7c;
+  --erp-border: #d5dde6;
   --erp-radius: 24rpx;
   --erp-radius-lg: 28rpx;
   --erp-shadow: 0 10rpx 36rpx rgba(15, 23, 42, 0.05);
@@ -35,9 +35,9 @@ page {
   margin-bottom: 20rpx;
   padding: 28rpx 24rpx;
   border-radius: var(--erp-radius-lg);
-  background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 55%, #ecfeff 100%);
-  border: 1rpx solid rgba(8, 145, 178, 0.14);
-  box-shadow: 0 12rpx 36rpx rgba(8, 145, 178, 0.08);
+  background: #ffffff;
+  border: 1rpx solid #d5dde6;
+  box-shadow: 0 12rpx 36rpx rgba(30, 58, 95, 0.08);
 }
 
 .erp-hero-title {
@@ -104,7 +104,7 @@ page {
 
 .erp-btn-primary {
   margin-top: 16rpx;
-  background: var(--erp-accent-grad) !important;
+  background: #1e3a5f !important;
   color: #fff !important;
   border-radius: 999rpx !important;
   font-size: 28rpx !important;

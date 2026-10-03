@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 28rpx 28rpx 80rpx;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
 }
 .legal-head {
   margin-bottom: 28rpx;
@@ -20,7 +20,7 @@
   margin-top: 12rpx;
   font-size: 34rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 .legal-date,
 .legal-phone {
@@ -43,7 +43,7 @@
   margin-bottom: 12rpx;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 .legal-paragraph {
   display: block;

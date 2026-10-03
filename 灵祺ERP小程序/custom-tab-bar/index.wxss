@@ -29,7 +29,7 @@
 }
 
 .tab-item.active {
-  color: #0891b2;
+  color: #1e3a5f;
 }
 
 .tab-icon-wrap {
@@ -44,7 +44,7 @@
 }
 
 .tab-item.active .tab-icon-wrap {
-  background: rgba(14, 165, 233, 0.12);
+  background: rgba(30, 58, 95, 0.12);
   transform: translateY(-2rpx);
 }
 

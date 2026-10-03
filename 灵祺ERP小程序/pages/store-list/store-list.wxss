@@ -1,6 +1,6 @@
 .store-page-v2 {
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
   box-sizing: border-box;
 }
 
@@ -12,17 +12,17 @@
   margin: 16rpx 28rpx 0;
   padding: 20rpx 24rpx;
   border-radius: 20rpx;
-  background: #e0f2fe;
+  background: #eef2f6;
 }
 
 .store-notice-soft {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(30, 58, 95, 0.12);
 }
 
 .store-notice-text {
   flex: 1;
   font-size: 22rpx;
-  color: #0369a1;
+  color: #3d5270;
   line-height: 1.5;
 }
 
@@ -129,7 +129,7 @@
 .store-plat-name {
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .store-badge {
@@ -225,7 +225,7 @@
   display: block;
   font-size: 26rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .store-list-addr {

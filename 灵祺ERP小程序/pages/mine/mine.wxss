@@ -3,7 +3,7 @@
 .page-mine-v2 {
   padding: 0 24rpx;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #e8f4fc 0%, #f8fafc 240rpx, #f8fafc 100%);
+  background: #e8edf2;
 }
 
 .profile-v2-hover {
@@ -17,17 +17,17 @@
   gap: 6rpx;
   padding: 8rpx 18rpx;
   border-radius: 999rpx;
-  background: rgba(224, 242, 254, 0.95);
-  border: 1rpx solid rgba(2, 132, 199, 0.16);
+  background: rgba(30, 58, 95, 0.95);
+  border: 1rpx solid rgba(30, 58, 95, 0.16);
 }
 .profile-edit-text {
   font-size: 22rpx;
-  color: #0891b2;
+  color: #1e3a5f;
   font-weight: 600;
 }
 .profile-edit-arrow {
   font-size: 22rpx;
-  color: #0891b2;
+  color: #1e3a5f;
 }
 
 .guest-login-card {
@@ -35,20 +35,20 @@
   padding: 22rpx 24rpx;
   border-radius: 24rpx;
   background: #fff;
-  border: 1rpx solid rgba(2, 132, 199, 0.12);
-  box-shadow: 0 10rpx 28rpx rgba(2, 132, 199, 0.06);
+  border: 1rpx solid rgba(30, 58, 95, 0.12);
+  box-shadow: 0 10rpx 28rpx rgba(30, 58, 95, 0.06);
 }
 .guest-login-t {
   display: block;
   font-size: 26rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 .guest-login-a {
   display: block;
   margin-top: 6rpx;
   font-size: 22rpx;
-  color: #0284c7;
+  color: #1e3a5f;
 }
 
 /* AI 圆角图标 */
@@ -74,7 +74,7 @@
   flex-shrink: 0;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 10rpx 28rpx rgba(91, 33, 182, 0.18);
+  box-shadow: 0 10rpx 28rpx rgba(30, 58, 95, 0.18);
 }
 
 .store-logo-img {
@@ -95,7 +95,7 @@
 .bind-label {
   flex: 1;
   min-width: 0;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .bind-head-v2 {
@@ -128,7 +128,7 @@
 
 .menu-item-title {
   flex: 1;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .logout-mask {
@@ -170,13 +170,13 @@
   width: 100%;
   margin: 0 0 16rpx;
   padding: 26rpx;
-  border: 1rpx solid rgba(2, 132, 199, 0.28);
+  border: 1rpx solid rgba(30, 58, 95, 0.28);
   border-radius: 28rpx;
   background: #fff;
-  color: #0369a1;
+  color: #3d5270;
   font-size: 28rpx;
   font-weight: 600;
-  box-shadow: 0 8rpx 24rpx rgba(2, 132, 199, 0.06);
+  box-shadow: 0 8rpx 24rpx rgba(30, 58, 95, 0.06);
 }
 
 .page-mine-v2 .same-switch-btn::after {

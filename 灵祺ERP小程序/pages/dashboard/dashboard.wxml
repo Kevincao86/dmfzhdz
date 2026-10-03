@@ -59,7 +59,7 @@
       <view class="dash-yday-actions">
         <view class="dash-yday-auto">
           <text>自动</text>
-          <switch class="dash-yday-switch" checked="{{ydayAuto}}" color="#0891b2" disabled="{{ydayLoading}}" bindchange="onToggleYdayAuto" />
+          <switch class="dash-yday-switch" checked="{{ydayAuto}}" color="#1e3a5f" disabled="{{ydayLoading}}" bindchange="onToggleYdayAuto" />
         </view>
         <text class="dash-yday-btn {{ydayLoading ? 'is-off' : ''}}" bindtap="onManualYesterdayAnalysis">{{ydayLoading ? '分析中' : '手动分析'}}</text>
       </view>

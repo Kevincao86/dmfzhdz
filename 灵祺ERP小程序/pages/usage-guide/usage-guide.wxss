@@ -1,5 +1,5 @@
 .page { height: 100vh; box-sizing: border-box; padding: 24rpx 24rpx 48rpx; background: #f8fafc; }
 .lead { display: block; margin-bottom: 20rpx; font-size: 26rpx; line-height: 1.6; color: #64748b; }
 .card { margin-bottom: 16rpx; padding: 24rpx; border-radius: 16rpx; background: #fff; }
-.card-title { display: block; margin-bottom: 12rpx; font-size: 30rpx; font-weight: 600; color: #0f172a; }
+.card-title { display: block; margin-bottom: 12rpx; font-size: 30rpx; font-weight: 600; color: #1e3a5f; }
 .step { display: block; margin-top: 8rpx; font-size: 26rpx; line-height: 1.6; color: #334155; }

@@ -2,7 +2,7 @@
   box-sizing: border-box;
   min-height: 100vh;
   padding: 12rpx 40rpx calc(40rpx + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, #d9f3fb 0%, #e9f8f4 38%, #f4eefc 72%, #fbf7ff 100%);
+  background: #e8edf2;
 }
 
 .welcome-head {
@@ -71,7 +71,7 @@
   font-size: 22rpx;
   font-weight: 700;
   letter-spacing: 1rpx;
-  color: #7c3aed;
+  color: #1e3a5f;
 }
 
 .welcome-tile--sms .welcome-tile__mark { color: #1e3a5f; }
@@ -139,7 +139,7 @@
   height: 72rpx !important;
   line-height: 72rpx !important;
   font-size: 22rpx !important;
-  color: #0369a1 !important;
+  color: #3d5270 !important;
   background: #f1f5f9 !important;
   border: 1rpx solid #e2e8f0 !important;
   border-radius: 24rpx !important;
@@ -159,7 +159,7 @@
 .btn-v2.guest-browse {
   margin-top: 20rpx;
   background: rgba(255, 255, 255, 0.72);
-  color: #0284c7;
+  color: #1e3a5f;
   border: 2rpx solid rgba(125, 211, 252, 0.8);
 }
 .btn-v2.guest-browse::after {
@@ -324,7 +324,7 @@
   height: 28rpx;
   margin-right: 8rpx;
   border-radius: 50%;
-  border: 2rpx solid #7dd3fc;
+  border: 2rpx solid #d5dde6;
   background: #fff;
   display: flex;
   align-items: center;
@@ -339,8 +339,8 @@
 }
 
 .login-legal-check--on {
-  background: #0284c7;
-  border-color: #0284c7;
+  background: #1e3a5f;
+  border-color: #1e3a5f;
 }
 
 .login-legal-txt,
@@ -351,7 +351,7 @@
 }
 
 .login-legal-link {
-  color: #0284c7;
+  color: #1e3a5f;
 }
 
 .login-legal-mask {
@@ -382,7 +382,7 @@
   display: block;
   font-size: 32rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   text-align: center;
 }
 
@@ -422,6 +422,6 @@
 }
 
 .login-legal-modal-btn--agree {
-  background: #0284c7;
+  background: #1e3a5f;
   color: #fff;
 }

@@ -4,7 +4,7 @@
   right: 0;
   top: 0;
   bottom: var(--tab-bar-pad);
-  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 220rpx, #f8fafc 100%);
+  background: #e8edf2;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -16,8 +16,8 @@
   padding: 24rpx;
   border-radius: 24rpx;
   background: #ffffff;
-  border: 1rpx solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 8rpx 28rpx rgba(79, 70, 229, 0.06);
+  border: 1rpx solid #d5dde6;
+  box-shadow: 0 8rpx 28rpx rgba(30, 58, 95, 0.06);
   flex-shrink: 0;
 }
 
@@ -39,7 +39,7 @@
   display: block;
   font-size: 32rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e3a5f;
   line-height: 44rpx;
 }
 
@@ -61,7 +61,7 @@
   min-height: 64rpx;
   padding: 0 28rpx;
   border-radius: 999rpx;
-  background: #4f46e5;
+  background: #1e3a5f;
   color: #fff;
   font-size: 24rpx;
   font-weight: 600;
@@ -71,7 +71,7 @@
 }
 
 .agent-chip.ghost {
-  background: #eef2ff;
+  background: #e8edf2;
   color: #4338ca;
 }
 
@@ -90,7 +90,7 @@
   font-size: 36rpx;
   font-weight: 700;
   line-height: 48rpx;
-  color: #0f172a;
+  color: #1e3a5f;
   margin-top: 24rpx;
 }
 
@@ -145,7 +145,7 @@
 
 .shortcut-t {
   font-size: 26rpx;
-  color: #0f172a;
+  color: #1e3a5f;
   line-height: 36rpx;
 }
 
@@ -172,7 +172,7 @@
   width: 56rpx;
   height: 56rpx;
   border-radius: 50%;
-  background: #0891b2;
+  background: #1e3a5f;
   color: #fff;
   font-size: 22rpx;
   display: flex;
@@ -189,7 +189,7 @@
 }
 
 .bubble-user {
-  background: #0891b2;
+  background: #1e3a5f;
   border-color: transparent;
 }
 
@@ -205,7 +205,7 @@
 .bubble-text {
   font-size: 28rpx;
   line-height: 40rpx;
-  color: rgba(0, 0, 0, 0.9);
+  color: #1e3a5f;
   white-space: pre-wrap;
 }
 
@@ -235,14 +235,14 @@
   display: block;
   font-size: 28rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .plan-price {
   display: block;
   margin-top: 6rpx;
   font-size: 24rpx;
-  color: #4f46e5;
+  color: #1e3a5f;
 }
 
 .plan-desc {
@@ -270,15 +270,15 @@
 }
 
 .plat-chip.on {
-  border-color: #a5b4fc;
-  background: #eef2ff;
+  border-color: #d5dde6;
+  background: #e8edf2;
   color: #3730a3;
 }
 
 .preview-link {
   margin-top: 12rpx;
   font-size: 24rpx;
-  color: #4f46e5;
+  color: #1e3a5f;
 }
 
 .upload-h {
@@ -286,7 +286,7 @@
   margin: 16rpx 0 8rpx;
   font-size: 26rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .upload-ai {
@@ -329,7 +329,7 @@
   border-radius: 8rpx;
   background: #f8fafc;
   font-size: 26rpx;
-  color: #0f172a;
+  color: #1e3a5f;
 }
 
 .field-inp.picker {
@@ -380,7 +380,7 @@
 .mini-btn {
   padding: 10rpx 18rpx;
   border-radius: 8rpx;
-  background: #eef2ff;
+  background: #e8edf2;
   color: #3730a3;
   font-size: 22rpx;
 }
@@ -403,7 +403,7 @@
 }
 
 .step-seg.on {
-  background: #6366f1;
+  background: #1e3a5f;
 }
 
 .shoot-box {
@@ -432,14 +432,14 @@
 }
 
 .btn-primary {
-  background: #4f46e5;
+  background: #1e3a5f;
   color: #fff;
 }
 
 .btn-ghost {
   background: #fff;
   color: #4338ca;
-  border: 1rpx solid #c7d2fe;
+  border: 1rpx solid #d5dde6;
 }
 
 .preview-done {
