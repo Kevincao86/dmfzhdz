@@ -8,6 +8,113 @@
   display: flex;
   flex-direction: column;
   background: var(--lq-bg);
+  position: relative;
+}
+.page-bg {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.34;
+  z-index: 0;
+}
+.page-fx {
+  position: fixed;
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+}
+.page-fx--wash,
+.page-fx--flash {
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+.page-fx--bar {
+  left: 0;
+  right: 0;
+  height: 18vh;
+  background: #1c1917;
+}
+.page-fx--bar-top { top: 0; }
+.page-fx--bar-bot { bottom: 0; }
+.login-hero,
+.login-body {
+  position: relative;
+  z-index: 1;
+}
+.login-page--play .page-bg {
+  animation: page-bg 820ms ease both;
+}
+.login-page--play.login-page--talent .login-hero,
+.login-page--play.login-page--talent .login-body,
+.login-page--play.login-page--talent .reg-stage__line {
+  animation: page-rise 780ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.login-page--play.login-page--talent .page-fx--wash {
+  background: radial-gradient(ellipse 100% 70% at 50% 100%, rgba(245, 200, 76, 0.7), transparent 62%);
+  animation: fx-wash 820ms ease both;
+}
+.login-page--play.login-page--shoot .login-hero,
+.login-page--play.login-page--shoot .login-body,
+.login-page--play.login-page--shoot .reg-stage__line {
+  animation: page-shutter 720ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.login-page--play.login-page--shoot .page-fx--flash {
+  background: #fff;
+  animation: fx-flash 700ms ease both;
+}
+.login-page--play.login-page--edit .login-hero,
+.login-page--play.login-page--edit .login-body,
+.login-page--play.login-page--edit .reg-stage__line {
+  animation: page-film 800ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.login-page--play.login-page--edit .page-fx--bar {
+  animation: fx-bars 860ms ease both;
+}
+.login-page--play.login-page--pr .login-hero,
+.login-page--play.login-page--pr .login-body,
+.login-page--play.login-page--pr .reg-stage__line {
+  animation: page-deal 760ms cubic-bezier(0.16, 0.84, 0.24, 1) both;
+}
+.login-page--play.login-page--pr .page-fx--wash {
+  background: linear-gradient(180deg, rgba(109, 40, 217, 0.28), transparent 46%);
+  animation: fx-wash 780ms ease both;
+}
+@keyframes page-bg {
+  from { opacity: 0; }
+  to { opacity: 0.34; }
+}
+@keyframes page-rise {
+  from { transform: translateY(36rpx); }
+  to { transform: none; }
+}
+@keyframes page-shutter {
+  from { transform: scale(0.96); }
+  to { transform: none; }
+}
+@keyframes page-film {
+  from { transform: translateX(8%); }
+  to { transform: none; }
+}
+@keyframes page-deal {
+  from { transform: translateY(-40rpx); opacity: 0.35; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes fx-wash {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes fx-flash {
+  0% { opacity: 0.92; }
+  100% { opacity: 0; }
+}
+@keyframes fx-bars {
+  0% { opacity: 1; height: 28vh; }
+  100% { opacity: 0; height: 0; }
 }
 
 .login-body {

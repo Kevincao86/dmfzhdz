@@ -35,12 +35,15 @@ export default function RegisterPage() {
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [smsCooldown, setSmsCooldown] = useState(0)
-  const [sceneKey, setSceneKey] = useState(0)
+  const [playing, setPlaying] = useState(true)
   const scene = IDENTITY_SCENES[workIdentity]
 
   function pickIdentity(id: MpWorkIdentity) {
     setWorkIdentity(id)
-    setSceneKey((n) => n + 1)
+    setPlaying(false)
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setPlaying(true))
+    })
   }
 
   async function onSendSms() {
@@ -106,14 +109,17 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="reg-page">
+    <div className={`reg-page reg-page--${workIdentity}${playing ? ' reg-page--play' : ''}`}>
+      <img className="reg-page__bg" src={`/register-identity/${scene.file}?v=20261003d`} alt="" />
+      <div className="reg-fx reg-fx--wash" aria-hidden="true" />
+      <div className="reg-fx reg-fx--flash" aria-hidden="true" />
+      <div className="reg-fx reg-fx--bar reg-fx--bar-top" aria-hidden="true" />
+      <div className="reg-fx reg-fx--bar reg-fx--bar-bot" aria-hidden="true" />
       <form onSubmit={onSubmit} className="reg-card">
-        <div className={`reg-stage reg-stage--${workIdentity}`} key={sceneKey}>
+        <div className="reg-stage">
           <img className="reg-stage__img" src={`/register-identity/${scene.file}?v=20261003d`} alt="" />
-          <div className="reg-stage__flash" />
-          <div className="reg-stage__bars" />
         </div>
-        <p className="reg-stage__line" key={`line-${sceneKey}`}>{scene.line}</p>
+        <p className="reg-stage__line">{scene.line}</p>
         <h1 className="reg-title">注册 · {scene.label}</h1>
         <p className="reg-note">手机号就是登录账号。身份选定后不可更改，之后登录自动进入这一版。</p>
         <div className="reg-picks">

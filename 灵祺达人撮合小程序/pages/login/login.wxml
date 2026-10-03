@@ -1,4 +1,9 @@
-<view class="login-page {{lqThemeClass}}">
+<view class="login-page {{lqThemeClass}} {{stageMotion ? 'login-page--play login-page--' + stageMotion : ''}}">
+  <image wx:if="{{stageSrc}}" class="page-bg" src="{{stageSrc}}" mode="aspectFill" />
+  <view class="page-fx page-fx--wash"></view>
+  <view class="page-fx page-fx--flash"></view>
+  <view class="page-fx page-fx--bar page-fx--bar-top"></view>
+  <view class="page-fx page-fx--bar page-fx--bar-bot"></view>
   <view class="login-hero" style="{{navBandStyle}}">
     <image class="login-hero__bg" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
     <view class="login-hero__cosmos" aria-hidden="true">
@@ -27,11 +32,9 @@
     <view class="login-shell">
       <view class="login-main">
         <view class="login-id-pick" wx:if="{{tab==='wx' || tab==='reg'}}">
-          <view class="reg-stage {{stageMotion ? 'reg-stage--' + stageMotion : ''}}">
+          <view class="reg-stage">
             <image wx:if="{{stageSrc}}" class="reg-stage__img" src="{{stageSrc}}" mode="aspectFit" />
-            <view wx:else class="reg-stage__empty">点一个身份，看这一版</view>
-            <view class="reg-stage__flash"></view>
-            <view class="reg-stage__bars"></view>
+            <view wx:else class="reg-stage__empty">点一个身份，整页会换成这一版</view>
           </view>
           <text wx:if="{{stageLine}}" class="reg-stage__line">{{stageLine}}</text>
           <text class="login-id-pick__hint">选定后不可更改，登录自动进入这一版</text>

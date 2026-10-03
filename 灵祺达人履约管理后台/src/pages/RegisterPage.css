@@ -1,16 +1,178 @@
 .reg-page {
+  --reg-accent: #6d28d9;
+  position: relative;
   min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 28px 16px;
-  background:
-    radial-gradient(ellipse 70% 40% at 50% 0%, rgba(245, 200, 76, 0.28), transparent 60%),
-    #f7f3ec;
+  overflow: hidden;
+  background: #f7f3ec;
   color: #1c1917;
 }
 
+.reg-page--talent { --reg-accent: #a16207; }
+.reg-page--shoot { --reg-accent: #6d28d9; }
+.reg-page--edit { --reg-accent: #44403c; }
+.reg-page--pr { --reg-accent: #6d28d9; }
+
+.reg-page__bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(22px) saturate(1.15);
+  transform: scale(1.08);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.reg-fx {
+  position: fixed;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+}
+
+.reg-fx--wash,
+.reg-fx--flash {
+  inset: 0;
+}
+
+.reg-fx--bar {
+  left: 0;
+  right: 0;
+  height: 22vh;
+  background: #1c1917;
+}
+
+.reg-fx--bar-top { top: 0; }
+.reg-fx--bar-bot { bottom: 0; }
+
+.reg-page--play .reg-page__bg {
+  animation: page-bg 820ms ease both;
+}
+
+.reg-page--play .reg-card,
+.reg-page--play .reg-stage__line,
+.reg-page--play .reg-title,
+.reg-page--play .reg-note,
+.reg-page--play .reg-picks,
+.reg-page--play .reg-field,
+.reg-page--play .reg-sms,
+.reg-page--play .reg-submit,
+.reg-page--play .reg-login {
+  animation-duration: 780ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+.reg-page--play.reg-page--talent .reg-card,
+.reg-page--play.reg-page--talent .reg-stage__line,
+.reg-page--play.reg-page--talent .reg-title,
+.reg-page--play.reg-page--talent .reg-note { animation-name: page-rise; }
+.reg-page--play.reg-page--talent .reg-fx--wash {
+  background: radial-gradient(ellipse 100% 80% at 50% 100%, rgba(245, 200, 76, 0.72), transparent 62%);
+  animation: fx-wash 820ms ease both;
+}
+.reg-page--play.reg-page--talent .reg-picks,
+.reg-page--play.reg-page--talent .reg-field,
+.reg-page--play.reg-page--talent .reg-sms,
+.reg-page--play.reg-page--talent .reg-submit,
+.reg-page--play.reg-page--talent .reg-login {
+  animation-name: page-rise;
+}
+
+.reg-page--play.reg-page--shoot .reg-card,
+.reg-page--play.reg-page--shoot .reg-stage__line,
+.reg-page--play.reg-page--shoot .reg-title,
+.reg-page--play.reg-page--shoot .reg-note { animation-name: page-shutter; }
+.reg-page--play.reg-page--shoot .reg-fx--flash {
+  background: #fff;
+  animation: fx-flash 700ms ease both;
+}
+.reg-page--play.reg-page--shoot .reg-picks,
+.reg-page--play.reg-page--shoot .reg-field,
+.reg-page--play.reg-page--shoot .reg-sms,
+.reg-page--play.reg-page--shoot .reg-submit,
+.reg-page--play.reg-page--shoot .reg-login {
+  animation-name: page-shutter;
+}
+
+.reg-page--play.reg-page--edit .reg-card,
+.reg-page--play.reg-page--edit .reg-stage__line,
+.reg-page--play.reg-page--edit .reg-title,
+.reg-page--play.reg-page--edit .reg-note { animation-name: page-film; }
+.reg-page--play.reg-page--edit .reg-fx--bar { animation: fx-bars 860ms ease both; }
+.reg-page--play.reg-page--edit .reg-picks,
+.reg-page--play.reg-page--edit .reg-field,
+.reg-page--play.reg-page--edit .reg-sms,
+.reg-page--play.reg-page--edit .reg-submit,
+.reg-page--play.reg-page--edit .reg-login {
+  animation-name: page-film;
+}
+
+.reg-page--play.reg-page--pr .reg-card,
+.reg-page--play.reg-page--pr .reg-stage__line,
+.reg-page--play.reg-page--pr .reg-title,
+.reg-page--play.reg-page--pr .reg-note { animation-name: page-deal; }
+.reg-page--play.reg-page--pr .reg-fx--wash {
+  background: linear-gradient(180deg, rgba(109, 40, 217, 0.28), transparent 46%);
+  animation: fx-wash 780ms ease both;
+}
+.reg-page--play.reg-page--pr .reg-picks,
+.reg-page--play.reg-page--pr .reg-field,
+.reg-page--play.reg-page--pr .reg-sms,
+.reg-page--play.reg-page--pr .reg-submit,
+.reg-page--play.reg-page--pr .reg-login {
+  animation-name: page-deal;
+}
+
+@keyframes page-bg {
+  from { opacity: 0; transform: scale(1.18); }
+  to { opacity: 0.42; transform: scale(1.08); }
+}
+
+@keyframes page-rise {
+  from { transform: translateY(36px); }
+  to { transform: none; }
+}
+
+@keyframes page-shutter {
+  from { transform: scale(0.96); filter: brightness(1.35); }
+  to { transform: none; filter: none; }
+}
+
+@keyframes page-film {
+  from { transform: translateX(7%); }
+  to { transform: none; }
+}
+
+@keyframes page-deal {
+  from { transform: translateY(-40px); opacity: 0.35; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes fx-wash {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes fx-flash {
+  0% { opacity: 0.94; }
+  100% { opacity: 0; }
+}
+
+@keyframes fx-bars {
+  0% { opacity: 1; height: 28vh; }
+  100% { opacity: 0; height: 0; }
+}
+
 .reg-card {
+  position: relative;
+  z-index: 2;
   width: min(100%, 440px);
   border-radius: 28px;
   background: #fffdf8;
@@ -52,82 +214,6 @@
   font-weight: 600;
 }
 
-.reg-stage__flash,
-.reg-stage__bars {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-}
-
-.reg-stage--talent .reg-stage__img {
-  animation: reg-rise 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.reg-stage--shoot .reg-stage__img {
-  animation: reg-shutter 680ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-.reg-stage--shoot .reg-stage__flash {
-  background: #fff;
-  animation: reg-flash 680ms ease both;
-}
-
-.reg-stage--edit .reg-stage__img {
-  animation: reg-film 740ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.reg-stage--edit .reg-stage__bars {
-  opacity: 1;
-  background:
-    linear-gradient(#1c1917, #1c1917) top / 100% 8px no-repeat,
-    linear-gradient(#1c1917, #1c1917) bottom / 100% 8px no-repeat;
-  animation: reg-bars 740ms ease both;
-}
-
-.reg-stage--pr .reg-stage__img {
-  animation: reg-deal 700ms cubic-bezier(0.16, 0.84, 0.24, 1) both;
-}
-
-.reg-stage__line {
-  animation: reg-line 700ms ease both;
-}
-
-@keyframes reg-rise {
-  from { transform: scale(1.14) translateY(16px); opacity: 0.35; }
-  to { transform: none; opacity: 1; }
-}
-
-@keyframes reg-shutter {
-  from { clip-path: circle(0% at 62% 58%); }
-  to { clip-path: circle(120% at 62% 58%); }
-}
-
-@keyframes reg-flash {
-  0% { opacity: 0.85; }
-  100% { opacity: 0; }
-}
-
-@keyframes reg-film {
-  from { transform: translateX(22%); opacity: 0.2; }
-  to { transform: none; opacity: 1; }
-}
-
-@keyframes reg-bars {
-  from { transform: scaleY(1.4); opacity: 0.9; }
-  to { transform: none; opacity: 0; }
-}
-
-@keyframes reg-deal {
-  from { transform: translateY(-14%) rotate(-1.5deg); opacity: 0; }
-  to { transform: none; opacity: 1; }
-}
-
-@keyframes reg-line {
-  from { transform: translateY(10px); opacity: 0; }
-  to { transform: none; opacity: 1; }
-}
-
 .reg-title {
   margin: 16px 2px 4px;
   font-size: 22px;
@@ -160,10 +246,11 @@
 }
 
 .reg-pick--on {
-  border-color: #6d28d9;
-  background: #f5f3ff;
-  color: #6d28d9;
+  border-color: var(--reg-accent);
+  background: #fffdf8;
+  color: var(--reg-accent);
   font-weight: 650;
+  box-shadow: inset 0 0 0 1px var(--reg-accent);
 }
 
 .reg-field {
@@ -219,7 +306,7 @@
   width: 100%;
   border: 0;
   border-radius: 14px;
-  background: #6d28d9;
+  background: var(--reg-accent);
   color: #fff;
   padding: 12px;
   font-size: 15px;
@@ -243,10 +330,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reg-stage__img,
-  .reg-stage__flash,
-  .reg-stage__bars,
-  .reg-stage__line {
+  .reg-page__bg,
+  .reg-fx,
+  .reg-card,
+  .reg-stage__line,
+  .reg-title,
+  .reg-note,
+  .reg-picks,
+  .reg-field,
+  .reg-sms,
+  .reg-submit,
+  .reg-login,
+  .reg-stage__img {
     animation: none !important;
   }
 }
