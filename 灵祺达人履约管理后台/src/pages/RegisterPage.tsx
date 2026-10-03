@@ -109,7 +109,7 @@ export default function RegisterPage() {
     <div className="reg-page">
       <form onSubmit={onSubmit} className="reg-card">
         <div className={`reg-stage reg-stage--${workIdentity}`} key={sceneKey}>
-          <img className="reg-stage__img" src={`/register-identity/${scene.file}`} alt="" />
+          <img className="reg-stage__img" src={`/register-identity/${scene.file}?v=20261003d`} alt="" />
           <div className="reg-stage__flash" />
           <div className="reg-stage__bars" />
         </div>

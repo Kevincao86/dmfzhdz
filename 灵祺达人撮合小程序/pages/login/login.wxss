@@ -274,7 +274,7 @@
 }
 .reg-stage {
   position: relative;
-  height: 240rpx;
+  height: 280rpx;
   margin-bottom: 16rpx;
   border-radius: 24rpx;
   overflow: hidden;
@@ -282,11 +282,11 @@
 }
 .reg-stage__img {
   width: 100%;
-  height: 240rpx;
+  height: 280rpx;
   display: block;
 }
 .reg-stage__empty {
-  height: 240rpx;
+  height: 280rpx;
   display: flex;
   align-items: flex-end;
   padding: 24rpx;
@@ -296,7 +296,7 @@
 .reg-stage__line {
   display: block;
   margin: 0 4rpx 12rpx;
-  color: #44403c;
+  color: #1c1917;
   font-size: 26rpx;
   font-weight: 600;
 }
