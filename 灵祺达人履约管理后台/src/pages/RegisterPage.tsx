@@ -1,17 +1,24 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { cn } from '../cn'
 import { phoneRegister, sendRegisterSms } from '../lib/mpApi'
 import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
 import { formatMpApiErr } from '../lib/mpApiErrors'
-import { WORK_EDITION_LABEL, workIdentityToAccountRole, type MpWorkIdentity } from '../lib/mpWorkIdentity'
+import { workIdentityToAccountRole, type MpWorkIdentity } from '../lib/mpWorkIdentity'
+import './RegisterPage.css'
 
 function normalizePhone(raw: string) {
   const digits = raw.replace(/\D/g, '')
   return /^1\d{10}$/.test(digits) ? digits : ''
 }
 
-const IDENTITY_OPTIONS: MpWorkIdentity[] = ['talent', 'shoot', 'edit', 'pr']
+const IDENTITY_SCENES: Record<MpWorkIdentity, { label: string; line: string; file: string }> = {
+  talent: { label: '我是达人', line: '看带货等级，报名商单', file: 'reg-talent.jpg' },
+  shoot: { label: '我是拍摄', line: '接拍摄任务，去看课程', file: 'reg-shoot.jpg' },
+  edit: { label: '我是剪辑', line: '接剪辑任务，交成片', file: 'reg-edit.jpg' },
+  pr: { label: '我是PR', line: '发布招募，对接达人', file: 'reg-pr.jpg' },
+}
+
+const IDENTITY_OPTIONS = Object.keys(IDENTITY_SCENES) as MpWorkIdentity[]
 
 export default function RegisterPage() {
   const nav = useNavigate()
@@ -28,6 +35,13 @@ export default function RegisterPage() {
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [smsCooldown, setSmsCooldown] = useState(0)
+  const [sceneKey, setSceneKey] = useState(0)
+  const scene = IDENTITY_SCENES[workIdentity]
+
+  function pickIdentity(id: MpWorkIdentity) {
+    setWorkIdentity(id)
+    setSceneKey((n) => n + 1)
+  }
 
   async function onSendSms() {
     const p = normalizePhone(phone)
@@ -92,97 +106,67 @@ export default function RegisterPage() {
   }
 
   return (
-    <div
-      className={cn(
-        'relative flex min-h-[100dvh] flex-col items-center justify-center px-4 py-10 text-slate-900',
-        'bg-gradient-to-b from-violet-50 via-white to-fuchsia-50/40',
-      )}
-    >
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-xl backdrop-blur-xl space-y-4"
-      >
-        <h1 className="text-xl font-bold">注册</h1>
-        <p className="text-sm text-slate-500">手机号将作为登录账号。身份选定后不可更改，登录时自动进入对应版本。</p>
-        <div className="flex flex-wrap gap-2">
+    <div className="reg-page">
+      <form onSubmit={onSubmit} className="reg-card">
+        <div className={`reg-stage reg-stage--${workIdentity}`} key={sceneKey}>
+          <img className="reg-stage__img" src={`/register-identity/${scene.file}`} alt="" />
+          <div className="reg-stage__flash" />
+          <div className="reg-stage__bars" />
+        </div>
+        <p className="reg-stage__line" key={`line-${sceneKey}`}>{scene.line}</p>
+        <h1 className="reg-title">注册 · {scene.label}</h1>
+        <p className="reg-note">手机号就是登录账号。身份选定后不可更改，之后登录自动进入这一版。</p>
+        <div className="reg-picks">
           {IDENTITY_OPTIONS.map((id) => (
             <button
               key={id}
               type="button"
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-sm',
-                workIdentity === id
-                  ? 'border-violet-600 bg-violet-50 font-semibold text-violet-700'
-                  : 'border-slate-200 text-slate-700',
-              )}
-              onClick={() => setWorkIdentity(id)}
+              className={workIdentity === id ? 'reg-pick reg-pick--on' : 'reg-pick'}
+              onClick={() => pickIdentity(id)}
             >
-              {WORK_EDITION_LABEL[id]}
+              {IDENTITY_SCENES[id].label}
             </button>
           ))}
         </div>
 
-        <label className="block text-sm">
-          <span className="text-slate-600">手机号</span>
+        <label className="reg-field">
+          <span>手机号</span>
           <input
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
             placeholder="11 位大陆手机号"
           />
         </label>
 
-        <div className="flex gap-2">
+        <div className="reg-sms">
           <input
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
             value={smsCode}
             onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder="6 位验证码"
+            aria-label="验证码"
           />
-          <button
-            type="button"
-            className="shrink-0 rounded-lg border border-violet-200 px-3 py-2 text-sm text-violet-700"
-            disabled={smsCooldown > 0}
-            onClick={() => void onSendSms()}
-          >
+          <button type="button" disabled={smsCooldown > 0} onClick={() => void onSendSms()}>
             {smsCooldown > 0 ? `${smsCooldown}s` : '获取验证码'}
           </button>
         </div>
 
-        <label className="block text-sm">
-          <span className="text-slate-600">密码</span>
-          <input
-            type="password"
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+        <label className="reg-field">
+          <span>密码</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
-        <label className="block text-sm">
-          <span className="text-slate-600">确认密码</span>
-          <input
-            type="password"
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-          />
+        <label className="reg-field">
+          <span>确认密码</span>
+          <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </label>
 
-        {err ? <p className="text-sm text-red-600">{err}</p> : null}
+        {err ? <p className="reg-err">{err}</p> : null}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-violet-600 py-2.5 text-white font-semibold disabled:opacity-50"
-        >
+        <button type="submit" className="reg-submit" disabled={loading}>
           {loading ? '提交中…' : '注册并进入工作台'}
         </button>
 
-        <p className="text-center text-sm text-slate-500">
-          已有账号？{' '}
-          <Link to="/login" className="text-violet-600 underline">
-            去登录
-          </Link>
+        <p className="reg-login">
+          已有账号？ <Link to="/login">去登录</Link>
         </p>
       </form>
     </div>

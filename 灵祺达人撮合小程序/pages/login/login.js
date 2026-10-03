@@ -189,7 +189,15 @@ Page({
   data: {
     tab: 'wx',
     newIdentity: '',
-    identityOptions: identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id]),
+    stageMotion: '',
+    stageSrc: '',
+    stageLine: '',
+    identityOptions: [
+      { id: 'talent', label: '我是达人', line: '看带货等级，报名商单', file: 'reg-talent.jpg' },
+      { id: 'shoot', label: '我是拍摄', line: '接拍摄任务，去看课程', file: 'reg-shoot.jpg' },
+      { id: 'edit', label: '我是剪辑', line: '接剪辑任务，交成片', file: 'reg-edit.jpg' },
+      { id: 'pr', label: '我是PR', line: '发布招募，对接达人', file: 'reg-pr.jpg' },
+    ],
     loginIdentity: '',
     loginIdentityLabel: '',
     loginIdentityIcon: '',
@@ -508,7 +516,16 @@ Page({
   onPickNewIdentity(e) {
     const id = e.currentTarget.dataset.id
     if (!identityTypes.isWorkIdentity(id)) return
-    this.setData({ newIdentity: id, err: '' })
+    const scene = (this.data.identityOptions || []).find((item) => item.id === id)
+    if (!scene) return
+    this.setData({
+      newIdentity: id,
+      stageMotion: '',
+      stageSrc: `/images/register/${scene.file}`,
+      stageLine: scene.line,
+      err: '',
+    })
+    setTimeout(() => this.setData({ stageMotion: id }), 30)
   },
 
   onWxLogin() {

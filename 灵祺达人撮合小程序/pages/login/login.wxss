@@ -272,6 +272,95 @@
 .login-id-pick {
   margin: 0 8rpx 24rpx;
 }
+.reg-stage {
+  position: relative;
+  height: 240rpx;
+  margin-bottom: 16rpx;
+  border-radius: 24rpx;
+  overflow: hidden;
+  background: #f3ece2;
+}
+.reg-stage__img {
+  width: 100%;
+  height: 240rpx;
+  display: block;
+}
+.reg-stage__empty {
+  height: 240rpx;
+  display: flex;
+  align-items: flex-end;
+  padding: 24rpx;
+  color: #78716c;
+  font-size: 26rpx;
+}
+.reg-stage__line {
+  display: block;
+  margin: 0 4rpx 12rpx;
+  color: #44403c;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.reg-stage__flash,
+.reg-stage__bars {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  opacity: 0;
+}
+.reg-stage--talent .reg-stage__img {
+  animation: reg-rise 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.reg-stage--shoot .reg-stage__img {
+  animation: reg-shutter 680ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.reg-stage--shoot .reg-stage__flash {
+  background: #fff;
+  animation: reg-flash 680ms ease both;
+}
+.reg-stage--edit .reg-stage__img {
+  animation: reg-film 740ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.reg-stage--edit .reg-stage__bars {
+  border-top: 8rpx solid #1c1917;
+  border-bottom: 8rpx solid #1c1917;
+  animation: reg-bars 740ms ease both;
+}
+.reg-stage--pr .reg-stage__img {
+  animation: reg-deal 700ms cubic-bezier(0.16, 0.84, 0.24, 1) both;
+}
+.reg-stage__line {
+  animation: reg-line 700ms ease both;
+}
+@keyframes reg-rise {
+  from { transform: scale(1.14) translateY(16rpx); opacity: 0.35; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes reg-shutter {
+  from { opacity: 0.2; transform: scale(0.86); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes reg-flash {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+@keyframes reg-film {
+  from { transform: translateX(18%); opacity: 0.2; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes reg-bars {
+  from { opacity: 0.9; }
+  to { opacity: 0; }
+}
+@keyframes reg-deal {
+  from { transform: translateY(-12%); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes reg-line {
+  from { transform: translateY(10rpx); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
 .login-id-pick__hint {
   display: block;
   margin-bottom: 16rpx;
@@ -281,15 +370,22 @@
 .login-id-pick__row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12rpx;
 }
 .login-id-chip {
-  padding: 12rpx 22rpx;
-  border-radius: 999rpx;
+  width: 48%;
+  margin-right: 4%;
+  margin-bottom: 12rpx;
+  box-sizing: border-box;
+  padding: 18rpx 16rpx;
+  border-radius: 20rpx;
   border: 1rpx solid #efe8dc;
   background: #fffdf8;
-  font-size: 26rpx;
+  font-size: 28rpx;
   color: #1c1917;
+  text-align: center;
+}
+.login-id-chip:nth-child(2n) {
+  margin-right: 0;
 }
 .login-id-chip--on {
   border-color: #6d28d9;

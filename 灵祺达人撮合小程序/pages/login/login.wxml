@@ -27,7 +27,14 @@
     <view class="login-shell">
       <view class="login-main">
         <view class="login-id-pick" wx:if="{{tab==='wx' || tab==='reg'}}">
-          <text class="login-id-pick__hint">新用户请选择身份，选定后不可更改</text>
+          <view class="reg-stage {{stageMotion ? 'reg-stage--' + stageMotion : ''}}">
+            <image wx:if="{{stageSrc}}" class="reg-stage__img" src="{{stageSrc}}" mode="aspectFill" />
+            <view wx:else class="reg-stage__empty">点一个身份，看这一版</view>
+            <view class="reg-stage__flash"></view>
+            <view class="reg-stage__bars"></view>
+          </view>
+          <text wx:if="{{stageLine}}" class="reg-stage__line">{{stageLine}}</text>
+          <text class="login-id-pick__hint">选定后不可更改，登录自动进入这一版</text>
           <view class="login-id-pick__row">
             <view
               wx:for="{{identityOptions}}"
