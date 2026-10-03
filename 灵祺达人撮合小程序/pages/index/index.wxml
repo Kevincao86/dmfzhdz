@@ -110,13 +110,15 @@
         <text class="home-entry__title">发布招募</text>
         <text class="home-entry__sub">对接认证达人</text>
       </view>
-      <view wx:else class="home-entry__card" data-key="eval" bindtap="goHomeEntry">
-        <text class="home-entry__title">达人账号分析</text>
-        <text class="home-entry__sub">看带货等级</text>
+      <view wx:else class="home-entry__card home-entry__card--img" data-key="eval" bindtap="goHomeEntry">
+        <image class="home-entry__img" src="{{entryEvalUrl}}" mode="aspectFill" />
       </view>
-      <view class="home-entry__card" data-key="apps" bindtap="goHomeEntry">
-        <text class="home-entry__title">{{workIdentity === 'pr' ? '我的发单' : '我的报名'}}</text>
-        <text class="home-entry__sub">{{workIdentity === 'pr' ? '已发布的招募' : '进行中的商单'}}</text>
+      <view wx:if="{{workIdentity === 'pr'}}" class="home-entry__card" data-key="apps" bindtap="goHomeEntry">
+        <text class="home-entry__title">我的发单</text>
+        <text class="home-entry__sub">已发布的招募</text>
+      </view>
+      <view wx:else class="home-entry__card home-entry__card--img" data-key="apps" bindtap="goHomeEntry">
+        <image class="home-entry__img" src="{{entryApplyUrl}}" mode="aspectFill" />
       </view>
     </view>
 

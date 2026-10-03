@@ -35,6 +35,12 @@ const HOME_CATEGORY_CHIPS = [
 
 const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const homeBannerAssets = require('../../utils/homeBannerAssets.js')
+const recruitCoverOssBase = require('../../utils/recruitCoverOssBase.js')
+
+function homeEntryUrl(name) {
+  const base = String(recruitCoverOssBase || '').replace(/\/$/, '')
+  return `${base}/home/${name}?v=20261003a`
+}
 
 const HOME_BANNER_PR = {
   bannerTitle: '灵祺星选 PR 工作台',
@@ -192,6 +198,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     kpiRecruitIcon: homeBannerAssets.kpiRecruit,
     kpiUrgentIcon: homeBannerAssets.kpiUrgent,
     kpiTodayIcon: homeBannerAssets.kpiToday,
+    entryEvalUrl: homeEntryUrl('entry-eval.jpg'),
+    entryApplyUrl: homeEntryUrl('entry-apply.jpg'),
     trainAds: [],
     ...HOME_BANNER_TALENT,
   },
