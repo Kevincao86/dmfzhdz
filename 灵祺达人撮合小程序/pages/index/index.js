@@ -39,7 +39,36 @@ const recruitCoverOssBase = require('../../utils/recruitCoverOssBase.js')
 
 function homeEntryUrl(name) {
   const base = String(recruitCoverOssBase || '').replace(/\/$/, '')
-  return `${base}/home/${name}?v=20261003b`
+  return `${base}/home/${name}?v=20261003c`
+}
+
+function homeEntriesForIdentity(identity) {
+  const posterTalent = homeBannerAssets.posterDefault
+  if (identity === 'pr') {
+    return {
+      entryLeftKey: 'publish',
+      entryLeftUrl: homeEntryUrl('entry-publish.jpg'),
+      entryRightKey: 'apps',
+      entryRightUrl: homeEntryUrl('entry-orders.jpg'),
+      posterPresetUrl: homeEntryUrl('poster-pr.jpg'),
+    }
+  }
+  if (identity === 'shoot' || identity === 'edit') {
+    return {
+      entryLeftKey: 'course',
+      entryLeftUrl: homeEntryUrl('entry-course.jpg'),
+      entryRightKey: 'apps',
+      entryRightUrl: homeEntryUrl('entry-apply.jpg'),
+      posterPresetUrl: posterTalent,
+    }
+  }
+  return {
+    entryLeftKey: 'eval',
+    entryLeftUrl: homeEntryUrl('entry-eval.jpg'),
+    entryRightKey: 'apps',
+    entryRightUrl: homeEntryUrl('entry-apply.jpg'),
+    posterPresetUrl: posterTalent,
+  }
 }
 
 const HOME_BANNER_PR = {
@@ -194,12 +223,10 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     homeSlides: [],
     homeGreeting: '下午好，达人',
     homePosterInterval: 4000,
-    posterPresetUrl: homeBannerAssets.posterDefault,
+    ...homeEntriesForIdentity('talent'),
     kpiRecruitIcon: homeBannerAssets.kpiRecruit,
     kpiUrgentIcon: homeBannerAssets.kpiUrgent,
     kpiTodayIcon: homeBannerAssets.kpiToday,
-    entryEvalUrl: homeEntryUrl('entry-eval.jpg'),
-    entryApplyUrl: homeEntryUrl('entry-apply.jpg'),
     trainAds: [],
     ...HOME_BANNER_TALENT,
   },
@@ -261,6 +288,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       homeGreeting: buildHomeGreeting(),
       ...tabVis,
       ...homeBannerForIdentity(identity),
+      ...homeEntriesForIdentity(identity),
     }
     if (!tabVis.showPaichianTab && this.data.hallTab === 'paichian') patch.hallTab = 'normal'
     if (identityChanged) {
@@ -377,6 +405,10 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     mpPlatformDecor.openDecorLink(item)
   },
   onFallbackPosterTap() {
+    if ((this.data.workIdentity || userProfile.readIdentity()) === 'pr') {
+      wx.switchTab({ url: '/pages/publish/publish' })
+      return
+    }
     this.applyHallTab('normal')
   },
   goHomeEntry(e) {
@@ -387,6 +419,15 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     }
     if (key === 'eval') {
       wx.navigateTo({ url: '/pages/subpack-mine/mine-local-life-eval/mine-local-life-eval' })
+      return
+    }
+    if (key === 'course') {
+      const courseUrl = '/pages/subpack-mine/mine-training/mine-training'
+      if (!auth.isLoggedIn()) {
+        require('../../utils/mpGuestRoutes.js').redirectToLogin(courseUrl)
+        return
+      }
+      wx.navigateTo({ url: courseUrl })
       return
     }
     const identity = this.data.workIdentity || userProfile.readIdentity()

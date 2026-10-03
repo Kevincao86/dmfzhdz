@@ -101,24 +101,11 @@
 
     <text class="home-feed-title">常用入口</text>
     <view class="home-entry">
-      <view
-        wx:if="{{workIdentity === 'pr'}}"
-        class="home-entry__card"
-        data-key="publish"
-        bindtap="goHomeEntry"
-      >
-        <text class="home-entry__title">发布招募</text>
-        <text class="home-entry__sub">对接认证达人</text>
+      <view class="home-entry__card home-entry__card--img" data-key="{{entryLeftKey}}" bindtap="goHomeEntry">
+        <image class="home-entry__img" src="{{entryLeftUrl}}" mode="aspectFill" />
       </view>
-      <view wx:else class="home-entry__card home-entry__card--img" data-key="eval" bindtap="goHomeEntry">
-        <image class="home-entry__img" src="{{entryEvalUrl}}" mode="aspectFill" />
-      </view>
-      <view wx:if="{{workIdentity === 'pr'}}" class="home-entry__card" data-key="apps" bindtap="goHomeEntry">
-        <text class="home-entry__title">我的发单</text>
-        <text class="home-entry__sub">已发布的招募</text>
-      </view>
-      <view wx:else class="home-entry__card home-entry__card--img" data-key="apps" bindtap="goHomeEntry">
-        <image class="home-entry__img" src="{{entryApplyUrl}}" mode="aspectFill" />
+      <view class="home-entry__card home-entry__card--img" data-key="{{entryRightKey}}" bindtap="goHomeEntry">
+        <image class="home-entry__img" src="{{entryRightUrl}}" mode="aspectFill" />
       </view>
     </view>
 
