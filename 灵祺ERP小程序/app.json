@@ -3,59 +3,9 @@
     "pages/login/login",
     "pages/functions/functions",
     "pages/dashboard/dashboard",
-    "pages/biz-overview/biz-overview",
     "pages/shop-eval/shop-eval",
     "pages/ai-agent/ai-agent",
-    "pages/mine/mine",
-    "pages/usage-guide/usage-guide",
-    "pages/legal/legal",
-    "pages/home/home",
-    "pages/module-detail/module-detail",
-    "pages/wallet/wallet",
-    "pages/recruitment/recruitment",
-    "pages/recruit-hub/recruit-hub",
-    "pages/recruit-publish-pick/recruit-publish-pick",
-    "pages/recruit-novice/recruit-novice",
-    "pages/recruit-pro/recruit-pro",
-    "pages/recruit-flow/recruit-flow",
-    "pages/recruit-talent-pool/recruit-talent-pool",
-    "pages/recruit-schedule/recruit-schedule",
-    "pages/recruit-video-review/recruit-video-review",
-    "pages/recruit-payment/recruit-payment",
-    "pages/product-list/product-list",
-    "pages/reviews-list/reviews-list",
-    "pages/product-voice/product-voice",
-    "pages/product-edit/product-edit",
-    "pages/shortvideo-voice/shortvideo-voice",
-    "pages/shortvideo-edit/shortvideo-edit",
-    "pages/recruit-voice/recruit-voice",
-    "pages/recruit-edit/recruit-edit",
-    "pages/product-create/product-create",
-    "pages/store-list/store-list",
-    "pages/store-analysis/store-analysis",
-    "pages/activity-center/activity-center",
-    "pages/finance-reconcile/finance-reconcile",
-    "pages/finance-tax/finance-tax",
-    "pages/ads-manage/ads-manage",
-    "pages/leads-center/leads-center",
-    "pages/geo-assist/geo-assist",
-    "pages/store-menu/store-menu",
-    "pages/competitors/competitors",
-    "pages/site-selection/site-selection",
-    "pages/knowledge-base/knowledge-base",
-    "pages/ai-ops-plan/ai-ops-plan",
-    "pages/ai-visual-studio/ai-visual-studio",
-    "pages/ai-content/ai-content",
-    "pages/shortvideo-ai/shortvideo-ai",
-    "pages/digital-human/digital-human",
-    "pages/short-drama/short-drama",
-    "pages/recruit-brief-wizard/recruit-brief-wizard",
-    "pages/recruit-brief-records/recruit-brief-records",
-    "pages/settings/settings",
-    "pages/notifications/notifications",
-    "pages/subscription/subscription",
-    "pages/support-chat/support-chat",
-    "pages/profile-edit/profile-edit"
+    "pages/mine/mine"
   ],
   "window": {
     "navigationBarTitleText": "灵祺商家",
@@ -105,9 +55,363 @@
       "desc": "用于选择门店位置"
     }
   },
-  "requiredPrivateInfos": ["chooseLocation"],
+  "requiredPrivateInfos": [
+    "chooseLocation"
+  ],
   "usingComponents": {
     "site-icp-footer": "/components/site-icp-footer/index"
   },
-  "lazyCodeLoading": "requiredComponents"
+  "lazyCodeLoading": "requiredComponents",
+  "subpackages": [
+    {
+      "root": "pages/biz-overview",
+      "name": "biz-overview",
+      "pages": [
+        "biz-overview"
+      ]
+    },
+    {
+      "root": "pages/usage-guide",
+      "name": "usage-guide",
+      "pages": [
+        "usage-guide"
+      ]
+    },
+    {
+      "root": "pages/legal",
+      "name": "legal",
+      "pages": [
+        "legal"
+      ]
+    },
+    {
+      "root": "pages/home",
+      "name": "home",
+      "pages": [
+        "home"
+      ]
+    },
+    {
+      "root": "pages/module-detail",
+      "name": "module-detail",
+      "pages": [
+        "module-detail"
+      ]
+    },
+    {
+      "root": "pages/wallet",
+      "name": "wallet",
+      "pages": [
+        "wallet"
+      ]
+    },
+    {
+      "root": "pages/recruitment",
+      "name": "recruitment",
+      "pages": [
+        "recruitment"
+      ]
+    },
+    {
+      "root": "pages/recruit-hub",
+      "name": "recruit-hub",
+      "pages": [
+        "recruit-hub"
+      ]
+    },
+    {
+      "root": "pages/recruit-publish-pick",
+      "name": "recruit-publish-pick",
+      "pages": [
+        "recruit-publish-pick"
+      ]
+    },
+    {
+      "root": "pages/recruit-novice",
+      "name": "recruit-novice",
+      "pages": [
+        "recruit-novice"
+      ]
+    },
+    {
+      "root": "pages/recruit-pro",
+      "name": "recruit-pro",
+      "pages": [
+        "recruit-pro"
+      ]
+    },
+    {
+      "root": "pages/recruit-flow",
+      "name": "recruit-flow",
+      "pages": [
+        "recruit-flow"
+      ]
+    },
+    {
+      "root": "pages/recruit-talent-pool",
+      "name": "recruit-talent-pool",
+      "pages": [
+        "recruit-talent-pool"
+      ]
+    },
+    {
+      "root": "pages/recruit-schedule",
+      "name": "recruit-schedule",
+      "pages": [
+        "recruit-schedule"
+      ]
+    },
+    {
+      "root": "pages/recruit-video-review",
+      "name": "recruit-video-review",
+      "pages": [
+        "recruit-video-review"
+      ]
+    },
+    {
+      "root": "pages/recruit-payment",
+      "name": "recruit-payment",
+      "pages": [
+        "recruit-payment"
+      ]
+    },
+    {
+      "root": "pages/product-list",
+      "name": "product-list",
+      "pages": [
+        "product-list"
+      ]
+    },
+    {
+      "root": "pages/reviews-list",
+      "name": "reviews-list",
+      "pages": [
+        "reviews-list"
+      ]
+    },
+    {
+      "root": "pages/product-voice",
+      "name": "product-voice",
+      "pages": [
+        "product-voice"
+      ]
+    },
+    {
+      "root": "pages/product-edit",
+      "name": "product-edit",
+      "pages": [
+        "product-edit"
+      ]
+    },
+    {
+      "root": "pages/shortvideo-voice",
+      "name": "shortvideo-voice",
+      "pages": [
+        "shortvideo-voice"
+      ]
+    },
+    {
+      "root": "pages/shortvideo-edit",
+      "name": "shortvideo-edit",
+      "pages": [
+        "shortvideo-edit"
+      ]
+    },
+    {
+      "root": "pages/recruit-voice",
+      "name": "recruit-voice",
+      "pages": [
+        "recruit-voice"
+      ]
+    },
+    {
+      "root": "pages/recruit-edit",
+      "name": "recruit-edit",
+      "pages": [
+        "recruit-edit"
+      ]
+    },
+    {
+      "root": "pages/product-create",
+      "name": "product-create",
+      "pages": [
+        "product-create"
+      ]
+    },
+    {
+      "root": "pages/store-list",
+      "name": "store-list",
+      "pages": [
+        "store-list"
+      ]
+    },
+    {
+      "root": "pages/store-analysis",
+      "name": "store-analysis",
+      "pages": [
+        "store-analysis"
+      ]
+    },
+    {
+      "root": "pages/activity-center",
+      "name": "activity-center",
+      "pages": [
+        "activity-center"
+      ]
+    },
+    {
+      "root": "pages/finance-reconcile",
+      "name": "finance-reconcile",
+      "pages": [
+        "finance-reconcile"
+      ]
+    },
+    {
+      "root": "pages/finance-tax",
+      "name": "finance-tax",
+      "pages": [
+        "finance-tax"
+      ]
+    },
+    {
+      "root": "pages/ads-manage",
+      "name": "ads-manage",
+      "pages": [
+        "ads-manage"
+      ]
+    },
+    {
+      "root": "pages/leads-center",
+      "name": "leads-center",
+      "pages": [
+        "leads-center"
+      ]
+    },
+    {
+      "root": "pages/geo-assist",
+      "name": "geo-assist",
+      "pages": [
+        "geo-assist"
+      ]
+    },
+    {
+      "root": "pages/store-menu",
+      "name": "store-menu",
+      "pages": [
+        "store-menu"
+      ]
+    },
+    {
+      "root": "pages/competitors",
+      "name": "competitors",
+      "pages": [
+        "competitors"
+      ]
+    },
+    {
+      "root": "pages/site-selection",
+      "name": "site-selection",
+      "pages": [
+        "site-selection"
+      ]
+    },
+    {
+      "root": "pages/knowledge-base",
+      "name": "knowledge-base",
+      "pages": [
+        "knowledge-base"
+      ]
+    },
+    {
+      "root": "pages/ai-ops-plan",
+      "name": "ai-ops-plan",
+      "pages": [
+        "ai-ops-plan"
+      ]
+    },
+    {
+      "root": "pages/ai-visual-studio",
+      "name": "ai-visual-studio",
+      "pages": [
+        "ai-visual-studio"
+      ]
+    },
+    {
+      "root": "pages/ai-content",
+      "name": "ai-content",
+      "pages": [
+        "ai-content"
+      ]
+    },
+    {
+      "root": "pages/shortvideo-ai",
+      "name": "shortvideo-ai",
+      "pages": [
+        "shortvideo-ai"
+      ]
+    },
+    {
+      "root": "pages/digital-human",
+      "name": "digital-human",
+      "pages": [
+        "digital-human"
+      ]
+    },
+    {
+      "root": "pages/short-drama",
+      "name": "short-drama",
+      "pages": [
+        "short-drama"
+      ]
+    },
+    {
+      "root": "pages/recruit-brief-wizard",
+      "name": "recruit-brief-wizard",
+      "pages": [
+        "recruit-brief-wizard"
+      ]
+    },
+    {
+      "root": "pages/recruit-brief-records",
+      "name": "recruit-brief-records",
+      "pages": [
+        "recruit-brief-records"
+      ]
+    },
+    {
+      "root": "pages/settings",
+      "name": "settings",
+      "pages": [
+        "settings"
+      ]
+    },
+    {
+      "root": "pages/notifications",
+      "name": "notifications",
+      "pages": [
+        "notifications"
+      ]
+    },
+    {
+      "root": "pages/subscription",
+      "name": "subscription",
+      "pages": [
+        "subscription"
+      ]
+    },
+    {
+      "root": "pages/support-chat",
+      "name": "support-chat",
+      "pages": [
+        "support-chat"
+      ]
+    },
+    {
+      "root": "pages/profile-edit",
+      "name": "profile-edit",
+      "pages": [
+        "profile-edit"
+      ]
+    }
+  ]
 }

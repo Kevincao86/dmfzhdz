@@ -2,7 +2,7 @@
 
 const SHARE_TITLE = '灵祺经营管理助手'
 const SHARE_PATH = '/pages/functions/functions'
-const SHARE_IMAGE = '/images/share-cover.png'
+const SHARE_IMAGE = '/images/share-cover.jpg'
 
 function sharePayload() {
   return {
