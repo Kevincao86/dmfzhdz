@@ -28,7 +28,7 @@
       <view class="login-main">
         <view class="login-id-pick" wx:if="{{tab==='wx' || tab==='reg'}}">
           <view class="reg-stage {{stageMotion ? 'reg-stage--' + stageMotion : ''}}">
-            <image wx:if="{{stageSrc}}" class="reg-stage__img" src="{{stageSrc}}" mode="aspectFill" />
+            <image wx:if="{{stageSrc}}" class="reg-stage__img" src="{{stageSrc}}" mode="aspectFit" />
             <view wx:else class="reg-stage__empty">点一个身份，看这一版</view>
             <view class="reg-stage__flash"></view>
             <view class="reg-stage__bars"></view>
