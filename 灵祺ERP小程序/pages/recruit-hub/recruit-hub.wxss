@@ -1,1 +1,8 @@
-/* 见 styles/mockup-base.wxss + app.wxss */
+.hub-grid {
+  margin-top: 8rpx;
+}
+.hub-mark {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2f6fed;
+}

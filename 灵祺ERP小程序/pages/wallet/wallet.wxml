@@ -73,7 +73,7 @@
         >{{item.label}}</view>
       </view>
       <label class="wallet-custom-row">
-        <switch checked="{{useCustom}}" bindchange="onToggleCustom" color="#1e3a5f" />
+        <switch checked="{{useCustom}}" bindchange="onToggleCustom" color="#2f6fed" />
         <text>自定义金额</text>
       </label>
       <input wx:if="{{useCustom}}" class="wallet-custom-input" type="digit" placeholder="输入充值金额（元）" value="{{customYuan}}" bindinput="onCustomYuan" />

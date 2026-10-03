@@ -49,7 +49,7 @@
 
 .focus-btn--on {
   color: #fff;
-  background: #1e3a5f;
+  background: #2f6fed;
 }
 
 .focus-hint {
@@ -109,7 +109,7 @@
 
 .chooser-btn--main {
   color: #fff;
-  background: #1e3a5f;
+  background: #2f6fed;
 }
 
 .chooser-cancel {
@@ -155,7 +155,7 @@
   min-height: 100vh;
   padding: 16rpx 24rpx calc(24rpx + var(--tab-bar-pad));
   box-sizing: border-box;
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 
 .plats {
@@ -198,8 +198,8 @@
 }
 
 .plat--on {
-  background: #1e3a5f;
-  border-color: #1e3a5f;
+  background: #2f6fed;
+  border-color: #2f6fed;
 }
 
 .plat--on .plat-name {
@@ -347,7 +347,7 @@
   height: 88rpx;
   border-radius: 50%;
   margin-bottom: 16rpx;
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
   font-size: 36rpx;
   font-weight: 800;
@@ -484,7 +484,7 @@
   font-size: 24rpx;
   font-weight: 700;
   color: #fff;
-  background: #1e3a5f;
+  background: #2f6fed;
 }
 
 .btn-sub {
@@ -566,7 +566,7 @@
 }
 
 .advice--plan {
-  background: #e8edf2;
+  background: #f4f8fc;
   box-shadow: inset 0 0 0 2rpx #fb923c;
 }
 

@@ -3,12 +3,12 @@
  * 各页可直接使用 .erp-* 类；app.wxss 已全局引入。
  */
 page {
-  --erp-accent: #1e3a5f;
-  --erp-accent-strong: #1e3a5f;
-  --erp-accent-soft: rgba(30, 58, 95, 0.12);
-  --erp-accent-grad: linear-gradient(135deg, #1e3a5f 0%, #1e3a5f 100%);
-  --erp-bg: #e8edf2;
-  --erp-bg-grad: #e8edf2;
+  --erp-accent: #2f6fed;
+  --erp-accent-strong: #1d4ed8;
+  --erp-accent-soft: rgba(47, 111, 237, 0.12);
+  --erp-accent-grad: linear-gradient(180deg, #2f6fed 0%, #6aa4ff 100%);
+  --erp-bg: #f4f8fc;
+  --erp-bg-grad: #f4f8fc;
   --erp-surface: #ffffff;
   --erp-text: #1e3a5f;
   --erp-text-secondary: #3d5270;
@@ -104,7 +104,7 @@ page {
 
 .erp-btn-primary {
   margin-top: 16rpx;
-  background: #1e3a5f !important;
+  background: #2f6fed !important;
   color: #fff !important;
   border-radius: 999rpx !important;
   font-size: 28rpx !important;

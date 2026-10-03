@@ -3,7 +3,7 @@
   padding: 28rpx;
   padding-bottom: 48rpx;
   box-sizing: border-box;
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 
 .edit-head {

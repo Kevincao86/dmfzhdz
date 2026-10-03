@@ -1,5 +1,7 @@
 {
-  "navigationBarTitleText": "功能",
+  "navigationStyle": "custom",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#2f6fed",
   "usingComponents": {},
   "enableShareAppMessage": true,
   "enableShareTimeline": true

@@ -4,7 +4,7 @@
   right: 0;
   top: 0;
   bottom: var(--tab-bar-pad);
-  background: #e8edf2;
+  background: #f4f8fc;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -61,7 +61,7 @@
   min-height: 64rpx;
   padding: 0 28rpx;
   border-radius: 999rpx;
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
   font-size: 24rpx;
   font-weight: 600;
@@ -71,7 +71,7 @@
 }
 
 .agent-chip.ghost {
-  background: #e8edf2;
+  background: #f4f8fc;
   color: #4338ca;
 }
 
@@ -172,7 +172,7 @@
   width: 56rpx;
   height: 56rpx;
   border-radius: 50%;
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
   font-size: 22rpx;
   display: flex;
@@ -189,7 +189,7 @@
 }
 
 .bubble-user {
-  background: #1e3a5f;
+  background: #2f6fed;
   border-color: transparent;
 }
 
@@ -271,7 +271,7 @@
 
 .plat-chip.on {
   border-color: #d5dde6;
-  background: #e8edf2;
+  background: #f4f8fc;
   color: #3730a3;
 }
 
@@ -380,7 +380,7 @@
 .mini-btn {
   padding: 10rpx 18rpx;
   border-radius: 8rpx;
-  background: #e8edf2;
+  background: #f4f8fc;
   color: #3730a3;
   font-size: 22rpx;
 }
@@ -403,7 +403,7 @@
 }
 
 .step-seg.on {
-  background: #1e3a5f;
+  background: #2f6fed;
 }
 
 .shoot-box {
@@ -432,7 +432,7 @@
 }
 
 .btn-primary {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 

@@ -146,7 +146,7 @@
 
       <view class="sv-longform-box">
         <label class="sv-check-row">
-          <switch checked="{{longformEnabled}}" disabled="{{busy}}" bindchange="onLongformChange" color="#1e3a5f" />
+          <switch checked="{{longformEnabled}}" disabled="{{busy}}" bindchange="onLongformChange" color="#2f6fed" />
           <view class="sv-check-text">
             <text class="sv-check-title">长片合成（分镜串行 + 尾帧衔接 + 拼接）</text>
             <text class="sv-check-sub">勾选后按分镜表逐段出片，并拼接为一条成片。</text>
@@ -414,7 +414,7 @@
 
     <view class="sv-ice-sec">
       <label class="sv-check-row pad">
-        <switch checked="{{batchGenerateEnabled}}" disabled="{{iceBusy}}" bindchange="onBatchEnable" color="#1e3a5f" />
+        <switch checked="{{batchGenerateEnabled}}" disabled="{{iceBusy}}" bindchange="onBatchEnable" color="#2f6fed" />
         <view class="sv-check-text">
           <text class="sv-check-title">启用批量生成</text>
           <text class="sv-check-sub">勾选后按所选条数依次提交。</text>

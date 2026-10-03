@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 28rpx 28rpx 80rpx;
   box-sizing: border-box;
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 .legal-head {
   margin-bottom: 28rpx;

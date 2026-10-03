@@ -55,7 +55,7 @@
       <view class="card hero">
         <view class="ring-stage">
           <view class="ring-scan" wx:if="{{evaluating}}"></view>
-          <view class="ring {{scorePop ? 'ring--pop' : ''}} {{evaluating ? 'ring--wait' : ''}}" style="background: conic-gradient(from -90deg, #1e3a5f 0%, #1e3a5f {{displayScore}}%, #eef2f6 {{displayScore}}%);">
+          <view class="ring {{scorePop ? 'ring--pop' : ''}} {{evaluating ? 'ring--wait' : ''}}" style="background: conic-gradient(from -90deg, #2f6fed 0%, #2f6fed {{displayScore}}%, #eef2f6 {{displayScore}}%);">
             <view class="ring-hole">
               <text class="score {{scorePop ? 'score--pop' : ''}} {{evaluating ? 'score--wait' : ''}}">{{displayScore}}</text>
             </view>

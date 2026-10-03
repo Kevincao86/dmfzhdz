@@ -1,6 +1,6 @@
 .fin-page {
   min-height: 100vh;
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 
 .fin-hero {

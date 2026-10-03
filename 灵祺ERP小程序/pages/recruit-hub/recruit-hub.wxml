@@ -9,22 +9,14 @@
     </view>
   </view>
 
-  <navigator url="/pages/recruit-flow/recruit-flow" class="lq-nav-card" hover-class="none">
-    <view class="lq-nav-ico">①</view>
-    <view class="lq-nav-main">
-      <text class="lq-nav-title">五步流程 · 达人招募</text>
-      <text class="lq-nav-desc">从发单到结算的标准 SOP</text>
-    </view>
-    <text class="tag">5 步</text>
-    <text class="chev">›</text>
-  </navigator>
-
-  <navigator url="/pages/recruitment/recruitment" class="lq-nav-card" hover-class="none">
-    <view class="lq-nav-ico teal">◎</view>
-    <view class="lq-nav-main">
-      <text class="lq-nav-title">查看达人订单</text>
-      <text class="lq-nav-desc">报名、排期、成片与结算状态</text>
-    </view>
-    <text class="chev">›</text>
-  </navigator>
+  <view class="func-grid hub-grid">
+    <navigator url="/pages/recruit-flow/recruit-flow" class="func-cell" hover-class="none">
+      <view class="func-well"><text class="hub-mark">①</text></view>
+      <text class="func-label">五步流程</text>
+    </navigator>
+    <navigator url="/pages/recruitment/recruitment" class="func-cell" hover-class="none">
+      <view class="func-well"><text class="hub-mark">◎</text></view>
+      <text class="func-label">查看达人订单</text>
+    </navigator>
+  </view>
 </scroll-view>

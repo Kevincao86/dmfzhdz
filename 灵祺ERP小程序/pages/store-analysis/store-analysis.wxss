@@ -1,6 +1,6 @@
 .sa-page {
   min-height: 100vh;
-  background: #e8edf2;
+  background: #f4f8fc;
   padding-bottom: 48rpx;
   box-sizing: border-box;
 }
@@ -72,7 +72,7 @@
 }
 
 .sa-btn.primary {
-  background: #1e3a5f !important;
+  background: #2f6fed !important;
   color: #fff !important;
 }
 
@@ -188,7 +188,7 @@
 }
 
 .sa-bar-fill.sales {
-  background: linear-gradient(90deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(90deg, #2f6fed, #2f6fed);
 }
 
 .sa-bar-fill.refund {

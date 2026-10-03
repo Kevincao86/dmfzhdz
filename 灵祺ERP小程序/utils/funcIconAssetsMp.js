@@ -1,5 +1,5 @@
 /** 功能页图标 — 统一深蓝线稿 */
-const NAVY = '#1e3a5f'
+const NAVY = '#2f6fed'
 
 const TONE_COLORS = {
   cyan: NAVY,

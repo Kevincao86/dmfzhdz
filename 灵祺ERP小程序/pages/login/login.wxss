@@ -2,7 +2,7 @@
   box-sizing: border-box;
   min-height: 100vh;
   padding: 12rpx 40rpx calc(40rpx + env(safe-area-inset-bottom));
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 
 .welcome-head {
@@ -63,7 +63,7 @@
 
 .welcome-tile--on {
   background: rgba(255, 255, 255, 0.92);
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   box-shadow: 0 12rpx 36rpx rgba(30, 58, 95, 0.14);
 }
 
@@ -339,8 +339,8 @@
 }
 
 .login-legal-check--on {
-  background: #1e3a5f;
-  border-color: #1e3a5f;
+  background: #2f6fed;
+  border-color: #2f6fed;
 }
 
 .login-legal-txt,
@@ -422,6 +422,6 @@
 }
 
 .login-legal-modal-btn--agree {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }

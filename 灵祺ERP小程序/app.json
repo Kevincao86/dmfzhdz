@@ -58,17 +58,17 @@
   ],
   "window": {
     "navigationBarTitleText": "灵祺商家",
-    "navigationBarBackgroundColor": "#e8edf2",
-    "navigationBarTextStyle": "black",
-    "backgroundColor": "#e8edf2",
-    "backgroundColorTop": "#e8edf2",
-    "backgroundColorBottom": "#e8edf2",
+    "navigationBarBackgroundColor": "#2f6fed",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f4f8fc",
+    "backgroundColorTop": "#2f6fed",
+    "backgroundColorBottom": "#f4f8fc",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "custom": true,
     "color": "#94a3b8",
-    "selectedColor": "#1e3a5f",
+    "selectedColor": "#2f6fed",
     "backgroundColor": "#ffffff",
     "list": [
       {

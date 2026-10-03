@@ -2,7 +2,7 @@
   height: 100vh;
   box-sizing: border-box;
   padding: 20rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 
 .pro-back {
@@ -73,7 +73,7 @@
 }
 
 .pro-mode.on {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   background: #eff6ff;
 }
 
@@ -128,7 +128,7 @@
 }
 
 .pro-chip.on {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   color: #1d4ed8;
   background: #eff6ff;
 }
@@ -157,7 +157,7 @@
 }
 
 .pro-chip-inline.on {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   background: #eff6ff;
   color: #1d4ed8;
 }
@@ -239,7 +239,7 @@
 .pro-submit {
   margin-top: 36rpx;
   border-radius: 16rpx;
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(95deg, #2f6fed, #2f6fed);
   color: #fff;
   font-weight: 700;
   font-size: 30rpx;
@@ -292,7 +292,7 @@
 .pro-modal-ok {
   margin-top: 20rpx;
   border-radius: 14rpx;
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
   font-weight: 600;
 }

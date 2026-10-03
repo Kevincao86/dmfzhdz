@@ -2,7 +2,7 @@
   min-height: 100vh;
   padding: 28rpx;
   box-sizing: border-box;
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 .pe-card {
   background: #fff;
@@ -126,7 +126,7 @@
   border: none;
 }
 .btn-v2.primary {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 .pe-sec {
@@ -195,7 +195,7 @@
   color: #3d5270;
 }
 .bind-ico.dark {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 .bind-st {

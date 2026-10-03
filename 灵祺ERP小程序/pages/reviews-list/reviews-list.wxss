@@ -1,6 +1,6 @@
 .rev-page {
   min-height: 100vh;
-  background: #e8edf2;
+  background: #f4f8fc;
   display: flex;
   flex-direction: column;
 }
@@ -19,7 +19,7 @@
   gap: 10rpx;
   padding: 14rpx 18rpx;
   border-radius: 999rpx;
-  background: #e8edf2;
+  background: #f4f8fc;
   border: 1rpx solid #e2e8f0;
 }
 
@@ -39,7 +39,7 @@
   gap: 6rpx;
   padding: 14rpx 20rpx;
   border-radius: 999rpx;
-  background: #e8edf2;
+  background: #f4f8fc;
   border: 1rpx solid #e2e8f0;
   font-size: 24rpx;
   color: #475569;
@@ -116,7 +116,7 @@
   padding: 18rpx 20rpx;
   border-radius: 20rpx;
   border: 1rpx solid #e0e7ff;
-  background: linear-gradient(180deg, #e8edf2 0%, #fff 100%);
+  background: linear-gradient(180deg, #f4f8fc 0%, #fff 100%);
 }
 
 .rev-ai-toggle-txt {
@@ -143,7 +143,7 @@
   margin: 0 24rpx 8rpx;
   padding: 16rpx 20rpx;
   border-radius: 16rpx;
-  background: #e8edf2;
+  background: #f4f8fc;
   border: 1rpx solid #d5dde6;
   font-size: 22rpx;
   color: #1e3a5f;
@@ -152,7 +152,7 @@
 .rev-ai-btn {
   margin: 0 !important;
   border-radius: 999rpx !important;
-  background: #e8edf2 !important;
+  background: #f4f8fc !important;
   color: #1e3a5f !important;
   border: 1rpx solid #d5dde6 !important;
 }
@@ -202,7 +202,7 @@
   right: 0;
   bottom: 0;
   height: 4rpx;
-  background: #1e3a5f;
+  background: #2f6fed;
 }
 
 .rev-tab-logo {
@@ -444,7 +444,7 @@
 .rev-btn-primary {
   margin: 0 !important;
   border-radius: 999rpx !important;
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f) !important;
+  background: linear-gradient(95deg, #2f6fed, #2f6fed) !important;
   color: #fff !important;
 }
 

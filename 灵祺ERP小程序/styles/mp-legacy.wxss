@@ -1,7 +1,7 @@
 /* 功能子页通用列表（来自灵祺小程序 app.wxss） */
 .mp-page {
   min-height: 100vh;
-  background: #e8edf2;
+  background: #f4f8fc;
   display: flex;
   flex-direction: column;
 }
@@ -24,7 +24,7 @@
 
 .mp-tab.active {
   color: #fff;
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(95deg, #2f6fed, #2f6fed);
   border-color: transparent;
 }
 
@@ -129,7 +129,7 @@
 }
 
 .meoo-btn-primary {
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f 45%, #14b8a6);
+  background: linear-gradient(95deg, #2f6fed, #2f6fed 45%, #14b8a6);
   color: #fff;
   border-radius: 16rpx;
   height: 88rpx;
@@ -187,7 +187,7 @@
   padding-bottom: 48rpx;
   box-sizing: border-box;
   min-height: 100vh;
-  background: linear-gradient(180deg, #e8edf2 0%, #e8edf2 35%);
+  background: linear-gradient(180deg, #f4f8fc 0%, #f4f8fc 35%);
 }
 
 .voice-hero-title {

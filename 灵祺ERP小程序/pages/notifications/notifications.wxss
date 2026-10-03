@@ -1,6 +1,6 @@
 .notify-page {
   min-height: 100vh;
-  background: #e8edf2;
+  background: #f4f8fc;
   padding: 16rpx 24rpx;
   box-sizing: border-box;
 }

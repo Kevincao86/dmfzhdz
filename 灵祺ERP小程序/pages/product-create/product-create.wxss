@@ -1,6 +1,6 @@
 .wizard-scroll {
   height: 100vh;
-  background: #e8edf2;
+  background: #f4f8fc;
   box-sizing: border-box;
 }
 
@@ -23,7 +23,7 @@
 
 .step-dot.on {
   color: #fff;
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(95deg, #2f6fed, #2f6fed);
 }
 
 .step-line {
@@ -52,7 +52,7 @@
   font-size: 22rpx;
   line-height: 1.8;
   color: #4338ca;
-  background: #e8edf2;
+  background: #f4f8fc;
   border-radius: 999rpx;
 }
 
@@ -111,7 +111,7 @@
 }
 
 .plat-chip.active {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   background: rgba(30, 58, 95, 0.1);
 }
 
@@ -257,7 +257,7 @@
   width: 56rpx;
   height: 56rpx;
   border-radius: 14rpx;
-  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(135deg, #2f6fed, #2f6fed);
   color: #fff;
   font-size: 26rpx;
   font-weight: 700;
@@ -289,8 +289,8 @@
 }
 
 .check-box.on {
-  border-color: #1e3a5f;
-  background: #1e3a5f;
+  border-color: #2f6fed;
+  background: #2f6fed;
 }
 
 .check-tick {
@@ -461,7 +461,7 @@
   font-weight: 600;
   line-height: 1.35;
   color: #fff;
-  background: linear-gradient(95deg, #1e3a5f, #14b8a6);
+  background: linear-gradient(95deg, #2f6fed, #14b8a6);
   box-shadow: 0 8rpx 22rpx rgba(30, 58, 95, 0.28);
 }
 
@@ -578,8 +578,8 @@
 }
 
 .wstep.on .wstep-num {
-  background: #1e3a5f;
-  border-color: #1e3a5f;
+  background: #2f6fed;
+  border-color: #2f6fed;
   color: #fff;
 }
 
@@ -588,7 +588,7 @@
 }
 
 .wstep.done .wstep-num {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   color: #1e3a5f;
 }
 
@@ -616,7 +616,7 @@
 }
 
 .plat-card-v2.on {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   background: #f4f7fb;
 }
 
@@ -674,8 +674,8 @@
 }
 
 .plat-radio.on {
-  border-color: #1e3a5f;
-  background: #1e3a5f;
+  border-color: #2f6fed;
+  background: #2f6fed;
 }
 
 .plat-radio-tick {

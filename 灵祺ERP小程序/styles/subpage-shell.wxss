@@ -6,7 +6,7 @@
   min-height: 100vh;
   padding: 20rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 
 /* 页头 Hero */
@@ -139,7 +139,7 @@
 }
 
 .chip.on {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
   border-color: transparent;
   font-weight: 700;
@@ -187,7 +187,7 @@
 }
 
 .btn-v2.primary {
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
+  background: #2f6fed;
   box-shadow: 0 12rpx 32rpx rgba(30, 58, 95, 0.28);
 }
 
@@ -235,7 +235,7 @@ textarea,
 
 .kpi-hero,
 .score-v2 {
-  background: linear-gradient(135deg, #1e3a5f, #1e3a5f 55%, #1e3a5f);
+  background: linear-gradient(135deg, #2f6fed, #2f6fed 55%, #2f6fed);
   box-shadow: 0 16rpx 40rpx rgba(30, 58, 95, 0.28);
 }
 
@@ -279,5 +279,42 @@ textarea,
 .legal-page {
   min-height: 100vh;
   box-sizing: border-box;
-  background: #e8edf2 !important;
+  background: #f4f8fc !important;
+}
+
+.func-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.func-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 18rpx 6rpx 16rpx;
+  box-sizing: border-box;
+}
+
+.func-well {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 26rpx;
+  background: #e7f0ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.func-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  width: 100%;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  line-height: 1.3;
+  font-weight: 600;
+  color: #1e3a5f;
+  text-align: center;
 }

@@ -1,6 +1,6 @@
 .sv-root {
   height: 100vh;
-  background: #e8edf2;
+  background: #f4f8fc;
   box-sizing: border-box;
 }
 
@@ -16,7 +16,7 @@
   width: 8rpx;
   height: 88rpx;
   border-radius: 8rpx;
-  background: linear-gradient(180deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(180deg, #2f6fed, #2f6fed);
 }
 
 .sv-header-row {
@@ -32,7 +32,7 @@
   line-height: 64rpx;
   text-align: center;
   border-radius: 18rpx;
-  background: linear-gradient(135deg, #e8edf2, #a5f3fc);
+  background: linear-gradient(135deg, #f4f8fc, #a5f3fc);
   color: #0e7490;
   font-weight: 800;
   box-shadow: 0 8rpx 24rpx rgba(30, 58, 95, 0.18);
@@ -124,7 +124,7 @@
 }
 
 .sv-quick-card.on {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   background: #f4f7fb;
 }
 
@@ -160,7 +160,7 @@
 
 .sv-main-tab.active {
   color: #fff;
-  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(135deg, #2f6fed, #2f6fed);
   border-color: transparent;
   font-weight: 700;
 }
@@ -276,7 +276,7 @@
 }
 
 .sv-chip.dark {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 
@@ -513,7 +513,7 @@
 }
 
 .sv-radio-dot.on {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   background: radial-gradient(circle, #1e3a5f 40%, transparent 45%);
 }
 
@@ -552,7 +552,7 @@
 }
 
 .sv-btn-cyan {
-  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(135deg, #2f6fed, #2f6fed);
   color: #fff;
   box-shadow: 0 12rpx 28rpx -10rpx rgba(30, 58, 95, 0.55);
 }
@@ -572,7 +572,7 @@
 }
 
 .sv-btn-dark {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 
@@ -583,7 +583,7 @@
 }
 
 .sv-btn-violet {
-  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(135deg, #2f6fed, #2f6fed);
   color: #fff;
 }
 
@@ -635,7 +635,7 @@
 }
 
 .sv-pane-icon.cyan {
-  background: #e8edf2;
+  background: #f4f8fc;
   color: #0e7490;
 }
 
@@ -698,7 +698,7 @@
   line-height: 48rpx;
   text-align: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(135deg, #2f6fed, #2f6fed);
   color: #fff;
   font-weight: 800;
   font-size: 24rpx;
@@ -745,7 +745,7 @@
   top: 48rpx;
   bottom: -8rpx;
   width: 4rpx;
-  background: linear-gradient(180deg, #1e3a5f, #d5dde6);
+  background: linear-gradient(180deg, #2f6fed, #d5dde6);
 }
 
 .sv-actions {
@@ -836,9 +836,9 @@
 }
 
 .sv-mood.on {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
 }
 
 .sv-music-row {
@@ -954,7 +954,7 @@
   line-height: 40rpx;
   text-align: center;
   border-radius: 50%;
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
   font-size: 22rpx;
   font-weight: 700;
@@ -987,12 +987,12 @@
 }
 
 .sv-mat-tab.on {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 
 .sv-mat-tab.violet.on {
-  background: #1e3a5f;
+  background: #2f6fed;
 }
 
 .sv-warn-box {
@@ -1022,7 +1022,7 @@
 
 .sv-upload-zone.violet {
   border-color: #c4b5fd;
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 
 .sv-upload-zone.muted {
@@ -1142,7 +1142,7 @@
 }
 
 .sv-batch-n.on {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 
@@ -1172,7 +1172,7 @@
   width: 100%;
   margin: 12rpx 0;
   border-radius: 16rpx;
-  background: #1e3a5f;
+  background: #2f6fed;
 }
 
 .sv-video.dark {
@@ -1183,7 +1183,7 @@
   margin: 0 28rpx 24rpx;
   padding: 24rpx;
   border-radius: 24rpx;
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #e2e8f0;
 }
 

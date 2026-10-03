@@ -1,6 +1,6 @@
 .wallet-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eef2f6 0%, #e8edf2 280rpx);
+  background: linear-gradient(180deg, #eef2f6 0%, #f4f8fc 280rpx);
   padding: 0 28rpx;
   box-sizing: border-box;
 }
@@ -172,7 +172,7 @@
   height: 88rpx;
   line-height: 88rpx;
   border-radius: 999rpx;
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f) !important;
+  background: linear-gradient(95deg, #2f6fed, #2f6fed) !important;
   color: #fff !important;
   font-size: 28rpx;
   font-weight: 700;
@@ -323,7 +323,7 @@
 }
 
 .wallet-tier.on {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   background: #eef2f6;
   color: #1e3a5f;
   font-weight: 700;
@@ -413,7 +413,7 @@
   flex: 1;
   margin: 0;
   border-radius: 999rpx;
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(95deg, #2f6fed, #2f6fed);
   color: #fff;
 }
 

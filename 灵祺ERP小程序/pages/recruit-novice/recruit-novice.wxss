@@ -2,7 +2,7 @@
   height: 100vh;
   box-sizing: border-box;
   padding: 28rpx;
-  background: #e8edf2;
+  background: #f4f8fc;
 }
 
 .nv-head {
@@ -91,7 +91,7 @@
 }
 
 .nv-chip.on {
-  border-color: #1e3a5f;
+  border-color: #2f6fed;
   background: rgba(30, 58, 95, 0.12);
   color: #3d5270;
 }
@@ -165,7 +165,7 @@
   padding: 24rpx;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(95deg, #2f6fed, #2f6fed);
 }
 
 .nv-ai-btn::after {
@@ -209,7 +209,7 @@
   border-radius: 14rpx;
   font-size: 26rpx;
   font-weight: 700;
-  background: linear-gradient(95deg, #1e3a5f, #1e3a5f);
+  background: linear-gradient(95deg, #2f6fed, #2f6fed);
   color: #fff;
   border: none;
 }
@@ -277,7 +277,7 @@
 .nv-modal-ok {
   margin-top: 16rpx;
   border-radius: 999rpx;
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 

@@ -1,6 +1,6 @@
 .op-page {
   min-height: 100vh;
-  background: #e8edf2;
+  background: #f4f8fc;
   padding-bottom: 48rpx;
 }
 
@@ -56,7 +56,7 @@
 }
 
 .op-chip.on {
-  background: #1e3a5f;
+  background: #2f6fed;
   color: #fff;
 }
 
@@ -99,7 +99,7 @@
 
 .op-btn {
   margin-top: 20rpx;
-  background: #1e3a5f !important;
+  background: #2f6fed !important;
   color: #fff !important;
   border-radius: 999rpx !important;
   font-size: 28rpx !important;
@@ -151,7 +151,7 @@
   width: 240rpx;
   height: 320rpx;
   border-radius: 16rpx;
-  background: #1e3a5f;
+  background: #2f6fed;
 }
 
 .op-body.muted {

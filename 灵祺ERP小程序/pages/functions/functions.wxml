@@ -1,57 +1,35 @@
 <scroll-view scroll-y class="page-func-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
-  <view class="func-hero">
-    <view class="func-hero-main">
-      <image class="func-brand-logo" src="{{logoSrc}}" mode="aspectFit" />
-      <view class="func-hero-text">
-        <text class="func-h1">商家能力中心</text>
-        <text class="func-p">知识库 · 店铺 · 商品 · 运营 · AI 创作 · 投流 · 线索 · 财务</text>
-      </view>
+  <view class="func-blue" style="padding-top: {{statusBarHeight}}px">
+    <view class="func-nav-slot">
+      <text class="func-h1">商家能力中心</text>
     </view>
-    <view class="func-hero-glow" aria-hidden="true"></view>
+    <text class="func-p">知识库 · 店铺 · 商品 · 运营 · AI 创作 · 投流 · 线索 · 财务</text>
   </view>
-  <view wx:if="{{guestMode}}" class="guest-banner" bindtap="onGoLogin">
-    <text class="guest-banner-t">游客浏览中 · 可先查看功能模块</text>
-    <text class="guest-banner-a">登录后使用完整能力 ›</text>
-  </view>
-  <block wx:for="{{sections}}" wx:key="id">
-    <view wx:if="{{item.layout === 'row'}}" class="sec-card-v2" data-url="{{item.items[0].url}}" bindtap="onOpenCell">
-      <view class="sec-row-v2">
-        <view class="ibox ibox-{{item.tone}} ibox-sm">
-          <image class="func-ic-img func-ic-sm" src="{{item.sectionIconSrc}}" mode="aspectFit" />
-        </view>
-        <text class="sec-row-title">{{item.title}}</text>
-        <text class="sec-row-desc">{{item.rowDesc}}</text>
-        <text class="chev">›</text>
-      </view>
+  <view class="func-sheet">
+    <view wx:if="{{guestMode}}" class="guest-banner" bindtap="onGoLogin">
+      <text class="guest-banner-t">游客浏览中 · 可先查看功能模块</text>
+      <text class="guest-banner-a">登录后使用完整能力 ›</text>
     </view>
-    <view wx:else class="sec-card-v2">
-      <view class="sec-head-v2">
-        <view class="ibox ibox-{{item.tone}} ibox-sm">
-          <image class="func-ic-img func-ic-sm" src="{{item.sectionIconSrc}}" mode="aspectFit" />
-        </view>
-        <text>{{item.title}}</text>
-        <text class="chev">›</text>
-      </view>
-      <view class="grid-v2 grid-v2-{{item.cols}}">
-        <view
-          wx:for="{{item.items}}"
-          wx:for-item="cell"
-          wx:for-index="idx"
-          wx:key="title"
-          class="cell-v2 {{idx % item.cols !== item.cols - 1 ? 'cell-v2-divide' : ''}}"
-          data-url="{{cell.url}}"
-          bindtap="onOpenCell"
-        >
-          <view class="ibox ibox-{{item.tone}} ibox-sm">
-            <image class="func-ic-img func-ic-sm" src="{{cell.iconSrc}}" mode="aspectFit" />
-          </view>
-          <view class="cell-text">
-            <text class="cell-strong">{{cell.title}}</text>
-            <text class="cell-span">{{cell.desc}}</text>
+    <block wx:for="{{sections}}" wx:key="id">
+      <view class="func-group">
+        <text class="func-group-title">{{item.title}}</text>
+        <view class="func-grid">
+          <view
+            wx:for="{{item.items}}"
+            wx:for-item="cell"
+            wx:key="title"
+            class="func-cell"
+            data-url="{{cell.url}}"
+            bindtap="onOpenCell"
+          >
+            <view class="func-well">
+              <image class="func-ic" src="{{cell.iconSrc}}" mode="aspectFit" />
+            </view>
+            <text class="func-label">{{cell.title}}</text>
           </view>
         </view>
       </view>
-    </view>
-  </block>
-  <site-icp-footer />
+    </block>
+    <site-icp-footer />
+  </view>
 </scroll-view>

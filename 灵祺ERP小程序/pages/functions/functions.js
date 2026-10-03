@@ -11,12 +11,18 @@ Page({
     erpLinked: false,
     guestMode: false,
     logoSrc: assetUrl('logo.png'),
+    statusBarHeight: 20,
   },
 
   onLoad() {
+    let statusBarHeight = 20
+    try {
+      const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+      statusBarHeight = info.statusBarHeight || 20
+    } catch (_) {}
     const sections = FUNCTION_SECTIONS.map((sec) => ({
       ...sec,
-      cols: sec.layout === 'grid3' ? 3 : sec.layout === 'grid2' ? 2 : 1,
+      cols: 4,
       sectionIconSrc: iconDataUri(sec.tone, sec.sectionIcon),
       items: sec.items.map((it) => ({
         ...it,
@@ -26,6 +32,7 @@ Page({
     }))
     this.setData({
       sections,
+      statusBarHeight,
       erpLinked: merchant.hasMerchantApi(),
       guestMode: !api.isRealAuthed(),
       logoSrc: assetUrl('logo.png'),
