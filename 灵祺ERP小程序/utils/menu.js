@@ -10,8 +10,8 @@ const SECTIONS = [
       {
         kind: 'link',
         url: '/pages/dashboard/dashboard',
-        title: '经营概览',
-        desc: '核心指标速览（详情图表请在电脑端首页查看）',
+        title: '首页',
+        desc: '轮播、常用入口与经营摘要',
       },
       {
         kind: 'link',

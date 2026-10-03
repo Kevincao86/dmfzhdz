@@ -1,5 +1,47 @@
-<scroll-view scroll-y class="dash-page-v2" enhanced show-scrollbar="{{false}}">
-  <view class="dash-head">
+<scroll-view
+  scroll-y
+  class="dash-page-v2"
+  enhanced
+  show-scrollbar="{{false}}"
+  scroll-into-view="{{scrollInto}}"
+  scroll-with-animation
+>
+  <swiper
+    class="home-poster"
+    indicator-dots
+    indicator-color="rgba(255,255,255,0.55)"
+    indicator-active-color="#ffffff"
+    circular
+    autoplay
+    interval="4000"
+    duration="400"
+  >
+    <swiper-item wx:for="{{posters}}" wx:key="id">
+      <view class="home-poster__slide home-poster__slide--{{item.tone}}" data-action="{{item.action}}" bindtap="onHomeAction">
+        <text class="home-poster__kicker">{{item.kicker}}</text>
+        <text class="home-poster__title">{{item.title}}</text>
+        <text class="home-poster__sub">{{item.sub}}</text>
+      </view>
+    </swiper-item>
+  </swiper>
+
+  <text class="home-feed-title">常用入口</text>
+  <view class="home-entry">
+    <view
+      wx:for="{{entries}}"
+      wx:key="id"
+      class="home-entry__card"
+      data-action="{{item.id}}"
+      bindtap="onHomeAction"
+    >
+      <view class="home-entry__mark home-entry__mark--{{item.tone}}">
+        <image class="home-entry__ic" src="{{item.iconSrc}}" mode="aspectFit" />
+      </view>
+      <text class="home-entry__title">{{item.title}}</text>
+    </view>
+  </view>
+
+  <view id="overview" class="dash-head">
     <view class="dash-head-icon">
       <image class="dash-hero-ic" src="{{heroIconSrc}}" mode="aspectFit" />
     </view>

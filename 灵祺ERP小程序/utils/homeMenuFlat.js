@@ -12,6 +12,7 @@ function isMenuItemVisible(it) {
 
 /** title -> { glyph, tone } */
 const GRID_VISUAL = {
+  首页: { glyph: '首', tone: 'blue' },
   经营概览: { glyph: '览', tone: 'blue' },
   我的钱包: { glyph: '钱', tone: 'amber' },
   店铺信息: { glyph: '店', tone: 'cyan' },

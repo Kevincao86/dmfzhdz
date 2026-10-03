@@ -256,6 +256,17 @@ Page({
     ydaySections: [],
     ydayEmpty: '',
     ydayMetrics: [],
+    scrollInto: '',
+    posters: [
+      { id: 'p1', tone: 'blue', kicker: '经营', title: '看清今天的生意', sub: '营收、核销和成交券', action: 'overview' },
+      { id: 'p2', tone: 'green', kicker: '店铺', title: '店铺分析', sub: '成交客群与经营建议', action: 'analysis' },
+      { id: 'p3', tone: 'violet', kicker: '门店', title: '门店评估', sub: '给门店打分，看改进方向', action: 'shop' },
+    ],
+    entries: [
+      { id: 'overview', title: '经营概览', tone: 'blue', iconSrc: iconDataUri('#2f6fed', 'chart') },
+      { id: 'analysis', title: '店铺分析', tone: 'green', iconSrc: iconDataUri('#22c55e', 'chart') },
+      { id: 'shop', title: '门店评估', tone: 'amber', iconSrc: iconDataUri('#f59e0b', 'pin') },
+    ],
   },
 
   onShow() {
@@ -269,6 +280,21 @@ Page({
     this.setData({ ydayAuto: readYdayAuto() })
     void this.loadDash()
     void this.loadYesterdayAnalysis()
+  },
+
+  onHomeAction(e) {
+    const action = e.currentTarget.dataset.action
+    if (action === 'overview') {
+      this.setData({ scrollInto: '' }, () => this.setData({ scrollInto: 'overview' }))
+      return
+    }
+    if (action === 'analysis') {
+      wx.navigateTo({ url: '/pages/store-analysis/store-analysis' })
+      return
+    }
+    if (action === 'shop') {
+      wx.switchTab({ url: '/pages/shop-eval/shop-eval' })
+    }
   },
 
   onToggleYdayAuto(e) {
