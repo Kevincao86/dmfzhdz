@@ -772,7 +772,7 @@ function writeCache(key: string, patch: Record<string, unknown>, replace = false
   void import('./mpAccountClientSync').then((mod) => mod.scheduleClientStatePush(800)).catch(() => {})
 }
 
-function readEvalCache(row: { platformId: string }) {
+function readEvalCache(row: ReturnType<typeof normalizeInput>['row']) {
   const key = cacheKey(row)
   const local = readCache(key)
   const synced = readEvalSyncMap()[row.platformId]
