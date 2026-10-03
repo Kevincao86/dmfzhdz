@@ -116,7 +116,7 @@ const PLATFORM_SPECS = {
 const ADVICE_SYSTEM = [
   '你是豆包。这是达人自己看的体检，按现状写给达人本人的改法，用「你」来写。',
   '不要用商家口吻，不要写合作、履约、核销、不建议合作。',
-  '不要编造粉丝数、GMV。未在资料里出现的数字不要写进来。',
+  '不要编造粉丝数、GMV。未在用户填写或公开检索里出现的数字不要写进来。同名但账号对不上的人不要写。',
   '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
   '只输出一个 JSON 对象，不要 Markdown。',
   '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
@@ -190,14 +190,16 @@ function scoreSystem(spec) {
     '你是豆包。',
     spec.scene,
     '这不是平台官方接口，不要声称读到了官方后台或官方等级。',
-    '只根据用户填写的账号资料分析。未填写的粉丝数、核销额、GMV、播放量不要编造。用户填了的数字按原数使用，不要改成另一个数。',
+    '根据用户填写的账号资料，以及附上的公开检索打分。用户填了的数字按原数使用，不要改成另一个数。',
+    '公开检索里明确属于这个账号的粉丝、作品标题、带货说法可以引用。检索里没有的粉丝数、播放量、GMV、官方带货等级不要编造。同名但账号对不上的人不要写进来。',
+    '公开检索为空或写着无公开账号记录时，按用户填写的资料打分，不要写成平台上没有这个人。',
     '用户自填的带货等级或达人等级只是用户自己填的，用来对照，不能当成官方读数。',
     '不要写「公开资料不足」「仅供参考」「不是官方」「弱预估」这类提示句。',
     '只输出一个 JSON 对象，不要 Markdown，不要额外说明。键名必须用英文双引号，最后一项后面不要逗号。',
     `blocks 为数组，每项含 name、points。points 为 0 到 100 的整数，表示该板块强弱。name 必须是：${spec.blocks.map((block) => block.name).join('、')}。`,
     `risk 为 0 到 ${spec.risk} 的整数，表示账号风险扣分。扣分依据：${spec.riskNote}。`,
     `同时输出 score，为 0 到 100 的整数，按这些权重合成后再扣 risk：${weights}。系统会按同样权重重算，重算成功时以系统结果为准。`,
-    `situations 为 3 到 5 项，每项含 name、now。now 不超过 40 字，只写该板块现状，不要写建议。现状要扣住用户填了的昵称、账号、粉丝、标签、报价或等级；没填的项不要写成具体数字。name 只能从这些板块里选：${blockNames(spec).join('、')}。`,
+    `situations 为 3 到 5 项，每项含 name、now。now 不超过 40 字，只写该板块现状，不要写建议。现状要扣住用户填了的昵称、账号、粉丝、标签、报价或等级，以及公开检索里属于这个账号的句子；没填也没检索到的项不要写成具体数字。name 只能从这些板块里选：${blockNames(spec).join('、')}。`,
     'exposureLift 为按整改后预计多出来的曝光百分比，整数 8 到 60，不要写百分号。',
     'salesLift 为按整改后预计每月多带来的带货金额，单位元的整数。按已填粉丝和报价估算增量，不要写成当前已经成交的金额。',
     '同一份账号资料每次必须给出相同 blocks、risk 和现状。',
@@ -280,6 +282,7 @@ function describeEvalBasis(raw) {
   if (spec.id === 'douyin' && row.salesLevel) bits.push(`带货等级 ${row.salesLevel}`)
   if (spec.id === 'kuaishou' && row.talentGrade) bits.push(`达人等级 ${row.talentGrade}`)
   if (row.quotePrice) bits.push(`报价 ${row.quotePrice}`)
+  bits.push('联网检索公开主页')
   return bits.join(' · ')
 }
 
@@ -388,13 +391,14 @@ function levelText(v) {
   return m ? `Lv${m[1]}` : 'Lv0'
 }
 
-async function askDoubao(system, user) {
+async function askDoubao(system, user, opts) {
   const data = await ecs.post(
     '/api/meoo-ai-chat',
     {
       provider: 'doubao',
       stream: false,
       temperature: 0,
+      ...(opts && opts.webSearch ? { webSearch: true } : {}),
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -435,32 +439,42 @@ function accountScope() {
 }
 
 function cacheKey(row) {
-  return ['lq_local_life_eval_v4', accountScope(), row.platformId].join('|')
-}
-
-function legacyCacheKey(row) {
-  return [
-    'lq_local_life_eval_v3',
-    row.platformId,
-    row.nickname,
-    row.accountId,
-    row.followers,
-    row.profileLink,
-    row.tags.join(','),
-    row.salesLevel,
-    row.talentGrade,
-    row.quotePrice,
-  ].join('|')
+  return ['lq_local_life_eval_v5', accountScope(), row.platformId].join('|')
 }
 
 function loadCache(row) {
   const key = cacheKey(row)
-  const hit = readCache(key)
-  if (hit) return { key, data: hit }
-  const old = readCache(legacyCacheKey(row))
-  if (!old) return { key, data: null }
-  writeCache(key, old, true)
-  return { key, data: readCache(key) || old }
+  return { key, data: readCache(key) }
+}
+
+async function doubaoPublicAccount(spec, row) {
+  try {
+    const text = await askDoubao(
+      [
+        '你在用方舟联网检索这一个达人账号。只写检索结果里明确属于这个昵称或这个账号 ID 的公开信息。',
+        '可写公开主页上的粉丝数、近期作品标题、带货或团购的公开说法。每条一行，最多 8 行。',
+        '同名但账号对不上的人不要写。没出现的粉丝数、播放量、GMV、带货等级不要编造。',
+        '一条都没有时只输出：无公开账号记录。',
+      ].join(''),
+      [
+        `平台：${spec.name}`,
+        `${spec.nickLabel}：${row.nickname || '未填写'}`,
+        `${spec.accountLabel}：${row.accountId || '未填写'}`,
+        `主页链接：${row.profileLink || '未填写'}`,
+        '请联网检索这一个账号的公开主页、近期内容和带货相关公开说法。',
+      ].join('\n'),
+      { webSearch: true },
+    )
+    const lines = String(text || '')
+      .split('\n')
+      .map((line) => line.replace(/^\d+[.、]\s*/, '').trim())
+      .filter((line) => line.length >= 6 && !/暂未检索|未检索到|没有找到|无法查询|公开渠道/.test(line))
+    if (/无公开账号记录/.test(text) && !lines.length) return '无公开账号记录'
+    if (!lines.length) return '无公开账号记录'
+    return lines.slice(0, 8).map((line, index) => `${index + 1}. ${line}`).join('\n')
+  } catch {
+    return ''
+  }
 }
 
 function mapBlockPoints(rows) {
@@ -652,12 +666,14 @@ async function evaluateTalent(raw, opts) {
   }
   const gate = await readTalentEvalQuota()
   if (!gate.ok) throw new Error(gate.message || '本月评估次数已用完')
+  const notes = await doubaoPublicAccount(spec, row)
+  const publicBlock = notes ? `公开检索：\n${notes}` : '公开检索：这次没有检索到。按用户填写的资料打分，不要编造粉丝、播放和带货数字。'
   const j = await askDoubaoJson(
     scoreSystem(spec),
-    `${accountFacts(spec, row)}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用达人自己能看懂的话来写，不要写给商家的合作判断。`,
+    `${accountFacts(spec, row)}\n${publicBlock}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用达人自己能看懂的话来写，不要写给商家的合作判断。`,
   )
   const score = buildScore(spec, j)
-  writeCache(key, score)
+  writeCache(key, Object.assign({}, score, { publicNotes: notes || '' }))
   try {
     await postTalentQuota('mp_ai_points_spend', {
       idempotencyKey: 'talent-eval-' + Date.now(),
@@ -684,9 +700,11 @@ async function adviseTalent(raw, score, opts) {
   }
   await pointsSpend.assertTalentEvalAffordable('talent_advice')
   const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
+  const notes = String((loaded.data && loaded.data.publicNotes) || '')
+  const publicBlock = notes ? `公开检索：\n${notes}` : '公开检索：这次没有检索到。'
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,
-    `${accountFacts(spec, row)}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请按每个板块写出分析结果、怎么调整、近两周要做的三件事。写具体动作，不要一句带过。`,
+    `${accountFacts(spec, row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请按每个板块写出分析结果、怎么调整、近两周要做的三件事。写具体动作，不要一句带过。`,
   )
   const advice = { lift: clampLift(j.lift), sections: mapSuggestions(j.sections) }
   await pointsSpend.spendTalentEvalPoints('talent_advice', '达人账号分析提升')
