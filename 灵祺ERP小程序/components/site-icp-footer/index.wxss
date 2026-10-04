@@ -1,11 +1,25 @@
 .site-icp-footer {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  padding: 28rpx 24rpx 16rpx;
+  box-sizing: border-box;
+}
+
+.site-icp-footer__row {
+  display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 8rpx 24rpx;
-  padding: 28rpx 24rpx 16rpx;
-  box-sizing: border-box;
+}
+
+.site-icp-footer__copy {
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: #94a3b8;
+  text-align: center;
 }
 
 .site-icp-footer__psb {

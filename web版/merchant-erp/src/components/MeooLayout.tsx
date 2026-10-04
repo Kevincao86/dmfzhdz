@@ -55,6 +55,7 @@ import {
   setActiveTenantStorageId,
 } from '../lib/tenantLocalState'
 import SiteIcpFooter from './SiteIcpFooter'
+import { LEGAL_COMPANY_NAME } from '../lib/legalProductMeta'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
@@ -609,6 +610,11 @@ export default function MeooLayout() {
                 隐私政策
               </NavLink>
             </p>
+            {!isPartnerEdition() ? (
+              <p className="text-center text-xs text-slate-400">
+                © {new Date().getFullYear()} {LEGAL_COMPANY_NAME} Copyright. All Rights Reserved.
+              </p>
+            ) : null}
             <SiteIcpFooter />
           </div>
         </footer>

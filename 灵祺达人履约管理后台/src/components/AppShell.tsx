@@ -10,6 +10,7 @@ import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { isShellNavItemActive, navItemsForRole } from '../lib/shellNavConfig'
 import { identityWorkAttr } from '../lib/identityTheme'
 import SiteIcpFooter from '@merchant/components/SiteIcpFooter'
+import { LEGAL_COMPANY_NAME } from '@merchant/lib/legalProductMeta'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { onShellRefresh } from '../lib/shellRefresh'
 import { syncAccountAccessOnBoot } from '../lib/registryProfileSync'
@@ -159,6 +160,7 @@ export default function AppShell() {
             <NavLink to="/team">关于我们</NavLink>
             <NavLink to="/legal/privacy">隐私政策</NavLink>
           </p>
+          <p className="xx-footer-links">© {new Date().getFullYear()} {LEGAL_COMPANY_NAME} Copyright. All Rights Reserved.</p>
           <SiteIcpFooter className="text-[var(--shell-muted)]" />
         </footer>
       </div>
