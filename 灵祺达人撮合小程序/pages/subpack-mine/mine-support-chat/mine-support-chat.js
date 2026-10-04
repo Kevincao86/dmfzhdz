@@ -29,9 +29,11 @@ Page({
     queueHint: '',
     ready: false,
     statusSub: '正在连接客服…',
+    keyboardHeight: 0,
   },
 
   onLoad(options) {
+    this.bindKeyboardLift()
     this._sessionId = relay.getOrCreateSessionId()
     this._pollTimer = null
     this._pollFailCount = 0
@@ -69,18 +71,55 @@ Page({
 
   onShow() {
     syncPageIdentity(this)
+    this.bindKeyboardLift()
     if (!relay.canSupport()) return
     this.startPoll()
   },
 
   onHide() {
+    this.unbindKeyboardLift()
+    this.applyKeyboardHeight(0)
     // 人工会话保持轮询：切去运营台回消息时若 stop，会表现为「回来看不到、需重进」
     if (this.data.humanMode) return
     this.stopPoll()
   },
 
   onUnload() {
+    this.unbindKeyboardLift()
     this.stopPoll()
+  },
+
+  bindKeyboardLift() {
+    if (this._onKeyboardHeight) return
+    this._onKeyboardHeight = (res) => {
+      this.applyKeyboardHeight(res && res.height)
+    }
+    if (typeof wx.onKeyboardHeightChange === 'function') {
+      wx.onKeyboardHeightChange(this._onKeyboardHeight)
+    }
+  },
+
+  unbindKeyboardLift() {
+    if (this._onKeyboardHeight && typeof wx.offKeyboardHeightChange === 'function') {
+      wx.offKeyboardHeightChange(this._onKeyboardHeight)
+    }
+    this._onKeyboardHeight = null
+  },
+
+  onKeyboardHeightChange(e) {
+    const detail = (e && e.detail) || {}
+    this.applyKeyboardHeight(detail.height)
+  },
+
+  applyKeyboardHeight(height) {
+    const h = Math.max(0, Math.round(Number(height) || 0))
+    if (h === this.data.keyboardHeight) return
+    const list = this.data.messages || []
+    const last = list.length ? list[list.length - 1] : null
+    const anchor = last && last.id ? `msg-${last.id}` : ''
+    this.setData({ keyboardHeight: h, scrollTo: '' }, () => {
+      if (anchor) this.setData({ scrollTo: anchor })
+    })
   },
 
   startPoll() {
