@@ -106,7 +106,7 @@
 
 .welcome-tile--sms .welcome-tile__mark { color: #1e3a5f; }
 .welcome-tile--reg .welcome-tile__mark { color: #0f4c5c; }
-.welcome-tile--wx .welcome-tile__mark { color: #07c160; }
+.welcome-tile--wx .welcome-tile__mark { color: #2f6fed; }
 
 .welcome-tile__label {
   margin-top: 10rpx;
@@ -318,7 +318,7 @@
   align-items: center;
   justify-content: center;
   gap: 12rpx;
-  background: #07c160 !important;
+  background: #2f6fed !important;
   color: #fff !important;
   border: none !important;
   font-size: 28rpx;
@@ -331,14 +331,6 @@
 
 .btn-v2.wx-login::after {
   border: none;
-}
-
-.wx-icon {
-  width: 40rpx;
-  height: 40rpx;
-  flex-shrink: 0;
-  border-radius: 8rpx;
-  background: #fff;
 }
 
 .login-legal-row {

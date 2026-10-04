@@ -9,7 +9,7 @@ const LANDING_WAYS = [
   { id: 'pwd', mark: '账号', label: '密码登录', sub: '登录名与密码进入工作台' },
   { id: 'sms', mark: '快捷', label: '验证码', sub: '手机号短信验证码登录' },
   { id: 'reg', mark: '入驻', label: '注册', sub: '新开商家账号，免费起步' },
-  { id: 'wx', mark: '微信', label: '一键登录', sub: '授权微信，绑定商家账号' },
+  { id: 'wx', mark: '手机', label: '快捷登录', sub: '手机号快捷登录，进入工作台' },
 ]
 
 const MODE_HINT = {
@@ -40,7 +40,6 @@ Page({
     err: '',
     infoHint: '',
     busy: false,
-    wechatIconSrc: assetUrl('payment/wechat.png'),
     wxBusy: false,
     refreshing: false,
     submitLabel: '登录并进入工作台',
@@ -438,7 +437,7 @@ Page({
   async _doWxLogin() {
     if (this.data.busy || this.data.wxBusy) return
     if (!tenantAuthApi.apiRoot()) {
-      this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用微信登录' })
+      this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用快捷登录' })
       return
     }
     this.setData({ wxBusy: true, err: '', infoHint: '' })
@@ -450,7 +449,7 @@ Page({
       })
       if (!r.ok || !r.access_token) {
         this.setData({
-          err: r.message || r.detail || '微信登录失败',
+          err: r.message || r.detail || '快捷登录失败',
           infoHint: r.isNew ? '' : this.data.infoHint,
         })
         return
@@ -473,7 +472,7 @@ Page({
       }
       this._goHome()
     } catch (e) {
-      const msg = e && e.message ? e.message : '微信登录失败'
+      const msg = e && e.message ? e.message : '快捷登录失败'
       this.setData({ err: msg })
     } finally {
       this.setData({ wxBusy: false })

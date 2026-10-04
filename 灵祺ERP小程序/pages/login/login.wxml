@@ -93,11 +93,10 @@
   </view>
 
   <view wx:if="{{pickedId === 'wx'}}" class="auth-card-v2 login-auth-card">
-    <text class="mode-hint">授权微信后绑定或登录商家账号。</text>
+    <text class="mode-hint">使用手机号快捷登录，进入商家工作台。</text>
     <text wx:if="{{err}}" class="err-msg">{{err}}</text>
     <button class="btn-v2 wx-login" loading="{{wxBusy}}" disabled="{{busy || wxBusy}}" bindtap="onWxLogin">
-      <image class="wx-icon" src="{{wechatIconSrc}}" mode="aspectFit" />
-      <text>微信一键登录</text>
+      <text>手机号快捷登录</text>
     </button>
     <button class="btn-v2 login-cancel" disabled="{{busy || wxBusy}}" bindtap="onLeaveLogin">返回，暂不登录</button>
   </view>
