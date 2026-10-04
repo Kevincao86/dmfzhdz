@@ -167,6 +167,10 @@ Page({
     })
   },
   onCashWithdraw() {
+    if (!this.data.accountBound) {
+      this.onBindAccount()
+      return
+    }
     if (this.data.cashLoading) {
       wx.showToast({ title: '正在读取红包', icon: 'none' })
       return
@@ -198,6 +202,10 @@ Page({
     })
   },
   onWithdraw() {
+    if (!this.data.accountBound) {
+      this.onBindAccount()
+      return
+    }
     wx.showModal({
       title: '提现到绑定账户',
       content: `可提现 ¥${this.data.netLabel}（已扣佣金 ¥${this.data.commissionLabel}、个税 ¥${this.data.taxLabel}）。每笔结算只能提现 1 次。每天 00:00–23:59 可发起，提交后 1–3 个工作日到账。`,

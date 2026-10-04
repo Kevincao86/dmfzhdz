@@ -1696,6 +1696,7 @@ PAT
     payout_id_fields)
       cat <<'PAT'
 WalletPage.tsx
+mine-wallet
 mine-training-account
 mpTraining.js
 meoo-mp-training.ts

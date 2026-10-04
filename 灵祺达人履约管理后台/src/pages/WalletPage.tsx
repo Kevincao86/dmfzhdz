@@ -235,8 +235,16 @@ export default function WalletPage() {
     }
   }
 
+  function hasPayoutAccount() {
+    return !!(account?.name && account?.bankNo)
+  }
+
   async function withdraw() {
     if (!me?.accountId) return
+    if (!hasPayoutAccount()) {
+      openBind()
+      return
+    }
     const net = Number(quote?.net || 0).toFixed(2)
     const tax = Number(quote?.tax || 0).toFixed(2)
     const commission = Number(quote?.commission || 0).toFixed(2)
@@ -348,6 +356,10 @@ export default function WalletPage() {
   }
 
   async function withdrawCash() {
+    if (!hasPayoutAccount()) {
+      openBind()
+      return
+    }
     const wallet = (cash?.wallet || {}) as { availableYuan?: string; hint?: string; canWithdraw?: boolean }
     if (!wallet.canWithdraw) {
       const note = String(wallet.hint || '暂时不能提现')
