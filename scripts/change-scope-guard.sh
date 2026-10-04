@@ -115,6 +115,7 @@ list_scopes() {
   mp_login_identity_close 登录身份：达人库已删除则进 PR；我的信息短信注销账号
   payout_id_fields     达人小程序与星选：绑定收款账户增加姓名、身份证号，人像面识别自动填入
   site_copyright       星选与商家网页页脚宁波墨典版权；商家小程序页脚温州灵祺版权
+  mp_four_fixes        商家经营分析顾客数据；达人我的单据缓存；转单原表打开；达人客服 AI 回复
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1709,6 +1710,22 @@ PAT
 MeooLayout.tsx
 AppShell.tsx
 灵祺ERP小程序/components/site-icp-footer
+change-scope-guard
+PAT
+      ;;
+    mp_four_fixes)
+      cat <<'PAT'
+douyinMerchantGateway.ts
+merchantPlatformOrdersCore.ts
+meoo-shop-analysis-summary.ts
+灵祺ERP小程序/pages/biz-overview/biz-overview.js
+灵祺达人撮合小程序/utils/mineProfileStats.js
+灵祺达人撮合小程序/pages/mine/mine.js
+灵祺达人撮合小程序/pages/mine/mine.wxml
+灵祺达人撮合小程序/utils/formRelaySourceMpLink.js
+灵祺达人撮合小程序/app.json
+灵祺达人撮合小程序/utils/talentSupportAiMp.js
+灵祺达人撮合小程序/pages/subpack-mine/mine-support-chat
 change-scope-guard
 PAT
       ;;

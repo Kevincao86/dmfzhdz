@@ -1,4 +1,5 @@
 const relay = require('../../../utils/supportRelayMp.js')
+const supportAi = require('../../../utils/talentSupportAiMp.js')
 const { syncPageIdentity } = require('../../../utils/pageIdentityChrome.js')
 
 function nowTime() {
@@ -24,6 +25,8 @@ Page({
     scrollTo: '',
     humanMode: false,
     connecting: false,
+    humanOpen: false,
+    queueHint: '',
     ready: false,
     statusSub: '正在连接客服…',
   },
@@ -36,7 +39,12 @@ Page({
     this._syncing = false
     this._pollGen = 0
     this._autoHuman = options && (options.human === '1' || options.human === 'true')
-    const welcome = Object.assign({}, relay.DEFAULT_BOT, { at: nowTime() })
+    this._supportCfg = supportAi.defaultConfig()
+    this.setData({ humanOpen: supportAi.humanWindowOpen(this._supportCfg) })
+    const welcome = Object.assign({}, relay.DEFAULT_BOT, {
+      at: nowTime(),
+      text: '你好，我是小灵同学。我会先回答你的问题；如需人工，请在 9:00–22:00 点击「进入人工客服」。',
+    })
     this.setData({ messages: [welcome] })
     if (!relay.canSupport()) {
       this.setData({
@@ -46,6 +54,17 @@ Page({
       return
     }
     void this.bootstrap()
+    void this.refreshSupportConfig()
+  },
+
+  async refreshSupportConfig() {
+    const cfg = await supportAi.loadConfig()
+    this._supportCfg = cfg
+    const open = supportAi.humanWindowOpen(cfg)
+    this.setData({
+      humanOpen: open,
+      queueHint: open ? '' : '人工客服服务时间为 9:00–22:00',
+    })
   },
 
   onShow() {
@@ -187,24 +206,36 @@ Page({
       wx.showToast({ title: '未配置客服通道', icon: 'none' })
       return
     }
+    if (!this.data.humanOpen) {
+      wx.showToast({ title: '人工客服 9:00–22:00', icon: 'none' })
+      return
+    }
     this.setData({ connecting: true })
-    const sysText =
-      '已为你接通人工客服。请直接说遇到的问题，客服看到后会在这里回复。'
-    const bid = this.pushLocal('system', sysText)
-    relay
-      .sendChatLine('system', sysText, bid, this._sessionId)
-      .then(() => {
-        this.setData(
-          { humanMode: true, connecting: false, showHumanBtn: false, input: '' },
-          () => {
-            this.startPoll()
-            void this.syncFromCloud()
-          },
-        )
+    supportAi
+      .enqueue(this._sessionId)
+      .then((q) => {
+        const ahead = q && q.ahead > 0 ? `当前前方 ${q.ahead} 人，` : ''
+        const sysText = `已进入人工客服排队。${ahead}客服将按顺序在本会话回复。`
+        const bid = this.pushLocal('system', sysText)
+        return relay.sendChatLine('system', sysText, bid, this._sessionId).then(() => {
+          this.setData(
+            {
+              humanMode: true,
+              connecting: false,
+              showHumanBtn: false,
+              input: '',
+              queueHint: ahead ? `排队中 · 前方 ${q.ahead} 人` : '已接入排队',
+            },
+            () => {
+              this.startPoll()
+              void this.syncFromCloud()
+            },
+          )
+        })
       })
       .catch((e) => {
         this.setData({ connecting: false })
-        this.pushLocal('system', (e && e.message) || '未能写入客服通道，请稍后重试')
+        this.pushLocal('system', (e && e.message) || '未能进入人工排队，请稍后重试')
       })
   },
 
@@ -220,13 +251,26 @@ Page({
           this.pushLocal('system', '消息尚未送达客服通道，请稍后重试')
           return
         }
-        if (!this.data.humanMode) {
-          setTimeout(() => {
-            const botText =
-              '已收到你的问题。如果需要人工帮忙，在输入框输入「人工服务」，再点出现的按钮即可。'
-            const bid = this.pushLocal('bot', botText)
-            void relay.sendChatLine('bot', botText, bid, this._sessionId)
-          }, 500)
+        if (!this.data.humanMode && this._supportCfg && this._supportCfg.aiEnabled !== false) {
+          const history = this.data.messages
+          supportAi
+            .askAi(t, history, this._supportCfg)
+            .then((botText) => {
+              const bid = this.pushLocal('bot', botText || '已收到，请补充更具体的问题。')
+              void relay.sendChatLine('bot', botText, bid, this._sessionId)
+            })
+            .catch((e) => {
+              const detail = String((e && e.message) || '').slice(0, 80)
+              const botText = detail
+                ? `暂时没能回答（${detail}）。可在 9:00–22:00 点击「进入人工客服」。`
+                : '已收到您的问题。人工客服时段为 9:00–22:00，可点击「进入人工客服」。'
+              const bid = this.pushLocal('bot', botText)
+              void relay.sendChatLine('bot', botText, bid, this._sessionId)
+            })
+        } else if (!this.data.humanMode) {
+          const botText = '已收到您的问题。如需人工，请在 9:00–22:00 点击「进入人工客服」。'
+          const bid = this.pushLocal('bot', botText)
+          void relay.sendChatLine('bot', botText, bid, this._sessionId)
         }
         void this.syncFromCloud()
       })

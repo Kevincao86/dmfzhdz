@@ -26,18 +26,20 @@
 
   <view class="composer">
     <button
-      wx:if="{{showHumanBtn && !humanMode}}"
+      wx:if="{{humanOpen && !humanMode}}"
       class="human-btn"
       bindtap="onRequestHuman"
       loading="{{connecting}}"
       disabled="{{connecting || !ready}}"
     >
-      人工服务
+      {{connecting ? '排队接入中…' : '进入人工客服'}}
     </button>
+    <text wx:elif="{{!humanMode}}" class="human-off">人工客服服务时间为 9:00–22:00</text>
+    <text wx:if="{{queueHint && !humanMode}}" class="human-off">{{queueHint}}</text>
     <view class="input-row">
       <input
         class="chat-input"
-        placeholder="{{humanMode ? '向人工客服描述问题…' : '输入问题；输入「人工服务」可转人工'}}"
+        placeholder="{{humanMode ? '向人工客服描述问题…' : '输入问题，我会先回答'}}"
         value="{{input}}"
         bindinput="onInput"
         confirm-type="send"

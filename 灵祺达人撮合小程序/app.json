@@ -124,7 +124,8 @@
     "connectSocket": 60000
   },
   "navigateToMiniProgramAppIdList": [
-    "wxfaa08012777a431e"
+    "wxfaa08012777a431e",
+    "wxfc4ef6d539d03373"
   ],
   "requiredPrivateInfos": [
     "chooseLocation",

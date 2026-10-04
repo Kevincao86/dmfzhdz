@@ -1,3 +1,43 @@
+const STAT_CACHE_KEY = 'meoo_mine_stat_cache_v1'
+const STAT_CACHE_TTL_MS = 60 * 60 * 1000
+
+function accountCacheKey(account) {
+  if (!account || typeof account !== 'object') return ''
+  return String(
+    account.id || account.accountId || account.login_name || account.loginName || account.phone || account.openid || '',
+  ).trim()
+}
+
+function readMineStatCache(identity, account) {
+  try {
+    const raw = wx.getStorageSync(STAT_CACHE_KEY)
+    const row = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {}
+    if (!row || row.identity !== identity) return null
+    if (String(row.accountKey || '') !== accountCacheKey(account)) return null
+    if (!row.stats || typeof row.stats !== 'object') return null
+    return row
+  } catch (_) {
+    return null
+  }
+}
+
+function mineStatCacheFresh(row, now) {
+  const saved = Number(row && row.savedAt) || 0
+  if (!saved) return false
+  return (now || Date.now()) - saved < STAT_CACHE_TTL_MS
+}
+
+function writeMineStatCache(identity, account, stats) {
+  try {
+    wx.setStorageSync(STAT_CACHE_KEY, {
+      identity,
+      accountKey: accountCacheKey(account),
+      stats,
+      savedAt: Date.now(),
+    })
+  } catch (_) {}
+}
+
 const applicationsStore = require('./applicationsStore.js')
 const auth = require('./auth.js')
 const prPublishedOrders = require('./prPublishedOrders.js')
@@ -93,4 +133,10 @@ function computeMineStats(identity) {
   return computeTalentStats()
 }
 
-module.exports = { computeMineStats, loadPrStatsAsync }
+module.exports = {
+  computeMineStats,
+  loadPrStatsAsync,
+  readMineStatCache,
+  mineStatCacheFresh,
+  writeMineStatCache,
+}

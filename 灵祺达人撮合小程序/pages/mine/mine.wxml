@@ -90,7 +90,15 @@
     <button class="vip-btn" bindtap="onGoLoginPage">微信登录</button>
   </view>
 
-  <scroll-view class="mine-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
+  <scroll-view
+    class="mine-scroll page-scroll-body"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled
+    refresher-triggered="{{statRefreshing}}"
+    bindrefresherrefresh="onStatRefresh"
+  >
     <view class="wb-section" wx:if="{{quickMenus.length}}">
       <view class="wb-section-head">
         <text class="wb-section-title">常用功能</text>

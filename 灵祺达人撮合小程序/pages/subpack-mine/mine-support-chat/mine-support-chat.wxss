@@ -109,6 +109,14 @@
   border-radius: 16rpx;
 }
 
+.human-off {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  text-align: center;
+}
+
 .input-row {
   display: flex;
   align-items: center;

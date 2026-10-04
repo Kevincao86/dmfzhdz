@@ -9,7 +9,10 @@ import {
   computeShopAnalysisSummary,
   type ShopAnalysisSummary,
 } from '../vite-plugins/merchantPlatformOrdersCore.js'
-import { fetchDouyinFinanceReconcileRows } from '../vite-plugins/douyinMerchantGateway.js'
+import {
+  fetchDouyinFinanceReconcileRows,
+  type DouyinLiveBuyerStats,
+} from '../vite-plugins/douyinMerchantGateway.js'
 
 export const config = { maxDuration: 60 }
 
@@ -65,6 +68,31 @@ function applyLiveDouyinTotals(
     refundCount: refundCoupons,
     refundCouponCount: refundCoupons,
     refundRate: salesYuan > 0 ? Math.round((refundAmountYuan / salesYuan) * 10000) / 100 : 0,
+  }
+}
+
+/** 来客实时单里识别到买家时，补上被金额覆盖后仍为 0 的客群指标 */
+function applyLiveBuyerStats(summary: ShopAnalysisSummary, stats?: DouyinLiveBuyerStats): ShopAnalysisSummary {
+  if (!stats || stats.buyerCount <= 0) return summary
+  if (summary.buyerCount > 0 && summary.openIdCoverage >= stats.openIdCoverage) return summary
+  const salesYuan = summary.salesAmountYuan
+  const newBuyerShare =
+    salesYuan > 0 ? Math.round((stats.newBuyerSalesYuan / salesYuan) * 10000) / 100 : stats.newBuyerShare
+  return {
+    ...summary,
+    buyerCount: stats.buyerCount,
+    openIdCoverage: stats.openIdCoverage,
+    newBuyerCount: stats.newBuyerCount,
+    oldBuyerCount: stats.oldBuyerCount,
+    newBuyerSalesYuan: stats.newBuyerSalesYuan,
+    oldBuyerSalesYuan: stats.oldBuyerSalesYuan,
+    newBuyerShare,
+    newBuyerPeopleShare: stats.newBuyerPeopleShare,
+    oneTimeBuyerCount: stats.oneTimeBuyerCount,
+    repeatBuyerCount: stats.repeatBuyerCount,
+    repurchaseRate: stats.repurchaseRate,
+    guestBasis: 'repurchase',
+    hasPreWindowHistory: summary.hasPreWindowHistory,
   }
 }
 
@@ -136,6 +164,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       try {
         const live = await fetchDouyinFinanceReconcileRows(douyinToken, startDate, endDate)
         summary = applyLiveDouyinTotals(summary, live.rows)
+        summary = applyLiveBuyerStats(summary, live.buyerStats)
       } catch {
         /* 来客实时失败时保留本地订单汇总 */
       }

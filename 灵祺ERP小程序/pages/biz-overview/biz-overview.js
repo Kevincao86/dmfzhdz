@@ -172,6 +172,11 @@ function pointsFromTokenUsage(usage, model) {
   return Math.max(1, Math.ceil(costYuan / 0.01))
 }
 
+function cacheClaimsZeroBuyers(sections) {
+  const text = (sections || []).map((s) => `${s.title || ''}\n${s.body || ''}`).join('\n')
+  return /可识别买家为\s*0/.test(text) || /可识别买家[^\d]{0,8}0\s*人/.test(text)
+}
+
 function sectionsFromReport(text) {
   const raw = String(text || '').trim()
   if (!raw) return []
@@ -206,6 +211,12 @@ function factsForYesterday(targetDate, summary, adviceFacts) {
     `退款金额：${yuan(s.refundAmountYuan)} 元`,
     `成交券数：${s.couponCount == null ? '未知' : s.couponCount}`,
     `退款券数：${s.refundCouponCount == null ? '未知' : s.refundCouponCount}`,
+    `可识别买家：${s.buyerCount == null ? '未知' : s.buyerCount} 人`,
+    `买家识别覆盖率：${s.openIdCoverage == null ? '未知' : s.openIdCoverage}%`,
+    `新客人数：${s.newBuyerCount == null ? '未知' : s.newBuyerCount}`,
+    `老客人数：${s.oldBuyerCount == null ? '未知' : s.oldBuyerCount}`,
+    `新客成交占比：${s.newBuyerShare == null ? '未知' : s.newBuyerShare}%`,
+    `区间复购率：${s.repurchaseRate == null ? '未知' : s.repurchaseRate}%`,
     adviceFacts ? String(adviceFacts) : '',
     '请输出完整五节分析。数字必须与上面给出的金额和券数一致，禁止把有数写成 0。',
   ]
@@ -448,7 +459,26 @@ Page({
     }
     if (!manual) {
       const cached = readYesterdayCache(slot, tenant)
+      let refreshZeroBuyers = false
       if (cached) {
+        try {
+          const peek = await shop.fetchShopAnalysisSummary({
+            startDate: targetDate,
+            endDate: targetDate,
+            platform: 'all',
+          })
+          const peeked = (peek && peek.summary) || {}
+          this._prefetchedYday = { targetDate, summary: peeked, adviceFacts: peek && peek.adviceFacts }
+          this.setData({
+            ydayDate: targetDate,
+            ydayMetrics: ydayMetricsFromSummary(peeked),
+          })
+          refreshZeroBuyers = (Number(peeked.buyerCount) || 0) > 0 && cacheClaimsZeroBuyers(cached.sections)
+        } catch (_) {
+          this._prefetchedYday = null
+        }
+      }
+      if (cached && !refreshZeroBuyers) {
         this.setData({
           ...base,
           ydayLoading: false,
@@ -460,10 +490,10 @@ Page({
               ? `${autoOn ? '已开启，每天 10:00 自动更新' : '自动分析已关闭'} · 本次已扣 ${cached.pointsCharged} 积分`
               : base.ydayHint,
         })
-        void this.fillYesterdayMetrics(targetDate)
+        if (!this._prefetchedYday) void this.fillYesterdayMetrics(targetDate)
         return
       }
-      if (!autoOn) {
+      if (!autoOn && !refreshZeroBuyers) {
         this.setData({
           ...base,
           ydayLoading: false,
@@ -480,11 +510,16 @@ Page({
     this._ydaySeq = seq
     this.setData({ ...base, ydayLoading: true, ydayEmpty: '', ydaySections: manual ? this.data.ydaySections : [] })
     try {
-      const summaryRes = await shop.fetchShopAnalysisSummary({
-        startDate: targetDate,
-        endDate: targetDate,
-        platform: 'all',
-      })
+      const pre = this._prefetchedYday
+      const summaryRes =
+        pre && pre.targetDate === targetDate
+          ? { summary: pre.summary, adviceFacts: pre.adviceFacts }
+          : await shop.fetchShopAnalysisSummary({
+              startDate: targetDate,
+              endDate: targetDate,
+              platform: 'all',
+            })
+      this._prefetchedYday = null
       if (seq !== this._ydaySeq) return
       const summary = summaryRes.summary || {}
       const metrics = ydayMetricsFromSummary(summary)

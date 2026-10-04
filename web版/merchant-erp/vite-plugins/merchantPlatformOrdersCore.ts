@@ -174,7 +174,10 @@ export async function upsertDouyinOrders(
            order_status = excluded.order_status,
            pay_time = excluded.pay_time,
            verify_time = excluded.verify_time,
-           open_id = excluded.open_id,
+           open_id = case
+             when coalesce(excluded.open_id, '') <> '' then excluded.open_id
+             else merchant_platform_orders.open_id
+           end,
            raw_json = excluded.raw_json,
            synced_at = now()`,
         [
@@ -314,6 +317,22 @@ export type ShopPeriodKpis = {
   newBuyerShare: number
 }
 
+/** 列为空时从 raw_json 取买家标识，避免同步漏写 open_id 后客群变成 0 */
+const SHOP_BUYER_KEY_SQL = `coalesce(
+  nullif(btrim(coalesce(open_id, '')), ''),
+  nullif(btrim(coalesce(raw_json->>'open_id', '')), ''),
+  nullif(btrim(coalesce(raw_json->>'openid', '')), ''),
+  nullif(btrim(coalesce(raw_json->>'buyer_open_id', '')), ''),
+  nullif(btrim(coalesce(raw_json->'buyer'->>'open_id', '')), ''),
+  nullif(btrim(coalesce(raw_json->'buyer_info'->>'open_id', '')), ''),
+  nullif(btrim(coalesce(raw_json->'user'->>'open_id', '')), ''),
+  case
+    when btrim(coalesce(raw_json->'contacts'->0->>'phone_encrypt', '')) <> ''
+      then 'ph:' || btrim(raw_json->'contacts'->0->>'phone_encrypt')
+    else null
+  end
+)`
+
 export async function computeShopAnalysisSummary(params: {
   tenantId: string
   platform?: string
@@ -350,7 +369,8 @@ export async function computeShopAnalysisSummary(params: {
     const w = where.join(' and ')
     const { rows } = await c.query(
       `select order_id, product_id, sku_name, poi_id, poi_name,
-              pay_amount_fen, refund_amount_fen, coupon_count, open_id, pay_time
+              pay_amount_fen, refund_amount_fen, coupon_count, pay_time,
+              (${SHOP_BUYER_KEY_SQL}) as buyer_key
          from public.merchant_platform_orders where ${w}`,
       args,
     )
@@ -380,7 +400,7 @@ export async function computeShopAnalysisSummary(params: {
       couponCount += coupons
       const day = shanghaiYmdFromPayTime(r.pay_time)
       if (day) daysWithOrders.add(day)
-      const oid = String(r.open_id || '').trim()
+      const oid = String(r.buyer_key || '').trim()
       if (oid) {
         withOpenId.push(oid)
         buyers.set(oid, (buyers.get(oid) || 0) + 1)
@@ -430,8 +450,8 @@ export async function computeShopAnalysisSummary(params: {
       const unique = [...new Set(withOpenId)]
       const preWhere = [
         'tenant_id = $1::uuid',
-        'open_id = any($2::text[])',
-        `open_id <> ''`,
+        `(${SHOP_BUYER_KEY_SQL}) = any($2::text[])`,
+        `(${SHOP_BUYER_KEY_SQL}) <> ''`,
         sqlPayTimeLtStartShanghai('$3'),
         '(order_status is null or order_status not in (0, 100))',
       ]
@@ -451,10 +471,10 @@ export async function computeShopAnalysisSummary(params: {
         }
       }
       const preHist = await c.query(
-        `select distinct open_id from public.merchant_platform_orders where ${preWhere.join(' and ')}`,
+        `select distinct (${SHOP_BUYER_KEY_SQL}) as buyer_key from public.merchant_platform_orders where ${preWhere.join(' and ')}`,
         preArgs,
       )
-      const oldSet = new Set(preHist.rows.map((h) => String(h.open_id)))
+      const oldSet = new Set(preHist.rows.map((h) => String(h.buyer_key || '')).filter(Boolean))
       hasPreWindowHistory = oldSet.size > 0
       if (!hasPreWindowHistory) {
         const anyWhere = [

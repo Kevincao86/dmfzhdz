@@ -6133,6 +6133,124 @@ function orderIsPaidForSales(order: Record<string, unknown>): boolean {
   return st === 200 || st === 201 || st === 1
 }
 
+function firstBuyerToken(...vals: unknown[]): string {
+  for (const v of vals) {
+    const s = String(v ?? '').trim()
+    if (s && s !== '0' && s !== 'null' && s !== 'undefined') return s
+  }
+  return ''
+}
+
+/** 来客订单上的买家标识。open_id 缺失时用加密手机号，避免客群人数被写成 0。 */
+export function douyinOrderBuyerKey(order: Record<string, unknown>): string {
+  const direct = firstBuyerToken(order.open_id, order.openid, order.buyer_open_id, order.user_id, order.uid)
+  if (direct) return direct
+  const nests = [order.buyer, order.buyer_info, order.user, order.user_info, order.purchaser]
+  for (const n of nests) {
+    if (!n || typeof n !== 'object') continue
+    const b = n as Record<string, unknown>
+    const hit = firstBuyerToken(b.open_id, b.openid, b.user_id, b.uid, b.buyer_open_id)
+    if (hit) return hit
+  }
+  const contacts = Array.isArray(order.contacts) ? order.contacts : []
+  for (const c of contacts) {
+    if (!c || typeof c !== 'object') continue
+    const row = c as Record<string, unknown>
+    const enc = firstBuyerToken(row.phone_encrypt, row.phoneEncrypt, row.encrypt_phone)
+    if (enc) return `ph:${enc}`
+  }
+  const certs = Array.isArray(order.certificate) ? order.certificate : []
+  for (const c of certs) {
+    if (!c || typeof c !== 'object') continue
+    const cert = c as Record<string, unknown>
+    const hit = firstBuyerToken(cert.open_id, cert.openid, cert.user_id)
+    if (hit) return hit
+  }
+  return ''
+}
+
+export type DouyinLiveBuyerStats = {
+  buyerCount: number
+  openIdCoverage: number
+  newBuyerCount: number
+  oldBuyerCount: number
+  newBuyerSalesYuan: number
+  oldBuyerSalesYuan: number
+  newBuyerShare: number
+  newBuyerPeopleShare: number
+  oneTimeBuyerCount: number
+  repeatBuyerCount: number
+  repurchaseRate: number
+  paidOrderCount: number
+}
+
+type DouyinBuyerAcc = {
+  seen: Set<string>
+  counts: Map<string, number>
+  salesFen: Map<string, number>
+  paidOrders: number
+  withBuyer: number
+}
+
+function emptyDouyinBuyerAcc(): DouyinBuyerAcc {
+  return { seen: new Set(), counts: new Map(), salesFen: new Map(), paidOrders: 0, withBuyer: 0 }
+}
+
+function noteDouyinBuyer(acc: DouyinBuyerAcc, order: Record<string, unknown>, startYmd: string, endYmd: string): void {
+  if (!orderIsPaidForSales(order)) return
+  const oid = orderUniqueId(order)
+  if (acc.seen.has(oid)) return
+  const paySec = orderPayUnixSec(order)
+  if (paySec <= 0) return
+  const day = shanghaiDateStringFromUnixSec(paySec)
+  if (day < startYmd || day > endYmd) return
+  acc.seen.add(oid)
+  acc.paidOrders += 1
+  const key = douyinOrderBuyerKey(order)
+  if (!key) return
+  acc.withBuyer += 1
+  acc.counts.set(key, (acc.counts.get(key) || 0) + 1)
+  const fen = Math.round(orderPayAmountYuan(order) * 100)
+  acc.salesFen.set(key, (acc.salesFen.get(key) || 0) + fen)
+}
+
+function summarizeDouyinBuyers(acc: DouyinBuyerAcc): DouyinLiveBuyerStats {
+  const buyerCount = acc.counts.size
+  const oneTimeBuyerCount = [...acc.counts.values()].filter((n) => n === 1).length
+  const repeatBuyerCount = [...acc.counts.values()].filter((n) => n >= 2).length
+  let newFen = 0
+  let oldFen = 0
+  let newBuyerCount = 0
+  let oldBuyerCount = 0
+  for (const [key, n] of acc.counts) {
+    const fen = acc.salesFen.get(key) || 0
+    if (n >= 2) {
+      oldBuyerCount += 1
+      oldFen += fen
+    } else {
+      newBuyerCount += 1
+      newFen += fen
+    }
+  }
+  const newBuyerSalesYuan = Math.round(newFen) / 100
+  const oldBuyerSalesYuan = Math.round(oldFen) / 100
+  const salesYuan = newBuyerSalesYuan + oldBuyerSalesYuan
+  return {
+    buyerCount,
+    openIdCoverage: acc.paidOrders > 0 ? Math.round((acc.withBuyer / acc.paidOrders) * 10000) / 100 : 0,
+    newBuyerCount,
+    oldBuyerCount,
+    newBuyerSalesYuan,
+    oldBuyerSalesYuan,
+    newBuyerShare: salesYuan > 0 ? Math.round((newBuyerSalesYuan / salesYuan) * 10000) / 100 : 0,
+    newBuyerPeopleShare: buyerCount > 0 ? Math.round((newBuyerCount / buyerCount) * 10000) / 100 : 0,
+    oneTimeBuyerCount,
+    repeatBuyerCount,
+    repurchaseRate: buyerCount > 0 ? Math.round((repeatBuyerCount / buyerCount) * 10000) / 100 : 0,
+    paidOrderCount: acc.paidOrders,
+  }
+}
+
 function orderSalesCouponCount(order: Record<string, unknown>): number {
   const certs = order.certificate
   if (Array.isArray(certs) && certs.length > 0) return certs.length
@@ -6517,7 +6635,7 @@ function normalizeDouyinTradeOrderDetail(order: Record<string, unknown>): Douyin
     orderStatus: Number.isFinite(st) ? st : null,
     payTimeIso: paySec > 0 ? new Date(paySec * 1000).toISOString() : null,
     verifyTimeIso: verifySec > 0 ? new Date(verifySec * 1000).toISOString() : null,
-    openId: String(order.open_id ?? order.openid ?? order.buyer_open_id ?? '').trim(),
+    openId: douyinOrderBuyerKey(order),
     raw: order,
   }
 }
@@ -6659,6 +6777,7 @@ type DouyinFinanceReconcileResult = {
   rows: FinanceReconcileRowPayload[]
   warnings: string[]
   hourlyTrend?: FinanceHourlyPayPoint[]
+  buyerStats?: DouyinLiveBuyerStats
 }
 
 const DOUYIN_FINANCE_CACHE_TTL_MS = 20_000
@@ -6714,6 +6833,8 @@ async function loadDouyinFinanceReconcileRows(
   const seenSalesOrderIds = new Set<string>()
   const seenVerifyCerts = new Set<string>()
   const seenRefundCerts = new Set<string>()
+  const buyerAcc = emptyDouyinBuyerAcc()
+  const onOrder = (order: Record<string, unknown>) => noteDouyinBuyer(buyerAcc, order, startYmd, endYmd)
   const trackHourly = startYmd === endYmd
   const hourlyPay = trackHourly ? new Map<number, number>() : undefined
   const queryStart = addCalendarDaysShanghai(startYmd, -DOUYIN_SALES_CREATE_LOOKBACK_DAYS)
@@ -6743,7 +6864,7 @@ async function loadDouyinFinanceReconcileRows(
           seenVerifyCerts,
           'create',
           tradeWarnings,
-          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES, seenRefundCerts },
+          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES, seenRefundCerts, onOrder },
           hourlyPay,
         ),
       ]
@@ -6762,7 +6883,7 @@ async function loadDouyinFinanceReconcileRows(
             seenVerifyCerts,
             'create',
             hermesWarnings,
-            { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_HERMES_WEEK_MAX_PAGES, seenRefundCerts },
+            { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_HERMES_WEEK_MAX_PAGES, seenRefundCerts, onOrder },
             hourlyPay,
           ),
         )
@@ -6807,7 +6928,7 @@ async function loadDouyinFinanceReconcileRows(
           seenVerifyCerts,
           'update',
           chunkWarnings,
-          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES, seenRefundCerts },
+          { pageSize: DOUYIN_WEEK_PAGE_SIZE, maxPages: DOUYIN_WEEK_MAX_PAGES, seenRefundCerts, onOrder },
           hourlyPay,
         )
         if (chunkWarnings.some((w) => w.includes('分页达到上限'))) {
@@ -6853,6 +6974,7 @@ async function loadDouyinFinanceReconcileRows(
   return {
     rows,
     warnings,
+    buyerStats: summarizeDouyinBuyers(buyerAcc),
     ...(hourlyPay ? { hourlyTrend: buildHourlyPayTrend(hourlyPay) } : {}),
   }
 }

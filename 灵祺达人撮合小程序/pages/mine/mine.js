@@ -429,6 +429,7 @@ Page({
     statAppliedLabel: '已报名',
     statInProgressLabel: '进行中',
     statCompletedLabel: '已完成',
+    statRefreshing: false,
     statAppliedKey: 'applications',
     profileVerified: false,
     membershipPlanLabel: '基础版（免费）',
@@ -577,7 +578,12 @@ Page({
       wxLoggedIn &&
       (identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
       !!memberProfileApplyGate.validateMemberProfileForApply(member, identity)
-    const stats = mineProfileStats.computeMineStats(identity)
+    const statCache = mineProfileStats.readMineStatCache(identity, acct)
+    const statCacheFresh = mineProfileStats.mineStatCacheFresh(statCache)
+    const useCachedStats = !this._forceStatRefresh && statCacheFresh
+    const stats = useCachedStats ? statCache.stats : mineProfileStats.computeMineStats(identity)
+    if (!useCachedStats) mineProfileStats.writeMineStatCache(identity, acct, stats)
+    this._mineStatsStale = !useCachedStats
     const profileVerified =
       wxLoggedIn &&
       (((identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
@@ -625,7 +631,7 @@ Page({
       membershipCtaLabel,
       ...stats,
     })
-    if (identity === 'pr' && wxLoggedIn) void this.refreshPrStatsIfNeeded()
+    if (identity === 'pr' && wxLoggedIn && this._mineStatsStale) void this.refreshPrStatsIfNeeded()
     if (wxLoggedIn) void this.attachLecturerCourses(identity)
   },
   async attachLecturerCourses(identity) {
@@ -652,6 +658,8 @@ Page({
     try {
       const stats = await mineProfileStats.loadPrStatsAsync()
       if (userProfile.readIdentity() !== 'pr') return
+      mineProfileStats.writeMineStatCache('pr', auth.readAccount(), stats)
+      this._mineStatsStale = false
       this.setData(stats)
     } catch (_) {}
   },
@@ -716,6 +724,19 @@ Page({
       }
     }
     this.setData({ notifyBadge: count })
+  },
+  async onStatRefresh() {
+    this._forceStatRefresh = true
+    this.setData({ statRefreshing: true })
+    try {
+      this.refresh()
+      if (userProfile.readIdentity() === 'pr' && auth.isLoggedIn()) {
+        await this.refreshPrStatsIfNeeded()
+      }
+    } finally {
+      this._forceStatRefresh = false
+      this.setData({ statRefreshing: false })
+    }
   },
   onHide() {
     setTabBarHidden(this, false)

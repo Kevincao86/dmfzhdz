@@ -97,11 +97,12 @@ function extractBaomingEid(url) {
 }
 
 function normalizeBaomingMiniPath(rawPath) {
-  const path = String(rawPath || '').trim().replace(/^\//, '')
+  let path = String(rawPath || '').trim().replace(/^\//, '')
   if (!path) return ''
+  path = path.replace(/^pages\/subpack-core\/detail\/detail/, 'pages/detail/detail')
   if (path.indexOf('pages/') === 0) return path
   const eid = extractBaomingEid(path.indexOf('eid=') >= 0 ? `https://x/?${(path.split('?')[1] || '')}` : path)
-  if (eid) return `pages/subpack-core/detail/detail?eid=${encodeURIComponent(eid)}`
+  if (eid) return `pages/detail/detail?eid=${encodeURIComponent(eid)}`
   return ''
 }
 
@@ -119,7 +120,7 @@ function buildBaomingMiniPath(rawUrl, pathHint) {
   const fromHint = normalizeBaomingMiniPath(pathHint || '')
   if (fromHint) return fromHint
   const eid = extractBaomingEid(rawUrl)
-  return eid ? `pages/subpack-core/detail/detail?eid=${encodeURIComponent(eid)}` : ''
+  return eid ? `pages/detail/detail?eid=${encodeURIComponent(eid)}` : ''
 }
 
 function resolveBaomingMiniProgram(rawUrl, pathHint) {
@@ -149,9 +150,14 @@ function resolveFormRelaySourceMpLink(sourceUrl, platform, cached) {
     const webUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : String(cached.sourceMpDisplayLink)
     let appId = String(cached.sourceMpAppId)
     let path = String(cached.sourceMpPath)
-    if (/baominggongju\.com/i.test(rawUrl) || appId === BAOMING_MP_APPID_LEGACY) {
+    if (
+      /baominggongju\.com/i.test(rawUrl) ||
+      appId === BAOMING_MP.appId ||
+      appId === BAOMING_MP_APPID_LEGACY ||
+      /报名工具/.test(String(cached.sourceMpDisplayLink || ''))
+    ) {
       appId = BAOMING_MP.appId
-      path = buildBaomingMiniPath(rawUrl, path) || path
+      path = buildBaomingMiniPath(rawUrl, path) || normalizeBaomingMiniPath(path) || path
     }
     return {
       displayLink: String(cached.sourceMpDisplayLink),
@@ -201,7 +207,7 @@ function resolveFormRelaySourceMpLink(sourceUrl, platform, cached) {
     if (eid) {
       const hit = resolveBaomingMiniProgram(
         rawUrl,
-        `pages/subpack-core/detail/detail?eid=${encodeURIComponent(eid)}`,
+        `pages/detail/detail?eid=${encodeURIComponent(eid)}`,
       )
       if (hit) return Object.assign({ rawUrl }, hit)
     }
@@ -280,6 +286,44 @@ function openHttpsFormUrl(webUrl, forceEmbed) {
 function openFormRelaySourceLink(link, fallbackUrl) {
   const open = link && typeof link === 'object' ? link : null
   const httpsUrl = resolveFormRelayHttpsOpenUrl(open, fallbackUrl)
+
+  if ((!open || open.openKind !== 'miniProgram' || !open.appId || !open.path) && httpsUrl && isQunbaoshuUrl(httpsUrl)) {
+    const formRelaySourceParse = require('./formRelaySourceParse.js')
+    wx.showLoading({ title: '打开群报数…', mask: true })
+    formRelaySourceParse
+      .parseFormRelaySource(httpsUrl, 'qunbaoshu')
+      .then((res) => {
+        wx.hideLoading()
+        if (res && res.sourceMpAppId && res.sourceMpPath) {
+          openFormRelaySourceLink(
+            {
+              openKind: 'miniProgram',
+              appId: res.sourceMpAppId,
+              path: res.sourceMpPath,
+              displayLink: res.sourceMpDisplayLink || '',
+              webUrl: httpsUrl,
+              rawUrl: httpsUrl,
+            },
+            httpsUrl,
+          )
+          return
+        }
+        wx.showModal({
+          title: '打开原表报名',
+          content: '未能跳转群报数小程序，请确认链接有效或联系招募方。',
+          showCancel: false,
+        })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showModal({
+          title: '打开原表报名',
+          content: '未能跳转群报数小程序，请检查网络后重试。',
+          showCancel: false,
+        })
+      })
+    return
+  }
 
   function fallbackWeb(fromMiniProgramFail) {
     if (httpsUrl) {
