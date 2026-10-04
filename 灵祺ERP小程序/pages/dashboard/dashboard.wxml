@@ -38,7 +38,9 @@
       data-id="{{item.id}}"
       bindtap="onEntryTap"
     >
-      <image class="home-entry__img" src="{{item.imageUrl}}" mode="aspectFill" />
+      <view class="home-entry__art" style="background:{{item.iconBg}}">
+        <image class="home-entry__icon" src="{{item.iconSrc}}" mode="aspectFit" />
+      </view>
       <text class="home-entry__title">{{item.title}}</text>
     </view>
   </view>

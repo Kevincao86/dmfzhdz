@@ -3,6 +3,7 @@ const reviews = require('../../utils/reviewsMp.js')
 const ops = require('../../utils/opsRegistryMp.js')
 const rest = require('../../utils/supabaseRest.js')
 const { readPlatformToken } = require('../../utils/platformTokensMp.js')
+const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
 
 const SLOT_KEY = 'erp.mp.home.banner'
 
@@ -37,21 +38,24 @@ const ENTRIES = [
   {
     id: 'overview',
     title: '经营概览',
-    imageUrl: '/images/home/entry-overview.jpg',
+    iconBg: '#e8f0ff',
+    iconSrc: iconDataUri('#2f6fed', 'trend'),
     url: '/pages/biz-overview/biz-overview',
     tab: false,
   },
   {
     id: 'analysis',
     title: '店铺分析',
-    imageUrl: '/images/home/entry-analysis.jpg',
+    iconBg: '#efe8ff',
+    iconSrc: iconDataUri('#6b5ce8', 'chart'),
     url: '/pages/store-analysis/store-analysis',
     tab: false,
   },
   {
     id: 'shop',
     title: '门店评估',
-    imageUrl: '/images/home/entry-eval.jpg',
+    iconBg: '#e3f6f2',
+    iconSrc: iconDataUri('#0d9488', 'shop'),
     url: '/pages/shop-eval/shop-eval',
     tab: true,
   },

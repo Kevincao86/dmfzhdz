@@ -56,10 +56,16 @@
   box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.05);
 }
 
-.home-entry__img {
-  width: 100%;
+.home-entry__art {
   height: 160rpx;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-entry__icon {
+  width: 72rpx;
+  height: 72rpx;
 }
 
 .home-entry__title {
