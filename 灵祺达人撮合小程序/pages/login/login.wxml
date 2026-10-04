@@ -165,15 +165,9 @@
     </view>
   </view>
 
-  <view class="login-talent-zone">
-    <text class="login-talent-title">✦ 优质达人 · 等你合作 ✦</text>
-    <text class="login-talent-hint">{{promoHint}}</text>
-    <view class="login-orbit-zone">
-    <image class="login-orbit-deco" src="{{authOrbitDeco}}" mode="aspectFill" aria-hidden="true" />
-    <view class="login-orbit-wall-wrap">
-      <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
-    </view>
-    </view>
+  <view class="login-legal-foot">
+    <text class="login-legal-copy">© 2026 宁波墨典网络科技有限公司 Copyright. All Rights Reserved.</text>
+    <site-icp-footer compact />
   </view>
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
   </view>
@@ -294,5 +288,4 @@
   </view>
 
   <text class="login-back-link" bindtap="onBack">‹ 返回</text>
-  <site-icp-footer compact />
 </view>

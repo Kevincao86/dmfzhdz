@@ -7,7 +7,6 @@ const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
 const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
 const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
-const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
 const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const { loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
@@ -188,15 +187,12 @@ Page({
     err: '',
     navBandStyle: '',
     navInnerStyle: '',
-    promoHint: '左右滑动查看更多达人',
     featureItems: [
       { tag: 'AI荐达人', text: '高匹配人才', glyph: '★' },
       { tag: '招募大厅', text: '多行业覆盖', glyph: '👥' },
       { tag: '私信沟通', text: '实时对接', glyph: '💬' },
     ],
-    orbitImages: ORBIT_IMAGES,
     authHeroBg: mpCdnAssets.loginHeroBg,
-    authOrbitDeco: mpCdnAssets.loginOrbitDeco,
     shareCoverPreloadUrl: mpCdnAssets.defaultShareCover,
     wxNickName: '',
     wxAvatarUrl: '',
