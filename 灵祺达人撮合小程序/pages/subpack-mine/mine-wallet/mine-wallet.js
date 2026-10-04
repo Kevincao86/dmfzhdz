@@ -21,6 +21,7 @@ Page({
     accountBound: false,
     payouts: [],
     cashVisible: false,
+    cashLoading: false,
     cashTitle: '',
     cashSubtitle: '',
     cashPoster: '',
@@ -42,8 +43,65 @@ Page({
   onShow() {
     if (auth.readSessionToken()) this.load()
   },
+  cashFallbackTitle(workIdentity) {
+    return workIdentity === 'talent' ? '达人活动红包提现' : 'PR招募现金红包'
+  },
+  showCashShell(workIdentity) {
+    return workIdentity === 'pr' || workIdentity === 'talent'
+  },
+  loadCash(workIdentity, seq) {
+    const token = sessionStore.readSessionToken()
+    return ecs
+      .post(
+        '/api/meoo-mp-pr-cash-wallet',
+        { action: 'summary', workIdentity },
+        { 'X-Mp-Session': token },
+      )
+      .then((cash) => {
+        if (seq !== this._cashSeq) return
+        if (!cash || cash.visible === false) {
+          this.setData({ cashVisible: false, cashLoading: false })
+          return
+        }
+        const cashCampaign = cash.campaign || {}
+        const cashWallet = cash.wallet || {}
+        this.setData({
+          cashVisible: true,
+          cashLoading: false,
+          cashTitle: cashCampaign.title || this.cashFallbackTitle(workIdentity),
+          cashSubtitle: cashCampaign.subtitle || '',
+          cashPoster: cashCampaign.posterUrl || '',
+          cashRules: cashCampaign.rulesText || '',
+          cashAvailable: cashWallet.availableYuan || '0.00',
+          cashOrders: cashWallet.qualifyingOrders || 0,
+          cashRemaining: cashCampaign.remaining || 0,
+          cashCanWithdraw: !!cashWallet.canWithdraw,
+          cashHint: cashWallet.hint || '',
+          cashWithdraws: cash.withdraws || [],
+        })
+      })
+      .catch(() => {
+        if (seq !== this._cashSeq) return
+        this.setData({
+          cashVisible: true,
+          cashLoading: false,
+          cashHint: '暂时读不到红包，下拉再试',
+        })
+      })
+  },
   async load() {
-    this.setData({ loading: true, err: '' })
+    const workIdentity = userProfile.readIdentity()
+    const showCash = this.showCashShell(workIdentity)
+    this._cashSeq = (this._cashSeq || 0) + 1
+    const cashSeq = this._cashSeq
+    this.setData({
+      loading: true,
+      err: '',
+      cashVisible: showCash,
+      cashLoading: showCash,
+      cashTitle: showCash ? this.data.cashTitle || this.cashFallbackTitle(workIdentity) : '',
+    })
+    if (showCash) this.loadCash(workIdentity, cashSeq)
     try {
       try { await registryProfileSync.pullRegistryProfileAfterLogin() } catch (_) {}
       const token = sessionStore.readSessionToken()
@@ -58,15 +116,6 @@ Page({
       const balance = s
         ? Math.max(0, Math.floor(Number(s.balance) || packageRemaining + rechargeBalance))
         : Math.max(0, Math.floor(Number(data && data.mpAiPointsBalance) || 0))
-      const workIdentity = userProfile.readIdentity()
-      const cash = await ecs.post(
-        '/api/meoo-mp-pr-cash-wallet',
-        { action: 'summary', workIdentity },
-        { 'X-Mp-Session': token },
-      ).catch(() => null)
-      const cashCampaign = cash && cash.campaign ? cash.campaign : {}
-      const cashWallet = cash && cash.wallet ? cash.wallet : {}
-      const cashFallback = workIdentity === 'talent' ? '达人活动红包提现' : 'PR招募现金红包'
       const summary = await training.walletSummary()
       const profile = await training.syncProfile()
       const quote = summary.settlement || {}
@@ -78,17 +127,6 @@ Page({
         netLabel: Number(quote.net || 0).toFixed(2),
         commissionLabel: Number(quote.commission || 0).toFixed(2),
         taxLabel: Number(quote.tax || 0).toFixed(2),
-        cashVisible: (workIdentity === 'pr' || workIdentity === 'talent') && !!(cash && cash.visible),
-        cashTitle: cashCampaign.title || cashFallback,
-        cashSubtitle: cashCampaign.subtitle || '',
-        cashPoster: cashCampaign.posterUrl || '',
-        cashRules: cashCampaign.rulesText || '',
-        cashAvailable: cashWallet.availableYuan || '0.00',
-        cashOrders: cashWallet.qualifyingOrders || 0,
-        cashRemaining: cashCampaign.remaining || 0,
-        cashCanWithdraw: !!cashWallet.canWithdraw,
-        cashHint: cashWallet.hint || '',
-        cashWithdraws: (cash && cash.withdraws) || [],
         payouts: (summary.payouts || []).map((row) => ({
           id: row.id,
           net: Number(row.net || 0).toFixed(2),
@@ -129,6 +167,10 @@ Page({
     })
   },
   onCashWithdraw() {
+    if (this.data.cashLoading) {
+      wx.showToast({ title: '正在读取红包', icon: 'none' })
+      return
+    }
     if (!this.data.cashCanWithdraw) {
       wx.showToast({ title: String(this.data.cashHint || '暂时不能提现').slice(0, 18), icon: 'none' })
       return

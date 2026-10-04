@@ -4,13 +4,19 @@
 
   <view class="wl-card" wx:if="{{cashVisible}}">
     <text class="wl-name">{{cashTitle}}</text>
-    <text class="wl-value">¥{{cashAvailable}}</text>
-    <text class="wl-hint">{{cashSubtitle}} 已达标 {{cashOrders}} 单，剩余 {{cashRemaining}} 个。</text>
-    <text wx:if="{{cashHint}}" class="wl-hint">{{cashHint}}</text>
-    <image wx:if="{{cashPoster}}" class="wl-poster" src="{{cashPoster}}" mode="widthFix" />
-    <text wx:if="{{cashRules}}" class="wl-hint">{{cashRules}}</text>
-    <view class="wl-btn wl-btn--block" bindtap="onCashWithdraw">提现</view>
-    <view wx:if="{{cashWithdraws.length}}" class="wl-payouts">
+    <block wx:if="{{cashLoading}}">
+      <text class="wl-value">…</text>
+      <text class="wl-hint">正在读取红包</text>
+    </block>
+    <block wx:else>
+      <text class="wl-value">¥{{cashAvailable}}</text>
+      <text class="wl-hint">{{cashSubtitle}} 已达标 {{cashOrders}} 单，剩余 {{cashRemaining}} 个。</text>
+      <text wx:if="{{cashHint}}" class="wl-hint">{{cashHint}}</text>
+      <image wx:if="{{cashPoster}}" class="wl-poster" src="{{cashPoster}}" mode="widthFix" />
+      <text wx:if="{{cashRules}}" class="wl-hint">{{cashRules}}</text>
+      <view class="wl-btn wl-btn--block" bindtap="onCashWithdraw">提现</view>
+    </block>
+    <view wx:if="{{!cashLoading && cashWithdraws.length}}" class="wl-payouts">
       <view wx:for="{{cashWithdraws}}" wx:key="id" class="wl-payout">
         <text class="wl-payout-net">¥{{item.amountYuan}}</text>
         <text class="wl-payout-status {{item.status === 'paid' ? 'wl-payout-status--paid' : ''}}">{{item.statusText}}</text>
