@@ -2,9 +2,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8rpx;
-  padding: 32rpx 24rpx 24rpx;
+  gap: 6rpx;
+  padding: 24rpx 12rpx 16rpx;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .site-icp-footer--compact {
@@ -13,10 +14,11 @@
 
 .site-icp-footer__row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
-  gap: 8rpx 20rpx;
+  gap: 8rpx 16rpx;
+  max-width: 100%;
 }
 
 .site-icp-footer__psb {
@@ -33,9 +35,9 @@
 
 .site-icp-footer__copy,
 .site-icp-footer__text {
-  font-size: 24rpx;
-  line-height: 1.5;
+  font-size: 20rpx;
+  line-height: 1.4;
   color: #5c4636;
   text-align: center;
-  font-weight: 600;
+  white-space: nowrap;
 }

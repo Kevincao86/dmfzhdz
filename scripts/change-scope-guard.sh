@@ -116,6 +116,7 @@ list_scopes() {
   payout_id_fields     达人小程序与星选：绑定收款账户增加姓名、身份证号，人像面识别自动填入
   site_copyright       星选与商家网页页脚宁波墨典版权；商家小程序页脚温州灵祺版权
   mp_four_fixes        商家经营分析顾客数据；达人我的单据缓存；转单原表打开；达人客服 AI 回复
+  talent_footer_lines 达人小程序页脚版权与备案收成两行
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1710,6 +1711,12 @@ PAT
 MeooLayout.tsx
 AppShell.tsx
 灵祺ERP小程序/components/site-icp-footer
+change-scope-guard
+PAT
+      ;;
+    talent_footer_lines)
+      cat <<'PAT'
+灵祺达人撮合小程序/components/site-icp-footer
 change-scope-guard
 PAT
       ;;
