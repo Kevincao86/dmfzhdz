@@ -465,7 +465,6 @@ async function recognizeDoc(kind, imageDataUrl) {
 
 async function saveProfile(input) {
   const prev = readProfile() || {}
-  if (lecturerState(prev) !== 'approved') throw new Error('讲师申请通过后才能绑定收款账户')
   const profile = {
     ...prev,
     hostId: accountId(),
@@ -479,7 +478,8 @@ async function saveProfile(input) {
     idFront: String(input.idFront || prev.idFront || ''),
     idBack: String(input.idBack || prev.idBack || ''),
     licenseImage: String(input.licenseImage || prev.licenseImage || ''),
-    lecturerStatus: 'approved',
+    lecturerStatus: prev.lecturerStatus || '',
+    lecturerNote: prev.lecturerNote || '',
     updatedAt: new Date().toISOString(),
   }
   if (!profile.idName) throw new Error('请填写姓名')

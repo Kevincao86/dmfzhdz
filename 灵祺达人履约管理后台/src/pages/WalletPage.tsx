@@ -253,13 +253,6 @@ export default function WalletPage() {
     }
   }
 
-  function lecturerApproved(profile: BoundAccount | null) {
-    if (!profile) return false
-    if (profile.lecturerStatus === 'none' || profile.lecturerStatus === 'pending' || profile.lecturerStatus === 'rejected') return false
-    if (profile.lecturerStatus === 'approved') return true
-    return !!(profile.intro && profile.city)
-  }
-
   function openBind() {
     setKind(account?.kind === 'entity' ? 'entity' : 'person')
     setHolder(account?.name || '')
@@ -304,10 +297,6 @@ export default function WalletPage() {
 
   async function saveAccount() {
     if (!me?.accountId) return
-    if (!lecturerApproved(account)) {
-      setErr('讲师通过后才能绑定收款账户')
-      return
-    }
     if (!idFront || !idBack) {
       setErr('请上传身份证人像面和国徽面')
       return

@@ -512,10 +512,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ ok: false, error: '缺少身份' })
       return
     }
-    const prev = store.profiles.find((p) => p.hostId === hostId)
-    if (!prev || lecturerState(prev) !== 'approved') {
-      res.status(400).json({ ok: false, error: '讲师申请通过后才能绑定收款账户' })
-      return
+    const prev: Profile = store.profiles.find((p) => p.hostId === hostId) || {
+      hostId,
+      kind: 'person',
+      name: '',
+      idName: '',
+      idNo: '',
+      bank: '',
+      bankNo: '',
+      licenseNo: '',
+      city: '',
+      platforms: '',
+      skills: '',
+      years: '',
+      intro: '',
+      avatar: '',
+      idFront: '',
+      idBack: '',
+      licenseImage: '',
+      lecturerStatus: '',
+      lecturerNote: '',
+      updatedAt: '',
     }
     const name = String(body.name || '').trim()
     const bankNo = String(body.bankNo || '').trim()
@@ -554,7 +571,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       idFront: clipImage(body.idFront) || prev.idFront || '',
       idBack: clipImage(body.idBack) || prev.idBack || '',
       licenseImage: clipImage(body.licenseImage) || prev.licenseImage || '',
-      lecturerStatus: 'approved',
+      lecturerStatus: prev.lecturerStatus || '',
       lecturerNote: prev.lecturerNote || '',
       updatedAt: new Date().toISOString(),
     }

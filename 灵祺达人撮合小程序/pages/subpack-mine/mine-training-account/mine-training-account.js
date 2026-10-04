@@ -252,9 +252,6 @@ Page({
   onSkills(e) { this._editing = true; this.setData({ skills: e.detail.value }) },
   onYears(e) { this._editing = true; this.setData({ years: e.detail.value }) },
   onIntro(e) { this._editing = true; this.setData({ intro: e.detail.value }) },
-  goApply() {
-    wx.redirectTo({ url: '/pages/subpack-mine/mine-training-account/mine-training-account?mode=apply' })
-  },
   onOpenMember() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership' })
   },

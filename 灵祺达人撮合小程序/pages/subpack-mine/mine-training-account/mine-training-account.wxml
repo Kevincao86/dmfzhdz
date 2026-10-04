@@ -89,16 +89,6 @@
     </view>
   </block>
 
-  <block wx:elif="{{lecturerStatus !== 'approved'}}">
-    <view class="la-card">
-      <text class="la-sec">还不能绑定</text>
-      <text class="la-note">讲师通过后才能绑定收款账户。未绑定也可以发布培训。</text>
-    </view>
-    <view class="la-bar">
-      <view class="la-btn" bindtap="goApply">去申请讲师</view>
-    </view>
-  </block>
-
   <block wx:else>
     <view class="la-card">
       <text class="la-sec">收款主体</text>
