@@ -172,7 +172,7 @@
       </scroll-view>
 
     <view wx:if="{{unconfigured}}" class="card state-warn home-filters-warn">
-      <text class="hint">演示模式，连接后台后可查看真实商单</text>
+      <text class="hint">这是演示数据，正式使用后这里会显示真实商单</text>
     </view>
 
     <view wx:if="{{err && displayRows.length}}" class="card state-warn home-refresh-hint">
@@ -246,7 +246,7 @@
       <view wx:if="{{displayRows.length === 0}}" class="card state-empty empty-block">
         <text class="state-empty-icon">📋</text>
         <text class="empty-title">暂无招募商单</text>
-        <text class="hint">运营台发布后将在此展示；可切换急单/云剪或下拉刷新</text>
+        <text class="hint">新商单发布后会出现在这里；可切换急单、云剪，或下拉刷新</text>
       </view>
     </block>
     <site-icp-footer />

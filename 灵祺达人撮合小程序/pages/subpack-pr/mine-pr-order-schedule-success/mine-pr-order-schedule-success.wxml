@@ -4,8 +4,8 @@
     <text class="sch-ok-title">探店排期已确认并通知达人</text>
     <text class="hint sch-ok-desc">
       {{talentCount > 0
-        ? '已向 ' + talentCount + ' 位达人下发探店日期与时段，达人可在小程序「我的报名 → 待探店」查看并签到。'
-        : '达人可在小程序「我的报名 → 待探店」查看排期详情，探店日当天完成签到后进入待传视频。'}}
+        ? '已把探店日期和时段发给 ' + talentCount + ' 位达人，他们可以在「我的报名 → 待探店」里查看并签到。'
+        : '达人可以在「我的报名 → 待探店」查看排期，探店当天签到后就能去传视频。'}}
     </text>
     <view class="sch-ok-actions">
       <button class="sch-ok-btn sch-ok-btn--primary" bindtap="goVideoReview">查看待视频审核</button>

@@ -83,9 +83,9 @@ async function uploadImageFileToOss(tempFilePath, opts) {
   } catch (e) {
     const msg = String((e && e.message) || e || '图片上传失败')
     if (isDomainListError(msg)) {
-      throw new Error('图片上传失败：请确认小程序 request 合法域名已含 mofangdianai.com')
+      throw new Error('图片上传失败，请稍后再试')
     }
-    if (/oss_not|upload_failed/i.test(msg)) throw new Error('服务器图片存储未就绪，请稍后重试')
+    if (/oss_not|upload_failed/i.test(msg)) throw new Error('图片暂时存不上，请稍后再试')
     throw new Error(msg.length > 48 ? `${msg.slice(0, 46)}…` : msg)
   }
 }

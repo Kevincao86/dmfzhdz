@@ -132,7 +132,7 @@ Page({
     }
     wx.showModal({
       title: '提现招募红包',
-      content: `可提现 ¥${this.data.cashAvailable}。提交后由运营打款，1–3 个工作日到账。`,
+      content: `可提现 ¥${this.data.cashAvailable}。提交后等待打款，1–3 个工作日到账。`,
       confirmText: '确认提现',
       success: async (res) => {
         if (!res.confirm) return

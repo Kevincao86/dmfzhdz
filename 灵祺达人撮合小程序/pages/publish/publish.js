@@ -851,7 +851,7 @@ Page({
     wx.showModal({
       title: '抖音林客授权',
       content:
-        '请在星选平台 Web 端（dr.mofangdianai.com）完成「抖音林客授权」并添加客户商家。使用同一账号登录小程序后，绑定信息将自动同步，即可在此挂接发单。',
+        '请先在电脑上的星选平台完成抖音授权，并添加客户商家。用同一账号登录小程序后，绑定信息会自动带过来，就可以在这里挂接发单。',
       showCancel: false,
       confirmText: '知道了',
     })
@@ -941,7 +941,7 @@ Page({
   },
   async loadEditOrder(mpId) {
     if (!api.hasApi()) {
-      wx.showToast({ title: '未配置后台地址', icon: 'none' })
+      wx.showToast({ title: '暂时连不上，请稍后再试', icon: 'none' })
       setTimeout(() => wx.navigateBack(), 800)
       return
     }
@@ -1126,7 +1126,7 @@ Page({
     if (id === 'targeted' && !mpTargetedRecruitAccess.canUseTargetedRecruit()) {
       wx.showModal({
         title: '定向邀约未开通',
-        content: '当前会员档位不含定向邀约，请升级会员或联系运营开通。',
+        content: '你现在的会员还不能定向邀请达人，请升级会员，或联系客服开通。',
         showCancel: false,
         confirmText: '知道了',
       })
@@ -2174,7 +2174,7 @@ Page({
       return
     }
     if (!api.hasApi()) {
-      wx.showToast({ title: '未配置后台地址', icon: 'none' })
+      wx.showToast({ title: '暂时连不上，请稍后再试', icon: 'none' })
       return
     }
     if (!this.promptLoginBeforePublish()) return

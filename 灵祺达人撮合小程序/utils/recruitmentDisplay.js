@@ -181,7 +181,7 @@ function enrichMpOrder(mp, merchant) {
   const tags = [
     { text: platform, tone: platform.includes('红') ? 'pink' : 'blue' },
     isIce ? { text: '闭环·云剪', tone: 'pink' } : { text: '开环·线下', tone: 'gray' },
-    isIce ? { text: '确认接收', tone: 'gray' } : { text: '运营反选', tone: 'gray' },
+    isIce ? { text: '确认接收', tone: 'gray' } : { text: '招募方挑选', tone: 'gray' },
   ]
 
   return {

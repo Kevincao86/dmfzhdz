@@ -6,8 +6,8 @@ const SHARE_PAGE = 'pages/subpack-pr/applicant-pick-share/applicant-pick-share'
 
 function shareErrorMessage(data) {
   const err = String((data && data.error) || '').trim()
-  if (err === 'applicant_pick_share_table_missing') return '分享功能未就绪，请联系运营'
-  if (err === 'applicant_pick_share_db_permission') return '分享功能未就绪，请联系运营'
+  if (err === 'applicant_pick_share_table_missing') return '分享还没准备好，请联系客服'
+  if (err === 'applicant_pick_share_db_permission') return '分享还没准备好，请联系客服'
   if (err === 'order_not_found') return '订单不存在或已删除'
   if (err === 'share_link_invalid') return '分享链接已失效'
   if (err === 'applicant_ids_required') return '请先选择要分享的达人'

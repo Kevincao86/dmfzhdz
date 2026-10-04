@@ -47,18 +47,18 @@ function callCloud(method, path, data, headers, force) {
   }
   mpRuntime.applyRuntimeConfig(config)
   if (!force && !cloudReady()) {
-    return Promise.reject(new Error('开发者工具已配置直连 ECS，请走 wx.request'))
+    return Promise.reject(new Error('暂时连不上，请稍后再试'))
   }
   if (force && !cloudEnvReady()) {
-    return Promise.reject(new Error('云开发未就绪，请检查 MP_CLOUD_ENV'))
+    return Promise.reject(new Error('暂时连不上，请稍后再试'))
   }
   const run = new Promise((resolve, reject) => {
     if (!force && !cloudReady()) {
-      reject(new Error('云开发未就绪，请检查 MP_CLOUD_ENV'))
+      reject(new Error('暂时连不上，请稍后再试'))
       return
     }
     if (force && !cloudEnvReady()) {
-      reject(new Error('云开发未就绪，请检查 MP_CLOUD_ENV'))
+      reject(new Error('暂时连不上，请稍后再试'))
       return
     }
     wx.cloud.callFunction({
@@ -67,14 +67,14 @@ function callCloud(method, path, data, headers, force) {
       success(res) {
         const r = res && res.result
         if (!r) {
-          reject(new Error('云函数无返回'))
+          reject(new Error('暂时连不上，请稍后再试'))
           return
         }
         if (r.ok === false || (r.status && r.status >= 400)) {
           const d = r.data || {}
           let userMsg = String(d.message || d.detail || d.hint || '').trim()
           if (/请在轻量执行|git pull|ecs-deploy-auth-api/i.test(userMsg)) {
-            userMsg = '后台服务未更新，请稍后再试或联系管理员'
+            userMsg = '服务还在更新，请稍后再试'
           }
           if (userMsg && /[\u4e00-\u9fa5]/.test(userMsg)) {
             reject(new Error(userMsg))

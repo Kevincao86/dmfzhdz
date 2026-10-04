@@ -25,7 +25,7 @@ Page({
     humanMode: false,
     connecting: false,
     ready: false,
-    statusSub: '正在连接运营在线客服…',
+    statusSub: '正在连接客服…',
   },
 
   onLoad(options) {
@@ -41,7 +41,7 @@ Page({
     if (!relay.canSupport()) {
       this.setData({
         ready: false,
-        statusSub: '请在 config.release.js 配置 MERCHANT_API_BASE_URL（ECS）',
+        statusSub: '客服暂时连不上，请稍后再试',
       })
       return
     }
@@ -102,7 +102,7 @@ Page({
       }
       this.setData({
         ready: true,
-        statusSub: '已连接商家管理后台 · 小程序在线客服',
+        statusSub: '客服已接通',
       })
       this.startPoll()
     } catch (e) {
@@ -137,11 +137,11 @@ Page({
         try {
           wx.vibrateShort({ type: 'light' })
         } catch (_) {}
-        this.setData({ statusSub: '运营已回复 · 小程序在线客服' })
+        this.setData({ statusSub: '客服已回复' })
       } else if (!this.data.ready) {
         this.setData({
           ready: true,
-          statusSub: '已连接商家管理后台 · 小程序在线客服',
+          statusSub: '客服已接通',
         })
       }
     } catch (e) {
@@ -189,7 +189,7 @@ Page({
     }
     this.setData({ connecting: true })
     const sysText =
-      '已为您接入灵祺人工客服（达人/PR）。请直接描述问题，运营同事将在商家管理后台「小程序在线客服」中回复。'
+      '已为你接通人工客服。请直接说遇到的问题，客服看到后会在这里回复。'
     const bid = this.pushLocal('system', sysText)
     relay
       .sendChatLine('system', sysText, bid, this._sessionId)
@@ -223,7 +223,7 @@ Page({
         if (!this.data.humanMode) {
           setTimeout(() => {
             const botText =
-              '已收到您的问题。若需运营人工处理，请在输入框输入「人工服务」后点击出现的按钮接入。'
+              '已收到你的问题。如果需要人工帮忙，在输入框输入「人工服务」，再点出现的按钮即可。'
             const bid = this.pushLocal('bot', botText)
             void relay.sendChatLine('bot', botText, bid, this._sessionId)
           }, 500)

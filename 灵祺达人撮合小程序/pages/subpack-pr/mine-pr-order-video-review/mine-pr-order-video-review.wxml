@@ -29,7 +29,7 @@
       <view class="vr-share-head__icon">🔗</view>
       <view class="vr-share-head__text">
         <text class="title-lg">分享审片</text>
-        <text class="hint">生成小程序审片链接，客户打开后可看视频并填写备注（与 Web 端数据同步）</text>
+        <text class="hint">生成审片链接，客户打开后可以看视频、写备注，和电脑上看到的是同一份</text>
       </view>
     </view>
     <view class="vr-share-actions">

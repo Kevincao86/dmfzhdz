@@ -777,21 +777,48 @@ Page({
       })
       return
     }
-    if (!auth.isLoggedIn()) {
-      wx.navigateTo({ url: '/pages/login/login' })
-      return
-    }
-    wxProfileDisplay.writeWxProfileCache({ wxNickName: nick, wxAvatarUrl: avatar })
-    this.setData({ wxLoginSubmitting: true, profileNick: nick, avatarUrl: avatar, displayName: nick })
+    this.setData({ wxLoginSubmitting: true })
     try {
-      await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+      const persistedAvatar = avatar ? await wxProfileDisplay.persistWxAvatarUrl(avatar) : ''
+      const data = await auth.wxLogin({
+        wxNickName: nick,
+        wxAvatarUrl: persistedAvatar || avatar,
+      })
+      const account = (data && data.account) || auth.readAccount()
+      const registered = !!(account && !data.isNew && !auth.needsPhoneBind(account))
+      if (!registered) {
+        if (!auth.needsPhoneBind(account)) auth.clearSession()
+        this.setData({ showWxLoginSheet: false })
+        setTabBarHidden(this, false)
+        guestRoutes.redirectToLogin('/pages/mine/mine')
+        return
+      }
+      userProfile.adoptAccountIdentity(account)
+      await wxProfileDisplay.applyWxProfileAfterLogin(nick, persistedAvatar || avatar, {
+        alreadyPersisted: !!persistedAvatar,
+        skipRemote: true,
+      })
       try {
         await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
       } catch (_) {}
-      wx.showToast({ title: '登录成功', icon: 'success' })
-      this.setData({ showWxLoginSheet: false })
+      try {
+        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+      } catch (_) {}
+      require('../../utils/tabBar.js').refreshTabBar()
+      const identity = userProfile.readIdentity()
+      const identityMeta = identityTypes.WORK_IDENTITIES[identity]
+      this.setData({
+        showWxLoginSheet: false,
+        profileNick: nick,
+        avatarUrl: persistedAvatar || avatar,
+        displayName: nick,
+      })
       setTabBarHidden(this, false)
       this.refresh()
+      wx.showToast({
+        title: identityMeta && identityMeta.label ? `已进入${identityMeta.label}` : '已进入',
+        icon: 'success',
+      })
     } catch (e) {
       wx.showToast({ title: String(e?.message || e).slice(0, 36), icon: 'none' })
     } finally {

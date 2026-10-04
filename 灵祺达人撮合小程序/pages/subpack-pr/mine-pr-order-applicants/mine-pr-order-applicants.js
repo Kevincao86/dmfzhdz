@@ -425,7 +425,7 @@ Page({
     const { mpOrderId } = this.data
     if (!mpOrderId) return
     if (!api.hasApi()) {
-      this.setData({ loading: false, err: '未配置后台地址，无法拉取报名' })
+      this.setData({ loading: false, err: '暂时连不上，报名名单加载失败' })
       return
     }
     this.setData({ loading: true, err: '' })
@@ -1020,7 +1020,7 @@ Page({
     const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     if (!a || !a.id) return
     if (!this.data.chatEnabled) {
-      wx.showToast({ title: '请先配置后台地址', icon: 'none' })
+      wx.showToast({ title: '暂时连不上，请稍后再试', icon: 'none' })
       return
     }
     this.setData({ chattingId: a.id })

@@ -26,7 +26,7 @@ async function call(body) {
       throw new Error('登录已过期，请重新登录')
     }
     if (code === 'order_label_db_error') {
-      throw new Error('标签功能尚未开通，请联系管理员')
+      throw new Error('标签功能还没开通，请联系客服')
     }
     const detail = String((res && (res.message || res.detail || res.hint || res.error)) || '').trim()
     throw new Error(mpApiErrors.formatMpApiErr(new Error(code), detail))

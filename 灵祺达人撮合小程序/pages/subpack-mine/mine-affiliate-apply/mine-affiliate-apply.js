@@ -118,7 +118,7 @@ Page({
           (affiliate.status === 'pending' || affiliate.status === 'active')
         ),
         info: data.created
-          ? '申请已提交，请等待运营审核。'
+          ? '申请已提交，请等待审核。'
           : '您已有待审核申请，请耐心等待；审核结果可在「我的推广」查看。',
       })
     } catch (e) {

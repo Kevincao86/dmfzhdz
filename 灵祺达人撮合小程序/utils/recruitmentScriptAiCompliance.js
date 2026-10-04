@@ -15,7 +15,7 @@ function authHeaders() {
 
 async function checkScriptCompliance(payload) {
   if (!ecs.hasBase()) {
-    throw new Error('未配置后台地址，无法 AI 检核')
+    throw new Error('暂时连不上，还不能做 AI 检查')
   }
   const token = auth.readSessionToken()
   const body = {

@@ -880,7 +880,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       const preview = prependSelfTalentTest([MOCK_PREVIEW])
       this.setData({
         loading: false,
-        err: '未配置后台地址',
+        err: '暂时连不上，请稍后再试',
         allRows: preview,
         displayRows: preview,
         listEmptyHint: '',
@@ -925,7 +925,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     if (!api.hasApi()) {
       this.setData({
         loading: false,
-        err: allowDemo ? '' : '未连接后台',
+        err: allowDemo ? '' : '暂时连不上，请稍后再试',
         allOrderRows: allowDemo ? mocks : [],
       })
       this._stripCacheKey = ''
@@ -1614,8 +1614,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     }
     if (!chat.canChat()) {
       wx.showModal({
-        title: '未连接后台',
-        content: '请在 config.local.js 配置 MERCHANT_API_BASE_URL 后使用私信。',
+        title: '暂时连不上',
+        content: '私信暂时连不上，请稍后再试。',
         showCancel: false,
       })
       return

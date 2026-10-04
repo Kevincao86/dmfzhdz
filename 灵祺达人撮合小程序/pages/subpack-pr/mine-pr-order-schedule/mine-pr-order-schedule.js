@@ -122,7 +122,7 @@ Page({
   async loadOrder() {
     const { mpOrderId, isReview } = this.data
     if (!mpOrderId || !api.hasApi()) {
-      this.setData({ loading: false, err: '未配置后台地址' })
+      this.setData({ loading: false, err: '暂时连不上，请稍后再试' })
       return
     }
     this.setData({ loading: true, err: '' })

@@ -58,10 +58,10 @@ function wxacodeErrorLabel(raw) {
   if (msg === 'wxacode_unavailable' || msg === 'invalid_wxacode_data' || msg === 'wxacode_write_fail') {
     return '太阳码生成失败，请稍后重试'
   }
-  if (msg === 'wx_not_configured') return '小程序码服务未配置，请联系管理员'
+  if (msg === 'wx_not_configured') return '小程序码暂时生成不了，请联系客服'
   if (msg === 'affiliate_not_active') return '推广员审核通过后才可生成太阳码'
   if (msg === 'unauthorized') return '请先登录后再查看推广中心'
-  if (/invalid page|page not found|41030/i.test(msg)) return '小程序页面未发布，请稍后重试或联系管理员'
+  if (/invalid page|page not found|41030/i.test(msg)) return '小程序码暂时生成不了，请稍后再试'
   if (/access_token|40001|42001/i.test(msg)) return '微信授权失效，请稍后重试'
   return '太阳码生成失败，请稍后重试'
 }

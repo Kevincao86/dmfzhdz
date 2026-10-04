@@ -53,7 +53,7 @@ function formatErrorMessage(err, fallback) {
     ).trim()
     if (msg) {
       if (/data exceed max size|exceed max size/i.test(msg)) {
-        return '视频过大，不能经云函数上传。请重新上传体验版（构建号 mp-20260615-publish-link）并确认已配置合法域名'
+        return '视频太大，传不上去。请压缩后再试'
       }
       if (/[\u4e00-\u9fa5]/.test(msg)) return msg
       return mpApiErrors.formatMpApiErr(new Error(msg), fb)
@@ -359,26 +359,12 @@ function putFileToOss(uploadUrl, filePath, contentType) {
               resolve()
               return
             }
-            let host = ''
-            try {
-              host = new URL(uploadUrl).hostname
-            } catch (_) {}
-            reject(
-              new Error(
-                host
-                  ? `上传 OSS 失败(${r.statusCode})，请确认小程序已配置 request 合法域名：${host}`
-                  : `上传失败 ${r.statusCode}`,
-              ),
-            )
+            reject(new Error('视频上传失败，请稍后再试'))
           },
           fail(err) {
             const msg = String((err && err.errMsg) || '上传失败')
-            let host = ''
-            try {
-              host = new URL(uploadUrl).hostname
-            } catch (_) {}
-            if (/domain|url not in|合法域名/i.test(msg) && host) {
-              reject(new Error(`请在小程序后台添加 request 合法域名：${host}`))
+            if (/domain|url not in|合法域名/i.test(msg)) {
+              reject(new Error('视频上传失败，请稍后再试'))
               return
             }
             reject(new Error(msg))

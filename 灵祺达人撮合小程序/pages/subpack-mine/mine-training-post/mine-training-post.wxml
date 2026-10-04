@@ -2,7 +2,7 @@
   <view class="tp-hero">
     <text class="tp-hero__kicker">本地生活培训</text>
     <text class="tp-hero__title">{{view === 'form' ? (editingId ? '编辑培训' : '新增培训') : '我的课程'}}</text>
-    <text class="tp-hero__sub" wx:if="{{view === 'form'}}">详情按图文填写，和网页是同一份内容。改完会重新提交审核。</text>
+    <text class="tp-hero__sub" wx:if="{{view === 'form'}}">详情按图文填写，和电脑上填写的是同一份。改完会重新提交审核。</text>
     <text class="tp-hero__sub" wx:else>查看已提交的课程，可以新增，也可以改已发布的内容。</text>
   </view>
 
@@ -126,7 +126,7 @@
         </view>
         <text class="tp-label">{{livePlatform === 'channels' ? '视频号 ID' : livePlatform === 'douyin' ? '抖音直播链接' : '会议链接或会议号'}}</text>
         <input class="tp-input" placeholder="{{livePlatform === 'channels' ? 'sph 开头，在视频号助手复制' : livePlatform === 'douyin' ? 'https://live.douyin.com/ 或 v.douyin.com' : '会议链接，或 9 到 12 位会议号'}}" value="{{liveUrl}}" bindinput="onLiveUrl" />
-        <text class="tp-hint">{{livePlatform === 'channels' ? '小程序会打开这个视频号的直播。微信要求该视频号已和本小程序关联主体。' : livePlatform === 'douyin' ? '网页直接打开。微信不能拉起抖音，这里会复制链接。' : '小程序会直接打开腾讯会议。填写会议号才能自动入会。'}}</text>
+        <text class="tp-hint">{{livePlatform === 'channels' ? '会打开这个视频号的直播。该视频号需要已经和本小程序绑定。' : livePlatform === 'douyin' ? '微信里打不开抖音，这里会复制链接，你到浏览器打开。' : '会直接打开腾讯会议。填写会议号才能自动入会。'}}</text>
       </block>
       <block wx:if="{{mode === 'offline'}}">
         <text class="tp-label">具体地址</text>

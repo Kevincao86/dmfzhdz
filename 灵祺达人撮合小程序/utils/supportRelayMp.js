@@ -12,7 +12,7 @@ const POLL_MS_HUMAN = 1500
 const DEFAULT_BOT = {
   id: 'welcome-bot',
   role: 'bot',
-  text: '您好，我是小灵同学。可解答招募、报名与账号问题；如需运营人工处理，请在输入框输入「人工服务」后点击按钮接入。',
+  text: '你好，我是小灵同学。可以问招募、报名和账号的问题；如果需要人工帮忙，在输入框输入「人工服务」，再点出现的按钮。',
   at: '',
   ts: 0,
 }
@@ -32,13 +32,13 @@ function canSupport() {
 function formatSupportError(err) {
   const msg = String((err && err.message) || err || '未知错误')
   if (/admin_not_configured|ecs_proxy|erp_proxy/i.test(msg)) {
-    return 'ECS 客服接口未就绪：请执行 bash ~/app/scripts/ecs-redeploy-mp-only.sh'
+    return '客服暂时连不上，请稍后再试'
   }
   if (/support_relay|42P01|does not exist/i.test(msg)) {
-    return '请确认已执行 support_relay_messages 相关数据库迁移'
+    return '客服功能还在准备，请稍后再试'
   }
-  if (/尚未配置后台|request:fail|url not in domain/i.test(msg)) {
-    return `${msg}（请检查 config.local.js 的 MERCHANT_API_BASE_URL 与开发者工具「不校验合法域名」）`
+  if (/尚未配置后台|request:fail|url not in domain|MERCHANT_API|config\.(release|local)|ECS|数据库/i.test(msg)) {
+    return '客服暂时连不上，请稍后再试'
   }
   return msg
 }

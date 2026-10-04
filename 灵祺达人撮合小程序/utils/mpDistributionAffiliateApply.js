@@ -36,7 +36,7 @@ function applyErrorLabel(error) {
     case 'already_active':
       return '您已是推广员，请前往「我的推广」查看推广码与数据'
     case 'phone_taken':
-      return '该手机号已被其他账号用于推广员申请，请使用注册手机号或联系运营'
+      return '这个手机号已经用来申请过推广员，请用注册手机号，或联系客服'
     case 'distribution_disabled':
       return '推广员申请暂未开放，请稍后再试'
     case 'invalid_fields':

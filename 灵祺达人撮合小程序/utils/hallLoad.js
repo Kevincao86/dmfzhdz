@@ -23,11 +23,11 @@ const mem = {
 function errHint(msg) {
   const m = String(msg || '')
   if (/timeout|超时|云函数超时/i.test(m)) return '加载超时，请下拉刷新'
-  if (/url not in domain list|合法域名/i.test(m)) return '网络配置异常，请联系管理员'
+  if (/url not in domain list|合法域名/i.test(m)) return '网络暂时连不上，请下拉刷新'
   if (/reset|errcode:-101|cronet|cloud:callFunction|500|cloud_proxy/i.test(m)) {
-    return '无法连接轻量服务器，请下拉刷新'
+    return '暂时连不上，请下拉刷新'
   }
-  if (/云开发未就绪|MP_CLOUD_ENV/i.test(m)) return '云开发未配置，请检查 MP_CLOUD_ENV'
+  if (/云开发未就绪|MP_CLOUD_ENV/i.test(m)) return '暂时连不上，请下拉刷新'
   if (/1048576|response size exceeded/i.test(m)) return '大厅数据过大，请稍后下拉刷新'
   return m.slice(0, 120) || '加载失败，请下拉刷新'
 }
@@ -156,7 +156,7 @@ async function loadHallList(page, opts) {
       unconfigured: true,
       normalRows: demo,
       cityFilters: hallFilters.buildCityFilterOptions(demo),
-      err: demo.length ? '' : '未连接后台',
+      err: demo.length ? '' : '暂时连不上，请稍后再试',
     })
     return
   }

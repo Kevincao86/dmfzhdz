@@ -56,10 +56,10 @@ async function uploadGroupQrFileToOss(mpOrderId, tempFilePath) {
   } catch (e) {
     const msg = String((e && e.message) || e || '群二维码上传失败')
     if (isDomainListError(msg)) {
-      throw new Error('群二维码上传失败：请确认小程序 request 合法域名已含 mofangdianai.com')
+      throw new Error('群二维码上传失败，请稍后再试')
     }
     if (/group_qr_too_large|过大/i.test(msg)) throw new Error('二维码图片过大，请换一张截图重试')
-    if (/oss_not/i.test(msg)) throw new Error('服务器 OSS 未配置，请联系管理员')
+    if (/oss_not/i.test(msg)) throw new Error('图片暂时存不上，请稍后再试')
     throw new Error(msg.length > 48 ? `${msg.slice(0, 46)}…` : msg)
   }
 }

@@ -64,8 +64,8 @@ function formatPatchError(e) {
   const msg = String((e && e.message) || e || '保存失败')
   if (/group_qr_too_large|过大/i.test(msg)) return '二维码图片过大，请换一张截图重试'
   if (/not_found|404/i.test(msg)) return '招募单不存在，请返回列表刷新后重试'
-  if (/群码未写入|group_qr_missing|oss_not/i.test(msg)) return '群码未同步到服务器，请换网络后重试'
-  if (/合法域名|domain/i.test(msg)) return msg
+  if (/群码未写入|group_qr_missing|oss_not/i.test(msg)) return '群二维码还没保存成功，请换个网络再试'
+  if (/合法域名|domain/i.test(msg)) return '群二维码上传失败，请稍后再试'
   if (/supabase|registry|patch_failed/i.test(msg)) return '服务器暂不可用，请稍后重试'
   if (/cloud|云函数|timeout/i.test(msg)) return '网络超时，请稍后重试'
   return msg.length > 32 ? `${msg.slice(0, 30)}…` : msg

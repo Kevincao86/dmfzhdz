@@ -598,13 +598,13 @@ Page({
       const msg = e && e.message ? e.message : String(e)
       let hint = msg
       if (msg.indexOf('wx_not_configured') >= 0) {
-        hint = '服务端未配置微信密钥，请联系管理员'
+        hint = '登录暂时失败，请稍后再试'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
         hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
       } else if (api.isNetReset(msg)) {
         hint = '网络不稳定，请稍后重试或删除小程序重新扫码'
       } else if (/admin_not_configured|not_configured/i.test(msg)) {
-        hint = '服务暂不可用，请联系管理员'
+        hint = '登录暂时失败，请稍后再试'
       }
       this.setData({ err: hint })
     } finally {

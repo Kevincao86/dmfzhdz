@@ -131,7 +131,7 @@
       </view>
     </view>
 
-    <view class="xx-foot">支付成功后约 20 秒内与星选 Web 端同步会员与权限。</view>
+    <view class="xx-foot">支付成功后，大约 20 秒内会员和权限会生效。</view>
   </scroll-view>
 
   <view class="xx-pay-mask" wx:if="{{showPaySheet}}" bindtap="onClosePay">

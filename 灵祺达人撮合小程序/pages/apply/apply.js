@@ -604,7 +604,7 @@ Page({
   async onSubmit() {
     if (this.data.submitting) return
     if (!api.hasApi()) {
-      wx.showToast({ title: '未配置后台地址', icon: 'none' })
+      wx.showToast({ title: '暂时连不上，请稍后再试', icon: 'none' })
       return
     }
     if (!this.data.mpOrderId) {

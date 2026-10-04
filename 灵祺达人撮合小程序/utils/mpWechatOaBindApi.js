@@ -17,12 +17,12 @@ async function call(body) {
       throw new Error('未找到当前身份资料，请先在「我的信息」完善并保存')
     }
     if (code === 'wx_oa_not_configured') {
-      throw new Error('服务号通知暂未开通，请联系管理员')
+      throw new Error('微信通知还没开通，请联系客服')
     }
     if (code === 'wx_oa_ip_not_whitelisted') {
       throw new Error(
         (res && res.message) ||
-          '微信服务号未配置服务器 IP 白名单，请联系管理员在公众平台添加 139.196.42.5',
+          '微信通知暂时发不出去，请联系客服',
       )
     }
     if (/wx_oa_qrcode|invalid credential|access_token/i.test(code)) {

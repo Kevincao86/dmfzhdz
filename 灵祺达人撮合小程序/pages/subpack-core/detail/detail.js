@@ -746,7 +746,7 @@ Page({
   },
   async loadOrder(id) {
     if (!api.hasApi()) {
-      this.setData({ loading: false, err: '未配置后台地址' })
+      this.setData({ loading: false, err: '暂时连不上，请稍后再试' })
       return
     }
     this.setData({ loading: true, err: '' })
@@ -1144,9 +1144,9 @@ Page({
       const msg = String(e.message || e)
       let hint = msg
       if (/fail|reset|cronet|超时|timeout/i.test(msg)) {
-        hint = '无法连接后台服务，请稍后重试或检查网络'
+        hint = '暂时连不上，请检查网络后再试'
       } else if (msg === '已使用本地缓存') {
-        hint = '无法连接后台服务，且本地无该任务缓存，请打开招募大厅刷新后重试'
+        hint = '暂时连不上，也没有这份任务的本地记录。请回到招募大厅刷新后再试'
       }
       this.setData({ loading: false, err: hint })
     }
@@ -1696,8 +1696,8 @@ Page({
     }
     if (!chat.canChat()) {
       wx.showModal({
-        title: '未连接后台',
-        content: '请配置 MERCHANT_API_BASE_URL 后使用私信。',
+        title: '暂时连不上',
+        content: '私信暂时连不上，请稍后再试。',
         showCancel: false,
       })
       return

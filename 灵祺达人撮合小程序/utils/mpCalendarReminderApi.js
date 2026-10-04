@@ -21,7 +21,7 @@ async function call(body) {
       throw new Error('提醒时间已过，请选择更早的提醒')
     }
     if (code === 'calendar_reminder_table_missing') {
-      throw new Error('日历提醒功能尚未开通，请联系管理员')
+      throw new Error('日历提醒还没开通，请联系客服')
     }
     const detail = String((res && (res.message || res.detail || res.hint || res.error)) || '').trim()
     throw new Error(mpApiErrors.formatMpApiErr(new Error(code), detail))

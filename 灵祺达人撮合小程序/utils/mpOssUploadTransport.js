@@ -74,14 +74,10 @@ function postOssUpload(apiPath, body, headers) {
       fail(e) {
         const msg = String((e && e.errMsg) || 'request:fail')
         if (/domain|url not in|合法域名/i.test(msg)) {
-          reject(
-            new Error(
-              '上传失败：请在小程序后台 request 合法域名添加 https://mofangdianai.com',
-            ),
-          )
+          reject(new Error('上传失败，请稍后再试'))
           return
         }
-        reject(new Error(`${msg} → ${fullUrl}`))
+        reject(new Error('上传失败，请稍后再试'))
       },
     })
   })

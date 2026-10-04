@@ -41,12 +41,12 @@
     </view>
 
     <view wx:if="{{!displayArticles.length}}" class="card manual-state">
-      <text class="hint">该分类暂无文章，请在运营台「小程序使用手册」中添加。</text>
+      <text class="hint">这一类还没有说明，稍后再来看。</text>
     </view>
   </block>
 
   <view wx:else class="card manual-state">
-    <text class="hint">暂无手册内容，请在运营管控台维护「小程序使用手册」后下拉刷新。</text>
+    <text class="hint">使用说明还在整理，下拉刷新再看看。</text>
   </view>
 
   <view class="card manual-footer">

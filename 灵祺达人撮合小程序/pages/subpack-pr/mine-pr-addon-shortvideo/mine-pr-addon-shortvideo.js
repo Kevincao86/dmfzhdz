@@ -506,7 +506,7 @@ Page({
   },
   async onSubmitIce() {
     if (!this.data.iceConfigured) {
-      wx.showToast({ title: '混剪未开通，请联系运营', icon: 'none' })
+      wx.showToast({ title: '混剪还没开通，请联系客服', icon: 'none' })
       return
     }
     let brief = this.composedBrief().trim()

@@ -128,7 +128,7 @@ function postHallRegistry(body, headers) {
   const base = String(ecs.base() || '').replace(/\/$/, '')
   // 基址已是 /erp-api 时，必须走 ecs.url，否则会变成 /erp-api/api/... 返回 not_found
   const fullUrl = ecs.url(HALL_POST, base)
-  if (!fullUrl) return Promise.reject(new Error('未配置后台地址'))
+  if (!fullUrl) return Promise.reject(new Error('暂时连不上，请稍后再试'))
   const config = require('./config.js')
   const ip = String(config.MP_ERP_IP || '').trim()
   const hostHeader = ip && base.includes(ip) ? { Host: ip } : {}
@@ -682,7 +682,7 @@ async function publishFormRelayWithGroupQr(order, groupQrImage) {
   await mpGroupQr.patchGroupQrImage(id, qr)
   const verify = await fetchFormRelayGroupQr(id)
   if (!verify || !verify.groupQrImage) {
-    throw new Error('群二维码未写入服务器，请检查网络后重试')
+    throw new Error('群二维码还没保存成功，请检查网络后再试')
   }
   return { id, groupQrImage: verify.groupQrImage }
 }

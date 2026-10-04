@@ -80,7 +80,7 @@ function ensureAiComplianceAddonAccess() {
   if (!mpAiReviewAccess.canUseAiReviewFeature(account)) {
     wx.showModal({
       title: '功能待开通',
-      content: 'AI 审核需会员档位含文稿/成片自检配额，或由灵祺运营开通增值子板块。',
+      content: 'AI 审核需要会员里包含文稿或成片检查次数，也可以联系客服开通。',
       showCancel: false,
       confirmText: '知道了',
       complete: () => wx.navigateBack(),

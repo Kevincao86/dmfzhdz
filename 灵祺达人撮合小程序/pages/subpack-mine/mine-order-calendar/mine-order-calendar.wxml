@@ -177,7 +177,7 @@
         class="cal-label-clear {{labelBusy ? 'cal-label-save--busy' : ''}}"
         catchtap="onClearLabel"
       >清除标签</view>
-      <text class="cal-label-hint">标签按当前身份保存，与网页商单日历同步</text>
+      <text class="cal-label-hint">标签会按你现在的身份保存，和电脑上的商单日历是同一份</text>
     </view>
   </view>
   <site-icp-footer />

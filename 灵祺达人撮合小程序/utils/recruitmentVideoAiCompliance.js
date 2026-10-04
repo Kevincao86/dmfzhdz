@@ -59,7 +59,7 @@ function resolveVideoDurationSec(payload) {
 
 function postVideoComplianceDirect(path, body, headers) {
   const fullUrl = resolveApiUrl(path)
-  if (!fullUrl) return Promise.reject(new Error('未配置后台地址，无法 AI 检核'))
+  if (!fullUrl) return Promise.reject(new Error('暂时连不上，还不能做 AI 检查'))
   return new Promise((resolve, reject) => {
     wx.request({
       url: fullUrl,
@@ -105,7 +105,7 @@ function postVideoComplianceDirect(path, body, headers) {
 
 async function checkVideoCompliance(payload) {
   if (!ecs.hasBase()) {
-    throw new Error('未配置后台地址，无法 AI 检核')
+    throw new Error('暂时连不上，还不能做 AI 检查')
   }
   const token = auth.readSessionToken()
   const durationSec = await resolveVideoDurationSec(payload || {})

@@ -196,6 +196,6 @@ exports.main = async (event) => {
     build: PROXY_BUILD,
     upstream: lastFail ? lastFail.upstream : undefined,
     hint:
-      '登录 http-500：在 ECS 执行 curl POST meoo-ops-mp-auth 与 journalctl -u meoo-auth-api；常见为微信密钥或 mp_accounts 表',
+      '登录暂时失败，请稍后再试',
   }
 }

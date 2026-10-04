@@ -8,7 +8,7 @@ const PORTAL_URL = '/pages/subpack-mine/mine-affiliate-portal/mine-affiliate-por
 const APPLY_URL = '/pages/subpack-mine/mine-affiliate-apply/mine-affiliate-apply'
 
 const SUBJECT_TYPE_LABEL = {
-  erp_merchant: 'ERP 商家',
+  erp_merchant: '商家电脑版',
   xingxuan_pr: '星选 PR',
   xingxuan_talent: '星选达人',
   xingxuan_shoot: '星选拍摄',
@@ -17,7 +17,7 @@ const SUBJECT_TYPE_LABEL = {
 
 const LANDING_SURFACE_LABEL = {
   cs: '商家 ERP',
-  dr: '星选 Web',
+  dr: '星选电脑版',
   mp: '星选小程序',
 }
 
@@ -151,7 +151,7 @@ Page({
       }
     } catch (e) {
       const msg = (e && e.message) || '加载失败'
-      const isGateway = /502|503|504|Bad Gateway|后台服务正在重启/i.test(msg)
+      const isGateway = /502|503|504|Bad Gateway|服务正在更新|服务暂时不可用/i.test(msg)
       if (retry < 1 && isGateway) {
         await new Promise((r) => setTimeout(r, 1500))
         return this.loadPortal(retry + 1)
@@ -249,7 +249,7 @@ Page({
     try {
       await affiliatePortal.submitWithdraw(Math.round(yuan * 100))
       await this.loadPortal()
-      this.setData({ withdrawAmount: '', withdrawHint: '提现申请已提交，请等待运营审核' })
+      this.setData({ withdrawAmount: '', withdrawHint: '提现申请已提交，请等待审核' })
     } catch (e) {
       this.setData({ withdrawHint: (e && e.message) || '提现申请失败' })
     } finally {

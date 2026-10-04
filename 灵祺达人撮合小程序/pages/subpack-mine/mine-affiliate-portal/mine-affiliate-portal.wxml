@@ -142,7 +142,7 @@
     <view wx:if="{{promoLinks}}" class="mp-sub-card">
       <view class="mp-sub-card__head">
         <view class="mp-sub-card__dot"></view>
-        <text class="mp-sub-card__title">网页推广链接</text>
+        <text class="mp-sub-card__title">推广链接</text>
       </view>
       <view class="link-item" wx:for="{{linkRows}}" wx:key="key">
         <view class="link-item__main">

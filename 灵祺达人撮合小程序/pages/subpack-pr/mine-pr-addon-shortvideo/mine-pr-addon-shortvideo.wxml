@@ -70,7 +70,7 @@
       <text class="addon-card__title">AI 混剪</text>
       <text class="addon-card__sub">批量上传素材、AI 文案指令、一键成片（与星选平台同源）</text>
       <view class="addon-points-tip">{{pointsHintMix}}</view>
-      <view class="addon-warn" wx:if="{{!iceConfigured}}">云剪能力尚未开通，请联系灵祺运营开通后再使用。</view>
+      <view class="addon-warn" wx:if="{{!iceConfigured}}">云剪还没开通，请联系客服开通后再使用。</view>
       <view class="addon-tabs addon-tabs--inner">
         <view class="addon-tab {{materialTab === 'video' ? 'addon-tab--on' : ''}}" data-tab="video" bindtap="onMaterialTab">视频队列</view>
         <view class="addon-tab {{materialTab === 'images' ? 'addon-tab--on' : ''}}" data-tab="images" bindtap="onMaterialTab">多图成片</view>

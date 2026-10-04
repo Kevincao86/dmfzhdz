@@ -266,7 +266,7 @@ function openHttpsFormUrl(webUrl, forceEmbed) {
     copyLinkGuide(
       webUrl,
       '打开原表报名',
-      '报名工具须跳转对应小程序打开，链接已复制。请粘贴到微信聊天中点击，或联系管理员配置小程序跳转白名单。',
+      '这个报名要到对应的小程序里打开，链接已经复制。请粘贴到微信聊天里点开。',
     )
     return
   }

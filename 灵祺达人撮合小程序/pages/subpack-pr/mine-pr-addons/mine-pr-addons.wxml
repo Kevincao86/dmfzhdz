@@ -5,12 +5,12 @@
       <text>星选增值</text>
     </view>
     <text class="addon-hero__title">增值服务</text>
-    <text class="addon-hero__sub">与星选平台同源能力，数据经 ECS 互通</text>
+    <text class="addon-hero__sub">和星选平台是同一套功能，数据会自动同步</text>
   </view>
 
   <view class="addon-section">
     <view class="addon-section__head">
-      <text class="addon-section__title">AI 运营工具</text>
+      <text class="addon-section__title">AI 工具</text>
       <text class="addon-section__tag" wx:if="{{addonsEnabled}}">按档位开通</text>
       <text class="addon-section__tag addon-section__tag--muted" wx:else>可升级解锁</text>
     </view>

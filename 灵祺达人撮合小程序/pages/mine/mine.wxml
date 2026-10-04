@@ -153,7 +153,7 @@
           <text class="id-sheet-title">微信登录 / 注册</text>
           <text class="id-sheet-close" bindtap="onCloseWxLoginSheet">×</text>
         </view>
-        <text class="id-sheet-hint">授权头像与昵称后，达人/PR 身份共用同一微信账号</text>
+        <text class="id-sheet-hint">已注册过的，确认后按你的身份直接进入；还没注册的，会去登录页完成注册。</text>
       </view>
       <view class="wx-login-profile">
         <button
@@ -183,7 +183,7 @@
           loading="{{wxLoginSubmitting}}"
           bindtap="onConfirmWxLogin"
         >
-          确认登录
+          确认进入
         </button>
       </view>
     </view>

@@ -8,7 +8,7 @@ const CHAT_PATH = '/api/meoo-ops-mp-talent-chat'
 
 async function chatRequest(payload) {
   if (!api.hasApi()) {
-    throw new Error('未配置 MERCHANT_API_BASE_URL（config.release.js）')
+    throw new Error('私信暂时连不上，请稍后再试')
   }
   return api.post(CHAT_PATH, payload)
 }
@@ -41,16 +41,13 @@ function sanitizeSnapshot(s) {
 function formatChatError(err) {
   const msg = String((err && err.message) || err || '未知错误')
   if (/42P01|relation .* does not exist|undefined table/i.test(msg)) {
-    return 'ECS 数据库表未就绪：请执行迁移 20260528100000_mp_talent_chat.sql'
+    return '消息功能还在准备，请稍后再试'
   }
   if (/fetch failed|ECONNREFUSED|8888|erp-api/i.test(msg)) {
-    return (
-      'ECS 暂不可用。请在服务器执行：bash ~/app/scripts/ecs-fix-mp-chat-path.sh，' +
-      '再上传体验版 mp-20260604-ecs-only 后重试。'
-    )
+    return '消息暂时连不上，请稍后再试'
   }
   if (/pr_not_ready/i.test(msg)) {
-    return '招募方尚未在小程序「消息」页登录过，请稍后再试，或由 PR 在报名列表点击「私信沟通」先发起会话'
+    return '对方还没打开过消息，请稍后再试；也可以让对方先从报名列表点「私信沟通」'
   }
   if (/meoo_ops_mp_talent_chat_failed/i.test(msg)) {
     const inner = msg.replace(/^meoo_ops_mp_talent_chat_failed\s*/i, '').trim()
@@ -58,17 +55,16 @@ function formatChatError(err) {
     return '消息服务暂时不可用，请稍后点「重试」。'
   }
   if (/url not in domain|不在.*合法域名|domain list/i.test(msg)) {
-    return '微信合法域名须仅配置 https://mofangdianai.com（request + downloadFile）。\n\n' + msg
+    return '网络暂时连不上，请稍后再试'
   }
   if (/reset|errcode:-101|cronet_error/i.test(msg)) {
-    return (
-      '网络连接被重置。请确认体验版 mp-20260604-ecs-only、合法域名仅 mofangdianai.com，' +
-      '删小程序重扫；ECS 执行 bash scripts/ecs-mp-minimal.sh。\n\n' +
-      msg
-    )
+    return '网络不稳定，请稍后再试'
   }
-  if (/request:fail|尚未配置后台/i.test(msg)) {
-    return `网络请求失败，请稍后点「重试」。\n\n${msg}`
+  if (/request:fail|尚未配置后台|MERCHANT_API|config\.(release|local)/i.test(msg)) {
+    return '网络请求失败，请稍后点「重试」'
+  }
+  if (/ECS|数据库|bash |migration|sql/i.test(msg)) {
+    return '消息暂时连不上，请稍后再试'
   }
   return msg
 }
@@ -436,7 +432,7 @@ function testPrSecret() {
 async function openTestChatDialog() {
   const userProfile = require('./userProfile.js')
   if (!canChat()) {
-    throw new Error('请先配置 MERCHANT_API_BASE_URL（开发者工具可用 config.local.js 指向本机 merchant-erp）')
+    throw new Error('私信暂时连不上，请稍后再试')
   }
   const identity = userProfile.readIdentity()
   let sessionId = ''

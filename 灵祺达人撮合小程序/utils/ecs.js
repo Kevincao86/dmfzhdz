@@ -77,14 +77,14 @@ function errMsg(status, data) {
     detail = ''
   }
   if (/请在轻量执行|请执行迁移|轻量执行迁移|git pull|ecs-deploy-auth-api/i.test(detail)) {
-    detail = '后台服务未更新，请稍后再试或联系管理员'
+    detail = '服务还在更新，请稍后再试'
   }
   const code = String(d.error || `http_${status}`).trim()
   if (code === 'applicant_pick_share_table_missing') {
-    detail = '分享功能未就绪，请联系运营'
+    detail = '分享还没准备好，请联系客服'
   }
-  if (status === 502) return mpApiErrors.formatMpApiErr(new Error('http_502'), '后台服务正在重启，请稍后重试')
-  if (status === 503) return mpApiErrors.formatMpApiErr(new Error('http_503'), '后台服务暂不可用，请稍后重试')
+  if (status === 502) return mpApiErrors.formatMpApiErr(new Error('http_502'), '服务正在更新，请稍后再试')
+  if (status === 503) return mpApiErrors.formatMpApiErr(new Error('http_503'), '服务暂时不可用，请稍后再试')
   if (status === 504) return mpApiErrors.formatMpApiErr(new Error('http_504'), '请求超时，请检查网络后重试')
   if (detail && /[\u4e00-\u9fa5]/.test(detail)) return detail
   return mpApiErrors.formatMpApiErr(new Error(code), detail || '请求失败，请稍后重试')
@@ -147,7 +147,7 @@ function wxRequestOnce(method, fullUrl, data, headers, tryNo, base, pathHint) {
 
 async function directRequest(method, path, data, headers, tryNo = 0, baseIdx = 0) {
   const list = bases()
-  if (!list.length) return Promise.reject(new Error('未配置 MERCHANT_API_BASE_URL'))
+  if (!list.length) return Promise.reject(new Error('暂时连不上，请稍后再试'))
   const base = list[baseIdx] || list[0]
   const fullUrl = url(path, base)
   try {
@@ -174,7 +174,7 @@ async function request(method, path, data, headers) {
     return cloudEcs.request(method, path, data, headers)
   }
   if (config.MP_USE_CLOUD_PROXY && !cloudEcs.cloudReady()) {
-    throw new Error('已开启云代理但未配置 MP_CLOUD_ENV，见 备案过渡-云开发代理.md')
+    throw new Error('暂时连不上，请稍后再试')
   }
   return directRequest(method, path, data, headers)
 }
@@ -190,7 +190,7 @@ function post(path, data, headers) {
 async function ping() {
   if (useCloudProxy()) return cloudEcs.ping()
   const list = bases()
-  if (!list.length) throw new Error('未配置 MERCHANT_API_BASE_URL')
+  if (!list.length) throw new Error('暂时连不上，请稍后再试')
   let lastErr
   for (const b of list) {
     try {

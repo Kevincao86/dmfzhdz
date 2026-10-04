@@ -58,7 +58,7 @@ Page({
       return
     }
     if (!api.hasApi()) {
-      this.setData({ loading: false, err: '未配置后台地址' })
+      this.setData({ loading: false, err: '暂时连不上，请稍后再试' })
       return
     }
     void this.load()

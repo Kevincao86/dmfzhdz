@@ -96,8 +96,8 @@
     <view class="rec-pr-locked" wx:if="{{isPrMode && prRecommendLocked}}">
       <view class="rec-pr-locked__icon">🔒</view>
       <text class="rec-pr-locked__title">推荐大厅需开通后使用</text>
-      <text class="rec-pr-locked__desc">智能荐达人、匹配招募单与达人库检索为增值能力，需由灵祺运营在后台为您开通后方可使用。</text>
-      <text class="rec-pr-locked__hint">如有合作意向请联系灵祺运营申请开通。</text>
+      <text class="rec-pr-locked__desc">智能推荐达人、匹配招募单和查找达人，需要联系客服开通后才能使用。</text>
+      <text class="rec-pr-locked__hint">有合作意向的话，联系客服申请开通。</text>
       <view class="rec-pr-locked__box">
         <text class="rec-pr-locked__box-title">包含能力</text>
         <text class="rec-pr-locked__bullet">· AI 智能推荐达人</text>
