@@ -1023,6 +1023,8 @@ export type RegistryFile = {
   teamIntro?: RegistryTeamIntro
   /** 平台装修：活动海报弹窗 / 页面广告位 */
   platformDecoration?: import('./platformDecorTypes.js').RegistryPlatformDecoration
+  /** 营销中心：星选 / 商家 ERP 现金红包活动、发放与钱包 */
+  marketingCenter?: import('./marketingCampaignCore.js').RegistryMarketingCenter
   /** 抖音带货等级月度重置标记（YYYY-MM，每月 6 日上海时区） */
   douyinSalesLevelResetYm?: string
   /** 达人平台链接月度自动解析完成标记（YYYY-MM，每月 5 日上海时区） */

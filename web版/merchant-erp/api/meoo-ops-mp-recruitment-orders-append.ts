@@ -63,6 +63,21 @@ async function appendViaRegistryIo(
   await io.save(data)
 }
 
+async function grantPublishCashQuiet(
+  order: RegistryMpRecruitmentOrder,
+): Promise<{ granted: boolean; amountCents: number; message: string } | null> {
+  try {
+    const { grantPrCashRedPacketForPublishedOrder } = await import('../src/lib/marketingCampaignStore.js')
+    const outcome = await grantPrCashRedPacketForPublishedOrder(order)
+    if (!outcome.granted) return null
+    return { granted: true, amountCents: outcome.amountCents, message: outcome.message }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn('[append] pr cash red packet grant skipped', msg.slice(0, 200))
+    return null
+  }
+}
+
 async function fireOrderSubscriptionPush(
   supabaseUrl: string,
   serviceRole: string,
@@ -148,11 +163,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           })
           return
         }
+        const cashRedPacket = await grantPublishCashQuiet(order)
         sendOpsJson(res, 200, {
           ok: true,
           id: order.id,
           via: 'pg',
           groupQrSaved: pgResult.groupQrSaved,
+          ...(cashRedPacket ? { cashRedPacket } : {}),
           subscribe: await fireOrderSubscriptionPush(supabaseUrl, serviceRole, order).catch((e) => {
             const msg = e instanceof Error ? e.message : String(e)
             console.warn('[append] order subscription push failed', msg)
@@ -180,10 +197,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     await appendViaRegistryIo(supabaseUrl, serviceRole, order)
+    const cashRedPacket = await grantPublishCashQuiet(order)
     sendOpsJson(res, 200, {
       ok: true,
       id: order.id,
       via: 'registry_io',
+      ...(cashRedPacket ? { cashRedPacket } : {}),
       subscribe: await fireOrderSubscriptionPush(supabaseUrl, serviceRole, order).catch((e) => {
         const msg = e instanceof Error ? e.message : String(e)
         console.warn('[append] order subscription push failed', msg)

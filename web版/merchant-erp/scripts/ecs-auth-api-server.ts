@@ -139,6 +139,8 @@ import teamIntroPublicHandler from '../api/meoo-team-intro-public.ts'
 import teamIntroSetHandler from '../api/meoo-ops-team-intro-set.ts'
 import platformDecorPublicHandler from '../api/meoo-platform-decor-public.ts'
 import platformDecorSetHandler from '../api/meoo-ops-platform-decor-set.ts'
+import marketingCampaignHandler from '../api/meoo-ops-marketing-campaign.ts'
+import prCashWalletHandler from '../api/meoo-mp-pr-cash-wallet.ts'
 import officialContactHandler from '../api/meoo-official-contact.ts'
 import mpTalentMemberRegisterHandler from '../api/meoo-ops-mp-talent-member-register.ts'
 import mpTalentPrQuotesHandler from '../api/meoo-ops-mp-talent-pr-quotes.ts'
@@ -403,6 +405,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-team-intro-set': teamIntroSetHandler as VercelLikeHandler,
   '/api/meoo-platform-decor-public': platformDecorPublicHandler as VercelLikeHandler,
   '/api/meoo-ops-platform-decor-set': platformDecorSetHandler as VercelLikeHandler,
+  '/api/meoo-ops-marketing-campaign': marketingCampaignHandler as VercelLikeHandler,
+  '/api/meoo-mp-pr-cash-wallet': prCashWalletHandler as VercelLikeHandler,
   '/api/meoo-official-contact': officialContactHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-member-register': mpTalentMemberRegisterHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-pr-quotes': mpTalentPrQuotesHandler as VercelLikeHandler,
