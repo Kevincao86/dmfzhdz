@@ -6,6 +6,7 @@ import { adminCenterView, type MarketingSurface } from '../src/lib/marketingCamp
 import {
   markPrCashWithdrawPaid,
   readMarketingCenter,
+  saveMarketingBoard,
   saveMarketingCampaign,
 } from '../src/lib/marketingCampaignStore.js'
 
@@ -59,6 +60,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const saved = await saveMarketingCampaign(surface, campaign)
+      sendJson(res, 200, { ok: true, ...adminCenterView(saved, surface) })
+      return
+    }
+    if (action === 'saveBoard') {
+      const board = body.board && typeof body.board === 'object' ? (body.board as Record<string, unknown>) : null
+      if (!board) {
+        sendJson(res, 400, { ok: false, error: 'invalid_board' })
+        return
+      }
+      const saved = await saveMarketingBoard(surface, board)
       sendJson(res, 200, { ok: true, ...adminCenterView(saved, surface) })
       return
     }

@@ -9,8 +9,10 @@ import {
   type MarketingSurface,
   type PublishOrderForCash,
   type RegistryMarketingCenter,
+  applyBoardSave,
   applyCampaignSave,
   grantCashForOrder,
+  isPromoBoardKind,
   markCashWithdrawPaid,
   normalizeMarketingCenter,
   requestCashWithdraw,
@@ -124,6 +126,31 @@ export async function saveMarketingCampaign(
       posterUrl: typeof patch.posterUrl === 'string' ? patch.posterUrl : undefined,
       rulesText: typeof patch.rulesText === 'string' ? patch.rulesText : undefined,
       withdrawAfterOrders: patch.withdrawAfterOrders != null ? Number(patch.withdrawAfterOrders) : undefined,
+    })
+    return { center: next, result: next }
+  })
+}
+
+export async function saveMarketingBoard(
+  surface: MarketingSurface,
+  patch: Record<string, unknown>,
+): Promise<RegistryMarketingCenter> {
+  if (!isPromoBoardKind(patch.kind)) throw new Error('invalid_board')
+  const kind = patch.kind
+  return mutateMarketingCenter((center) => {
+    const next = applyBoardSave(center, {
+      surface,
+      kind,
+      title: typeof patch.title === 'string' ? patch.title : undefined,
+      subtitle: typeof patch.subtitle === 'string' ? patch.subtitle : undefined,
+      enabled: patch.enabled === true,
+      offerText: typeof patch.offerText === 'string' ? patch.offerText : undefined,
+      audience: typeof patch.audience === 'string' ? patch.audience : undefined,
+      quota: patch.quota != null ? Number(patch.quota) : undefined,
+      startAt: typeof patch.startAt === 'string' ? patch.startAt : undefined,
+      endAt: typeof patch.endAt === 'string' ? patch.endAt : undefined,
+      posterUrl: typeof patch.posterUrl === 'string' ? patch.posterUrl : undefined,
+      rulesText: typeof patch.rulesText === 'string' ? patch.rulesText : undefined,
     })
     return { center: next, result: next }
   })

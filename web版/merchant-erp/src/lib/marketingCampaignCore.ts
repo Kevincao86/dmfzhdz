@@ -21,6 +21,26 @@ export type CashRedPacketCampaign = {
   updatedAt: string
 }
 
+export const PROMO_BOARD_KINDS = ['version_discount', 'pr_plan', 'talent_plan', 'member_bonus', 'flash_open'] as const
+export type PromoBoardKind = (typeof PROMO_BOARD_KINDS)[number]
+
+export type PromoBoard = {
+  id: string
+  surface: MarketingSurface
+  kind: PromoBoardKind
+  title: string
+  subtitle: string
+  enabled: boolean
+  offerText: string
+  audience: string
+  quota: number
+  startAt: string
+  endAt: string
+  posterUrl: string
+  rulesText: string
+  updatedAt: string
+}
+
 export type MarketingGrant = {
   id: string
   campaignId: string
@@ -56,6 +76,7 @@ export type MarketingWithdraw = {
 
 export type RegistryMarketingCenter = {
   campaigns: CashRedPacketCampaign[]
+  boards: PromoBoard[]
   grants: MarketingGrant[]
   wallets: MarketingWallet[]
   withdraws: MarketingWithdraw[]
@@ -120,9 +141,81 @@ export function defaultCashCampaign(surface: MarketingSurface): CashRedPacketCam
   }
 }
 
+const BOARD_COPY: Record<PromoBoardKind, { title: string; subtitle: string; offerText: string; audience: string; rulesText: string }> = {
+  version_discount: {
+    title: '版本折扣',
+    subtitle: '会员版本限时折扣，折扣或优惠价在这里手动上线',
+    offerText: '8折',
+    audience: '全部会员版本',
+    rulesText: '活动时间内，指定版本按优惠内容执行。名额填 0 表示不限。关闭上线后活动停止。',
+  },
+  pr_plan: {
+    title: 'PR版本活动',
+    subtitle: 'PR 开通、续费或升级的专属活动',
+    offerText: '首年立减',
+    audience: 'PR',
+    rulesText: '只面向 PR 版本。填写优惠、名额和起止时间后打开上线。',
+  },
+  talent_plan: {
+    title: '达人版活动',
+    subtitle: '达人会员开通或续费活动',
+    offerText: '达人版特价',
+    audience: '达人',
+    rulesText: '只面向达人版本。优惠、名额、海报和规则单独保存。',
+  },
+  member_bonus: {
+    title: '会员加赠',
+    subtitle: '开通即送天数、席位或积分',
+    offerText: '加赠 30 天',
+    audience: '新开通',
+    rulesText: '开通指定版本后按优惠内容加赠。这条不走现金红包自动入账。',
+  },
+  flash_open: {
+    title: '限时开通',
+    subtitle: '指定日期内的新客开通价',
+    offerText: '限时价',
+    audience: '新客',
+    rulesText: '只在开始和结束时间内有效。到期后关闭上线。',
+  },
+}
+
+export function promoBoardId(surface: MarketingSurface, kind: PromoBoardKind): string {
+  return `${surface}:${kind}`
+}
+
+export function isPromoBoardKind(value: unknown): value is PromoBoardKind {
+  return PROMO_BOARD_KINDS.some((kind) => kind === value)
+}
+
+export function defaultPromoBoard(surface: MarketingSurface, kind: PromoBoardKind): PromoBoard {
+  const copy = BOARD_COPY[kind]
+  const merchant = surface === 'merchant_erp'
+  return {
+    id: promoBoardId(surface, kind),
+    surface,
+    kind,
+    title: copy.title,
+    subtitle: merchant ? `商家 ERP · ${copy.subtitle}` : copy.subtitle,
+    enabled: false,
+    offerText: copy.offerText,
+    audience: copy.audience,
+    quota: 0,
+    startAt: '',
+    endAt: '',
+    posterUrl: '',
+    rulesText: copy.rulesText,
+    updatedAt: '',
+  }
+}
+
+export function defaultPromoBoards(surface: MarketingSurface): PromoBoard[] {
+  return PROMO_BOARD_KINDS.map((kind) => defaultPromoBoard(surface, kind))
+}
+
 export function emptyMarketingCenter(): RegistryMarketingCenter {
   return {
     campaigns: [defaultCashCampaign('xingxuan'), defaultCashCampaign('merchant_erp')],
+    boards: [...defaultPromoBoards('xingxuan'), ...defaultPromoBoards('merchant_erp')],
     grants: [],
     wallets: [],
     withdraws: [],
@@ -145,6 +238,41 @@ function asCampaign(raw: unknown, fallback: CashRedPacketCampaign): CashRedPacke
     withdrawAfterOrders: clampInt(row.withdrawAfterOrders, 0, 999, fallback.withdrawAfterOrders),
     updatedAt: text(row.updatedAt, 40),
   }
+}
+
+function asBoard(raw: unknown, fallback: PromoBoard): PromoBoard {
+  const row = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const poster = text(row.posterUrl, 2000)
+  const startAt = text(row.startAt, 40)
+  const endAt = text(row.endAt, 40)
+  return {
+    ...fallback,
+    title: text(row.title, 40) || fallback.title,
+    subtitle: text(row.subtitle, 80) || fallback.subtitle,
+    enabled: row.enabled == null ? fallback.enabled : row.enabled === true || row.enabled === 'true',
+    offerText: text(row.offerText, 40) || fallback.offerText,
+    audience: text(row.audience, 40) || fallback.audience,
+    quota: clampInt(row.quota, 0, 1_000_000, fallback.quota),
+    startAt,
+    endAt,
+    posterUrl: poster.startsWith('data:') ? '' : poster,
+    rulesText: text(row.rulesText, 2000) || fallback.rulesText,
+    updatedAt: text(row.updatedAt, 40),
+  }
+}
+
+function boardsFrom(raw: unknown): PromoBoard[] {
+  const incoming = Array.isArray(raw) ? raw : []
+  const surfaces: MarketingSurface[] = ['xingxuan', 'merchant_erp']
+  return surfaces.flatMap((surface) =>
+    defaultPromoBoards(surface).map((fallback) => {
+      const found = incoming.find((item) => {
+        if (!item || typeof item !== 'object') return false
+        return String((item as { id?: unknown }).id || '') === fallback.id
+      })
+      return asBoard(found, fallback)
+    }),
+  )
 }
 
 function asGrant(raw: unknown): MarketingGrant | null {
@@ -223,6 +351,7 @@ export function normalizeMarketingCenter(raw: unknown): RegistryMarketingCenter 
     .filter((x): x is MarketingWithdraw => !!x)
   return {
     campaigns,
+    boards: boardsFrom(row.boards),
     grants: grants.slice(0, 20_000),
     wallets: wallets.slice(0, 20_000),
     withdraws: withdraws.slice(0, 20_000),
@@ -263,6 +392,36 @@ export function applyCampaignSave(
   return {
     ...center,
     campaigns: center.campaigns.map((item) => (item.id === current.id ? next : item)),
+    updatedAt: next.updatedAt,
+  }
+}
+
+export function applyBoardSave(
+  center: RegistryMarketingCenter,
+  patch: Partial<PromoBoard> & { surface: MarketingSurface; kind: PromoBoardKind },
+): RegistryMarketingCenter {
+  const current =
+    center.boards.find((item) => item.surface === patch.surface && item.kind === patch.kind) ??
+    defaultPromoBoard(patch.surface, patch.kind)
+  const next = asBoard(
+    {
+      ...current,
+      ...patch,
+      id: current.id,
+      surface: current.surface,
+      kind: current.kind,
+      updatedAt: nowText(),
+    },
+    current,
+  )
+  next.id = current.id
+  next.surface = current.surface
+  next.kind = current.kind
+  next.updatedAt = nowText()
+  const exists = center.boards.some((item) => item.id === current.id)
+  return {
+    ...center,
+    boards: exists ? center.boards.map((item) => (item.id === current.id ? next : item)) : [...center.boards, next],
     updatedAt: next.updatedAt,
   }
 }
@@ -514,5 +673,22 @@ export function adminCenterView(center: RegistryMarketingCenter, surface: Market
       ...item,
       amountYuan: yuanFromCents(item.amountCents),
     })),
+    boards: center.boards
+      .filter((item) => item.surface === surface)
+      .map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        title: item.title,
+        subtitle: item.subtitle,
+        enabled: item.enabled,
+        offerText: item.offerText,
+        audience: item.audience,
+        quota: item.quota,
+        startAt: item.startAt,
+        endAt: item.endAt,
+        posterUrl: item.posterUrl,
+        rulesText: item.rulesText,
+        updatedAt: item.updatedAt,
+      })),
   }
 }

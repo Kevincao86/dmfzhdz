@@ -37,10 +37,29 @@ export type MarketingWithdrawRow = {
   paidAt?: string
 }
 
+export type MarketingBoardKind = 'version_discount' | 'pr_plan' | 'talent_plan' | 'member_bonus' | 'flash_open'
+
+export type MarketingBoardForm = {
+  id: string
+  kind: MarketingBoardKind
+  title: string
+  subtitle: string
+  enabled: boolean
+  offerText: string
+  audience: string
+  quota: number
+  startAt: string
+  endAt: string
+  posterUrl: string
+  rulesText: string
+  updatedAt: string
+}
+
 export type MarketingCenterPayload = {
   campaign: MarketingCampaignForm
   grants: MarketingGrantRow[]
   withdraws: MarketingWithdrawRow[]
+  boards: MarketingBoardForm[]
 }
 
 function surfaceBody(surface: MarketingSurface) {
@@ -73,6 +92,7 @@ async function postCampaign(body: Record<string, unknown>): Promise<
       campaign,
       grants: Array.isArray(data.grants) ? (data.grants as MarketingGrantRow[]) : [],
       withdraws: Array.isArray(data.withdraws) ? (data.withdraws as MarketingWithdrawRow[]) : [],
+      boards: Array.isArray(data.boards) ? (data.boards as MarketingBoardForm[]) : [],
     },
   }
 }
@@ -96,6 +116,28 @@ export async function saveMarketingCampaign(surface: MarketingSurface, campaign:
       posterUrl: campaign.posterUrl,
       rulesText: campaign.rulesText,
       withdrawAfterOrders: campaign.withdrawAfterOrders,
+    },
+  })
+}
+
+export async function saveMarketingBoard(surface: MarketingSurface, board: MarketingBoardForm) {
+  const denied = requireOpsModuleEdit('marketing')
+  if (denied) return { ok: false as const, error: denied }
+  return postCampaign({
+    action: 'saveBoard',
+    surface: surfaceBody(surface),
+    board: {
+      kind: board.kind,
+      title: board.title,
+      subtitle: board.subtitle,
+      enabled: board.enabled,
+      offerText: board.offerText,
+      audience: board.audience,
+      quota: board.quota,
+      startAt: board.startAt,
+      endAt: board.endAt,
+      posterUrl: board.posterUrl,
+      rulesText: board.rulesText,
     },
   })
 }
