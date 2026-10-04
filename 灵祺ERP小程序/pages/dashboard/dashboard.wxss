@@ -56,25 +56,10 @@
   box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.05);
 }
 
-.home-entry__art {
-  height: 160rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.home-entry__icon {
-  width: 72rpx;
-  height: 72rpx;
-}
-
-.home-entry__title {
+.home-entry__img {
+  width: 100%;
+  height: 224rpx;
   display: block;
-  padding: 14rpx 8rpx 16rpx;
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #1e3a5f;
-  text-align: center;
 }
 
 .home-card {
