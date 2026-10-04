@@ -11,6 +11,7 @@ import {
   Library,
   GraduationCap,
   UserRound,
+  Gift,
   Megaphone,
   BookOpen,
   MapPinned,
@@ -100,6 +101,34 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
     entries: [
       { kind: 'leaf', to: '/announcements', label: '商家 ERP 公告', icon: Megaphone, permission: 'announcements' },
       { kind: 'leaf', to: '/mp-announcements', label: '达人小程序公告', icon: Smartphone, permission: 'announcements' },
+    ],
+  },
+  {
+    id: 'marketing',
+    label: '营销中心',
+    entries: [
+      {
+        kind: 'parent',
+        id: 'marketing-hub',
+        label: '营销中心',
+        icon: Gift,
+        children: [
+          {
+            kind: 'leaf',
+            to: '/marketing?surface=xingxuan',
+            label: '星选平台活动',
+            icon: Smartphone,
+            permission: 'marketing',
+          },
+          {
+            kind: 'leaf',
+            to: '/marketing?surface=merchant',
+            label: '商家ERP活动',
+            icon: Building2,
+            permission: 'marketing',
+          },
+        ],
+      },
     ],
   },
   {

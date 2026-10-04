@@ -108,6 +108,10 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     Array.isArray((parsed.platformDecoration as { items?: unknown }).items)
       ? (parsed.platformDecoration as RegistryFile['platformDecoration'])
       : undefined
+  const marketingCenter =
+    parsed?.marketingCenter && typeof parsed.marketingCenter === 'object' && !Array.isArray(parsed.marketingCenter)
+      ? (parsed.marketingCenter as RegistryFile['marketingCenter'])
+      : undefined
   const videoAi = normalizeRegistryVideoAi(parsed?.videoAi)
   const videoAiUpdatedAt =
     typeof parsed?.videoAiUpdatedAt === 'string' && parsed.videoAiUpdatedAt
@@ -187,6 +191,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     helpManualArticles,
     teamIntro,
     ...(platformDecoration !== undefined ? { platformDecoration } : {}),
+    ...(marketingCenter !== undefined ? { marketingCenter } : {}),
     ...membershipPlanVersions,
     ...(douyinSalesLevelResetYm ? { douyinSalesLevelResetYm } : {}),
     ...(distributionPolicy !== undefined ? { distributionPolicy } : {}),

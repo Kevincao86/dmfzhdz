@@ -498,6 +498,14 @@ export type RegistryFile = {
   teamIntro?: RegistryTeamIntro
   /** 平台装修：活动海报弹窗 / 页面广告位 */
   platformDecoration?: import('./platformDecorTypes.js').RegistryPlatformDecoration
+  /** 营销中心现金红包。整表读写时必须透传，避免被归一化丢掉。 */
+  marketingCenter?: {
+    campaigns?: unknown[]
+    grants?: unknown[]
+    wallets?: unknown[]
+    withdraws?: unknown[]
+    updatedAt?: string
+  }
   /** 抖音带货等级重置月份（运营台配置） */
   douyinSalesLevelResetYm?: string
   /** 渠道分销 · 全局策略与 P1/P2 数据（注册表扩展） */
