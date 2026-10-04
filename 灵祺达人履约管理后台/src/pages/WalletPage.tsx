@@ -78,10 +78,12 @@ type BoundAccount = {
 function CashRedPacketCard({
   cash,
   busy,
+  note,
   onWithdraw,
 }: {
   cash: Record<string, unknown>
   busy: boolean
+  note: string
   onWithdraw: () => void
 }) {
   const campaign = (cash.campaign || {}) as {
@@ -114,12 +116,13 @@ function CashRedPacketCard({
         <button
           type="button"
           className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
-          disabled={busy || !wallet.canWithdraw}
+          disabled={busy}
           onClick={onWithdraw}
         >
           {busy ? '提交中' : '提现'}
         </button>
       </div>
+      {note ? <p className="mt-2 text-sm text-amber-800">{note}</p> : null}
       {campaign.posterUrl ? <img src={campaign.posterUrl} alt="" className="mt-3 max-h-40 w-full rounded-xl object-cover" /> : null}
       {campaign.rulesText ? <p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-[var(--shell-muted)]">{campaign.rulesText}</p> : null}
       {withdraws.length ? (
@@ -163,6 +166,7 @@ export default function WalletPage() {
   const [payTrade, setPayTrade] = useState('')
   const [payBusy, setPayBusy] = useState(false)
   const [cash, setCash] = useState<Record<string, unknown> | null>(null)
+  const [cashNote, setCashNote] = useState('')
 
   async function load() {
     setLoading(true)
@@ -336,16 +340,22 @@ export default function WalletPage() {
   async function withdrawCash() {
     const wallet = (cash?.wallet || {}) as { availableYuan?: string; hint?: string; canWithdraw?: boolean }
     if (!wallet.canWithdraw) {
-      setErr(String(wallet.hint || '暂时不能提现'))
+      const note = String(wallet.hint || '暂时不能提现')
+      setCashNote(note)
+      setErr(note)
       return
     }
     setBusy('cash')
     setErr('')
+    setCashNote('')
     try {
       const next = await postPrCashWallet({ action: 'withdraw', workIdentity: getWorkIdentity() })
       setCash(next.visible ? next : null)
+      setCashNote('提现已提交，等待打款')
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '提现失败')
+      const note = e instanceof Error ? e.message : '提现失败'
+      setCashNote(note)
+      setErr(note)
     } finally {
       setBusy('')
     }
@@ -388,7 +398,7 @@ export default function WalletPage() {
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
 
       {cash ? (
-        <CashRedPacketCard cash={cash} busy={busy === 'cash'} onWithdraw={() => void withdrawCash()} />
+        <CashRedPacketCard cash={cash} busy={busy === 'cash'} note={cashNote} onWithdraw={() => void withdrawCash()} />
       ) : null}
 
       <section className="rounded-2xl border border-[var(--shell-border)] bg-[var(--panel-card)] p-4">
