@@ -2,7 +2,7 @@
 
 export type PlatformDecorSurface = 'mp' | 'dr' | 'cs'
 
-export type PlatformDecorLinkType = 'mp_path' | 'web_url' | 'none'
+export type PlatformDecorLinkType = 'mp_path' | 'web_url' | 'marketing' | 'none'
 
 export type PlatformDecorFreq = 'once' | 'daily' | 'always'
 

@@ -52,6 +52,7 @@ export default function OpsMarketingCenterPage() {
   const [saving, setSaving] = useState(false)
   const [savingBoard, setSavingBoard] = useState('')
   const [uploading, setUploading] = useState('')
+  const [category, setCategory] = useState<'cash' | 'version' | 'open'>('cash')
 
   useEffect(() => {
     let stop = false
@@ -146,8 +147,13 @@ export default function OpsMarketingCenterPage() {
       <style>{`
         .mkt-page { max-width: 64rem; margin: 0 auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; color: var(--ops-text); }
         .mkt-kicker { margin: 0.35rem 0 0; font-size: 0.875rem; line-height: 1.6; color: var(--ops-muted); }
-        .mkt-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-        .mkt-nav a { border: 1.5px solid color-mix(in srgb, var(--ops-text) 35%, var(--ops-border)); border-radius: 999px; padding: 0.35rem 0.75rem; font-size: 0.8125rem; font-weight: 600; color: var(--ops-text); background: var(--ops-panel); text-decoration: none; }
+        .mkt-split { display: grid; grid-template-columns: 12.5rem minmax(0, 1fr); gap: 1rem; align-items: start; }
+        @media (max-width: 800px) { .mkt-split { grid-template-columns: 1fr; } }
+        .mkt-cats { display: flex; flex-direction: column; gap: 0.45rem; position: sticky; top: 0.75rem; }
+        .mkt-cat { text-align: left; border: 1.5px solid color-mix(in srgb, var(--ops-text) 35%, var(--ops-border)); background: var(--ops-panel); color: var(--ops-text); border-radius: 0.8rem; padding: 0.75rem 0.85rem; font-size: 1rem; font-weight: 700; cursor: pointer; }
+        .mkt-cat small { display: block; margin-top: 0.15rem; font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
+        .mkt-cat.on { background: #5b21b6; color: #fff; border-color: #5b21b6; }
+        .mkt-stack { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
         .mkt-card { background: var(--ops-panel); border: 2px solid color-mix(in srgb, var(--ops-text) 32%, var(--ops-border)); border-radius: 1rem; box-shadow: var(--ops-card-shadow); padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
         .mkt-card h2 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--ops-text); }
         .mkt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
@@ -196,22 +202,28 @@ export default function OpsMarketingCenterPage() {
         </p>
       </div>
 
-      {!loading ? (
-        <nav className="mkt-nav">
-          <a href="#mkt-cash">现金红包</a>
-          {boards.map((board) => (
-            <a key={board.id} href={`#mkt-${board.kind}`}>
-              {board.title || board.kind}
-            </a>
-          ))}
-        </nav>
-      ) : null}
-
       {err ? <p className="mkt-err">{err}</p> : null}
       {msg ? <p className="mkt-msg">{msg}</p> : null}
       {loading ? <p className="ops-muted text-sm">加载中…</p> : null}
 
       {!loading ? (
+        <div className="mkt-split">
+          <aside className="mkt-cats">
+            <button type="button" className={category === 'cash' ? 'mkt-cat on' : 'mkt-cat'} onClick={() => setCategory('cash')}>
+              红包活动
+              <small>现金红包</small>
+            </button>
+            <button type="button" className={category === 'version' ? 'mkt-cat on' : 'mkt-cat'} onClick={() => setCategory('version')}>
+              版本活动
+              <small>折扣 / PR / 达人</small>
+            </button>
+            <button type="button" className={category === 'open' ? 'mkt-cat on' : 'mkt-cat'} onClick={() => setCategory('open')}>
+              开通优惠
+              <small>加赠 / 限时开通</small>
+            </button>
+          </aside>
+          <div className="mkt-stack">
+      {!loading && category === 'cash' ? (
         <section id="mkt-cash" className="mkt-card">
           <div className="mkt-head">
             <div>
@@ -280,7 +292,16 @@ export default function OpsMarketingCenterPage() {
       ) : null}
 
       {!loading
-        ? boards.map((board) => (
+        ? boards
+            .filter((board) =>
+              (category === 'version'
+                ? ['version_discount', 'pr_plan', 'talent_plan']
+                : category === 'open'
+                  ? ['member_bonus', 'flash_open']
+                  : []
+              ).includes(board.kind),
+            )
+            .map((board) => (
             <section key={board.id} id={`mkt-${board.kind}`} className="mkt-card">
               <div className="mkt-head">
                 <div>
@@ -350,7 +371,7 @@ export default function OpsMarketingCenterPage() {
           ))
         : null}
 
-      {xingxuan && !loading ? (
+      {xingxuan && !loading && category === 'cash' ? (
         <>
           <section className="mkt-table-wrap">
             <h2>发放记录</h2>
@@ -411,6 +432,9 @@ export default function OpsMarketingCenterPage() {
             {!withdraws.length ? <p className="mkt-empty">还没有提现</p> : null}
           </section>
         </>
+      ) : null}
+          </div>
+        </div>
       ) : null}
     </div>
   )

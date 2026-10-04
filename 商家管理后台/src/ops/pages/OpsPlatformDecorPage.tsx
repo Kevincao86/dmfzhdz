@@ -32,6 +32,34 @@ function isPopupSlot(slotKey: string) {
   return String(slotKey || '').endsWith('.popup')
 }
 
+const MARKETING_JUMPS = [
+  { kind: 'cash', label: '现金红包' },
+  { kind: 'version_discount', label: '版本折扣' },
+  { kind: 'pr_plan', label: 'PR版本活动' },
+  { kind: 'talent_plan', label: '达人版活动' },
+  { kind: 'member_bonus', label: '会员加赠' },
+  { kind: 'flash_open', label: '限时开通' },
+] as const
+
+function marketingSurfaceForSlot(slotKey: string): 'xingxuan' | 'merchant_erp' {
+  if (slotKey.startsWith('cs.') || slotKey.startsWith('erp.')) return 'merchant_erp'
+  return 'xingxuan'
+}
+
+function marketingKindOf(linkValue?: string) {
+  const kind = String(linkValue || '').split(':')[1] || ''
+  return MARKETING_JUMPS.some((item) => item.kind === kind) ? kind : 'cash'
+}
+
+function marketingLinkValue(slotKey: string, kind: string) {
+  return `${marketingSurfaceForSlot(slotKey)}:${kind}`
+}
+
+function marketingJumpLabel(linkValue?: string) {
+  const kind = marketingKindOf(linkValue)
+  return MARKETING_JUMPS.find((item) => item.kind === kind)?.label || '营销活动'
+}
+
 function nowIsoLocal() {
   return new Date().toISOString()
 }
@@ -405,9 +433,11 @@ export default function OpsPlatformDecorPage() {
                     {isCarouselBannerSlot(it.slotKey)
                       ? ` · 每张 ${normalizeCarouselSeconds(it.carouselSeconds)} 秒`
                       : ''}
-                    {isCarouselBannerSlot(it.slotKey) && it.linkType !== 'none' && it.linkValue
-                      ? ' · 已设跳转'
-                      : ''}
+                    {isCarouselBannerSlot(it.slotKey) && it.linkType === 'marketing'
+                      ? ` · 跳转${marketingJumpLabel(it.linkValue)}`
+                      : isCarouselBannerSlot(it.slotKey) && it.linkType !== 'none' && it.linkValue
+                        ? ' · 已设跳转'
+                        : ''}
                     {it.enabled ? '' : ' · 已停用'}
                   </p>
                   {PLATFORM_DECOR_SLOT_SIZE_HINTS[it.slotKey] ? (
@@ -473,6 +503,9 @@ export default function OpsPlatformDecorPage() {
                   ...(isLaunchSplashSlot(slotKey) ? { playSeconds: editing.playSeconds === 5 ? 5 : 3 } : {}),
                   ...(isCarouselBannerSlot(slotKey)
                     ? { carouselSeconds: normalizeCarouselSeconds(editing.carouselSeconds ?? sharedSeconds) }
+                    : {}),
+                  ...(editing.linkType === 'marketing'
+                    ? { linkValue: marketingLinkValue(slotKey, marketingKindOf(editing.linkValue)) }
                     : {}),
                 })
               }}
@@ -572,15 +605,41 @@ export default function OpsPlatformDecorPage() {
               <select
                 className="ops-field mt-1"
                 value={editing.linkType}
-                onChange={(e) =>
-                  patchItem(editing.id, { linkType: e.target.value as PlatformDecorLinkType })
-                }
+                onChange={(e) => {
+                  const linkType = e.target.value as PlatformDecorLinkType
+                  patchItem(editing.id, {
+                    linkType,
+                    ...(linkType === 'marketing'
+                      ? { linkValue: marketingLinkValue(editing.slotKey, marketingKindOf(editing.linkValue)) }
+                      : {}),
+                  })
+                }}
               >
                 <option value="none">无跳转</option>
                 <option value="mp_path">小程序路径</option>
                 <option value="web_url">网页 URL</option>
+                {kind !== 'popup' ? <option value="marketing">营销活动</option> : null}
               </select>
             </label>
+            {editing.linkType === 'marketing' ? (
+              <label className="ops-label">
+                营销活动
+                <select
+                  className="ops-field mt-1"
+                  value={marketingKindOf(editing.linkValue)}
+                  onChange={(e) =>
+                    patchItem(editing.id, { linkValue: marketingLinkValue(editing.slotKey, e.target.value) })
+                  }
+                >
+                  {MARKETING_JUMPS.map((item) => (
+                    <option key={item.kind} value={item.kind}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="ops-hint mt-1">点这张广告图打开对应活动。商家广告位进商家侧，达人和星选广告位进星选侧。</p>
+              </label>
+            ) : (
             <label className="ops-label">
               跳转值
               <input
@@ -590,6 +649,7 @@ export default function OpsPlatformDecorPage() {
                 onChange={(e) => patchItem(editing.id, { linkValue: e.target.value })}
               />
             </label>
+            )}
           </div>
           {isCarouselBannerSlot(editing.slotKey) ? (
             <p className="ops-hint">这一张单独跳转。最多 {MP_HOME_BANNER_MAX} 张，下面的秒数整组共用。</p>

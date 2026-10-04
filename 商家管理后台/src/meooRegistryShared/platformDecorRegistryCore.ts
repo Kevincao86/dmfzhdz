@@ -21,7 +21,7 @@ function newId(): string {
 
 function normalizeLinkType(raw: unknown): PlatformDecorLinkType {
   const v = String(raw || 'none')
-  if (v === 'mp_path' || v === 'web_url' || v === 'none') return v
+  if (v === 'mp_path' || v === 'web_url' || v === 'marketing' || v === 'none') return v
   return 'none'
 }
 

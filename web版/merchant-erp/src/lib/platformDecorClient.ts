@@ -61,6 +61,14 @@ export function openDecorLink(item: RegistryPlatformDecorItem | null): void {
   const type = String(item.linkType || 'none')
   const val = String(item.linkValue || '').trim()
   if (type === 'none' || !val) return
+  if (type === 'marketing') {
+    const kind = val.split(':')[1] || ''
+    const surface = val.split(':')[0] || ''
+    const onXingxuan = surface !== 'merchant_erp'
+    const href = !onXingxuan ? '/settings' : kind === 'cash' ? '/profile/wallet' : '/profile/membership'
+    window.location.assign(href)
+    return
+  }
   if (type === 'web_url' || /^https?:\/\//i.test(val)) {
     window.open(val, '_blank', 'noopener,noreferrer')
     return

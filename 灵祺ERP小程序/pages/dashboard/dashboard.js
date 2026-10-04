@@ -79,6 +79,10 @@ function openDecorLink(item) {
     })
     return
   }
+  if (type === 'marketing') {
+    wx.navigateTo({ url: '/pages/subscription/subscription', fail: () => {} })
+    return
+  }
   if (type === 'web_url') {
     wx.setClipboardData({ data: val })
   }

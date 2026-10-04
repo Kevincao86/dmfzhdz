@@ -195,7 +195,7 @@ export default function OpsAdminLayout() {
                   type="button"
                   onClick={() => toggleExpanded(groupKey)}
                   className={cn(
-                    'ops-nav-group-header mb-1 flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider transition-all',
+                    'ops-nav-group-header mb-1 flex w-full items-center gap-1 rounded-md px-2 py-2 text-left text-[15px] font-semibold tracking-normal transition-all',
                     groupActive ? 'ops-nav-group-header--active' : 'ops-nav-group-header--idle',
                   )}
                 >

@@ -101,6 +101,15 @@ function openDecorLink(item) {
     })
     return
   }
+  if (type === 'marketing') {
+    const kind = val.split(':')[1] || ''
+    const url =
+      kind === 'cash'
+        ? '/pages/subpack-mine/mine-wallet/mine-wallet'
+        : '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership'
+    wx.navigateTo({ url, fail: () => {} })
+    return
+  }
   if (type === 'web_url') {
     const enc = encodeURIComponent(val)
     wx.navigateTo({
