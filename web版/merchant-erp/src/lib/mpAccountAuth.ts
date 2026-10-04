@@ -2,7 +2,7 @@
  * 达人/PR 统一账号：一微信 openid 仅一条 mp_accounts；Web 与小程序共用会话 token。
  */
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
-import type { RegistryMpPrUser, RegistryMpTalentMember } from './opsRegistryTypes.js'
+import type { RegistryFile, RegistryMpPrUser, RegistryMpTalentMember } from './opsRegistryTypes.js'
 import {
   allocateLingqiEditTeamId,
   allocateLingqiShootTeamId,
@@ -10,6 +10,7 @@ import {
 } from './lingqiIdentity.js'
 import { dedupeMpTalentMembersByOpenId, upsertMpTalentMember } from './mpTalentMemberUpsert.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
+import { findTalentLibraryEntriesForAccount } from './mpRegistryProfileEnrich.js'
 import { resolveEffectiveFeatureAccess } from './mpMembershipCatalog.js'
 import { DEFAULT_PR_FEATURE_ACCESS } from './prFeatureAccess.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
@@ -24,7 +25,7 @@ import {
   isValidMpLoginPhone,
   isMpContactBound,
 } from './mpPhoneAuth.js'
-import { verifyAuthSmsCode } from '../../vite-plugins/authSmsAuthShared.js'
+import { sendAuthSmsCode, verifyAuthSmsCode } from '../../vite-plugins/authSmsAuthShared.js'
 import { sendAuthEmailCode, verifyAuthEmailCode } from '../../vite-plugins/authIdentityBindCore.js'
 import {
   buildDouyinWebAuthorizeUrl,
@@ -355,7 +356,20 @@ export function mpAccountIdentities(account: MpAccountRow) {
 
 export type MpFixedWorkIdentity = 'talent' | 'pr' | 'shoot' | 'edit'
 
-/** 登录版本：PR 账号优先，其次拍摄/剪辑，达人库或未写身份视为达人。不改库。 */
+/** 达人库和会员资料都已不在时，账号上残留的达人编号不能再把人送进达人版。 */
+export function talentSideStillExists(
+  data: RegistryFile,
+  account: MpAccountRow,
+  member: RegistryMpTalentMember | null,
+): boolean {
+  if (findTalentLibraryEntriesForAccount(data, account, member).length > 0) return true
+  if (!member) return false
+  if (member.workIdentity === 'shoot' || member.workIdentity === 'edit') return true
+  if (String(member.lingqiShootTeamId || '').trim() || String(member.lingqiEditTeamId || '').trim()) return true
+  return memberHasResolvablePlatformInfo(member)
+}
+
+/** 登录版本：PR 账号优先；达人资料已删除且 PR 资料还在时进 PR；拍摄/剪辑其次。 */
 export function resolveFixedWorkIdentity(
   account: {
     active_role?: string | null
@@ -369,6 +383,7 @@ export function resolveFixedWorkIdentity(
     lingqiShootTeamId?: string | null
     lingqiEditTeamId?: string | null
   } | null,
+  opts?: { talentProfileLive?: boolean },
 ): MpFixedWorkIdentity {
   if (account.active_role === 'pr') return 'pr'
   if (member?.workIdentity === 'shoot' || String(member?.lingqiShootTeamId || '').trim()) return 'shoot'
@@ -377,6 +392,7 @@ export function resolveFixedWorkIdentity(
   const hasTalent = Boolean(
     String(account.lingqi_talent_id || '').trim() || String(account.registry_member_id || '').trim(),
   )
+  if (opts?.talentProfileLive === false && hasPr) return 'pr'
   if (hasPr && !hasTalent) return 'pr'
   return 'talent'
 }
@@ -456,13 +472,26 @@ export async function accountPayloadWithMemberExtras(
       (phoneKey.length >= 8
         ? (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phoneKey)
         : undefined)
+    const linkedMember = findRegistryMemberForAccount(data, acc)
+    const talentProfileLive = talentSideStillExists(data, acc, linkedMember)
+    const fixedIdentity = resolveFixedWorkIdentity(acc, linkedMember, { talentProfileLive })
+    if (
+      fixedIdentity === 'pr' &&
+      acc.active_role !== 'pr' &&
+      !talentProfileLive &&
+      (acc.lingqi_pr_id || acc.registry_pr_id)
+    ) {
+      const rest = restClient(supabaseUrl, serviceRole)
+      await updateAccount(rest, acc.id, { active_role: 'pr' })
+      acc = { ...acc, active_role: 'pr' }
+    }
     if (member) {
       extras = {
         lingqiShootTeamId: member.lingqiShootTeamId || null,
         lingqiEditTeamId: member.lingqiEditTeamId || null,
         workIdentity: member.workIdentity || null,
       }
-      extras.workIdentity = resolveFixedWorkIdentity(acc, member)
+      extras.workIdentity = fixedIdentity
       if (acc.active_role !== 'pr') {
         extras.prFeatureAccess = resolveEffectiveFeatureAccess(
           'talent',
@@ -476,7 +505,7 @@ export async function accountPayloadWithMemberExtras(
       }
     }
     // 达人/拍摄/剪辑身份保留达人会员权限。仅有 PR 编号时不能覆盖，否则专业版达人评估会被 PR 套餐关掉。
-    if (!member) extras.workIdentity = resolveFixedWorkIdentity(acc, null)
+    if (!member) extras.workIdentity = fixedIdentity
     if (acc.active_role === 'pr' || (!extras.prFeatureAccess && (acc.lingqi_pr_id || acc.registry_pr_id))) {
       const pr = findRegistryPrForAccount(data, acc)
       extras.prFeatureAccess = pr
@@ -1336,6 +1365,45 @@ export async function mpAuthChangePasswordBySms(
   await updateAccount(rest, accountId, { password_hash: hash, password_salt: salt })
 }
 
+function accountLoginPhone(account: MpAccountRow): string {
+  return normalizeMpLoginPhone(String(account.login_name || '')) || ''
+}
+
+/** 注销验证码只发到当前账号绑定的手机号。 */
+export async function mpAuthSendCloseAccountSms(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+): Promise<{ phoneMasked: string }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const account = await findAccountById(rest, accountId)
+  if (!account) throw new Error('account_not_found')
+  const phone = accountLoginPhone(account)
+  if (!phone) throw new Error('account_phone_missing')
+  const sent = await sendAuthSmsCode(phone)
+  if (!sent.ok) throw new Error(sent.error || 'sms_not_configured')
+  return { phoneMasked: maskMpPhone(phone) }
+}
+
+/** 短信验证通过后删除登录账号和会话。达人、PR、拍摄、剪辑共用这一条。 */
+export async function mpAuthCloseAccount(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  smsCode: string,
+): Promise<void> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const account = await findAccountById(rest, accountId)
+  if (!account) throw new Error('account_not_found')
+  const phone = accountLoginPhone(account)
+  if (!phone) throw new Error('account_phone_missing')
+  const code = String(smsCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
+  if (!(await verifyAuthSmsCode(phone, code))) throw new Error('sms_code_invalid')
+  await rest.delete(`/mp_auth_sessions?account_id=eq.${encodeURIComponent(account.id)}`)
+  await deleteAccountById(rest, account.id)
+}
+
 export type MpAuthPhoneRegisterInput = {
   phone: string
   smsCode: string
@@ -1519,14 +1587,10 @@ async function fixedIdentityForAccount(
   try {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const memberId = String(account.registry_member_id || '').trim()
-    const phoneKey = accountPhoneKey(account)
-    const member =
-      (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
-      (phoneKey.length >= 8
-        ? (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phoneKey)
-        : undefined)
-    return resolveFixedWorkIdentity(account, member || null)
+    const linkedMember = findRegistryMemberForAccount(data, account)
+    return resolveFixedWorkIdentity(account, linkedMember, {
+      talentProfileLive: talentSideStillExists(data, account, linkedMember),
+    })
   } catch {
     return resolveFixedWorkIdentity(account, null)
   }

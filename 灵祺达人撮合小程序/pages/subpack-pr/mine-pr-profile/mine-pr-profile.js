@@ -38,6 +38,11 @@ Page({
   behaviors: [require('../../../behaviors/identityTheme')],
   data: {
     form: userProfile.emptyPrProfile(),
+    closeSheet: false,
+    closeCode: '',
+    closeSending: false,
+    closeCooldown: 0,
+    closePhoneMasked: '',
     accountTypes: ACCOUNT_TYPES,
     provinces: [],
     cities: [],
@@ -88,6 +93,21 @@ Page({
   },
   onLogoutAccount() {
     accountSessionActions.logout()
+  },
+  onOpenCloseAccount() {
+    accountSessionActions.openCloseSheet.call(this)
+  },
+  onCloseCloseSheet() {
+    accountSessionActions.closeCloseSheet.call(this)
+  },
+  onCloseCodeInput(e) {
+    accountSessionActions.onCloseCodeInput.call(this, e)
+  },
+  onSendCloseSms() {
+    accountSessionActions.sendCloseSms.call(this)
+  },
+  onConfirmCloseAccount() {
+    accountSessionActions.confirmCloseAccount.call(this)
   },
   onField(e) {
     const k = e.currentTarget.dataset.k

@@ -35,6 +35,8 @@ import {
   mpAuthRebindEmailLogin,
   mpAuthRebindPhoneSms,
   mpAuthChangePasswordBySms,
+  mpAuthSendCloseAccountSms,
+  mpAuthCloseAccount,
   mpAuthEnsureIdentity,
   mpAuthSwitchRole,
   mpAuthUpdateWxProfile,
@@ -461,6 +463,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: true,
         account: refreshed ? accountToClientPayload(refreshed.account) : accountToClientPayload(sess.account),
       })
+      return
+    }
+
+    if (action === 'close_account_sms') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const sent = await mpAuthSendCloseAccountSms(supabaseUrl, serviceRole, sess.account.id)
+      sendJson(res, 200, { ok: true, phoneMasked: sent.phoneMasked })
+      return
+    }
+
+    if (action === 'close_account') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      await mpAuthCloseAccount(supabaseUrl, serviceRole, sess.account.id, String(body.smsCode || ''))
+      sendJson(res, 200, { ok: true })
       return
     }
 
@@ -1745,6 +1771,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'rebind_email_login',
         'rebind_phone_sms',
         'change_password_sms',
+        'close_account_sms',
+        'close_account',
         'register',
         'set_password',
         'switch_role',
@@ -1847,6 +1875,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       email_bind_failed: '邮箱绑定失败，请重试',
       phone_mismatch: '手机号须与当前登录账号一致',
       account_phone_missing: '当前账号未绑定手机号',
+      sms_not_configured: '验证码暂时发不出去，请稍后再试',
+      aliyun_sms_send_failed: '验证码暂时发不出去，请稍后再试',
       invalid_credentials: '账号或密码错误',
       account_no_password: '该账号未设置密码，请先用微信登录并在资料页设置密码',
       invalid_session: '登录已过期，请重新登录',

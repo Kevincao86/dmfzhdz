@@ -33,3 +33,83 @@
 .account-session-btn--hover {
   opacity: 0.88;
 }
+
+.account-session-btn--danger {
+  color: #b91c1c;
+  background: #fff;
+  border-color: #fecaca;
+  font-weight: 500;
+}
+
+.close-sheet-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 40;
+}
+
+.close-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  padding: 32rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+}
+
+.close-sheet-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.close-sheet-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.close-sheet-row {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 28rpx;
+  align-items: center;
+}
+
+.close-sheet-input {
+  flex: 1;
+  height: 80rpx;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+  font-size: 30rpx;
+}
+
+.close-sheet-send {
+  margin: 0;
+  height: 80rpx;
+  line-height: 80rpx;
+  padding: 0 24rpx;
+  font-size: 26rpx;
+  color: #5b21b6;
+  background: #f5f3ff;
+  border-radius: 16rpx;
+}
+
+.close-sheet-send::after {
+  border: none;
+}
+
+.close-sheet-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 28rpx;
+}

@@ -192,6 +192,14 @@ async function setLoginCredentials(loginName, password) {
   })
 }
 
+async function sendCloseAccountSms() {
+  return authPost('close_account_sms', {})
+}
+
+async function closeAccount(smsCode) {
+  return authPost('close_account', { smsCode: String(smsCode || '').trim() })
+}
+
 async function changePasswordBySms(phone, smsCode, newPassword) {
   return authPost('change_password_sms', {
     phone: String(phone || '').trim(),
@@ -282,6 +290,8 @@ module.exports = {
   smsLogin,
   setLoginCredentials,
   changePasswordBySms,
+  sendCloseAccountSms,
+  closeAccount,
   switchRole,
   ensureIdentity,
   refreshSession,

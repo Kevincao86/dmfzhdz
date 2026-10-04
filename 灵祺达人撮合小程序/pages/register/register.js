@@ -120,6 +120,11 @@ Page({
     lingqiEditTeamIdLabel: '',
     workIdentity: 'talent',
     isSupplier: false,
+    closeSheet: false,
+    closeCode: '',
+    closeSending: false,
+    closeCooldown: 0,
+    closePhoneMasked: '',
     supplierProfile: supplierTeamProfile.emptySupplierProfile(),
     entityTypes: supplierTeamProfile.ENTITY_TYPES,
     experienceYears: supplierTeamProfile.EXPERIENCE_YEARS,
@@ -409,6 +414,21 @@ Page({
   },
   onLogoutAccount() {
     accountSessionActions.logout()
+  },
+  onOpenCloseAccount() {
+    accountSessionActions.openCloseSheet.call(this)
+  },
+  onCloseCloseSheet() {
+    accountSessionActions.closeCloseSheet.call(this)
+  },
+  onCloseCodeInput(e) {
+    accountSessionActions.onCloseCodeInput.call(this, e)
+  },
+  onSendCloseSms() {
+    accountSessionActions.sendCloseSms.call(this)
+  },
+  onConfirmCloseAccount() {
+    accountSessionActions.confirmCloseAccount.call(this)
   },
   onProvinceChange(e) {
     this.markFormDirty()

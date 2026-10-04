@@ -351,6 +351,20 @@
   <view class="account-session-actions">
     <button class="account-session-btn" plain type="default" hover-class="account-session-btn--hover" catchtap="onSwitchAccount">切换账号</button>
     <button class="account-session-btn account-session-btn--ghost" plain type="default" hover-class="account-session-btn--hover" catchtap="onLogoutAccount">退出登录</button>
+    <button class="account-session-btn account-session-btn--danger" plain type="default" hover-class="account-session-btn--hover" catchtap="onOpenCloseAccount">注销账号</button>
+  </view>
+  <view class="close-sheet-mask" wx:if="{{closeSheet}}" catchtap="onCloseCloseSheet"></view>
+  <view class="close-sheet" wx:if="{{closeSheet}}">
+    <text class="close-sheet-title">注销账号</text>
+    <text class="close-sheet-hint">验证码会发到 {{closePhoneMasked}}。注销后这个账号不能再登录。</text>
+    <view class="close-sheet-row">
+      <input class="close-sheet-input" type="number" maxlength="6" placeholder="6 位验证码" value="{{closeCode}}" bindinput="onCloseCodeInput" />
+      <button class="close-sheet-send" disabled="{{closeSending || closeCooldown > 0}}" bindtap="onSendCloseSms">{{closeCooldown > 0 ? closeCooldown + '秒' : '获取验证码'}}</button>
+    </view>
+    <view class="close-sheet-actions">
+      <button class="account-session-btn account-session-btn--ghost" plain type="default" catchtap="onCloseCloseSheet">取消</button>
+      <button class="account-session-btn account-session-btn--danger" plain type="default" catchtap="onConfirmCloseAccount">确认注销</button>
+    </view>
   </view>
   <site-icp-footer />
 </view>
