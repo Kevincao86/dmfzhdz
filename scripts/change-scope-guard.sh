@@ -117,6 +117,7 @@ list_scopes() {
   site_copyright       星选与商家网页页脚宁波墨典版权；商家小程序页脚温州灵祺版权
   mp_four_fixes        商家经营分析顾客数据；达人我的单据缓存；转单原表打开；达人客服 AI 回复
   talent_footer_lines 达人小程序页脚版权与备案收成两行
+  talent_audit_browse  达人小程序审核：首页可先浏览，手机号/头像/昵称改为用户自行登录时再授权
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1718,6 +1719,12 @@ PAT
     talent_footer_lines)
       cat <<'PAT'
 灵祺达人撮合小程序/components/site-icp-footer
+change-scope-guard
+PAT
+      ;;
+    talent_audit_browse)
+      cat <<'PAT'
+灵祺达人撮合小程序/app.js
 change-scope-guard
 PAT
       ;;

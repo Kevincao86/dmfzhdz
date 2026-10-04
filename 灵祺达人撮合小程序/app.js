@@ -12,29 +12,13 @@ function isWelcomeRoute() {
   return route === '' || route === 'pages/login/login' || route === 'pages/subpack-signup/signup/signup' || route === 'pages/legal/legal'
 }
 
+/** 已登录则同步身份。未登录留在首页浏览，不在打开时要求手机号、头像或昵称。 */
 function redirectIfLoginRequired() {
   try {
-    const route = currentRoute()
-    if (route === 'pages/login/login' || route === 'pages/subpack-signup/signup/signup' || route === 'pages/legal/legal' || route === 'pages/register/register') return
     const auth = require('./utils/auth.js')
-    if (auth.isLoggedIn()) {
-      const acc = auth.readAccount()
-      if (acc) require('./utils/userProfile.js').adoptAccountIdentity(acc)
-      return
-    }
-    if (require('./utils/mpGuestRoutes.js').isGuestBrowsing()) return
-    wx.reLaunch({ url: '/pages/login/login' })
-  } catch (_) {}
-}
-
-function redirectIfPhoneBindRequired() {
-  try {
-    const auth = require('./utils/auth.js')
-    if (!auth.isLoggedIn() || !auth.needsPhoneBind()) return
-    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
-    const route = pages.length ? String(pages[pages.length - 1].route || '') : ''
-    if (route === 'pages/login/login' || route === 'pages/subpack-signup/signup/signup') return
-    wx.reLaunch({ url: '/pages/login/login' })
+    if (!auth.isLoggedIn()) return
+    const acc = auth.readAccount()
+    if (acc) require('./utils/userProfile.js').adoptAccountIdentity(acc)
   } catch (_) {}
 }
 
@@ -136,7 +120,6 @@ App({
         auth
           .refreshSession()
           .then(() => {
-            redirectIfPhoneBindRequired()
             try {
               return require('./utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
             } catch (_) {
