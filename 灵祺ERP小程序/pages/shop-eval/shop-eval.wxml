@@ -189,7 +189,10 @@
         <view class="chooser-cancel" bindtap="onCloseChooser">取消</view>
       </block>
       <block wx:else>
-        <text class="chooser-title">选择 1 家门店</text>
+        <view class="chooser-head">
+          <text class="chooser-title">选择 1 家门店</text>
+          <view class="chooser-close" hover-class="chooser-close--on" bindtap="onBackChooser">关闭</view>
+        </view>
         <input class="form-input" placeholder="按店名或地址筛选" value="{{storeQuery}}" bindinput="onStoreQuery" />
         <scroll-view class="chooser-list" scroll-y>
           <view class="chooser-store" wx:for="{{filteredStores}}" wx:key="id" data-id="{{item.id}}" bindtap="onPickStore">
