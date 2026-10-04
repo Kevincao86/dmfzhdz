@@ -111,6 +111,7 @@ list_scopes() {
   merchant_shop_metrics  商家小程序经营分析与商家 ERP 看板：营收/核销/退款金额与成交券、退款券
   merchant_membership_plans  星选会员权益与商家订阅档位：168 一账号、368 五账号、计量文案
   pr_cash_campaign     营销中心现金红包：星选/商家ERP活动模版，PR 发单入钱包
+  mp_home_banner_identity 达人小程序首页海报轮播：运营台可选展示身份（达人 / PR / 全部）
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1608,6 +1609,12 @@ HomeDashboard.tsx
 灵祺ERP小程序/pages/dashboard/dashboard.js
 灵祺ERP小程序/pages/dashboard/dashboard.wxml
 灵祺ERP小程序/pages/dashboard/dashboard.wxss
+change-scope-guard
+PAT
+      ;;
+    mp_home_banner_identity)
+      cat <<'PAT'
+OpsPlatformDecorPage.tsx
 change-scope-guard
 PAT
       ;;

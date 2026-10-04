@@ -32,6 +32,21 @@ function isPopupSlot(slotKey: string) {
   return String(slotKey || '').endsWith('.popup')
 }
 
+function bannerAudience(ids?: string[]): 'all' | 'talent' | 'pr' {
+  const list = (ids || []).map((x) => String(x || '').trim()).filter(Boolean)
+  if (!list.length || list.includes('all')) return 'all'
+  if (list.length === 1 && list[0] === 'pr') return 'pr'
+  if (list.length === 1 && list[0] === 'talent') return 'talent'
+  return 'all'
+}
+
+function bannerAudienceLabel(ids?: string[]) {
+  const v = bannerAudience(ids)
+  if (v === 'pr') return '仅 PR'
+  if (v === 'talent') return '仅达人'
+  return '全部身份'
+}
+
 const MARKETING_JUMPS = [
   { kind: 'cash', label: '现金红包' },
   { kind: 'version_discount', label: '版本折扣' },
@@ -433,6 +448,7 @@ export default function OpsPlatformDecorPage() {
                     {isCarouselBannerSlot(it.slotKey)
                       ? ` · 每张 ${normalizeCarouselSeconds(it.carouselSeconds)} 秒`
                       : ''}
+                    {it.slotKey === 'mp.home.banner' ? ` · ${bannerAudienceLabel(it.identities)}` : ''}
                     {isCarouselBannerSlot(it.slotKey) && it.linkType === 'marketing'
                       ? ` · 跳转${marketingJumpLabel(it.linkValue)}`
                       : isCarouselBannerSlot(it.slotKey) && it.linkType !== 'none' && it.linkValue
@@ -653,6 +669,27 @@ export default function OpsPlatformDecorPage() {
           </div>
           {isCarouselBannerSlot(editing.slotKey) ? (
             <p className="ops-hint">这一张单独跳转。最多 {MP_HOME_BANNER_MAX} 张，下面的秒数整组共用。</p>
+          ) : null}
+
+          {editing.slotKey === 'mp.home.banner' ? (
+            <label className="ops-label">
+              展示身份
+              <select
+                className="ops-field mt-1"
+                value={bannerAudience(editing.identities)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  patchItem(editing.id, {
+                    identities: v === 'pr' ? ['pr'] : v === 'talent' ? ['talent'] : ['all'],
+                  })
+                }}
+              >
+                <option value="all">全部身份</option>
+                <option value="talent">达人</option>
+                <option value="pr">PR</option>
+              </select>
+              <p className="ops-hint mt-1">只有选中的身份能在首页看到这张海报。选全部，达人、PR、拍摄和剪辑都能看到。</p>
+            </label>
           ) : null}
 
           {isCarouselBannerSlot(editing.slotKey) ? (
