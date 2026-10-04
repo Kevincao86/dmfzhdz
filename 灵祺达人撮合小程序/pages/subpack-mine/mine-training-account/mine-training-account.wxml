@@ -128,6 +128,7 @@
           <text wx:if="{{idBack}}" class="la-doc__badge">已上传</text>
         </view>
       </view>
+      <text class="la-note">上传人像面后，自动填入姓名和身份证号，可以再改。</text>
       <view wx:if="{{kind === 'entity'}}" class="la-doc la-doc--wide" data-kind="license" bindtap="onPickDoc">
         <image wx:if="{{licenseImage}}" class="la-doc__img" src="{{licenseImage}}" mode="aspectFill" />
         <block wx:else>
@@ -140,6 +141,10 @@
 
     <view class="la-card">
       <text class="la-sec">账户信息</text>
+      <text class="la-label">姓名</text>
+      <input class="la-input" value="{{idName}}" bindinput="onIdName" placeholder="与身份证一致" maxlength="40" />
+      <text class="la-label">身份证号</text>
+      <input class="la-input" value="{{idNo}}" bindinput="onId" placeholder="18 位身份证号" maxlength="18" />
       <text class="la-label">户名</text>
       <input class="la-input" value="{{name}}" bindinput="onName" placeholder="{{kind === 'person' ? '收款人姓名' : '账户名称'}}" />
       <block wx:if="{{kind === 'entity'}}">

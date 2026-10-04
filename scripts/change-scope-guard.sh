@@ -113,6 +113,7 @@ list_scopes() {
   pr_cash_campaign     营销中心现金红包：星选/商家ERP活动模版，PR 发单入钱包
   mp_home_banner_identity 达人小程序首页海报轮播：运营台可选展示身份（达人 / PR / 全部）
   mp_login_identity_close 登录身份：达人库已删除则进 PR；我的信息短信注销账号
+  payout_id_fields     达人小程序与星选：绑定收款账户增加姓名、身份证号，人像面识别自动填入
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1689,6 +1690,15 @@ TalentLocalLifeEvalPage.tsx
 registryProfileSync.ts
 tabBarConfig.js
 mine-local-life-eval.js
+change-scope-guard
+PAT
+      ;;
+    payout_id_fields)
+      cat <<'PAT'
+WalletPage.tsx
+mine-training-account
+mpTraining.js
+meoo-mp-training.ts
 change-scope-guard
 PAT
       ;;

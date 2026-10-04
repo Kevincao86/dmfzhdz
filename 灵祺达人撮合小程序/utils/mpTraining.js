@@ -471,6 +471,7 @@ async function saveProfile(input) {
     hostId: accountId(),
     kind: input.kind === 'entity' ? 'entity' : 'person',
     name: String(input.name || '').trim(),
+    idName: String(input.idName || '').trim(),
     idNo: String(input.idNo || '').trim(),
     bank: String(input.bank || '').trim(),
     bankNo: String(input.bankNo || '').trim(),
@@ -481,6 +482,8 @@ async function saveProfile(input) {
     lecturerStatus: 'approved',
     updatedAt: new Date().toISOString(),
   }
+  if (!profile.idName) throw new Error('请填写姓名')
+  if (!/^(\d{15}|\d{17}[\dXx])$/.test(profile.idNo)) throw new Error('请填写正确的身份证号')
   if (!profile.name || !profile.bankNo) throw new Error('请填写户名和账号')
   if (profile.kind === 'entity' && !profile.licenseNo) throw new Error('请填写统一社会信用代码')
   if (ecs.hasBase && ecs.hasBase()) {

@@ -63,6 +63,7 @@ type Quote = {
 type BoundAccount = {
   kind?: string
   name?: string
+  idName?: string
   bank?: string
   bankNo?: string
   licenseNo?: string
@@ -148,6 +149,7 @@ export default function WalletPage() {
   const [bindOpen, setBindOpen] = useState(false)
   const [kind, setKind] = useState<'person' | 'entity'>('person')
   const [holder, setHolder] = useState('')
+  const [idName, setIdName] = useState('')
   const [bankName, setBankName] = useState('')
   const [bankNo, setBankNo] = useState('')
   const [licenseNo, setLicenseNo] = useState('')
@@ -261,6 +263,7 @@ export default function WalletPage() {
   function openBind() {
     setKind(account?.kind === 'entity' ? 'entity' : 'person')
     setHolder(account?.name || '')
+    setIdName(account?.idName || '')
     setBankName(account?.bank || '')
     setBankNo(account?.bankNo || '')
     setLicenseNo(account?.licenseNo || '')
@@ -282,9 +285,18 @@ export default function WalletPage() {
       else setLicenseImage(imageDataUrl)
       const result = await postTraining({ action: 'ocrDoc', kind: docKind, imageDataUrl })
       const fields = (result.fields || {}) as Record<string, string>
-      if (fields.name) setHolder(fields.name)
-      if (fields.idNo) setIdNo(fields.idNo)
-      if (fields.licenseNo) setLicenseNo(fields.licenseNo)
+      if (docKind === 'id_front') {
+        if (fields.name) {
+          setIdName(fields.name)
+          if (kind === 'person') setHolder(fields.name)
+        }
+        if (fields.idNo) setIdNo(fields.idNo)
+      } else if (docKind === 'license') {
+        if (fields.name) setHolder(fields.name)
+        if (fields.licenseNo) setLicenseNo(fields.licenseNo)
+      } else if (fields.idNo) {
+        setIdNo(fields.idNo)
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : `${label}识别失败`)
     }
@@ -304,6 +316,14 @@ export default function WalletPage() {
       setErr('请上传营业执照')
       return
     }
+    if (!idName.trim()) {
+      setErr('请填写姓名')
+      return
+    }
+    if (!/^(\d{15}|\d{17}[\dXx])$/.test(idNo.trim())) {
+      setErr('请填写正确的身份证号')
+      return
+    }
     if (!holder.trim() || !bankNo.trim()) {
       setErr('请填写户名和账号')
       return
@@ -320,6 +340,7 @@ export default function WalletPage() {
         hostId: me.accountId,
         kind,
         name: holder.trim(),
+        idName: idName.trim(),
         idNo: idNo.trim(),
         bank: bankName.trim(),
         bankNo: bankNo.trim(),
@@ -544,7 +565,16 @@ export default function WalletPage() {
                 </label>
               ))}
             </div>
+            <p className="mt-2 text-xs text-slate-400">上传人像面后，自动填入姓名和身份证号，可以再改。</p>
             <label className="mt-4 block text-xs font-medium text-slate-500">
+              姓名
+              <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400" value={idName} onChange={(e) => setIdName(e.target.value)} placeholder="与身份证一致" maxLength={40} />
+            </label>
+            <label className="mt-3 block text-xs font-medium text-slate-500">
+              身份证号
+              <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400" value={idNo} onChange={(e) => setIdNo(e.target.value.trim())} placeholder="18 位身份证号" maxLength={18} />
+            </label>
+            <label className="mt-3 block text-xs font-medium text-slate-500">
               户名
               <input className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400" value={holder} onChange={(e) => setHolder(e.target.value)} placeholder={kind === 'person' ? '收款人姓名' : '账户名称'} />
             </label>

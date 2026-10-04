@@ -43,6 +43,7 @@ type Profile = {
   hostId: string
   kind: 'person' | 'entity'
   name: string
+  idName: string
   idNo: string
   bank: string
   bankNo: string
@@ -457,6 +458,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hostId,
       kind: prev?.kind === 'entity' ? 'entity' : 'person',
       name: prev?.name || '',
+      idName: prev?.idName || '',
       idNo: prev?.idNo || '',
       bank: prev?.bank || '',
       bankNo: prev?.bankNo || '',
@@ -519,6 +521,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const bankNo = String(body.bankNo || '').trim()
     const kind = body.kind === 'entity' ? 'entity' : 'person'
     const licenseNo = String(body.licenseNo || '').trim()
+    const sentIdName = Object.prototype.hasOwnProperty.call(body, 'idName')
+    const idName = sentIdName ? clipText(body.idName, 40) : clipText(prev?.idName, 40)
+    const idNo = clipText(body.idNo ?? prev?.idNo, 18)
     if (!name || !bankNo) {
       res.status(400).json({ ok: false, error: '请填写户名和账号' })
       return
@@ -527,11 +532,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ ok: false, error: '请填写统一社会信用代码' })
       return
     }
+    if (sentIdName) {
+      if (!idName) {
+        res.status(400).json({ ok: false, error: '请填写姓名' })
+        return
+      }
+      if (!/^(\d{15}|\d{17}[\dXx])$/.test(idNo)) {
+        res.status(400).json({ ok: false, error: '请填写正确的身份证号' })
+        return
+      }
+    }
     const profile: Profile = {
       ...prev,
       kind,
       name,
-      idNo: String(body.idNo || '').trim(),
+      idName,
+      idNo,
       bank: String(body.bank || '').trim(),
       bankNo,
       licenseNo: kind === 'entity' ? licenseNo : '',

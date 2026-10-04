@@ -24,6 +24,7 @@ Page({
     lecturerStatus: 'none',
     kind: 'person',
     name: '',
+    idName: '',
     idNo: '',
     bank: '',
     bankNo: '',
@@ -71,6 +72,7 @@ Page({
       lecturerStatus: training.lecturerState(p),
       kind: p.kind || 'person',
       name: p.name || '',
+      idName: p.idName || '',
       idNo: p.idNo || '',
       bank: p.bank || '',
       bankNo: p.bankNo || '',
@@ -183,6 +185,7 @@ Page({
   },
   onPickDoc(e) {
     const kind = e.currentTarget.dataset.kind
+    this._editing = true
     wx.chooseImage({
       count: 1,
       sizeType: ['compressed'],
@@ -198,10 +201,18 @@ Page({
             const patch = kind === 'id_front' ? { idFront: imageDataUrl } : kind === 'id_back' ? { idBack: imageDataUrl } : { licenseImage: imageDataUrl }
             try {
               const fields = await training.recognizeDoc(kind, imageDataUrl)
-              if (fields.name) patch.name = fields.name
-              if (fields.idNo) patch.idNo = fields.idNo
-              if (fields.licenseNo) patch.licenseNo = fields.licenseNo
-              if (fields.legalPerson && this.data.kind === 'entity' && !fields.name) patch.name = fields.legalPerson
+              if (kind === 'id_front') {
+                if (fields.name) {
+                  patch.idName = fields.name
+                  if (this.data.kind === 'person') patch.name = fields.name
+                }
+                if (fields.idNo) patch.idNo = fields.idNo
+              } else if (kind === 'license') {
+                if (fields.name) patch.name = fields.name
+                if (fields.licenseNo) patch.licenseNo = fields.licenseNo
+              } else if (fields.idNo) {
+                patch.idNo = fields.idNo
+              }
               this.setData(patch)
               wx.showToast({ title: '已填入识别结果', icon: 'none' })
             } catch (err) {
@@ -231,7 +242,8 @@ Page({
   },
   onKind(e) { this._editing = true; this.setData({ kind: e.currentTarget.dataset.id }) },
   onName(e) { this._editing = true; this.setData({ name: e.detail.value }) },
-  onId(e) { this.setData({ idNo: e.detail.value }) },
+  onIdName(e) { this._editing = true; this.setData({ idName: e.detail.value }) },
+  onId(e) { this._editing = true; this.setData({ idNo: String(e.detail.value || '').replace(/\s/g, '') }) },
   onBank(e) { this.setData({ bank: e.detail.value }) },
   onBankNo(e) { this.setData({ bankNo: e.detail.value }) },
   onLicense(e) { this.setData({ licenseNo: e.detail.value }) },
