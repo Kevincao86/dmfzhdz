@@ -110,6 +110,7 @@ list_scopes() {
   login_session_refresh  商家 Web/小程序：登录仍在但 access token 过期时先刷新再请求
   merchant_shop_metrics  商家小程序经营分析与商家 ERP 看板：营收/核销/退款金额与成交券、退款券
   merchant_membership_plans  星选会员权益与商家订阅档位：168 一账号、368 五账号、计量文案
+  pr_cash_campaign     营销中心现金红包：星选/商家ERP活动模版，PR 发单入钱包
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1607,6 +1608,26 @@ HomeDashboard.tsx
 灵祺ERP小程序/pages/dashboard/dashboard.js
 灵祺ERP小程序/pages/dashboard/dashboard.wxml
 灵祺ERP小程序/pages/dashboard/dashboard.wxss
+change-scope-guard
+PAT
+      ;;
+    pr_cash_campaign)
+      cat <<'PAT'
+marketingCampaign
+meoo-ops-marketing-campaign
+meoo-mp-pr-cash-wallet
+OpsMarketingCenter
+opsMarketingCampaign
+mine-wallet
+WalletPage.tsx
+灵祺达人履约管理后台/src/lib/mpApi.ts
+opsNavConfig.ts
+opsStaffAuth.ts
+商家管理后台/src/App.tsx
+opsRegistryTypes.ts
+opsRegistryGatewayCore.ts
+ecs-auth-api-server.ts
+meoo-ops-mp-recruitment-orders-append.ts
 change-scope-guard
 PAT
       ;;

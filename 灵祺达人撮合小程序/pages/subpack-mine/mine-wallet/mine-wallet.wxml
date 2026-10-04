@@ -2,6 +2,23 @@
   <text class="wl-sub">积分、培训保证金和课时费。退保证金后讲师变为未认证，不能发布课程。</text>
   <text wx:if="{{err}}" class="wl-err">{{err}}</text>
 
+  <view class="wl-card" wx:if="{{cashVisible}}">
+    <text class="wl-name">{{cashTitle}}</text>
+    <text class="wl-value">¥{{cashAvailable}}</text>
+    <text class="wl-hint">{{cashSubtitle}} 已达标 {{cashOrders}} 单，剩余 {{cashRemaining}} 个。</text>
+    <text wx:if="{{cashHint}}" class="wl-hint">{{cashHint}}</text>
+    <image wx:if="{{cashPoster}}" class="wl-poster" src="{{cashPoster}}" mode="widthFix" />
+    <text wx:if="{{cashRules}}" class="wl-hint">{{cashRules}}</text>
+    <view class="wl-btn wl-btn--block" bindtap="onCashWithdraw">提现</view>
+    <view wx:if="{{cashWithdraws.length}}" class="wl-payouts">
+      <view wx:for="{{cashWithdraws}}" wx:key="id" class="wl-payout">
+        <text class="wl-payout-net">¥{{item.amountYuan}}</text>
+        <text class="wl-payout-status {{item.status === 'paid' ? 'wl-payout-status--paid' : ''}}">{{item.statusText}}</text>
+        <text class="wl-hint">{{item.createdAt}}</text>
+      </view>
+    </view>
+  </view>
+
   <view class="wl-card">
     <view class="wl-row">
       <view>

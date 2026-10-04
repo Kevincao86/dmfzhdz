@@ -19,6 +19,17 @@ Page({
     taxLabel: '0',
     accountBound: false,
     payouts: [],
+    cashVisible: false,
+    cashTitle: '',
+    cashSubtitle: '',
+    cashPoster: '',
+    cashRules: '',
+    cashAvailable: '0.00',
+    cashOrders: 0,
+    cashRemaining: 0,
+    cashCanWithdraw: false,
+    cashHint: '',
+    cashWithdraws: [],
   },
   onLoad() {
     prepareMineSubPage(this)
@@ -46,6 +57,13 @@ Page({
       const balance = s
         ? Math.max(0, Math.floor(Number(s.balance) || packageRemaining + rechargeBalance))
         : Math.max(0, Math.floor(Number(data && data.mpAiPointsBalance) || 0))
+      const cash = await ecs.post(
+        '/api/meoo-mp-pr-cash-wallet',
+        { action: 'summary' },
+        { 'X-Mp-Session': token },
+      ).catch(() => null)
+      const cashCampaign = cash && cash.campaign ? cash.campaign : {}
+      const cashWallet = cash && cash.wallet ? cash.wallet : {}
       const summary = await training.walletSummary()
       const profile = await training.syncProfile()
       const quote = summary.settlement || {}
@@ -57,6 +75,17 @@ Page({
         netLabel: Number(quote.net || 0).toFixed(2),
         commissionLabel: Number(quote.commission || 0).toFixed(2),
         taxLabel: Number(quote.tax || 0).toFixed(2),
+        cashVisible: !!(cash && cash.visible),
+        cashTitle: cashCampaign.title || 'PR招募现金红包',
+        cashSubtitle: cashCampaign.subtitle || '',
+        cashPoster: cashCampaign.posterUrl || '',
+        cashRules: cashCampaign.rulesText || '',
+        cashAvailable: cashWallet.availableYuan || '0.00',
+        cashOrders: cashWallet.qualifyingOrders || 0,
+        cashRemaining: cashCampaign.remaining || 0,
+        cashCanWithdraw: !!cashWallet.canWithdraw,
+        cashHint: cashWallet.hint || '',
+        cashWithdraws: (cash && cash.withdraws) || [],
         payouts: (summary.payouts || []).map((row) => ({
           id: row.id,
           net: Number(row.net || 0).toFixed(2),
@@ -92,6 +121,33 @@ Page({
           this.load()
         } catch (e) {
           wx.showToast({ title: String((e && e.message) || '退款失败').slice(0, 18), icon: 'none' })
+        }
+      },
+    })
+  },
+  onCashWithdraw() {
+    if (!this.data.cashCanWithdraw) {
+      wx.showToast({ title: String(this.data.cashHint || '暂时不能提现').slice(0, 18), icon: 'none' })
+      return
+    }
+    wx.showModal({
+      title: '提现招募红包',
+      content: `可提现 ¥${this.data.cashAvailable}。提交后由运营打款，1–3 个工作日到账。`,
+      confirmText: '确认提现',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          const token = sessionStore.readSessionToken()
+          const data = await ecs.post(
+            '/api/meoo-mp-pr-cash-wallet',
+            { action: 'withdraw' },
+            { 'X-Mp-Session': token },
+          )
+          if (!data || data.ok === false) throw new Error((data && (data.message || data.error)) || '提现失败')
+          wx.showToast({ title: '已提交', icon: 'success' })
+          this.load()
+        } catch (e) {
+          wx.showToast({ title: String((e && e.message) || '提现失败').slice(0, 18), icon: 'none' })
         }
       },
     })

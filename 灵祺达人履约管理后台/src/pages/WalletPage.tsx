@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchRegistryProfile, fetchTraining, postTraining } from '../lib/mpApi'
+import { fetchRegistryProfile, fetchTraining, postPrCashWallet, postTraining } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
 
 const DEPOSIT = 500
@@ -74,6 +74,67 @@ type BoundAccount = {
   intro?: string
 }
 
+function CashRedPacketCard({
+  cash,
+  busy,
+  onWithdraw,
+}: {
+  cash: Record<string, unknown>
+  busy: boolean
+  onWithdraw: () => void
+}) {
+  const campaign = (cash.campaign || {}) as {
+    title?: string
+    subtitle?: string
+    posterUrl?: string
+    rulesText?: string
+    amountYuan?: string
+    remaining?: number
+    withdrawAfterOrders?: number
+  }
+  const wallet = (cash.wallet || {}) as {
+    availableYuan?: string
+    qualifyingOrders?: number
+    canWithdraw?: boolean
+    hint?: string
+  }
+  const withdraws = Array.isArray(cash.withdraws) ? (cash.withdraws as Array<{ id: string; amountYuan: string; statusText: string; createdAt: string }>) : []
+  return (
+    <section className="rounded-2xl border border-amber-200 bg-[var(--panel-card)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--shell-text)]">{campaign.title || 'PR招募现金红包'}</h2>
+          <p className="mt-1 text-2xl font-bold text-amber-700">¥{wallet.availableYuan || '0.00'}</p>
+          <p className="mt-1 text-xs text-[var(--shell-muted)]">
+            {campaign.subtitle || '发单红包自动进入钱包'} · 已达标 {wallet.qualifyingOrders || 0} 单 · 剩余 {campaign.remaining ?? 0} 个
+          </p>
+          {wallet.hint ? <p className="mt-1 text-xs text-amber-800">{wallet.hint}</p> : null}
+        </div>
+        <button
+          type="button"
+          className="rounded-xl bg-amber-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          disabled={busy || !wallet.canWithdraw}
+          onClick={onWithdraw}
+        >
+          {busy ? '提交中' : '提现'}
+        </button>
+      </div>
+      {campaign.posterUrl ? <img src={campaign.posterUrl} alt="" className="mt-3 max-h-40 w-full rounded-xl object-cover" /> : null}
+      {campaign.rulesText ? <p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-[var(--shell-muted)]">{campaign.rulesText}</p> : null}
+      {withdraws.length ? (
+        <div className="mt-3 space-y-2">
+          {withdraws.map((row) => (
+            <div key={row.id} className="flex items-center justify-between text-sm">
+              <span>¥{row.amountYuan}</span>
+              <span className="text-xs text-[var(--shell-muted)]">{row.statusText} · {row.createdAt}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 export default function WalletPage() {
   const me = getAccount()
   const [balance, setBalance] = useState(0)
@@ -100,15 +161,18 @@ export default function WalletPage() {
   const [payQr, setPayQr] = useState('')
   const [payTrade, setPayTrade] = useState('')
   const [payBusy, setPayBusy] = useState(false)
+  const [cash, setCash] = useState<Record<string, unknown> | null>(null)
 
   async function load() {
     setLoading(true)
     setErr('')
     try {
-      const [profile, training] = await Promise.all([
+      const [profile, training, cashWallet] = await Promise.all([
         fetchRegistryProfile().catch(() => null),
         fetchTraining(me?.accountId),
+        postPrCashWallet({ action: 'summary' }).catch(() => null),
       ])
+      setCash(cashWallet && cashWallet.visible ? cashWallet : null)
       const summary = profile?.mpAiPointsSummary
       const points = summary
         ? Math.max(0, Math.floor(Number(summary.balance) || Number(summary.packageRemaining || 0) + Number(summary.rechargeBalance || 0)))
@@ -268,6 +332,24 @@ export default function WalletPage() {
     }
   }
 
+  async function withdrawCash() {
+    const wallet = (cash?.wallet || {}) as { availableYuan?: string; hint?: string; canWithdraw?: boolean }
+    if (!wallet.canWithdraw) {
+      setErr(String(wallet.hint || '暂时不能提现'))
+      return
+    }
+    setBusy('cash')
+    setErr('')
+    try {
+      const next = await postPrCashWallet({ action: 'withdraw' })
+      setCash(next.visible ? next : null)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '提现失败')
+    } finally {
+      setBusy('')
+    }
+  }
+
   async function startScanPay() {
     if (!me?.accountId) {
       setErr('请先登录')
@@ -303,6 +385,10 @@ export default function WalletPage() {
         <p className="mt-1 text-sm text-[var(--shell-muted)]">积分、培训保证金和课时费。退保证金后讲师变为未认证，不能发布课程。</p>
       </div>
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
+
+      {cash ? (
+        <CashRedPacketCard cash={cash} busy={busy === 'cash'} onWithdraw={() => void withdrawCash()} />
+      ) : null}
 
       <section className="rounded-2xl border border-[var(--shell-border)] bg-[var(--panel-card)] p-4">
         <div className="flex items-start justify-between gap-3">

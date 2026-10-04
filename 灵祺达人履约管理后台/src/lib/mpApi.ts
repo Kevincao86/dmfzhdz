@@ -324,6 +324,13 @@ export async function postTraining(body: Record<string, unknown>) {
   return postJsonCandidates('/api/meoo-mp-training', body)
 }
 
+export async function postPrCashWallet(body: Record<string, unknown>) {
+  const token = getToken()
+  return postJsonCandidates('/api/meoo-mp-pr-cash-wallet', body, {
+    extraHeaders: token ? { 'X-Mp-Session': token } : {},
+  })
+}
+
 export async function bindEmailLogin(email: string, emailCode: string, platform: 'wx' | 'dy') {
   const data = await mpAuthRequest('bind_email_login', { email, emailCode, platform })
   return { token: String(data.token), account: data.account as MpAccount }
