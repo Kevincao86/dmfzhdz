@@ -148,6 +148,32 @@ Page({
     })
   },
 
+  onLeaveLogin() {
+    api.enterGuestBrowse()
+    const stack = getCurrentPages()
+    if (stack.length > 1) {
+      wx.navigateBack({
+        delta: 1,
+        fail: () => this.onGuestBrowse(),
+      })
+      return
+    }
+    this.onGuestBrowse()
+  },
+
+  onCancelBindPhone() {
+    const loggedIn = Boolean(api.getBearerToken())
+    this.setData({
+      showBindPhone: false,
+      bindMergeToken: '',
+      bindMergeMsg: '',
+      bindNeedCode: false,
+      bindSmsCode: '',
+      err: '',
+    })
+    if (loggedIn) this._goHome()
+  },
+
   onToggleLegalAgree() {
     this.setData({ legalAgreed: !this.data.legalAgreed, err: '' })
   },

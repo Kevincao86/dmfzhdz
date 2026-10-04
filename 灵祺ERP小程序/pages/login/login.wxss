@@ -13,6 +13,36 @@
   align-items: center;
 }
 
+.login-back-btn {
+  align-self: flex-start;
+  width: 160rpx;
+  margin: 0 0 12rpx;
+  padding: 0;
+  height: 72rpx;
+  line-height: 72rpx;
+  border-radius: 36rpx;
+  background: #ffffff;
+  color: #1e3a5f;
+  font-size: 30rpx;
+  font-weight: 700;
+  border: 2rpx solid #1e3a5f;
+}
+
+.login-back-btn::after {
+  border: none;
+}
+
+.btn-v2.login-cancel {
+  margin-top: 16rpx;
+  background: #ffffff;
+  color: #1e3a5f;
+  border: 2rpx solid #1e3a5f;
+}
+
+.btn-v2.login-cancel::after {
+  border: none;
+}
+
 .welcome-head__logo {
   width: 96rpx;
   height: 96rpx;
@@ -158,9 +188,10 @@
 
 .btn-v2.guest-browse {
   margin-top: 20rpx;
-  background: rgba(255, 255, 255, 0.72);
+  background: #ffffff;
   color: #1e3a5f;
-  border: 2rpx solid rgba(125, 211, 252, 0.8);
+  border: 2rpx solid #1e3a5f;
+  font-weight: 700;
 }
 .btn-v2.guest-browse::after {
   border: none;
