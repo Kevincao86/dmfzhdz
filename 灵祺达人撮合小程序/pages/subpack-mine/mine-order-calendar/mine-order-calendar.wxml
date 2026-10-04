@@ -180,4 +180,5 @@
       <text class="cal-label-hint">标签按当前身份保存，与网页商单日历同步</text>
     </view>
   </view>
+  <site-icp-footer />
 </view>

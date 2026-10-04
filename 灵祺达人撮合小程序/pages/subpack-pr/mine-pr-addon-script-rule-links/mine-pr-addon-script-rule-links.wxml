@@ -17,4 +17,5 @@
       <text class="addon-order-pick__arrow">›</text>
     </view>
   </view>
+  <site-icp-footer />
 </view>

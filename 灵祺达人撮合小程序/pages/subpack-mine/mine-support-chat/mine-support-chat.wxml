@@ -47,4 +47,5 @@
       <button class="send-btn" bindtap="onSend" disabled="{{!ready || !input}}">发送</button>
     </view>
   </view>
+  <site-icp-footer />
 </view>

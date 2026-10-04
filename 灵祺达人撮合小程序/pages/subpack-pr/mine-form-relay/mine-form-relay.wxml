@@ -252,4 +252,5 @@
       <view class="relay-share-sheet-cancel" bindtap="onCloseShareSheet">取消</view>
     </view>
   </view>
+  <site-icp-footer />
 </view>

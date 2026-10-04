@@ -160,4 +160,5 @@
       <view class="la-btn" bindtap="onSave">保存账户</view>
     </view>
   </block>
+  <site-icp-footer />
 </view>

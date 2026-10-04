@@ -79,6 +79,7 @@
       <text class="match-sub">{{item.platform}} · {{item.region}}</text>
     </view>
   </view>
+  <site-icp-footer />
 </view>
 
 <!-- 城市选择（与发招募单一致） -->

@@ -18,4 +18,5 @@
       <text data-id="{{item.id}}" bindtap="onEvidence">提交完成证明</text>
     </view>
   </view>
+  <site-icp-footer />
 </view>

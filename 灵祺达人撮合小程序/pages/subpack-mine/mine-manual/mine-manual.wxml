@@ -52,4 +52,5 @@
   <view class="card manual-footer">
     <text class="hint">灵祺 AI · 灵祺星选</text>
   </view>
+  <site-icp-footer />
 </scroll-view>

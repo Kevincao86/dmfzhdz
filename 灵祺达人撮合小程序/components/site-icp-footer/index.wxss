@@ -1,15 +1,22 @@
 .site-icp-footer {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  gap: 8rpx 24rpx;
+  gap: 8rpx;
   padding: 32rpx 24rpx 24rpx;
   box-sizing: border-box;
 }
 
 .site-icp-footer--compact {
-  padding: 20rpx 24rpx 12rpx;
+  padding: 16rpx 20rpx 12rpx;
+}
+
+.site-icp-footer__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8rpx 20rpx;
 }
 
 .site-icp-footer__psb {
@@ -24,9 +31,11 @@
   flex-shrink: 0;
 }
 
+.site-icp-footer__copy,
 .site-icp-footer__text {
-  font-size: 22rpx;
+  font-size: 24rpx;
   line-height: 1.5;
-  color: #94a3b8;
+  color: #5c4636;
   text-align: center;
+  font-weight: 600;
 }

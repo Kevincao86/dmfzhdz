@@ -2,9 +2,34 @@
   position: relative;
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 128rpx 28rpx 64rpx;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 108rpx) 28rpx calc(24rpx + env(safe-area-inset-bottom));
   background: #f7f3ec;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.reg-nav-back {
+  position: fixed;
+  z-index: 30;
+  left: 24rpx;
+  top: calc(env(safe-area-inset-top) + 16rpx);
+  padding: 12rpx 24rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  background: linear-gradient(180deg, #b07a45 0%, #8d5a32 100%);
+  border-radius: 999rpx;
+  box-shadow: 0 8rpx 20rpx rgba(92, 58, 34, 0.28);
+}
+
+.reg-copy {
+  margin-top: auto;
+  position: relative;
+  z-index: 2;
+  padding-top: 24rpx;
 }
 
 .reg-page__bg {

@@ -13,4 +13,5 @@
     <text class="note warn" wx:if="{{item.reason}}">{{item.reason}}</text>
     <button class="xingxuan-btn xingxuan-btn--danger btn danger sm" data-id="{{item.id}}" bindtap="remove">移出</button>
   </view>
+  <site-icp-footer />
 </view>

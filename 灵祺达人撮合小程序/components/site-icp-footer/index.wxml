@@ -1,7 +1,10 @@
 <view class="site-icp-footer {{compact ? 'site-icp-footer--compact' : ''}}">
-  <text class="site-icp-footer__text">{{filing}}</text>
-  <view class="site-icp-footer__psb">
-    <image class="site-icp-footer__badge" src="/images/beian-ghs.png" mode="aspectFit" />
-    <text class="site-icp-footer__text">{{psbFiling}}</text>
+  <text class="site-icp-footer__copy">© 2026 宁波墨典网络科技有限公司 Copyright. All Rights Reserved.</text>
+  <view class="site-icp-footer__row">
+    <text class="site-icp-footer__text">{{filing}}</text>
+    <view class="site-icp-footer__psb">
+      <image class="site-icp-footer__badge" src="/images/beian-ghs.png" mode="aspectFit" />
+      <text class="site-icp-footer__text">{{psbFiling}}</text>
+    </view>
   </view>
 </view>

@@ -75,4 +75,5 @@
     <text class="wl-hint">会员开通与积分充值</text>
     <text class="wl-go">查看记录</text>
   </view>
+  <site-icp-footer />
 </view>

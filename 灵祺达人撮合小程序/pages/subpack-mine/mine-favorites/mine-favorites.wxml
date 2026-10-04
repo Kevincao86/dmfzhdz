@@ -46,4 +46,5 @@
       <text class="fav-card__unfav" catchtap="onUnfavorite" data-id="{{item.id}}">取消</text>
     </view>
   </view>
+  <site-icp-footer />
 </view>

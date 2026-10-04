@@ -11,4 +11,5 @@
     <button class="web-link-btn" bindtap="copyLink">{{copied ? '已复制，点此再复制' : '复制原表链接'}}</button>
     <text class="web-link-guide">请粘贴到「文件传输助手」或任意微信聊天，点击链接即可打开原表填写报名。</text>
   </view>
+  <site-icp-footer />
 </view>

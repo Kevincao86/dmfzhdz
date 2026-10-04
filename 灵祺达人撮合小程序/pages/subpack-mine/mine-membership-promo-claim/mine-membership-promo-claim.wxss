@@ -1,0 +1,149 @@
+.promo-page {
+  min-height: 100vh;
+  padding: 32rpx 28rpx 48rpx;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 42%, #ffffff 100%);
+}
+
+.promo-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24rpx 12rpx 36rpx;
+}
+
+.promo-hero__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8rpx 24rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #38bdf8, #6366f1);
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.promo-hero__title {
+  margin-top: 24rpx;
+  color: #2563eb;
+  font-size: 44rpx;
+  font-weight: 700;
+}
+
+.promo-hero__days {
+  margin-top: 8rpx;
+  color: #ca8a04;
+  font-size: 96rpx;
+  line-height: 1;
+  font-weight: 800;
+  text-shadow: 0 6rpx 0 rgba(234, 179, 8, 0.25);
+}
+
+.promo-hero__sub {
+  margin-top: 8rpx;
+  color: #1d4ed8;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.promo-hero__deadline {
+  margin-top: 16rpx;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.promo-card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 32rpx 28rpx;
+  box-shadow: 0 12rpx 40rpx rgba(99, 102, 241, 0.08);
+}
+
+.promo-card--center {
+  text-align: center;
+}
+
+.promo-card__title {
+  display: block;
+  color: #0f172a;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.promo-card__desc {
+  display: block;
+  margin-top: 16rpx;
+  color: #475569;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+.promo-benefits {
+  margin-top: 28rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.promo-benefit {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.promo-benefit__icon {
+  width: 56rpx;
+  text-align: center;
+  font-size: 34rpx;
+}
+
+.promo-benefit__body {
+  flex: 1;
+}
+
+.promo-benefit__title {
+  display: block;
+  color: #0f172a;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.promo-benefit__desc {
+  display: block;
+  margin-top: 4rpx;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.promo-muted {
+  display: block;
+  margin-top: 20rpx;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.promo-err {
+  display: block;
+  margin-top: 20rpx;
+  color: #dc2626;
+  font-size: 26rpx;
+}
+
+.promo-btn {
+  margin-top: 28rpx;
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.promo-btn--primary {
+  background: linear-gradient(90deg, #0284c7, #6366f1);
+  color: #fff;
+}
+
+.promo-btn--ghost {
+  background: #eef2ff;
+  color: #4338ca;
+}

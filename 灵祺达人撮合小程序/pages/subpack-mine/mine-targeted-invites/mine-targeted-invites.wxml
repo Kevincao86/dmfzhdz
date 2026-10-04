@@ -13,4 +13,5 @@
       <button class="tgt-inv-btn tgt-inv-btn--reject" data-order="{{item.mpOrderId}}" bindtap="onReject">拒绝</button>
     </view>
   </view>
+  <site-icp-footer />
 </view>

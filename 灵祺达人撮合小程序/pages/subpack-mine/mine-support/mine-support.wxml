@@ -10,4 +10,5 @@
   <view class="card">
     <button class="btn-primary" bindtap="onContact">联系客服</button>
   </view>
+  <site-icp-footer />
 </view>

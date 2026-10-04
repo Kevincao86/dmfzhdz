@@ -1,4 +1,5 @@
 <view class="reg-page {{newIdentity ? 'reg-page--' + newIdentity : ''}} {{stageMotion ? 'reg-page--play' : ''}}">
+  <view class="reg-nav-back" bindtap="onBackLogin">‹ 返回</view>
   <image wx:if="{{stageSrc}}" class="reg-page__bg" src="{{stageSrc}}" mode="aspectFill" />
   <view class="reg-fx reg-fx--wash"></view>
   <view class="reg-fx reg-fx--flash"></view>
@@ -73,5 +74,8 @@
       <text class="reg-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
     </view>
     <text class="reg-back" bindtap="onBackLogin">已有账号，去登录</text>
+  </view>
+  <view class="reg-copy">
+    <site-icp-footer />
   </view>
 </view>

@@ -35,4 +35,5 @@
     <text class="hint">暂无模版，点击上方按钮新建</text>
   </view>
   </block>
+  <site-icp-footer />
 </view>

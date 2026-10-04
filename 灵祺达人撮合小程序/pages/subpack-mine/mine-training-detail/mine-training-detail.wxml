@@ -29,4 +29,5 @@
     </block>
   </view>
   <view wx:if="{{!ownCourse}}" class="td-bar" bindtap="onSignup">支付到平台并报名</view>
+  <site-icp-footer />
 </view>

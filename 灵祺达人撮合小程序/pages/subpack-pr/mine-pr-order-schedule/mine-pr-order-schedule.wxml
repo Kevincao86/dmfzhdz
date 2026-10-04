@@ -180,5 +180,6 @@
       <text wx:if="{{okMsg}}" class="sch-ok">{{okMsg}}</text>
       <text wx:if="{{errMsg}}" class="sch-err-text">{{errMsg}}</text>
     </view>
-  </block>
+</block>
+  <site-icp-footer />
 </view>

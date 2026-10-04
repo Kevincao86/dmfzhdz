@@ -46,4 +46,5 @@
     <view class="welcome-vortex__spin" style="background: {{transitionColor}};" />
     <view class="welcome-vortex__burst" style="background: {{transitionColor}};" />
   </view>
+  <site-icp-footer />
 </view>

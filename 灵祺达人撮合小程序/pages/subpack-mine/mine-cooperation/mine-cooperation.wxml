@@ -21,4 +21,5 @@
       <button class="xingxuan-btn xingxuan-btn--danger btn sm" data-id="{{item.id}}" bindtap="remove">移出池</button>
     </view>
   </view>
+  <site-icp-footer />
 </view>

@@ -49,6 +49,7 @@
     </view>
     <text wx:if="{{!loading && !displayRows.length}}" class="addon-hint">暂无匹配达人</text>
   </view>
+  <site-icp-footer />
   <view class="tgt-pick-bar">
     <text class="tgt-pick-bar__info">已选 {{selectedCount}} 人</text>
     <button class="tgt-pick-bar__btn" bindtap="onSend" loading="{{sending}}" disabled="{{selectedCount < 1}}">发送邀约</button>

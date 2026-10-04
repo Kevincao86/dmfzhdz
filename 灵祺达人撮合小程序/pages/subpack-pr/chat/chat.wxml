@@ -66,6 +66,7 @@
       <text>{{turnHint}}</text>
     </view>
     <view class="scroll-pad"></view>
+    <site-icp-footer />
   </scroll-view>
 
   <view class="chat-composer">

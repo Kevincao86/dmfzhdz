@@ -64,6 +64,7 @@
       <text>发送消息开始协作，支持文字、语音、图片、位置与文件</text>
     </view>
     <view class="scroll-pad"></view>
+    <site-icp-footer />
   </scroll-view>
 
   <view class="chat-composer">

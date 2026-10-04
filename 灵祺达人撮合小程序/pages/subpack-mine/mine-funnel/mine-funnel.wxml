@@ -21,4 +21,5 @@
   </view>
 
   <view wx:if="{{!summary.length && !loading}}" class="xingxuan-empty">暂无发单数据</view>
+  <site-icp-footer />
 </view>

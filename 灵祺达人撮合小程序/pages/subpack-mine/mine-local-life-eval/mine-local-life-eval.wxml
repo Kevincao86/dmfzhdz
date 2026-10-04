@@ -165,4 +165,5 @@
       <text class="eval-tab-tx {{item.compact ? 'eval-tab-tx--compact' : ''}}">{{item.text}}</text>
     </view>
   </view>
+  <site-icp-footer />
 </view>

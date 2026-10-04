@@ -15,6 +15,7 @@
       <button size="mini" class="xingxuan-btn xingxuan-btn--danger" data-id="{{item.id}}" bindtap="remove">删除</button>
     </view>
   </view>
+  <site-icp-footer />
 </view>
 
 <view class="mask" wx:if="{{editing}}" catchtouchmove="noop">

@@ -1,4 +1,7 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#f7f3ec"
+  "backgroundColor": "#f7f3ec",
+  "usingComponents": {
+    "site-icp-footer": "/components/site-icp-footer/index"
+  }
 }

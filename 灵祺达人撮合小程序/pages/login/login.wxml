@@ -165,13 +165,16 @@
     </view>
   </view>
 
-  <view class="login-legal-foot">
-    <text class="login-legal-copy">© 2026 宁波墨典网络科技有限公司 Copyright. All Rights Reserved.</text>
-    <view class="login-icp-row">
-      <text class="login-icp-text">{{icpFiling}}</text>
-      <view class="login-icp-psb">
-        <image class="login-icp-badge" src="/images/beian-ghs.png" mode="aspectFit" />
-        <text class="login-icp-text">{{psbFiling}}</text>
+  <view class="login-foot">
+    <view class="login-back-link" bindtap="onBack">‹ 返回</view>
+    <view class="login-legal-foot">
+      <text class="login-legal-copy">© 2026 宁波墨典网络科技有限公司 Copyright. All Rights Reserved.</text>
+      <view class="login-icp-row">
+        <text class="login-icp-text">{{icpFiling}}</text>
+        <view class="login-icp-psb">
+          <image class="login-icp-badge" src="/images/beian-ghs.png" mode="aspectFit" />
+          <text class="login-icp-text">{{psbFiling}}</text>
+        </view>
       </view>
     </view>
   </view>
@@ -293,5 +296,4 @@
     </view>
   </view>
 
-  <view class="login-back-link" bindtap="onBack">‹ 返回</view>
 </view>

@@ -185,4 +185,5 @@
 
     <view class="portal-safe-bottom"></view>
   </scroll-view>
+  <site-icp-footer />
 </view>

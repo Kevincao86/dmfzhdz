@@ -38,4 +38,5 @@
     <button class="submit" bindtap="onSubmit" disabled="{{busy}}">{{busy ? '提交中…' : (editing ? '确定' : '绑定')}}</button>
   </view>
   <text class="err" wx:if="{{err}}">{{err}}</text>
+  <site-icp-footer />
 </view>

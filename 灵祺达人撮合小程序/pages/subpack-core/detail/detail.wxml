@@ -438,6 +438,7 @@
     </view>
   </block>
   </view>
+  <site-icp-footer />
 </view>
 
 <view wx:if="{{view && !loading}}" class="bottom-bar detail-bottom-v2">

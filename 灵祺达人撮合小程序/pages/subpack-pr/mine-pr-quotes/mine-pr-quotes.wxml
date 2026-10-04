@@ -142,4 +142,5 @@
       <button wx:if="{{editingKey}}" class="btn-secondary quote-cancel-btn" bindtap="onCancelEdit">取消编辑</button>
     </view>
   </block>
+  <site-icp-footer />
 </view>

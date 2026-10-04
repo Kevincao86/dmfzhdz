@@ -552,6 +552,7 @@
     <text class="hint pr-app-footer-hint" wx:elif="{{iceVerifyMode === 'ai'}}">AI 核查模式 · 达人提交链接后自动完成</text>
     <text class="hint pr-app-footer-hint" wx:else>PR 审核模式 · 达人回传链接后请审核</text>
   </view>
+  <site-icp-footer />
 </view>
 
 <view

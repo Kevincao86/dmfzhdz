@@ -466,4 +466,5 @@
     <text class="hint">当前 Tab 或筛选条件下暂无报名</text>
   </view>
   <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
+  <site-icp-footer />
 </view>

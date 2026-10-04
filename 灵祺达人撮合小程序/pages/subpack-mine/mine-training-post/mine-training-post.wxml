@@ -219,4 +219,5 @@
       <view class="tp-btn" bindtap="onConfirmCity">确认</view>
     </view>
   </view>
+  <site-icp-footer />
 </view>

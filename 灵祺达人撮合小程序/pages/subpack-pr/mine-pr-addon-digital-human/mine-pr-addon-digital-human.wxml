@@ -144,4 +144,5 @@
       </view>
     </view>
   </view>
+  <site-icp-footer />
 </scroll-view>

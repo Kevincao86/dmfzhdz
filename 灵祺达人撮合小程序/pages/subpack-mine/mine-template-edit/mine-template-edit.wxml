@@ -61,6 +61,7 @@
     <button class="btn-secondary tpl-footer-btn" bindtap="onPreview">预览</button>
     <button class="btn-primary tpl-footer-btn" bindtap="onSave">保存</button>
   </view>
+  <site-icp-footer />
 </view>
 
 <view class="tpl-modal-mask" wx:if="{{showFieldModal}}" bindtap="onCloseFieldModal" />

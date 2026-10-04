@@ -13,4 +13,5 @@
       <button class="sch-ok-btn" plain bindtap="goOrders">返回发单列表</button>
     </view>
   </view>
+  <site-icp-footer />
 </view>

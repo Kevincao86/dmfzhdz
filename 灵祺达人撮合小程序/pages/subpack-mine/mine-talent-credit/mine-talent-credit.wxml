@@ -33,4 +33,5 @@
       <view wx:for="{{credit.tips}}" wx:key="*this" class="tip">· {{item}}</view>
     </view>
   </block>
+  <site-icp-footer />
 </view>

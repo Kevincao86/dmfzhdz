@@ -148,4 +148,5 @@
   <view class="orders-refresh" bindtap="onReload" wx:if="{{!loading}}">
     <text>刷新</text>
   </view>
+  <site-icp-footer />
 </view>

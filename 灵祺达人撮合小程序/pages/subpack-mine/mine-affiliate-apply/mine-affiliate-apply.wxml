@@ -34,4 +34,5 @@
     </button>
     <button class="btn-secondary" loading="{{checking}}" disabled="{{booting}}" bindtap="onCheckStatus">查询进度</button>
   </view>
+  <site-icp-footer />
 </view>

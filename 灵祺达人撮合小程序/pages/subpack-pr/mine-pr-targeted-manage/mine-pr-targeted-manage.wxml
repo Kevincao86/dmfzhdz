@@ -98,4 +98,5 @@
     </view>
   </view>
   <view wx:if="{{loading}}" class="addon-hint" style="margin:24rpx;">加载中…</view>
+  <site-icp-footer />
 </view>

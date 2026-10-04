@@ -172,4 +172,5 @@
       {{isEditIce || isIceMode ? '认领任务' : '提交报名'}}
     </button>
   </view>
+  <site-icp-footer />
 </view>

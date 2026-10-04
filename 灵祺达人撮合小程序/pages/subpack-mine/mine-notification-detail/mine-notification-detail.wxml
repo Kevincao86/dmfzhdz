@@ -25,4 +25,5 @@
   </view>
 
   <button wx:if="{{row.detailUrl}}" class="ntf-detail-link" bindtap="onGoOrder">{{row.detailLabel}}</button>
+  <site-icp-footer />
 </view>

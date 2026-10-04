@@ -55,4 +55,5 @@
       <button class="pts-pay-cancel" bindtap="onClosePay" disabled="{{payBusy}}">取消</button>
     </view>
   </view>
+  <site-icp-footer />
 </view>

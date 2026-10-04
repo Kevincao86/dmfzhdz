@@ -15,4 +15,5 @@
     </view>
     <view wx:else class="frg-empty"><text class="hint">群二维码暂不可用，请联系招募方</text></view>
   </view>
+  <site-icp-footer />
 </view>

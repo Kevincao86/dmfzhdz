@@ -42,4 +42,5 @@
   <view class="tr-fab {{lecturerStatus === 'approved' ? 'tr-fab--done' : ''}} {{lecturerStatus === 'pending' ? 'tr-fab--wait' : ''}}" bindtap="onApply">
     <text class="tr-fab__main">{{lecturerStatus === 'approved' ? '讲师已通过' : lecturerStatus === 'pending' ? '讲师审核中' : lecturerStatus === 'rejected' ? '重新申请' : '申请讲师'}}</text>
   </view>
+  <site-icp-footer />
 </view>
