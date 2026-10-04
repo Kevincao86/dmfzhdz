@@ -13,6 +13,7 @@ const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpShare = require('../../utils/mpShare.js')
 const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
+const { MP_ICP_FILING, MP_PSB_FILING } = require('../../utils/siteIcp.js')
 
 const LEGAL_PROMPT_COPY = {
   wx: {
@@ -209,6 +210,8 @@ Page({
     legalPromptAction: 'wx',
     legalPromptText: LEGAL_PROMPT_COPY.wx.text,
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.wx.agree,
+    icpFiling: MP_ICP_FILING,
+    psbFiling: MP_PSB_FILING,
     showPhoneBindSheet: false,
     bindPhone: '',
     pendingWorkIdForBind: '',

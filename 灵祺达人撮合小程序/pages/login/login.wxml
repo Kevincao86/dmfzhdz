@@ -13,7 +13,7 @@
       <view class="login-hero__brand">
         <image class="login-hero__logo lq-brand-logo" src="/images/login-logo-beige.png" mode="aspectFill" />
         <text class="login-hero__title">灵祺星选平台</text>
-        <text class="login-hero__sub">本地生活 · 达人赋能 · 高效撮合</text>
+        <view class="login-hero__sub">本地生活 · 达人赋能 · 高效撮合</view>
         <view class="login-chips">
           <text class="login-chip"><text class="login-chip__ico">📍</text>本地生活</text>
           <text class="login-chip"><text class="login-chip__ico">🌿</text>探店种草</text>
@@ -167,7 +167,13 @@
 
   <view class="login-legal-foot">
     <text class="login-legal-copy">© 2026 宁波墨典网络科技有限公司 Copyright. All Rights Reserved.</text>
-    <site-icp-footer compact />
+    <view class="login-icp-row">
+      <text class="login-icp-text">{{icpFiling}}</text>
+      <view class="login-icp-psb">
+        <image class="login-icp-badge" src="/images/beian-ghs.png" mode="aspectFit" />
+        <text class="login-icp-text">{{psbFiling}}</text>
+      </view>
+    </view>
   </view>
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
   </view>
@@ -287,5 +293,5 @@
     </view>
   </view>
 
-  <text class="login-back-link" bindtap="onBack">‹ 返回</text>
+  <view class="login-back-link" bindtap="onBack">‹ 返回</view>
 </view>

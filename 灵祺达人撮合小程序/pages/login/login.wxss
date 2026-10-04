@@ -140,8 +140,7 @@
   text-align: center;
 }
 
-.login-hero__title,
-.login-hero__sub {
+.login-hero__title {
   width: 100%;
   text-align: center;
 }
@@ -162,9 +161,14 @@
 }
 
 .login-hero__sub {
-  margin-top: 10rpx;
+  margin-top: 12rpx;
+  padding: 8rpx 22rpx;
   font-size: 26rpx;
-  color: #7a624e;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #2f1c12;
+  background: rgba(255, 248, 240, 0.92);
+  border-radius: 999rpx;
 }
 
 .login-top--ai {
@@ -385,17 +389,52 @@
 
 .login-legal-foot {
   margin-top: auto;
+  margin-left: 24rpx;
+  margin-right: 24rpx;
+  margin-bottom: calc(104rpx + env(safe-area-inset-bottom));
   position: relative;
-  z-index: 1;
-  padding: 28rpx 32rpx calc(28rpx + env(safe-area-inset-bottom));
+  z-index: 2;
+  padding: 16rpx 20rpx 14rpx;
+  background: rgba(255, 248, 240, 0.94);
+  border-radius: 20rpx;
+  box-shadow: 0 8rpx 24rpx rgba(44, 24, 16, 0.16);
 }
 
 .login-legal-copy {
   display: block;
   text-align: center;
-  font-size: 22rpx;
+  font-size: 24rpx;
+  font-weight: 600;
   line-height: 1.5;
-  color: #8a7564;
+  color: #2f1c12;
+}
+
+.login-icp-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8rpx 20rpx;
+  margin-top: 8rpx;
+}
+
+.login-icp-psb {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.login-icp-badge {
+  width: 28rpx;
+  height: 28rpx;
+  flex-shrink: 0;
+}
+
+.login-icp-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #2f1c12;
 }
 
 .login-talent-zone {
@@ -689,13 +728,17 @@
 
 .login-back-link {
   position: fixed;
-  left: 28rpx;
+  left: 24rpx;
   bottom: calc(env(safe-area-inset-bottom) + 24rpx);
   z-index: 20;
+  padding: 16rpx 32rpx;
   font-size: 28rpx;
-  font-weight: 600;
-  color: #64748b;
-  line-height: 1.5;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  background: linear-gradient(180deg, #b07a45 0%, #8d5a32 100%);
+  border-radius: 999rpx;
+  box-shadow: 0 8rpx 20rpx rgba(92, 58, 34, 0.32);
 }
 
 .login-legal-row {
