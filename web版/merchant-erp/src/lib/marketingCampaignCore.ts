@@ -97,9 +97,6 @@ export type PublishOrderForCash = {
 const DEFAULT_RULES =
   'PR 在小程序或星选平台成功发布招募（闭环或开环都算）后，按活动单价发放一笔现金红包，自动进入「我的钱包」。每个招募单只发一次，红包发完即止。累计发单数大于 5 单后，可将钱包余额一次提现。'
 
-const TALENT_RULES =
-  '完成达人活动后，红包自动进入「我的钱包」。每个活动只记一次，红包发完即止。累计达标单数大于 5 单后，可将钱包余额一次提现。'
-
 export function parseCashWithdrawIdentity(value: unknown, fallback: CashWithdrawIdentity = 'pr'): CashWithdrawIdentity {
   return value === 'talent' || value === 'pr' ? value : fallback
 }
