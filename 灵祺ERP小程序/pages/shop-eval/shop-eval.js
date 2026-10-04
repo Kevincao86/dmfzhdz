@@ -146,6 +146,7 @@ function readSavedForm() {
       cat1Index,
       cat2List,
       cat2Index,
+      categoryChosen: Boolean(saved.cat1 && saved.cat2),
     }
   } catch (e) {
     return null
@@ -230,6 +231,8 @@ Page({
     cat1Index: 0,
     cat2List: CATEGORIES[CAT1[0]] || [],
     cat2Index: 0,
+    categoryChosen: false,
+    binding: true,
     quotaPaid: false,
     quotaRemaining: -1,
     quotaLimit: 1,
@@ -248,15 +251,42 @@ Page({
       if (api.goLogin) api.goLogin()
       return
     }
-    const rows = platformRows()
-    let platformId = this.data.platformId
-    const restored = readSavedForm()
-    const view = restored ? Object.assign({}, this.data, restored) : this.data
-    if (restored) this._formTouched = true
-    this.setData(Object.assign({ platforms: rows, platformId }, restored || {}, { canEval: formReady(view) }))
+    this._left = false
     void this.refreshQuota()
-    if (formReady(view)) void this.syncFormResult(view)
-    else if (rows.some((p) => p.id === platformId && p.bound)) void this.loadStore(platformId)
+    void this.bootstrapEval()
+  },
+
+  async bootstrapEval() {
+    try {
+      const sessionSync = require('../../utils/merchantSessionSyncMp.js')
+      await sessionSync.syncFromCloud({ force: false })
+    } catch (e) {}
+    if (this._left) return
+    const rows = platformRows()
+    let platformId = this.data.platformId || 'douyin'
+    const currentBound = rows.some((p) => p.id === platformId && p.bound)
+    if (!this._platformChosen && !currentBound) {
+      const first = rows.find((p) => p.bound)
+      if (first) platformId = first.id
+    }
+    const bound = rows.some((p) => p.id === platformId && p.bound)
+    const restored = readSavedForm()
+    const patch = { platforms: rows, platformId, binding: bound }
+    if (!bound && restored) {
+      Object.assign(patch, restored)
+      this._formTouched = true
+    }
+    const view = Object.assign({}, this.data, patch)
+    patch.canEval = formReady(view)
+    this.setData(patch)
+    if (bound) {
+      await this.loadStore(platformId)
+      return
+    }
+    this.setData({ binding: false, boundStores: [], filteredStores: [], boundCount: 0 })
+    if (formReady(Object.assign({}, view, { boundCount: 0 }))) {
+      void this.syncFormResult(Object.assign({}, view, { boundCount: 0, platformId }))
+    }
   },
 
   rememberForm(extra) {
@@ -268,8 +298,8 @@ Page({
           formName: data.formName || '',
           region: data.region || [],
           detailAddress: data.detailAddress || '',
-          cat1: (data.cat1List || [])[data.cat1Index] || '',
-          cat2: (data.cat2List || [])[data.cat2Index] || '',
+          cat1: data.categoryChosen ? (data.cat1List || [])[data.cat1Index] || '' : '',
+          cat2: data.categoryChosen ? (data.cat2List || [])[data.cat2Index] || '' : '',
         }),
       )
     } catch (e) {}
@@ -285,6 +315,7 @@ Page({
 
   async syncFormResult(data) {
     const view = data || this.data
+    if (Number(view.boundCount) >= 1 || (this._boundStores && this._boundStores.length)) return
     if (!formReady(view) || this.data.evaluating) return
     const base = Object.assign({}, formInput(view))
     let saved = null
@@ -377,6 +408,7 @@ Page({
   },
 
   onUnload() {
+    this._left = true
     this.stopTick()
     this.stopGains()
   },
@@ -393,7 +425,7 @@ Page({
         storeNames: '',
         storeId: '',
       })
-      this.setData({ boundStores: [], filteredStores: [], boundCount: 0, scopeLabel: scopeText(this._input) })
+      this.setData({ boundStores: [], filteredStores: [], boundCount: 0, binding: false, scopeLabel: scopeText(this._input) })
       return
     }
     let items = []
@@ -405,7 +437,7 @@ Page({
     } catch (e) {}
     const mapped = (items || [])
       .map((row, index) => ({
-        id: String((row && (row.id || row.name)) || index),
+        id: String((row && row.id) || '') || String((row && row.name) || 'store') + '-' + index,
         name: String((row && row.name) || '').trim(),
         address: String((row && row.address) || '').trim(),
         city: String((row && row.city) || '').trim(),
@@ -415,7 +447,30 @@ Page({
       }))
       .filter((row) => row.name)
     this._boundStores = mapped
-    const input = evalApi.resolveShopEvalFromStores(platformId, mapped, Math.max(total, mapped.length))
+    const boundCount = Math.max(mapped.length, total)
+    this.setData({
+      boundStores: mapped,
+      filteredStores: mapped,
+      boundCount,
+      binding: false,
+    })
+    if (!mapped.length) {
+      const restored = readSavedForm()
+      const patch = { boundCount: 0, binding: false }
+      if (restored) Object.assign(patch, restored)
+      const view = Object.assign({}, this.data, patch, { platformId, boundCount: 0 })
+      patch.canEval = formReady(view)
+      this.setData(patch)
+      if (formReady(view)) void this.syncFormResult(view)
+      return
+    }
+    if (this._userPicked && this._input && this._input.platformId === platformId && this._input.evalFocus) {
+      this.setData({
+        canEval: formReady(Object.assign({}, this.data, { boundCount, formName: this.data.formName || this._input.storeName || this._input.brandName })),
+      })
+      return
+    }
+    const input = evalApi.resolveShopEvalFromStores(platformId, mapped, boundCount)
     let brandSnap = null
     if (mapped.length >= 2) {
       const target = evalApi.boundEvalBrandTarget(mapped)
@@ -439,17 +494,32 @@ Page({
         regionText: nextRegion.length === 3 ? nextRegion.join(' ') : this.data.regionText,
         detailAddress: (region && region.detail) || (anchor && anchor.address) || this.data.detailAddress,
       }
+    } else {
+      const store = mapped[0]
+      const region = evalApi.splitCnRegion(store.address || '', store.city)
+      const nextRegion = region && region.province && region.city && region.district ? [region.province, region.city, region.district] : []
+      input.evalFocus = 'store'
+      input.scope = 'single'
+      input.storeCount = 1
+      input.storeId = store.id
+      input.storeName = store.name
+      input.brandName = store.brandName || ''
+      input.storeNames = ''
+      input.city = (region && region.city) || store.city || ''
+      input.address = nextRegion.join('') + ((region && region.detail) || store.address || '')
+      input.phone = store.phone || ''
+      input.businessHours = store.businessHours || ''
+      brandSnap = {
+        formName: store.name,
+        region: nextRegion.length === 3 ? nextRegion : this.data.region,
+        regionText: nextRegion.length === 3 ? nextRegion.join(' ') : this.data.regionText,
+        detailAddress: (region && region.detail) || store.address || this.data.detailAddress,
+      }
     }
-    this.setData({
-      boundStores: mapped,
-      filteredStores: mapped,
-      boundCount: Math.max(mapped.length, total),
-    })
     if (evalApi.hydrateShopEval) await evalApi.hydrateShopEval(input, storage)
     if (this.data.platformId !== platformId) return
-    if (formReady(this.data) && (this._formTouched || !brandSnap)) return
     const saved = evalApi.readSavedShopEval(input, storage)
-    const viewed = withChain(input, saved && saved.profile)
+    const viewed = input.evalFocus ? input : withChain(input, saved && saved.profile)
     const scope = evalApi.shopEvalScopeOf(viewed)
     const meta = evalApi.platformShopEvalMeta(platformId, scope)
     this._input = viewed
@@ -457,9 +527,12 @@ Page({
     const advice = saved && saved.advice
     const grade = score ? evalApi.shopEvalGrade(score.score, scope) : null
     this._score = score || null
-    const filled = !this._formTouched && brandSnap ? brandSnap : !this._formTouched && input.storeName ? { formName: input.storeName, detailAddress: this.data.detailAddress || input.address || '' } : null
-    const displayName = (filled && filled.formName) || String(this.data.formName || '').trim() || (scope === 'chain' && viewed.brandName ? viewed.brandName : viewed.storeName)
-    if (filled) this.setData(filled)
+    const filled = brandSnap || (input.storeName ? { formName: input.storeName, detailAddress: this.data.detailAddress || input.address || '' } : null)
+    const displayName = (filled && filled.formName) || String(this.data.formName || '').trim() || (viewed.evalFocus === 'brand' && viewed.brandName ? viewed.brandName : viewed.storeName)
+    if (filled) {
+      this.setData(filled)
+      this.rememberForm(filled)
+    }
     this.setData({
       platformName: meta.name,
       evalTitle: meta.title,
@@ -504,8 +577,29 @@ Page({
     if (!id || id === this.data.platformId) return
     this.stopTick()
     this._signals = null
-    this.setData({ platformId: id })
-    if (readPlatformToken(id)) void this.loadStore(id)
+    this._platformChosen = true
+    this._userPicked = false
+    this.setData({ platformId: id, platforms: platformRows() })
+    if (readPlatformToken(id)) {
+      void this.loadStore(id)
+      return
+    }
+    this._boundStores = []
+    this._input = Object.assign({}, this._input || {}, {
+      platformId: id,
+      evalFocus: '',
+      scope: 'single',
+      storeCount: 1,
+      storeNames: '',
+      storeId: '',
+    })
+    const restored = readSavedForm()
+    const patch = { boundStores: [], filteredStores: [], boundCount: 0, binding: false, scopeLabel: '单门店' }
+    if (restored) Object.assign(patch, restored)
+    const view = Object.assign({}, this.data, patch, { platformId: id })
+    patch.canEval = formReady(view)
+    this.setData(patch)
+    if (formReady(view)) void this.syncFormResult(view)
   },
 
   stopTick() {
@@ -624,6 +718,7 @@ Page({
   },
 
   onChooseBrand() {
+    this._userPicked = true
     const stores = this._boundStores || []
     const target = evalApi.boundEvalBrandTarget(stores)
     const anchor = target.anchor
@@ -656,6 +751,7 @@ Page({
   },
 
   onPickStore(e) {
+    this._userPicked = true
     const id = e.currentTarget.dataset.id
     const store = (this._boundStores || []).find((item) => item.id === id)
     if (!store) return
@@ -762,7 +858,7 @@ Page({
       const typedAddress = region.join('') + String(data.detailAddress || '').trim()
       const address = bound ? String((draft && draft.address) || typedAddress || name) : typedAddress
       const city = bound ? String((draft && draft.city) || region[1] || '') : region[1] || ''
-      const category = cat1 && cat2 ? cat1 + ' / ' + cat2 : ''
+      const category = bound && !data.categoryChosen ? '' : cat1 && cat2 ? cat1 + ' / ' + cat2 : ''
       const located = await postLocate({
         action: 'locate',
         address,
@@ -883,8 +979,8 @@ Page({
     this._formTouched = true
     const cat1Index = Number(e.detail.value) || 0
     const cat2List = CATEGORIES[this.data.cat1List[cat1Index]] || []
-    const next = Object.assign({}, this.data, { cat1Index, cat2List, cat2Index: 0 })
-    this.setData({ cat1Index, cat2List, cat2Index: 0, canEval: formReady(next) })
+    const next = Object.assign({}, this.data, { cat1Index, cat2List, cat2Index: 0, categoryChosen: true })
+    this.setData({ cat1Index, cat2List, cat2Index: 0, categoryChosen: true, canEval: formReady(next) })
     this.rememberForm({ cat1Index, cat2List, cat2Index: 0 })
     this.scheduleSync()
   },
@@ -892,7 +988,7 @@ Page({
   onCat2(e) {
     this._formTouched = true
     const cat2Index = Number(e.detail.value) || 0
-    this.setData({ cat2Index, canEval: formReady(Object.assign({}, this.data, { cat2Index })) })
+    this.setData({ cat2Index, categoryChosen: true, canEval: formReady(Object.assign({}, this.data, { cat2Index, categoryChosen: true })) })
     this.rememberForm({ cat2Index })
     this.scheduleSync()
   },

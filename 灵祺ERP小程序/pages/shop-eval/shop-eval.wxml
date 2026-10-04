@@ -12,7 +12,7 @@
     </view>
   </view>
 
-  <view class="card form" wx:if="{{boundCount < 1}}">
+  <view class="card form" wx:if="{{!binding && boundCount < 1}}">
     <text class="advice-title">免费评估</text>
     <text class="form-label">门店名称</text>
     <input class="form-input" placeholder="输入门店或品牌名称" value="{{formName}}" bindinput="onFormName" />
@@ -48,6 +48,7 @@
         <text class="scope">{{scopeLabel}}</text>
         <text class="did">{{platformName}}</text>
         <text class="did" wx:if="{{basis}}">{{basis}}</text>
+        <text class="did" wx:elif="{{boundCount >= 1}}">已使用绑定门店的资料</text>
         <text class="did" wx:else>填写名称、省市区、详细地址和分类后即可免费评估</text>
       </view>
     </view>
@@ -141,7 +142,7 @@
   </view>
   <text class="need">首次评估免费。升级会员后每月可评估 30 次。生成分析提升每次 5 积分，并需先绑定门店账号。</text>
   <text class="err" wx:if="{{err}}">{{err}}</text>
-  <text class="need" wx:if="{{!canEval}}">请填写门店名称、省市区、详细地址和分类</text>
+  <text class="need" wx:if="{{!canEval}}">{{boundCount >= 1 ? '请先选择总品牌或一家门店' : '请填写门店名称、省市区、详细地址和分类'}}</text>
   <text class="need" wx:elif="{{!scoreReady}}">请先完成门店评估</text>
 
   <view class="card advice advice--plan" wx:if="{{adviceReady}}">
