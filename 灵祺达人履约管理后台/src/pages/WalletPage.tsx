@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchRegistryProfile, fetchTraining, postPrCashWallet, postTraining } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
+import { getWorkIdentity } from '../lib/mpWorkIdentity'
 
 const DEPOSIT = 500
 
@@ -103,7 +104,7 @@ function CashRedPacketCard({
     <section className="rounded-2xl border border-amber-200 bg-[var(--panel-card)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-[var(--shell-text)]">{campaign.title || 'PR招募现金红包'}</h2>
+          <h2 className="text-sm font-semibold text-[var(--shell-text)]">{campaign.title || (getWorkIdentity() === 'talent' ? '达人活动红包提现' : 'PR招募现金红包')}</h2>
           <p className="mt-1 text-2xl font-bold text-amber-700">¥{wallet.availableYuan || '0.00'}</p>
           <p className="mt-1 text-xs text-[var(--shell-muted)]">
             {campaign.subtitle || '发单红包自动进入钱包'} · 已达标 {wallet.qualifyingOrders || 0} 单 · 剩余 {campaign.remaining ?? 0} 个
@@ -170,7 +171,7 @@ export default function WalletPage() {
       const [profile, training, cashWallet] = await Promise.all([
         fetchRegistryProfile().catch(() => null),
         fetchTraining(me?.accountId),
-        postPrCashWallet({ action: 'summary' }).catch(() => null),
+        postPrCashWallet({ action: 'summary', workIdentity: getWorkIdentity() }).catch(() => null),
       ])
       setCash(cashWallet && cashWallet.visible ? cashWallet : null)
       const summary = profile?.mpAiPointsSummary
@@ -341,7 +342,7 @@ export default function WalletPage() {
     setBusy('cash')
     setErr('')
     try {
-      const next = await postPrCashWallet({ action: 'withdraw' })
+      const next = await postPrCashWallet({ action: 'withdraw', workIdentity: getWorkIdentity() })
       setCash(next.visible ? next : null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '提现失败')

@@ -5,6 +5,9 @@ export const MERCHANT_CASH_CAMPAIGN_ID = 'merchant-erp-cash-red-packet'
 
 export type MarketingSurface = 'xingxuan' | 'merchant_erp'
 
+/** 谁能在钱包里看到并提现这只现金红包。 */
+export type CashWithdrawIdentity = 'pr' | 'talent'
+
 export type CashRedPacketCampaign = {
   id: string
   surface: MarketingSurface
@@ -18,6 +21,7 @@ export type CashRedPacketCampaign = {
   rulesText: string
   /** 达标发单数必须大于该值才可提现。默认 5，即大于 5 单。 */
   withdrawAfterOrders: number
+  withdrawIdentity: CashWithdrawIdentity
   updatedAt: string
 }
 
@@ -91,7 +95,14 @@ export type PublishOrderForCash = {
 }
 
 const DEFAULT_RULES =
-  'PR 在达人小程序或星选平台成功发布招募（闭环或开环都算）后，按活动单价发放一笔现金红包，自动进入「我的钱包」。每个招募单只发一次，红包发完即止。累计达标发单数大于 5 单后，可将钱包余额一次提现，由运营打款。'
+  'PR 在小程序或星选平台成功发布招募（闭环或开环都算）后，按活动单价发放一笔现金红包，自动进入「我的钱包」。每个招募单只发一次，红包发完即止。累计发单数大于 5 单后，可将钱包余额一次提现。'
+
+const TALENT_RULES =
+  '完成达人活动后，红包自动进入「我的钱包」。每个活动只记一次，红包发完即止。累计达标单数大于 5 单后，可将钱包余额一次提现。'
+
+export function parseCashWithdrawIdentity(value: unknown, fallback: CashWithdrawIdentity = 'pr'): CashWithdrawIdentity {
+  return value === 'talent' || value === 'pr' ? value : fallback
+}
 
 function nowText(): string {
   return new Date().toLocaleString('zh-CN', { hour12: false })
@@ -137,6 +148,7 @@ export function defaultCashCampaign(surface: MarketingSurface): CashRedPacketCam
       ? DEFAULT_RULES
       : '这是商家 ERP 的现金红包活动模版。可调整单价、红包数量、海报和规则。当前自动入账接在星选 / 达人小程序的 PR 发单；商家侧配置单独保存。',
     withdrawAfterOrders: 5,
+    withdrawIdentity: 'pr',
     updatedAt: '',
   }
 }
@@ -236,6 +248,7 @@ function asCampaign(raw: unknown, fallback: CashRedPacketCampaign): CashRedPacke
     posterUrl: poster.startsWith('data:') ? '' : poster,
     rulesText: text(row.rulesText, 2000) || fallback.rulesText,
     withdrawAfterOrders: clampInt(row.withdrawAfterOrders, 0, 999, fallback.withdrawAfterOrders),
+    withdrawIdentity: parseCashWithdrawIdentity(row.withdrawIdentity, fallback.withdrawIdentity || 'pr'),
     updatedAt: text(row.updatedAt, 40),
   }
 }
@@ -467,6 +480,9 @@ export function grantCashForOrder(center: RegistryMarketingCenter, order: Publis
     }
   }
   const campaign = campaignBySurface(center, 'xingxuan')
+  if (campaign.withdrawIdentity !== 'pr') {
+    return { center, outcome: { granted: false, reason: 'identity_not_pr', amountCents: 0, message: '' } }
+  }
   if (!campaign.enabled) {
     return { center, outcome: { granted: false, reason: 'campaign_disabled', amountCents: 0, message: '' } }
   }
@@ -527,9 +543,18 @@ export function requestCashWithdraw(
   center: RegistryMarketingCenter,
   prKey: string,
   displayName = '',
+  identity: CashWithdrawIdentity = 'pr',
 ): { center: RegistryMarketingCenter; ok: true; withdraw: MarketingWithdraw } | { center: RegistryMarketingCenter; ok: false; error: string; message: string } {
   const key = text(prKey, 80)
   const campaign = campaignBySurface(center, 'xingxuan')
+  if (campaign.withdrawIdentity !== identity) {
+    return {
+      center,
+      ok: false,
+      error: 'identity_mismatch',
+      message: campaign.withdrawIdentity === 'talent' ? '这个红包只给达人提现' : '这个红包只给 PR 提现',
+    }
+  }
   const idx = center.wallets.findIndex((item) => item.campaignId === campaign.id && item.prKey === key)
   const wallet = idx >= 0 ? center.wallets[idx]! : null
   const orders = wallet?.qualifyingOrders ?? 0
@@ -538,7 +563,7 @@ export function requestCashWithdraw(
       center,
       ok: false,
       error: 'need_more_orders',
-      message: `累计发单大于 ${campaign.withdrawAfterOrders} 单后才能提现，当前 ${orders} 单`,
+      message: `${campaign.withdrawIdentity === 'talent' ? '累计达标' : '累计发单'}大于 ${campaign.withdrawAfterOrders} 单后才能提现，当前 ${orders} 单`,
     }
   }
   if (wallet.availableCents < 1) {
@@ -605,26 +630,42 @@ export function markCashWithdrawPaid(
   return { center: { ...center, withdraws, wallets, updatedAt: paidAt }, ok: true }
 }
 
-export function walletViewForPr(center: RegistryMarketingCenter, prKey: string) {
-  const key = text(prKey, 80)
+export function walletViewForIdentity(
+  center: RegistryMarketingCenter,
+  holderKey: string,
+  identity: CashWithdrawIdentity | 'shoot' | 'edit' | '',
+) {
+  const key = text(holderKey, 80)
   const campaign = campaignBySurface(center, 'xingxuan')
-  const wallet = center.wallets.find((item) => item.campaignId === campaign.id && item.prKey === key) ?? null
-  const withdraws = center.withdraws.filter((item) => item.campaignId === campaign.id && item.prKey === key).slice(0, 20)
+  const allowed = campaign.withdrawIdentity
+  const matched = identity === allowed
+  const wallet = matched
+    ? center.wallets.find((item) => item.campaignId === campaign.id && item.prKey === key) ?? null
+    : null
+  const withdraws = matched
+    ? center.withdraws.filter((item) => item.campaignId === campaign.id && item.prKey === key).slice(0, 20)
+    : []
   const orders = wallet?.qualifyingOrders ?? 0
   const grantedCount = center.grants.filter((item) => item.campaignId === campaign.id).length
   const remaining = Math.max(0, campaign.totalQuota - grantedCount)
-  const canWithdraw = !!wallet && orders > campaign.withdrawAfterOrders && wallet.availableCents > 0 && !withdraws.some((item) => item.status === 'pending')
-  const visible = Boolean(key) && (campaign.enabled || orders > 0 || (wallet?.availableCents ?? 0) > 0 || (wallet?.frozenCents ?? 0) > 0 || withdraws.length > 0)
+  const canWithdraw = matched && !!wallet && orders > campaign.withdrawAfterOrders && wallet.availableCents > 0 && !withdraws.some((item) => item.status === 'pending')
+  const visible = matched && Boolean(key) && (campaign.enabled || orders > 0 || (wallet?.availableCents ?? 0) > 0 || (wallet?.frozenCents ?? 0) > 0 || withdraws.length > 0)
+  const progress = allowed === 'talent' ? '累计达标' : '累计发单'
+  const title =
+    allowed === 'talent' && (!campaign.title || campaign.title === 'PR招募现金红包')
+      ? '达人活动红包提现'
+      : campaign.title
   let hint = ''
-  if (!canWithdraw) {
-    if (orders <= campaign.withdrawAfterOrders) hint = `累计发单大于 ${campaign.withdrawAfterOrders} 单后可提现，当前 ${orders} 单`
-    else if (withdraws.some((item) => item.status === 'pending')) hint = '提现已提交，等待运营打款'
+  if (matched && !canWithdraw) {
+    if (orders <= campaign.withdrawAfterOrders) hint = `${progress}大于 ${campaign.withdrawAfterOrders} 单后可提现，当前 ${orders} 单`
+    else if (withdraws.some((item) => item.status === 'pending')) hint = '提现已提交，等待打款'
     else if ((wallet?.availableCents ?? 0) < 1) hint = '当前没有可提现余额'
   }
   return {
     visible,
     campaign: {
-      title: campaign.title,
+      title,
+      withdrawIdentity: allowed,
       subtitle: campaign.subtitle,
       enabled: campaign.enabled,
       amountYuan: yuanFromCents(campaign.amountCents),
@@ -652,6 +693,10 @@ export function walletViewForPr(center: RegistryMarketingCenter, prKey: string) 
       paidAt: item.paidAt || '',
     })),
   }
+}
+
+export function walletViewForPr(center: RegistryMarketingCenter, prKey: string) {
+  return walletViewForIdentity(center, prKey, 'pr')
 }
 
 export function adminCenterView(center: RegistryMarketingCenter, surface: MarketingSurface) {

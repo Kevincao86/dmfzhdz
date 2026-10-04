@@ -2,6 +2,7 @@ const auth = require('../../../utils/auth.js')
 const ecs = require('../../../utils/ecs.js')
 const sessionStore = require('../../../utils/mpSessionStore.js')
 const mpBillingRoleHint = require('../../../utils/mpBillingRoleHint.js')
+const userProfile = require('../../../utils/userProfile.js')
 const registryProfileSync = require('../../../utils/registryProfileSync.js')
 const training = require('../../../utils/mpTraining.js')
 const guestRoutes = require('../../../utils/mpGuestRoutes.js')
@@ -57,13 +58,15 @@ Page({
       const balance = s
         ? Math.max(0, Math.floor(Number(s.balance) || packageRemaining + rechargeBalance))
         : Math.max(0, Math.floor(Number(data && data.mpAiPointsBalance) || 0))
+      const workIdentity = userProfile.readIdentity()
       const cash = await ecs.post(
         '/api/meoo-mp-pr-cash-wallet',
-        { action: 'summary' },
+        { action: 'summary', workIdentity },
         { 'X-Mp-Session': token },
       ).catch(() => null)
       const cashCampaign = cash && cash.campaign ? cash.campaign : {}
       const cashWallet = cash && cash.wallet ? cash.wallet : {}
+      const cashFallback = workIdentity === 'talent' ? '达人活动红包提现' : 'PR招募现金红包'
       const summary = await training.walletSummary()
       const profile = await training.syncProfile()
       const quote = summary.settlement || {}
@@ -75,8 +78,8 @@ Page({
         netLabel: Number(quote.net || 0).toFixed(2),
         commissionLabel: Number(quote.commission || 0).toFixed(2),
         taxLabel: Number(quote.tax || 0).toFixed(2),
-        cashVisible: !!(cash && cash.visible),
-        cashTitle: cashCampaign.title || 'PR招募现金红包',
+        cashVisible: (workIdentity === 'pr' || workIdentity === 'talent') && !!(cash && cash.visible),
+        cashTitle: cashCampaign.title || cashFallback,
         cashSubtitle: cashCampaign.subtitle || '',
         cashPoster: cashCampaign.posterUrl || '',
         cashRules: cashCampaign.rulesText || '',
@@ -131,7 +134,7 @@ Page({
       return
     }
     wx.showModal({
-      title: '提现招募红包',
+      title: userProfile.readIdentity() === 'talent' ? '提现活动红包' : '提现招募红包',
       content: `可提现 ¥${this.data.cashAvailable}。提交后等待打款，1–3 个工作日到账。`,
       confirmText: '确认提现',
       success: async (res) => {
@@ -140,7 +143,7 @@ Page({
           const token = sessionStore.readSessionToken()
           const data = await ecs.post(
             '/api/meoo-mp-pr-cash-wallet',
-            { action: 'withdraw' },
+            { action: 'withdraw', workIdentity: userProfile.readIdentity() },
             { 'X-Mp-Session': token },
           )
           if (!data || data.ok === false) throw new Error((data && (data.message || data.error)) || '提现失败')

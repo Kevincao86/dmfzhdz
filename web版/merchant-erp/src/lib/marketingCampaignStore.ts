@@ -5,6 +5,7 @@ import pg from 'pg'
 import type { RegistryFile } from './opsRegistryTypes.js'
 import { readRegistryPgConnectionString } from './registrySnapshotPgAppend.js'
 import {
+  type CashWithdrawIdentity,
   type GrantOutcome,
   type MarketingSurface,
   type PublishOrderForCash,
@@ -126,6 +127,7 @@ export async function saveMarketingCampaign(
       posterUrl: typeof patch.posterUrl === 'string' ? patch.posterUrl : undefined,
       rulesText: typeof patch.rulesText === 'string' ? patch.rulesText : undefined,
       withdrawAfterOrders: patch.withdrawAfterOrders != null ? Number(patch.withdrawAfterOrders) : undefined,
+      withdrawIdentity: patch.withdrawIdentity === 'talent' ? 'talent' : patch.withdrawIdentity === 'pr' ? 'pr' : undefined,
     })
     return { center: next, result: next }
   })
@@ -165,9 +167,9 @@ export async function grantPrCashRedPacketForPublishedOrder(order: PublishOrderF
   })
 }
 
-export async function withdrawPrCashWallet(prKey: string, displayName = '') {
+export async function withdrawPrCashWallet(prKey: string, displayName = '', identity: CashWithdrawIdentity = 'pr') {
   return mutateMarketingCenter((center) => {
-    const next = requestCashWithdraw(center, prKey, displayName)
+    const next = requestCashWithdraw(center, prKey, displayName, identity)
     return { center: next.center, result: next }
   })
 }

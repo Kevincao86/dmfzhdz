@@ -25,9 +25,19 @@ function emptyForm(): MarketingCampaignForm {
     posterUrl: '',
     rulesText: '',
     withdrawAfterOrders: 5,
+    withdrawIdentity: 'pr',
     updatedAt: '',
   }
 }
+
+const PR_CASH_TITLE = 'PR招募现金红包'
+const TALENT_CASH_TITLE = '达人活动红包提现'
+const PR_CASH_SUB = '完成闭环或开环招募发单，红包自动进入钱包'
+const TALENT_CASH_SUB = '完成达人活动后，红包自动进入钱包'
+const TALENT_CASH_RULES =
+  '完成达人活动后，红包自动进入「我的钱包」。每个活动只记一次，红包发完即止。累计达标单数大于设定值后，可将钱包余额一次提现。'
+const PR_CASH_RULES =
+  'PR 在小程序或星选平台成功发布招募（闭环或开环都算）后，按活动单价发放一笔现金红包，自动进入「我的钱包」。每个招募单只发一次，红包发完即止。累计发单数大于设定值后，可将钱包余额一次提现。'
 
 function Field(props: { label: string; children: ReactNode }) {
   return (
@@ -197,7 +207,7 @@ export default function OpsMarketingCenterPage() {
         <h1 className="ops-page-title text-xl font-semibold">{xingxuan ? '星选平台活动' : '商家ERP活动'}</h1>
         <p className="mkt-kicker">
           {xingxuan
-            ? '现金红包仍按 PR 发单自动入账。版本折扣、PR 版本、达人版、会员加赠和限时开通在下面单独填写，打开「上线」后保存即发布。'
+            ? '现金红包按提现身份显示：选 PR 只有 PR 能看到招募红包，选达人只有达人能看到活动红包提现。其它活动在下面单独填写，打开「上线」后保存即发布。'
             : '商家 ERP 的活动单独保存。现金红包是其中一块，其余活动可手动设置并上线，不影响星选那边的配置。'}
         </p>
       </div>
@@ -230,8 +240,10 @@ export default function OpsMarketingCenterPage() {
               <h2>现金红包</h2>
               <p className="mkt-sub">
                 {xingxuan
-                  ? 'PR 完成闭环或开环招募发单后，按单价自动进入钱包。大于设定单数才可提现。'
-                  : '商家侧单独的现金红包模版。自动入账目前接在星选 PR 发单。'}
+                  ? form.withdrawIdentity === 'talent'
+                    ? '只有达人能在钱包里看到并提现。大于设定单数才可提现。'
+                    : '只有 PR 能在钱包里看到并提现。发单后按单价自动进入钱包，大于设定单数才可提现。'
+                  : '商家侧单独的现金红包模版。提现身份决定谁能在钱包里看到。'}
               </p>
             </div>
             <span className={form.enabled ? 'mkt-pill on' : 'mkt-pill off'}>{form.enabled ? '已上线' : '未上线'}</span>
@@ -257,6 +269,45 @@ export default function OpsMarketingCenterPage() {
                 value={String(form.totalQuota)}
                 onChange={(e) => patch({ totalQuota: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
               />
+            </Field>
+            <Field label="提现身份">
+              <select
+                className="mkt-field"
+                value={form.withdrawIdentity === 'talent' ? 'talent' : 'pr'}
+                onChange={(e) => {
+                  const next = e.target.value === 'talent' ? 'talent' : 'pr'
+                  patch({
+                    withdrawIdentity: next,
+                    title:
+                      next === 'talent'
+                        ? form.title === PR_CASH_TITLE || !form.title.trim()
+                          ? TALENT_CASH_TITLE
+                          : form.title
+                        : form.title === TALENT_CASH_TITLE || !form.title.trim()
+                          ? PR_CASH_TITLE
+                          : form.title,
+                    subtitle:
+                      next === 'talent'
+                        ? form.subtitle === PR_CASH_SUB || !form.subtitle.trim()
+                          ? TALENT_CASH_SUB
+                          : form.subtitle
+                        : form.subtitle === TALENT_CASH_SUB || !form.subtitle.trim()
+                          ? PR_CASH_SUB
+                          : form.subtitle,
+                    rulesText:
+                      next === 'talent'
+                        ? !form.rulesText.trim() || form.rulesText.includes('发布招募')
+                          ? TALENT_CASH_RULES
+                          : form.rulesText
+                        : !form.rulesText.trim() || form.rulesText.startsWith('完成达人活动')
+                          ? PR_CASH_RULES
+                          : form.rulesText,
+                  })
+                }}
+              >
+                <option value="pr">PR</option>
+                <option value="talent">达人</option>
+              </select>
             </Field>
             <Field label="大于几单可提现">
               <input

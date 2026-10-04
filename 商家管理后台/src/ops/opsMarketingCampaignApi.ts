@@ -14,6 +14,7 @@ export type MarketingCampaignForm = {
   posterUrl: string
   rulesText: string
   withdrawAfterOrders: number
+  withdrawIdentity: 'pr' | 'talent'
   updatedAt: string
 }
 
@@ -116,6 +117,7 @@ export async function saveMarketingCampaign(surface: MarketingSurface, campaign:
       posterUrl: campaign.posterUrl,
       rulesText: campaign.rulesText,
       withdrawAfterOrders: campaign.withdrawAfterOrders,
+      withdrawIdentity: campaign.withdrawIdentity === 'talent' ? 'talent' : 'pr',
     },
   })
 }

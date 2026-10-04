@@ -7,7 +7,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createMpAuthRest, resolveSession } from '../src/lib/mpAccountAuth.js'
-import { walletViewForPr } from '../src/lib/marketingCampaignCore.js'
+import { parseCashWithdrawIdentity, walletViewForIdentity, type CashWithdrawIdentity } from '../src/lib/marketingCampaignCore.js'
 import { readMarketingCenter, withdrawPrCashWallet } from '../src/lib/marketingCampaignStore.js'
 
 export const config = { maxDuration: 30 }
@@ -63,7 +63,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 401, { ok: false, error: 'login_required', message: '请先登录' })
       return
     }
-    const prKey = String(session.account.lingqi_pr_id || session.account.registry_pr_id || '').trim()
     const displayName = String(session.account.wx_nick_name || session.account.login_name || '').trim()
     let body: Record<string, unknown> = {}
     try {
@@ -72,22 +71,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
+    const asked = String(body.workIdentity || body.billingRole || '').trim()
+    const identity: CashWithdrawIdentity | 'shoot' | 'edit' | '' =
+      asked === 'pr' || asked === 'talent' || asked === 'shoot' || asked === 'edit'
+        ? asked
+        : session.account.active_role === 'pr'
+          ? 'pr'
+          : 'talent'
+    const holderKey =
+      identity === 'pr'
+        ? String(session.account.lingqi_pr_id || session.account.registry_pr_id || '').trim()
+        : identity === 'talent'
+          ? String(session.account.lingqi_talent_id || session.account.registry_member_id || '').trim()
+          : ''
     if (String(body.action || 'summary') === 'withdraw') {
-      if (!prKey) {
-        sendJson(res, 400, { ok: false, error: 'not_pr', message: '请使用 PR 账号领取招募红包' })
+      const cashIdentity = parseCashWithdrawIdentity(identity, 'pr')
+      if (identity !== 'pr' && identity !== 'talent') {
+        sendJson(res, 400, { ok: false, error: 'identity_mismatch', message: '当前身份不能提现这个红包' })
         return
       }
-      const result = await withdrawPrCashWallet(prKey, displayName)
+      if (!holderKey) {
+        sendJson(res, 400, {
+          ok: false,
+          error: identity === 'pr' ? 'not_pr' : 'not_talent',
+          message: identity === 'pr' ? '请先完善 PR 资料后再提现' : '请先完善达人资料后再提现',
+        })
+        return
+      }
+      const result = await withdrawPrCashWallet(holderKey, displayName, cashIdentity)
       if (!result.ok) {
         sendJson(res, 400, { ok: false, error: result.error, message: result.message })
         return
       }
       const center = await readMarketingCenter()
-      sendJson(res, 200, { ok: true, message: '提现已提交，等待运营打款', ...walletViewForPr(center, prKey) })
+      sendJson(res, 200, { ok: true, message: '提现已提交，等待打款', ...walletViewForIdentity(center, holderKey, identity) })
       return
     }
     const center = await readMarketingCenter()
-    sendJson(res, 200, { ok: true, ...walletViewForPr(center, prKey) })
+    sendJson(res, 200, { ok: true, ...walletViewForIdentity(center, holderKey, identity) })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     sendJson(res, 500, { ok: false, error: 'pr_cash_wallet_failed', message: '钱包加载失败', detail: msg.slice(0, 400) })
