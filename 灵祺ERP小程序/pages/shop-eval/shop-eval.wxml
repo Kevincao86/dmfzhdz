@@ -206,5 +206,24 @@
     </view>
   </view>
 
+  <view class="up-mask" wx:if="{{upgradeOpen}}" bindtap="closeUpgrade" catchtouchmove="preventMove">
+    <view class="up-card" catchtap="preventMove">
+      <text class="up-kicker">开通后可看</text>
+      <text class="up-title">看你这家店的改法</text>
+      <text class="up-lead">数十位本地生活操盘手带过店的做法，写成你这家店这周能照着改的提升方案。</text>
+      <text class="up-sub">对着刚才的评估说短板，不讲空的行业套话。</text>
+      <view class="up-actions">
+        <view class="up-btn up-btn--ghost" bindtap="closeUpgrade">
+          <view class="up-btn-shine"></view>
+          <text class="up-btn-tx">先看看</text>
+        </view>
+        <view class="up-btn up-btn--go" bindtap="goUpgrade">
+          <view class="up-btn-shine"></view>
+          <text class="up-btn-tx">去开通</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <site-icp-footer />
 </view>

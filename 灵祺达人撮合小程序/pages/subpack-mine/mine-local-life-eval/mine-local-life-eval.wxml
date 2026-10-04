@@ -165,5 +165,24 @@
       <text class="eval-tab-tx {{item.compact ? 'eval-tab-tx--compact' : ''}}">{{item.text}}</text>
     </view>
   </view>
+  <view class="up-mask" wx:if="{{upgradeOpen}}" bindtap="closeUpgrade" catchtouchmove="preventMove">
+    <view class="up-card" catchtap="preventMove">
+      <text class="up-kicker">开通后可看</text>
+      <text class="up-title">看你这个账号的改法</text>
+      <text class="up-lead">数千位本地生活达人跑通的做法，收成你这个账号下一步该怎么改的分析。</text>
+      <text class="up-sub">先点明现在卡在哪，再给你最该动的一步。</text>
+      <view class="up-actions">
+        <view class="up-btn up-btn--ghost" bindtap="closeUpgrade">
+          <view class="up-btn-shine"></view>
+          <text class="up-btn-tx">先看看</text>
+        </view>
+        <view class="up-btn up-btn--go" bindtap="goUpgrade">
+          <view class="up-btn-shine"></view>
+          <text class="up-btn-tx">去开通</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <site-icp-footer />
 </view>

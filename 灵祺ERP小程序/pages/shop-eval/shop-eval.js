@@ -76,6 +76,19 @@ function letterOf(name) {
 
 const FORM_KEY = 'lq_shop_eval_form'
 
+function activeTenantId() {
+  try {
+    return String(wx.getStorageSync('meoo_active_tenant_id') || '').trim()
+  } catch (e) {
+    return ''
+  }
+}
+
+function formStorageKey() {
+  const tid = activeTenantId()
+  return tid ? FORM_KEY + '@' + tid : ''
+}
+
 function formInput(data) {
   const region = data.region || []
   const cat1 = (data.cat1List || [])[data.cat1Index] || ''
@@ -130,8 +143,10 @@ function identityPatch(input, score) {
 }
 
 function readSavedForm() {
+  const key = formStorageKey()
+  if (!key) return null
   try {
-    const raw = wx.getStorageSync(FORM_KEY)
+    const raw = wx.getStorageSync(key)
     const saved = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (!saved || !saved.formName) return null
     const cat1Index = Math.max(0, CAT1.indexOf(saved.cat1))
@@ -198,6 +213,7 @@ Page({
     canEval: false,
     evaluating: false,
     advising: false,
+    upgradeOpen: false,
     displayScore: 0,
     scoreReady: false,
     scorePop: false,
@@ -270,11 +286,41 @@ Page({
       if (first) platformId = first.id
     }
     const bound = rows.some((p) => p.id === platformId && p.bound)
+    try {
+      wx.removeStorageSync(FORM_KEY)
+    } catch (e) {}
+    const tid = activeTenantId()
+    const tenantChanged = this._formTenantId !== tid
+    this._formTenantId = tid
     const restored = readSavedForm()
     const patch = { platforms: rows, platformId, binding: bound }
     if (!bound && restored) {
       Object.assign(patch, restored)
       this._formTouched = true
+    } else if (!bound && tenantChanged) {
+      this._formTouched = false
+      this._score = null
+      Object.assign(patch, {
+        formName: '',
+        region: [],
+        regionText: '',
+        detailAddress: '',
+        cat1Index: 0,
+        cat2List: CATEGORIES[CAT1[0]] || [],
+        cat2Index: 0,
+        categoryChosen: false,
+        storeName: '',
+        basis: '',
+        scopeLabel: '单门店',
+        avatarLetter: '店',
+        scoreReady: false,
+        displayScore: 0,
+        scorePop: false,
+        adviceReady: false,
+        sections: [],
+        showGrade: false,
+        showGains: false,
+      })
     }
     const view = Object.assign({}, this.data, patch)
     patch.canEval = formReady(view)
@@ -290,10 +336,12 @@ Page({
   },
 
   rememberForm(extra) {
+    const key = formStorageKey()
+    if (!key) return
     const data = Object.assign({}, this.data, extra || {})
     try {
       wx.setStorageSync(
-        FORM_KEY,
+        key,
         JSON.stringify({
           formName: data.formName || '',
           region: data.region || [],
@@ -670,15 +718,7 @@ Page({
       const plan = snap && snap.ent && snap.ent.plan
       if (plan && plan !== 'free') return true
     } catch (e) {}
-    wx.showModal({
-      title: '请升级会员',
-      content: '分析提升需开通会员，每次 5 积分。升级后每月可评估 30 次。',
-      confirmText: '去升级',
-      cancelText: '取消',
-      success(res) {
-        if (res.confirm) wx.navigateTo({ url: '/pages/subscription/subscription' })
-      },
-    })
+    this.setData({ upgradeOpen: true })
     return false
   },
 
@@ -991,6 +1031,17 @@ Page({
     this.setData({ cat2Index, categoryChosen: true, canEval: formReady(Object.assign({}, this.data, { cat2Index, categoryChosen: true })) })
     this.rememberForm({ cat2Index })
     this.scheduleSync()
+  },
+
+  preventMove() {},
+
+  closeUpgrade() {
+    this.setData({ upgradeOpen: false })
+  },
+
+  goUpgrade() {
+    this.setData({ upgradeOpen: false })
+    wx.navigateTo({ url: '/pages/subscription/subscription' })
   },
 
   async onAdvise() {

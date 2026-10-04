@@ -3,7 +3,7 @@ const talentMember = require('../../../utils/talentMember.js')
 const wxAccount = require('../../../utils/wxAccount.js')
 const evalApi = require('../../../utils/talentLocalLifeEval.js')
 const userProfile = require('../../../utils/userProfile.js')
-const { getTabList, promptMembershipUpgrade } = require('../../../utils/tabBarConfig.js')
+const { getTabList } = require('../../../utils/tabBarConfig.js')
 const { syncPageIdentity } = require('../../../utils/pageIdentityChrome.js')
 
 function letterOf(name) {
@@ -44,6 +44,7 @@ Page({
     canEval: false,
     evaluating: false,
     advising: false,
+    upgradeOpen: false,
     displayScore: 0,
     scoreReady: false,
     scorePop: false,
@@ -337,9 +338,22 @@ Page({
     }
   },
 
+  preventMove() {},
+
+  closeUpgrade() {
+    this.setData({ upgradeOpen: false })
+  },
+
+  goUpgrade() {
+    this.setData({ upgradeOpen: false })
+    wx.navigateTo({
+      url: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
+    }).catch(() => {})
+  },
+
   async onAdvise() {
     if (!prFeatureAccess.canUseAddonPerm(null, 'talentAdvice')) {
-      promptMembershipUpgrade('分析与提升方案')
+      this.setData({ upgradeOpen: true })
       return
     }
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
