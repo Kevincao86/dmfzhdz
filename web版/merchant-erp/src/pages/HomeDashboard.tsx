@@ -671,7 +671,7 @@ function MerchantHomeDashboard() {
                 </button>
               </div>
 
-              <div className="mb-6 grid grid-cols-2 gap-4 pt-1 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="mb-6 grid grid-cols-2 gap-3 pt-1 sm:grid-cols-3">
                 {MODAL_METRICS.map((cell) => {
                   const selected = modalMetric === cell.key
                   const value = cell.money
@@ -684,16 +684,15 @@ function MerchantHomeDashboard() {
                       aria-pressed={selected}
                       onClick={() => setModalMetric(cell.key)}
                       whileHover={{
-                        y: -4,
-                        scale: 1.04,
+                        y: -2,
                         boxShadow: selected
-                          ? `0 0 0 2px ${cell.color}, 0 16px 32px ${cell.color}33`
-                          : `0 12px 28px ${cell.color}2e`,
+                          ? `0 0 0 2px ${cell.color}, 0 12px 24px ${cell.color}33`
+                          : `0 8px 18px ${cell.color}2e`,
                       }}
-                      whileTap={{ scale: 0.97 }}
+                      whileTap={{ y: 0 }}
                       transition={{ type: 'spring', stiffness: 420, damping: 22 }}
                       className={cn(
-                        'rounded-xl p-4 text-left transition-[background-color]',
+                        'min-w-0 overflow-hidden rounded-xl px-3 py-3 text-left transition-[background-color]',
                         selected ? 'bg-white' : 'bg-gray-50 hover:bg-white',
                       )}
                       style={{
@@ -702,9 +701,11 @@ function MerchantHomeDashboard() {
                           : undefined,
                       }}
                     >
-                      <p className="mb-1 text-sm text-gray-500">{cell.label}</p>
-                      <p className="text-xl font-bold tabular-nums text-gray-900">{value}</p>
-                      <p className="mt-1 text-xs" style={{ color: selected ? cell.color : '#9ca3af' }}>
+                      <p className="mb-1 truncate text-xs text-gray-500 sm:text-sm">{cell.label}</p>
+                      <p className="text-base font-bold leading-tight tabular-nums text-gray-900 [overflow-wrap:anywhere] sm:text-lg">
+                        {value}
+                      </p>
+                      <p className="mt-1 truncate text-xs" style={{ color: selected ? cell.color : '#9ca3af' }}>
                         {selected ? '当前曲线' : timeLabel}
                       </p>
                     </motion.button>
