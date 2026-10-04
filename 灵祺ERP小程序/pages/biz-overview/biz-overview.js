@@ -137,6 +137,54 @@ function writeYdayAuto(on) {
   } catch (_) {}
 }
 
+const PAGE_CACHE_KEY = 'meoo_biz_overview_page_v1'
+
+function readPageCache() {
+  try {
+    const raw = wx.getStorageSync(PAGE_CACHE_KEY)
+    const row = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw || {}
+    if (!row || row.tenant !== dashTenantKey()) return null
+    return row
+  } catch (_) {
+    return null
+  }
+}
+
+function writePageCache(row) {
+  try {
+    wx.setStorageSync(PAGE_CACHE_KEY, row)
+  } catch (_) {}
+}
+
+function saveRangeCache(rangeId, payload) {
+  const row = readPageCache() || { tenant: dashTenantKey(), ranges: {} }
+  row.tenant = dashTenantKey()
+  row.ranges = row.ranges || {}
+  row.ranges[rangeId] = Object.assign({ savedAt: Date.now() }, payload)
+  writePageCache(row)
+}
+
+function readRangeCache(rangeId) {
+  const row = readPageCache()
+  const hit = row && row.ranges && row.ranges[rangeId]
+  if (!hit || !Array.isArray(hit.kpis) || !hit.kpis.length) return null
+  return hit
+}
+
+function saveYdayMetrics(targetDate, metrics) {
+  const row = readPageCache() || { tenant: dashTenantKey(), ranges: {} }
+  row.tenant = dashTenantKey()
+  row.yday = { targetDate, metrics: metrics || [], savedAt: Date.now() }
+  writePageCache(row)
+}
+
+function readYdayMetrics(targetDate) {
+  const row = readPageCache()
+  const yday = row && row.yday
+  if (!yday || yday.targetDate !== targetDate || !Array.isArray(yday.metrics) || !yday.metrics.length) return null
+  return yday.metrics
+}
+
 const YDAY_AI_SYSTEM = [
   '你是资深本地生活店铺经营顾问。请只根据给出的昨日数据写中文分析，禁止编造未提供的数字。',
   '输出只能使用这五个标题，格式为「一、标题」：',
@@ -275,8 +323,32 @@ Page({
       return
     }
     this.setData({ ydayAuto: readYdayAuto() })
-    void this.loadDash()
+    if (!this.paintRangeCache(this.data.range)) void this.loadDash()
     void this.loadYesterdayAnalysis()
+  },
+
+  paintRangeCache(rangeId) {
+    const hit = readRangeCache(rangeId)
+    if (!hit) return false
+    this.setData({
+      loading: false,
+      usePreview: false,
+      kpis: enrichKpis(hit.kpis),
+      chartEmpty: !!hit.chartEmpty,
+      chartBars: hit.chartBars || [],
+      chartHint: hit.chartHint || '',
+      chartTitle: hit.chartTitle || chartTitleFor(rangeId),
+    })
+    return true
+  },
+
+  async onPullDownRefresh() {
+    try {
+      await this.loadDash({ silent: true })
+      await this.loadYesterdayAnalysis({ refreshMetrics: true })
+    } finally {
+      wx.stopPullDownRefresh()
+    }
   },
 
   onToggleYdayAuto(e) {
@@ -295,10 +367,10 @@ Page({
     const range = e.currentTarget.dataset.id
     if (!range || range === this.data.range) return
     this.setData({ range })
-    void this.loadDash()
+    if (!this.paintRangeCache(range)) void this.loadDash()
   },
 
-  async loadDash() {
+  async loadDash(opts) {
     const tab = RANGE_TABS.find((t) => t.id === this.data.range) || RANGE_TABS[0]
     const previewPack = PREVIEW_BY_RANGE[tab.id] || PREVIEW_BY_RANGE.today
 
@@ -337,9 +409,17 @@ Page({
       return
     }
 
-    this.setData({ loading: true })
-    const d = await dashboardMp.fetchAggregateDashboard(tab.apiRange)
-    if (!d.connected) {
+    const silent = Boolean(opts && opts.silent)
+    if (!silent) this.setData({ loading: true })
+    let d
+    try {
+      d = await dashboardMp.fetchAggregateDashboard(tab.apiRange)
+    } catch (e) {
+      this.setData({ loading: false })
+      return
+    }
+    if (!d || !d.connected) {
+      if (silent && this.paintRangeCache(tab.id)) return
       this.setData({
         loading: false,
         usePreview: false,
@@ -352,7 +432,7 @@ Page({
       return
     }
 
-    const kpis = enrichKpis([
+    const rawKpis = [
       {
         label: '营收金额',
         value: formatYuanExact(d.totalRevenue),
@@ -388,18 +468,29 @@ Page({
         deltaUp: true,
         iconKey: 'list',
       },
-    ])
+    ]
+    const kpis = enrichKpis(rawKpis)
 
     const bars = Array.isArray(d.chartBars) ? d.chartBars : []
     const hasVal = bars.some((x) => Number(x.value) > 0)
+    const chartEmpty = bars.length === 0
+    const chartHint = bars.length === 0 ? '暂无趋势点' : hasVal ? '' : '已接通平台，当前区间成交额为 0'
+    const chartTitle = chartTitleFor(tab.id)
+    saveRangeCache(tab.id, {
+      kpis: rawKpis,
+      chartEmpty,
+      chartBars: bars,
+      chartHint,
+      chartTitle,
+    })
     this.setData({
       loading: false,
       usePreview: false,
       kpis,
-      chartEmpty: bars.length === 0,
+      chartEmpty,
       chartBars: bars,
-      chartHint: bars.length === 0 ? '暂无趋势点' : hasVal ? '' : '已接通平台，当前区间成交额为 0',
-      chartTitle: chartTitleFor(tab.id),
+      chartHint,
+      chartTitle,
     })
   },
 
@@ -411,9 +502,11 @@ Page({
         platform: 'all',
       })
       const summary = (summaryRes && summaryRes.summary) || {}
+      const metrics = ydayMetricsFromSummary(summary)
+      saveYdayMetrics(targetDate, metrics)
       this.setData({
         ydayDate: targetDate,
-        ydayMetrics: ydayMetricsFromSummary(summary),
+        ydayMetrics: metrics,
       })
     } catch (_) {}
   },
@@ -424,6 +517,7 @@ Page({
 
   async loadYesterdayAnalysis(opts) {
     const manual = Boolean(opts && opts.manual)
+    const refreshMetrics = Boolean(opts && opts.refreshMetrics)
     const { slot, targetDate } = yesterdayRefreshSlot()
     const tenant = dashTenantKey()
     const autoOn = readYdayAuto()
@@ -459,8 +553,37 @@ Page({
     }
     if (!manual) {
       const cached = readYesterdayCache(slot, tenant)
-      let refreshZeroBuyers = false
-      if (cached) {
+      const savedMetrics = readYdayMetrics(targetDate)
+      const cachedHint =
+        cached && cached.pointsCharged > 0
+          ? `${autoOn ? '已开启，每天 10:00 自动更新' : '自动分析已关闭'} · 本次已扣 ${cached.pointsCharged} 积分`
+          : base.ydayHint
+      if (!refreshMetrics) {
+        if (cached) {
+          this.setData({
+            ...base,
+            ydayLoading: false,
+            ydayEmpty: '',
+            ydayDate: cached.targetDate || targetDate,
+            ydaySections: cached.sections,
+            ydayMetrics: savedMetrics || [],
+            ydayHint: cachedHint,
+          })
+          return
+        }
+        if (!autoOn) {
+          if (!savedMetrics) await this.fillYesterdayMetrics(targetDate)
+          this.setData({
+            ...base,
+            ydayLoading: false,
+            ydaySections: [],
+            ydayMetrics: savedMetrics || this.data.ydayMetrics,
+            ydayEmpty: '自动分析未开启。打开开关后每天 10:00 分析一次，也可点手动分析',
+          })
+          return
+        }
+      } else if (cached) {
+        let refreshZeroBuyers = false
         try {
           const peek = await shop.fetchShopAnalysisSummary({
             startDate: targetDate,
@@ -468,39 +591,33 @@ Page({
             platform: 'all',
           })
           const peeked = (peek && peek.summary) || {}
+          const metrics = ydayMetricsFromSummary(peeked)
+          saveYdayMetrics(targetDate, metrics)
           this._prefetchedYday = { targetDate, summary: peeked, adviceFacts: peek && peek.adviceFacts }
-          this.setData({
-            ydayDate: targetDate,
-            ydayMetrics: ydayMetricsFromSummary(peeked),
-          })
+          this.setData({ ydayDate: targetDate, ydayMetrics: metrics })
           refreshZeroBuyers = (Number(peeked.buyerCount) || 0) > 0 && cacheClaimsZeroBuyers(cached.sections)
         } catch (_) {
           this._prefetchedYday = null
         }
-      }
-      if (cached && !refreshZeroBuyers) {
-        this.setData({
-          ...base,
-          ydayLoading: false,
-          ydayEmpty: '',
-          ydayDate: cached.targetDate || targetDate,
-          ydaySections: cached.sections,
-          ydayHint:
-            cached.pointsCharged > 0
-              ? `${autoOn ? '已开启，每天 10:00 自动更新' : '自动分析已关闭'} · 本次已扣 ${cached.pointsCharged} 积分`
-              : base.ydayHint,
-        })
-        if (!this._prefetchedYday) void this.fillYesterdayMetrics(targetDate)
-        return
-      }
-      if (!autoOn && !refreshZeroBuyers) {
+        if (!refreshZeroBuyers) {
+          this.setData({
+            ...base,
+            ydayLoading: false,
+            ydayEmpty: '',
+            ydayDate: cached.targetDate || targetDate,
+            ydaySections: cached.sections,
+            ydayHint: cachedHint,
+          })
+          return
+        }
+      } else if (!autoOn) {
+        await this.fillYesterdayMetrics(targetDate)
         this.setData({
           ...base,
           ydayLoading: false,
           ydaySections: [],
           ydayEmpty: '自动分析未开启。打开开关后每天 10:00 分析一次，也可点手动分析',
         })
-        void this.fillYesterdayMetrics(targetDate)
         return
       }
     }
@@ -523,6 +640,7 @@ Page({
       if (seq !== this._ydaySeq) return
       const summary = summaryRes.summary || {}
       const metrics = ydayMetricsFromSummary(summary)
+      saveYdayMetrics(targetDate, metrics)
       this.setData({ ydayMetrics: metrics, ydayDate: targetDate })
       if (!summaryHasBiz(summary)) {
         this.setData({
