@@ -3,14 +3,45 @@
 @import '../../styles/hero-deco.wxss';
 
 .login-page {
+  --lq-primary: #8a5a32;
+  --lq-primary-dark: #6b4324;
+  --lq-primary-deep: #5c3a22;
+  --lq-nav-bar: #f6f1e8;
+  --lq-primary-soft: #c4a27a;
+  --lq-primary-50: #f8f1e6;
+  --lq-primary-100: #ead9c4;
+  --lq-violet: #8a5a32;
+  --lq-gradient: linear-gradient(180deg, #a56b3c 0%, #8a5430 100%);
+  --lq-gradient-header: transparent;
+  --lq-gradient-deep: linear-gradient(180deg, #6b4324 0%, #a56b3c 100%);
+  --lq-gradient-tab: linear-gradient(180deg, #b07a45 0%, #8d5a32 100%);
+  --lq-gradient-tab-track: #f7f1e8;
+  --lq-bg: #f6f1e8;
+  --lq-border: rgba(92, 58, 34, 0.12);
+  --lq-shadow-soft: 0 8rpx 28rpx rgba(92, 58, 34, 0.08);
+  --lq-chip-on-bg: #f8f1e6;
+  --lq-chip-on-border: #e4d3be;
+  --lq-active-tint: rgba(141, 90, 50, 0.12);
+  --lq-home-nav: #f6f1e8;
   box-sizing: border-box;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--lq-bg);
+  background: #f6f1e8;
+}
+
+.login-life-bg {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
 }
 
 .login-body {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -20,10 +51,11 @@
 .login-top,
 .login-hero {
   position: relative;
+  z-index: 1;
   overflow: hidden;
   padding-bottom: 88rpx;
   flex-shrink: 0;
-  background: var(--lq-gradient-header);
+  background: transparent;
   min-height: 400rpx;
 }
 
@@ -43,18 +75,15 @@
   z-index: 1;
   background: linear-gradient(
     180deg,
-    var(--lq-active-tint) 0%,
-    rgba(255, 255, 255, 0.08) 55%,
-    rgba(255, 255, 255, 0.02) 100%
+    rgba(246, 241, 232, 0.42) 0%,
+    rgba(246, 241, 232, 0.18) 42%,
+    rgba(246, 241, 232, 0.78) 100%
   );
   pointer-events: none;
 }
 
 .login-hero__cosmos {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
+  display: none;
 }
 
 .login-star {
@@ -121,13 +150,13 @@
   width: 108rpx;
   height: 108rpx;
   margin-bottom: 16rpx;
-  border: 4rpx solid rgba(255, 255, 255, 0.35);
+  border: 4rpx solid rgba(255, 255, 255, 0.86);
 }
 
 .login-hero__title {
   font-size: 40rpx;
   font-weight: 800;
-  color: #fff;
+  color: #4a3424;
   letter-spacing: 2rpx;
   line-height: 1.25;
 }
@@ -135,7 +164,7 @@
 .login-hero__sub {
   margin-top: 10rpx;
   font-size: 26rpx;
-  color: rgba(255, 255, 255, 0.9);
+  color: #7a624e;
 }
 
 .login-top--ai {
@@ -230,9 +259,9 @@
   padding: 6rpx 16rpx;
   font-size: 20rpx;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.94);
-  background: rgba(255, 255, 255, 0.14);
-  border: 1rpx solid rgba(255, 255, 255, 0.26);
+  color: #5c4030;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1rpx solid rgba(92, 64, 48, 0.12);
   border-radius: 999rpx;
 }
 
@@ -330,14 +359,14 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--lq-gradient-tab);
-  box-shadow: var(--lq-shadow-tab);
+  background: #f3e6d4;
+  box-shadow: none;
   margin-bottom: 8rpx;
 }
 
 .login-feature__glyph {
   font-size: 28rpx;
-  color: #fff;
+  color: #6b4324;
   line-height: 1;
 }
 
@@ -459,7 +488,7 @@
   top: 0;
   bottom: 0;
   z-index: 10000;
-  background: rgba(45, 27, 78, 0.35);
+  background: rgba(62, 42, 28, 0.35);
   display: flex;
   align-items: flex-end;
 }
@@ -481,7 +510,7 @@
   background: var(--lq-card);
   border-radius: 40rpx 40rpx 0 0;
   border: 3rpx solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 -12rpx 0 rgba(196, 181, 253, 0.25);
+  box-shadow: 0 -12rpx 0 rgba(196, 160, 120, 0.28);
 }
 
 .login-id-sheet-head {

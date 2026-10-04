@@ -1,7 +1,7 @@
 <view class="login-page {{lqThemeClass}}">
+  <image class="login-life-bg" src="/images/login-life-bg.jpg" mode="aspectFill" />
   <launch-splash />
   <view class="login-hero" style="{{navBandStyle}}">
-    <image class="login-hero__bg" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
     <view class="login-hero__cosmos" aria-hidden="true">
       <view class="login-star login-star--1" />
       <view class="login-star login-star--2" />
@@ -11,7 +11,7 @@
 
     <view class="login-hero__inner">
       <view class="login-hero__brand">
-        <image class="login-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+        <image class="login-hero__logo lq-brand-logo" src="/images/login-logo-beige.png" mode="aspectFill" />
         <text class="login-hero__title">灵祺星选平台</text>
         <text class="login-hero__sub">本地生活 · 达人赋能 · 高效撮合</text>
         <view class="login-chips">

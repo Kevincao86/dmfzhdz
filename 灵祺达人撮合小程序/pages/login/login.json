@@ -1,6 +1,6 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#faf7ff",
+  "backgroundColor": "#f6f1e8",
   "usingComponents": {
     "login-orbit-wall": "/components/login-orbit-wall/index",
     "launch-splash": "/components/launch-splash/index"
