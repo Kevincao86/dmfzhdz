@@ -1,11 +1,18 @@
 <scroll-view scroll-y class="op-page" enhanced show-scrollbar="{{false}}">
   <view class="op-hero">
     <text class="op-title">AI 短剧</text>
-    <text class="op-sub">选世界观与场景，可 AI 写故事、上传角色参考图，竖屏出片。步骤与电脑端一致。</text>
+    <text class="op-sub">和电脑端同一套：场景、故事、角色（可保存、可按参考图二选一）、再出片。分四步，每步只做一件事。</text>
     <text class="op-meta">{{rateLabel}}</text>
   </view>
 
-  <view class="op-card">
+  <view class="op-steps">
+    <text class="op-step {{dramaStep === 1 ? 'on' : ''}}" data-step="1" bindtap="onDramaStep">1 场景</text>
+    <text class="op-step {{dramaStep === 2 ? 'on' : ''}}" data-step="2" bindtap="onDramaStep">2 故事</text>
+    <text class="op-step {{dramaStep === 3 ? 'on' : ''}}" data-step="3" bindtap="onDramaStep">3 角色</text>
+    <text class="op-step {{dramaStep === 4 ? 'on' : ''}}" data-step="4" bindtap="onDramaStep">4 出片</text>
+  </view>
+
+  <view class="op-card" wx:if="{{dramaStep === 1}}">
     <text class="op-label">世界观</text>
     <view class="op-chips">
       <text
@@ -17,9 +24,6 @@
       >{{item.label}}</text>
     </view>
     <text class="op-body muted">{{worldBlurb}}</text>
-  </view>
-
-  <view class="op-card">
     <text class="op-label">场景</text>
     <view class="op-chips">
       <text
@@ -38,38 +42,95 @@
       <input class="op-input" placeholder="这一场前三秒怎么抓住人" value="{{customSceneHook}}" bindinput="onCustomSceneHook" />
       <text class="op-label">画面里必须出现</text>
       <input class="op-input" placeholder="例如：卷帘门、剩汤、路灯" value="{{customSceneMustSee}}" bindinput="onCustomSceneMust" />
-      <text class="op-body muted">只用于当前这个大类。成片按这里写的场景出，不再套用预设场景。</text>
     </block>
+    <button class="op-btn" bindtap="onDramaNext">下一步：写故事</button>
   </view>
 
-  <view class="op-card">
+  <view class="op-card" wx:elif="{{dramaStep === 2}}">
     <block wx:for="{{fields}}" wx:key="key">
       <text class="op-label">{{item.label}}</text>
-      <input
-        class="op-input"
-        data-key="{{item.key}}"
-        placeholder="{{item.placeholder}}"
-        value="{{item.value}}"
-        bindinput="onField"
-      />
+      <input class="op-input" data-key="{{item.key}}" placeholder="{{item.placeholder}}" value="{{item.value}}" bindinput="onField" />
     </block>
     <text class="op-label">一句话故事</text>
     <textarea class="op-area" maxlength="400" placeholder="可改写故事走向，或点 AI生成故事" value="{{story}}" bindinput="onStory" />
     <button class="op-btn-ghost" loading="{{storyBusy}}" bindtap="onAiStory">{{storyBusy ? '正在写故事' : 'AI生成故事'}}</button>
+    <view class="op-pair">
+      <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
+      <button class="op-btn" bindtap="onDramaNext">下一步：角色</button>
+    </view>
+  </view>
 
-    <text class="op-label">角色</text>
-    <input class="op-input" placeholder="角色名，如店长小琪" value="{{castName}}" bindinput="onCastName" />
-    <textarea class="op-area" maxlength="300" placeholder="形象词：年龄、发型发色、衣着颜色款式。写完后点生成预览。" value="{{castDesc}}" bindinput="onCastDesc" />
-    <button class="op-btn-ghost" loading="{{castBusy}}" bindtap="onGenCast">{{castBusy ? '正在生成预览' : '生成预览'}}</button>
-    <button class="op-btn-ghost" bindtap="onPickCastPhoto">上传参考图</button>
-    <view wx:if="{{castPreview}}" class="op-cast">
-      <image class="op-cast-img" src="{{castPreview}}" mode="aspectFill" bindtap="onPreviewCast" />
-      <text class="op-meta">{{castConfirmed ? '角色形象 · 已确认' : '角色形象 · 待确认'}}</text>
-      <button class="op-btn-ghost" bindtap="onConfirmCast">{{castConfirmed ? '已确认角色' : '用此图确认角色'}}</button>
+  <view class="op-card" wx:elif="{{dramaStep === 3}}">
+    <text class="op-label">角色形象</text>
+    <text class="op-body muted">每位角色二选一：写文字形象，或上传参考图。上传后还要再选：按图美化生成，或识别成文字。不能两路一起用。</text>
+    <view class="op-row">
+      <button class="op-btn-ghost" bindtap="onToggleCastLibrary">选用已存{{castPacks.length ? ' ' + castPacks.length : ''}}</button>
+      <button class="op-btn-ghost" bindtap="onToggleCastSave">保存角色</button>
+      <button class="op-btn-ghost" bindtap="onAddCast">新建角色</button>
     </view>
 
+    <view wx:if="{{showCastSave}}" class="op-box">
+      <text class="op-body">保存当前全部角色，下次做续集可直接载入。</text>
+      <input class="op-input" placeholder="角色组名称，如小柔 / 男顾客" value="{{castPackName}}" bindinput="onCastPackName" />
+      <button class="op-btn" bindtap="onSaveCastPack">确认保存</button>
+    </view>
+
+    <view wx:if="{{showCastLibrary}}" class="op-box">
+      <text wx:if="{{!castPacks.length}}" class="op-body muted">还没有已存角色组。确认形象后点「保存角色」。</text>
+      <view wx:for="{{castPacks}}" wx:key="id" class="op-pack">
+        <text class="op-body">{{item.name}} · {{item.members.length}} 人</text>
+        <button class="op-btn" data-id="{{item.id}}" bindtap="onLoadCastPack">载入</button>
+        <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onDeleteCastPack">删除</button>
+      </view>
+    </view>
+
+    <view wx:for="{{cast}}" wx:key="id" class="op-cast-card">
+      <view class="op-row">
+        <input class="op-input grow" data-id="{{item.id}}" placeholder="角色名" value="{{item.name}}" bindinput="onCastName" />
+        <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onRemoveCast">删除</button>
+      </view>
+      <textarea
+        class="op-area"
+        maxlength="300"
+        data-id="{{item.id}}"
+        disabled="{{item.sourceDataUrl ? true : false}}"
+        placeholder="{{item.sourceDataUrl ? '已选用参考图，文字已锁定。若要改文字，请先去掉参考图。' : '形象词：年龄、发型发色、衣着。写完后点生成预览。'}}"
+        value="{{item.desc}}"
+        bindinput="onCastDesc"
+      />
+      <button wx:if="{{item.sourceDataUrl}}" class="op-btn-ghost" data-id="{{item.id}}" bindtap="onClearCastPhoto">改用文字描述（去掉参考图）</button>
+      <button wx:elif="{{item.desc}}" class="op-btn-ghost" data-id="{{item.id}}" bindtap="onClearCastText">改用参考图（清空文字）</button>
+      <button wx:if="{{!item.sourceDataUrl}}" class="op-btn-ghost" loading="{{castBusyId === item.id}}" data-id="{{item.id}}" bindtap="onGenCast">生成预览</button>
+      <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onPickCastPhoto">上传参考图</button>
+
+      <view wx:if="{{item.sourceDataUrl}}" class="op-box">
+        <text class="op-label">参考图用法（二选一）</text>
+        <view class="op-chips">
+          <text class="op-chip {{item.refMode === 'beautify' ? 'on' : ''}}" data-id="{{item.id}}" data-mode="beautify" bindtap="onCastRefMode">按图美化</text>
+          <text class="op-chip {{item.refMode === 'describe' ? 'on' : ''}}" data-id="{{item.id}}" data-mode="describe" bindtap="onCastRefMode">识别成文字</text>
+        </view>
+        <text class="op-body muted">按图美化：成片锁这张脸。识别成文字：填完后不再用原图锁脸。</text>
+        <button class="op-btn" loading="{{castBusyId === item.id}}" data-id="{{item.id}}" bindtap="onApplyCastRef">
+          {{item.refMode === 'describe' ? '识别并填入文案' : item.refMode === 'beautify' ? '按图美化生成' : '请先选一种用法'}}
+        </button>
+      </view>
+
+      <view wx:if="{{item.previewPath || item.sourcePath}}" class="op-cast">
+        <image class="op-cast-img" src="{{item.previewPath || item.sourcePath}}" mode="aspectFill" data-id="{{item.id}}" bindtap="onPreviewCast" />
+        <text class="op-meta">{{item.confirmed ? '角色形象 · 已确认' : '角色形象 · 待确认'}}</text>
+        <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onConfirmCast">{{item.confirmed ? '已确认角色' : '用此图确认角色'}}</button>
+      </view>
+    </view>
+
+    <view class="op-pair">
+      <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
+      <button class="op-btn" bindtap="onDramaNext">下一步：出片</button>
+    </view>
+  </view>
+
+  <view class="op-card" wx:elif="{{dramaStep === 4}}">
     <text class="op-label">参考画面（可不传，最多 3 张）</text>
-    <text class="op-body muted">传了则按这些画面的背景出片；不传则按 AI 故事匹配场景。</text>
+    <text class="op-body muted">传了则按这些画面的背景出片；不传则按故事匹配场景。角色脸用上一步已确认的图。</text>
     <button class="op-btn-ghost" bindtap="onPickRefs">上传参考图</button>
     <button wx:if="{{refPaths.length}}" class="op-btn-ghost" bindtap="clearRefs">去掉参考图</button>
     <view wx:if="{{refPaths.length}}" class="op-chips">
@@ -79,13 +140,7 @@
     <input class="op-input" placeholder="一句口语对白" value="{{dialogue}}" bindinput="onDialogue" />
     <text class="op-label">画风</text>
     <view class="op-chips">
-      <text
-        wx:for="{{styles}}"
-        wx:key="id"
-        class="op-chip {{item.on ? 'on' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onStyle"
-      >{{item.name}}</text>
+      <text wx:for="{{styles}}" wx:key="id" class="op-chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onStyle">{{item.name}}</text>
     </view>
     <text class="op-label">成片时长</text>
     <picker mode="selector" range="{{durationOptions}}" range-key="label" value="{{durationIdx}}" bindchange="onDuration">
@@ -97,6 +152,7 @@
     </button>
     <button wx:if="{{busy}}" class="op-btn-ghost" bindtap="cancelWait">停止等待</button>
     <text wx:if="{{pointsHint}}" class="op-meta">{{pointsHint}}</text>
+    <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
   </view>
 
   <view wx:if="{{err}}" class="op-err">{{err}}</view>

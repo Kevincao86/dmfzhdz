@@ -281,5 +281,13 @@
 .vs-result__img {
   width: 100%;
   border-radius: 16rpx;
-  background: #2f6fed;
+  background: #f8fafc;
+}
+
+.vs-aspect-canvas {
+  position: fixed;
+  left: -4000px;
+  top: 0;
+  width: 10px;
+  height: 10px;
 }

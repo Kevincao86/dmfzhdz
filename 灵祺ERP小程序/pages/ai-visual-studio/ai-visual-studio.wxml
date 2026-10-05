@@ -28,7 +28,7 @@
         bindtap="onToggleChannel"
       >{{item.label}}</view>
     </view>
-    <text class="vs-label">业态</text>
+    <text class="vs-label">一级类目</text>
     <view class="vs-chips">
       <view
         wx:for="{{industries}}"
@@ -38,6 +38,30 @@
         bindtap="onIndustry"
       >{{item.label}}</view>
     </view>
+    <text class="vs-label">二级类目</text>
+    <view class="vs-chips">
+      <view
+        wx:for="{{level2}}"
+        wx:key="id"
+        class="vs-chip {{midId === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onMid"
+      >{{item.label}}</view>
+    </view>
+    <text class="vs-label">三级类目（出图按这个锁定）</text>
+    <view class="vs-chips" wx:if="{{level3.length}}">
+      <view
+        wx:for="{{level3}}"
+        wx:key="id"
+        class="vs-chip {{leafId === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onLeaf"
+      >{{item.label}}</view>
+    </view>
+    <text wx:else class="vs-card__sub">先选二级类目，再选具体三级类目。不选到三级不能出图。</text>
+    <text wx:if="{{categoryPath}}" class="vs-card__sub">本次出图类目：{{categoryPath}}</text>
+    <text wx:if="{{storeIndustryPath}}" class="vs-card__sub">门店档案类目：{{storeIndustryPath}}</text>
+    <text wx:if="{{menuHint}}" class="vs-card__sub">将优先画在售：{{menuHint}}</text>
     <text class="vs-label">门店 / 品牌名</text>
     <input class="vs-input" placeholder="如：灵祺小馆" value="{{storeName}}" bindinput="onStoreName" />
     <view class="vs-chip {{seriesOn ? 'on' : ''}}" bindtap="onToggleSeries">一键多端套装{{seriesOn ? ' · 已开' : ''}}</view>
@@ -144,6 +168,8 @@
       <view class="vs-chip {{aspect === '16:9' ? 'on' : ''}}" data-val="16:9" bindtap="onAspect">横屏 16:9</view>
       <view class="vs-chip {{aspect === 'carousel' ? 'on' : ''}}" data-val="carousel" bindtap="onAspect">三连图</view>
     </view>
+    <text class="vs-card__sub">出图规格已锁定为 {{aspectLabel}}（{{aspectPixels}}）。模型不能改比例。</text>
+    <text class="vs-card__sub" wx:if="{{categoryPath}}">画面类目：{{categoryPath}}</text>
     <button class="vs-btn" loading="{{genBusy}}" bindtap="onGenerate">一键出图（{{imagePoints}} 积分）</button>
     <text class="vs-progress" wx:if="{{progress}}">{{progress}}</text>
     <text class="vs-err" wx:if="{{err}}">{{err}}</text>
@@ -154,4 +180,5 @@
     </view>
     <button class="vs-btn ghost" bindtap="onPrevStep">上一步</button>
   </view>
+  <canvas type="2d" id="vs-aspect-canvas" class="vs-aspect-canvas" />
 </scroll-view>

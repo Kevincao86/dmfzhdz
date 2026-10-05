@@ -5,6 +5,7 @@ const erpPoints = require('../../utils/erpPointsSpendMp.js')
 const economics = require('../../utils/mpPointsEconomicsMp.js')
 const labels = require('../../utils/shortVideoLabelsMp.js')
 const vs = require('../../utils/visualStudioAiMp.js')
+const castStore = require('../../utils/shortDramaCastMp.js')
 
 const SEEDANCE_MODEL = labels.SEEDANCE_1_5_PRO_MODEL_ID
 
@@ -65,12 +66,13 @@ Page({
     story: '',
     dialogue: '',
     storyBusy: false,
-    castName: '',
-    castDesc: '',
-    castBusy: false,
-    castPreview: '',
-    castDataUrl: '',
-    castConfirmed: false,
+    dramaStep: 1,
+    cast: [castStore.newMember(1)],
+    castBusyId: '',
+    castPacks: [],
+    showCastSave: false,
+    showCastLibrary: false,
+    castPackName: '',
     refPaths: [],
     refDataUrls: [],
     durationOptions: [
@@ -97,6 +99,31 @@ Page({
     if (!api.getAccessToken()) {
       wx.redirectTo({ url: '/pages/login/login' })
     }
+  },
+
+  onShow() {
+    const saved = castStore.loadCurrent()
+    this.setData({
+      castPacks: castStore.loadPacks(),
+      cast: saved.length ? saved : this.data.cast,
+    })
+  },
+
+  onDramaStep(e) {
+    const n = Number(e.currentTarget.dataset.step)
+    if (n >= 1 && n <= 4) this.setData({ dramaStep: n, err: '' })
+  },
+  onDramaNext() {
+    this.setData({ dramaStep: Math.min(4, this.data.dramaStep + 1), err: '' })
+  },
+  onDramaPrev() {
+    this.setData({ dramaStep: Math.max(1, this.data.dramaStep - 1), err: '' })
+  },
+
+  _patchCast(id, patch) {
+    const cast = (this.data.cast || []).map((m) => (m.id === id ? Object.assign({}, m, patch) : m))
+    this.setData({ cast })
+    return cast
   },
 
   applyWorld(worldId) {
@@ -190,10 +217,44 @@ Page({
   },
 
   onCastName(e) {
-    this.setData({ castName: e.detail.value })
+    this._patchCast(e.currentTarget.dataset.id, { name: e.detail.value })
   },
   onCastDesc(e) {
-    this.setData({ castDesc: e.detail.value, castConfirmed: false })
+    this._patchCast(e.currentTarget.dataset.id, { desc: e.detail.value, confirmed: false })
+  },
+  onAddCast() {
+    const cast = this.data.cast || []
+    if (cast.length >= castStore.MAX) {
+      wx.showToast({ title: `最多 ${castStore.MAX} 个角色`, icon: 'none' })
+      return
+    }
+    this.setData({ cast: cast.concat(castStore.newMember(cast.length + 1)) })
+  },
+  onRemoveCast(e) {
+    const id = e.currentTarget.dataset.id
+    const cast = (this.data.cast || []).filter((m) => m.id !== id)
+    this.setData({ cast: cast.length ? cast : [castStore.newMember(1)] })
+  },
+  onClearCastPhoto(e) {
+    this._patchCast(e.currentTarget.dataset.id, {
+      sourcePath: '',
+      sourceDataUrl: '',
+      previewPath: '',
+      previewDataUrl: '',
+      refMode: '',
+      confirmed: false,
+    })
+    this.setData({ hint: '已去掉参考图，可以改文字形象。' })
+  },
+  onClearCastText(e) {
+    this._patchCast(e.currentTarget.dataset.id, { desc: '', confirmed: false })
+    this.setData({ hint: '已清空文字形象，可以上传参考图。' })
+  },
+  onCastRefMode(e) {
+    const mode = e.currentTarget.dataset.mode
+    const patch = { refMode: mode }
+    if (mode === 'beautify') patch.desc = ''
+    this._patchCast(e.currentTarget.dataset.id, patch)
   },
   _readImageDataUrl(path) {
     try {
@@ -203,7 +264,11 @@ Page({
       return ''
     }
   },
-  onPickCastPhoto() {
+  _member(id) {
+    return (this.data.cast || []).find((m) => m.id === id) || null
+  },
+  onPickCastPhoto(e) {
+    const id = e.currentTarget.dataset.id
     wx.chooseMedia({
       count: 1,
       mediaType: ['image'],
@@ -211,86 +276,217 @@ Page({
         const f = res.tempFiles && res.tempFiles[0]
         if (!f || !f.tempFilePath) return
         const dataUrl = this._readImageDataUrl(f.tempFilePath)
-        this.setData({
-          castPreview: f.tempFilePath,
-          castDataUrl: dataUrl,
-          castConfirmed: Boolean(dataUrl),
+        this._patchCast(id, {
+          sourcePath: f.tempFilePath,
+          sourceDataUrl: dataUrl,
+          previewPath: '',
+          previewDataUrl: '',
+          desc: '',
+          refMode: '',
+          confirmed: false,
         })
+        this.setData({ hint: '已上传参考图。请二选一：按图美化生成，或识别成文字填入形象词。' })
       },
     })
   },
-  async onGenCast() {
-    if (this.data.castBusy) return
-    const desc = String(this.data.castDesc || '').trim()
-    const name = String(this.data.castName || '').trim() || '主角'
-    if (desc.length < 6) {
+  async _genPreview(member, usePhoto) {
+    const name = String(member.name || '').trim() || '主角'
+    const desc = String(member.desc || '').trim()
+    const prompt = usePhoto
+      ? [
+          '图生图：必须与参考图为同一人，同一张脸、同一发型发色、同一套衣服，禁止换脸。',
+          '去掉字幕、水印和路人。竖屏半身短剧定妆，电影棚拍光，单人，禁止文字。',
+        ].join('')
+      : [
+          '竖屏半身短剧定妆，单人，正面或微侧，五官清晰，电影棚拍光，商业广告质感；不要证件照。',
+          `角色身份：${name}。`,
+          `外貌与穿搭：${desc}。`,
+          '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
+        ].join('')
+    const r = await vs.postAiAgentImage(prompt, {
+      preferredVendor: 'qwen',
+      aspectRatio: '3:4',
+      wanxSize: '832*1184',
+      exactPrompt: true,
+      referenceImage: usePhoto ? member.sourceDataUrl || '' : '',
+    })
+    if (!r.ok || !r.imageUrl) throw new Error(r.message || '角色生成失败')
+    this._patchCast(member.id, {
+      previewPath: r.imageUrl,
+      previewDataUrl: '',
+      confirmed: false,
+    })
+    this.setData({ hint: `已为${name}生成预览，请点「用此图确认角色」后再出片。` })
+  },
+  async onGenCast(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    if (!member || this.data.castBusyId) return
+    if (String(member.desc || '').trim().length < 6) {
       wx.showToast({ title: '请先写形象词（至少 6 字）', icon: 'none' })
       return
     }
-    this.setData({ castBusy: true, err: '' })
+    if (member.sourceDataUrl) {
+      wx.showToast({ title: '已有参考图，请先选用法或去掉参考图', icon: 'none' })
+      return
+    }
+    this.setData({ castBusyId: member.id, err: '' })
     try {
-      const prompt = [
-        '竖屏半身短剧定妆，单人，正面或微侧，五官清晰，电影棚拍光，商业广告质感；不要证件照。',
-        `角色身份：${name}。`,
-        `外貌与穿搭：${desc}。`,
-        '禁止字幕、水印、Logo、多人、拼贴和海报排版。',
-      ].join('')
-      const r = await vs.postAiAgentImage(prompt, {
-        preferredVendor: 'qwen',
-        aspectRatio: '3:4',
-        exactPrompt: true,
-      })
-      if (!r.ok || !r.imageUrl) throw new Error(r.message || '角色生成失败')
-      this.setData({
-        castPreview: r.imageUrl,
-        castDataUrl: '',
-        castConfirmed: false,
-        hint: '已生成角色预览，请点「用此图确认角色」后再出片。',
-      })
-    } catch (e) {
-      this.setData({ err: (e && e.message) || '角色生成失败' })
+      await this._genPreview(member, false)
+    } catch (err) {
+      this.setData({ err: (err && err.message) || '角色生成失败' })
     } finally {
-      this.setData({ castBusy: false })
+      this.setData({ castBusyId: '' })
     }
   },
-  async onConfirmCast() {
-    const preview = String(this.data.castPreview || '').trim()
+  async onApplyCastRef(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    if (!member || this.data.castBusyId) return
+    if (!member.sourceDataUrl) {
+      wx.showToast({ title: '请先上传参考图', icon: 'none' })
+      return
+    }
+    if (member.refMode !== 'beautify' && member.refMode !== 'describe') {
+      wx.showToast({ title: '请先选一种用法', icon: 'none' })
+      return
+    }
+    this.setData({ castBusyId: member.id, err: '' })
+    try {
+      if (member.refMode === 'beautify') {
+        await this._genPreview(member, true)
+        return
+      }
+      const chat = await vs.postAiChat(
+        [
+          {
+            role: 'system',
+            content: '你是人像核验员。只根据用户给出的参考图描述可见特征。看不清就写看不清。只输出一段中文形象词，60到140字。',
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: `角色身份：${member.name || '主角'}。请按参考图写下发型、发色、五官、衣着颜色和款式。禁止另造一张脸。` },
+              { type: 'image_url', image_url: { url: member.sourceDataUrl } },
+            ],
+          },
+        ],
+        { provider: 'qwen', taskType: 'generate_copywriting', temperature: 0.2 },
+      )
+      if (!chat.ok || !String(chat.content || '').trim()) throw new Error(chat.message || '识别失败')
+      this._patchCast(member.id, {
+        desc: String(chat.content).trim().slice(0, 300),
+        sourcePath: '',
+        sourceDataUrl: '',
+        refMode: 'describe',
+        confirmed: false,
+      })
+      this.setData({ hint: '已把参考图识别成形象词。成片按这段文字走，不再用原图锁脸。可再点「生成预览」。' })
+    } catch (err) {
+      this.setData({ err: (err && err.message) || '参考图处理失败' })
+    } finally {
+      this.setData({ castBusyId: '' })
+    }
+  },
+  async onConfirmCast(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    if (!member) return
+    const preview = String(member.previewPath || member.sourcePath || '').trim()
     if (!preview) {
       wx.showToast({ title: '请先生成或上传角色预览', icon: 'none' })
       return
     }
-    if (this.data.castDataUrl) {
-      this.setData({ castConfirmed: true, hint: '角色形象已确认，出片将锁这张脸。' })
+    if (member.previewDataUrl || (member.sourceDataUrl && member.refMode === 'beautify' && member.previewPath === member.sourcePath)) {
+      const cast = this._patchCast(member.id, { confirmed: true })
+      castStore.saveCurrent(cast)
+      this.setData({ hint: `已确认${member.name || '角色'}，出片将锁这张脸。` })
+      return
+    }
+    const src = member.previewPath || member.sourcePath
+    if (member.sourceDataUrl && !member.previewPath) {
+      const cast = this._patchCast(member.id, {
+        previewPath: member.sourcePath,
+        previewDataUrl: member.sourceDataUrl,
+        confirmed: true,
+        refMode: 'beautify',
+      })
+      castStore.saveCurrent(cast)
+      this.setData({ hint: `已确认${member.name || '角色'}，出片将锁这张脸。` })
       return
     }
     wx.showLoading({ title: '确认角色…', mask: true })
     try {
-      const local = await new Promise((resolve, reject) => {
-        wx.downloadFile({
-          url: preview,
-          success: (res) => {
-            if (res.statusCode === 200 && res.tempFilePath) resolve(res.tempFilePath)
-            else reject(new Error('角色图下载失败'))
-          },
-          fail: () => reject(new Error('角色图下载失败')),
-        })
+      const local = await this.downloadImageAsDataUrl(src)
+      const cast = this._patchCast(member.id, {
+        previewDataUrl: local,
+        confirmed: Boolean(local),
       })
-      const dataUrl = this._readImageDataUrl(local)
-      this.setData({
-        castPreview: local,
-        castDataUrl: dataUrl,
-        castConfirmed: Boolean(dataUrl),
-        hint: dataUrl ? '角色形象已确认，出片将锁这张脸。' : '角色图未能转成本地文件',
-      })
-    } catch (e) {
-      this.setData({ err: (e && e.message) || '确认角色失败' })
+      if (local) castStore.saveCurrent(cast)
+      this.setData({ hint: local ? `已确认${member.name || '角色'}，出片将锁这张脸。` : '角色图未能转成本地文件' })
+    } catch (err) {
+      this.setData({ err: (err && err.message) || '确认角色失败' })
     } finally {
       wx.hideLoading()
     }
   },
-  onPreviewCast() {
-    if (!this.data.castPreview) return
-    wx.previewImage({ urls: [this.data.castPreview], current: this.data.castPreview })
+  onPreviewCast(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    const url = member && (member.previewPath || member.sourcePath)
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  onToggleCastSave() {
+    const next = !this.data.showCastSave
+    const named = (this.data.cast || [])
+      .map((m) => String(m.name || '').trim())
+      .filter((n) => n && !/^角色\d+$/.test(n))
+    this.setData({
+      showCastSave: next,
+      showCastLibrary: false,
+      castPackName: this.data.castPackName || named.slice(0, 4).join(' / ') || '续集角色',
+    })
+  },
+  onToggleCastLibrary() {
+    this.setData({ showCastLibrary: !this.data.showCastLibrary, showCastSave: false, castPacks: castStore.loadPacks() })
+  },
+  onCastPackName(e) {
+    this.setData({ castPackName: e.detail.value.slice(0, 32) })
+  },
+  onSaveCastPack() {
+    const members = this.data.cast || []
+    if (!castStore.worthSaving(members)) {
+      wx.showToast({ title: '请先写形象或上传参考图', icon: 'none' })
+      return
+    }
+    const name = String(this.data.castPackName || '').trim() || '续集角色'
+    const packs = castStore.loadPacks().filter((p) => p.name !== name)
+    packs.unshift({
+      id: `p${Date.now().toString(36)}`,
+      name,
+      savedAt: Date.now(),
+      members,
+    })
+    try {
+      castStore.savePacks(packs)
+      castStore.saveCurrent(members)
+      this.setData({ castPacks: castStore.loadPacks(), showCastSave: false, hint: `已保存角色组「${name}」。` })
+    } catch (err) {
+      this.setData({ err: '角色图太大，保存失败。可去掉原图、只保留形象词后再存。' })
+    }
+  },
+  onLoadCastPack(e) {
+    const pack = (this.data.castPacks || []).find((p) => p.id === e.currentTarget.dataset.id)
+    if (!pack || !pack.members || !pack.members.length) return
+    this.setData({
+      cast: pack.members.slice(0, castStore.MAX),
+      showCastLibrary: false,
+      hint: `已载入「${pack.name}」。`,
+    })
+    castStore.saveCurrent(pack.members)
+  },
+  onDeleteCastPack(e) {
+    const id = e.currentTarget.dataset.id
+    const packs = castStore.loadPacks().filter((p) => p.id !== id)
+    castStore.savePacks(packs)
+    this.setData({ castPacks: packs })
   },
 
   async onAiStory() {
@@ -411,11 +607,12 @@ Page({
   },
 
   collectDramaImages() {
-    if (this.data.castConfirmed && this.data.castDataUrl) {
-      return [this.data.castDataUrl].concat(this.data.refDataUrls || []).slice(0, 3)
-    }
-    if (this.data.refDataUrls && this.data.refDataUrls.length) return this.data.refDataUrls.slice(0, 3)
-    return []
+    const faces = (this.data.cast || [])
+      .filter((m) => m.confirmed && (m.previewDataUrl || (m.refMode === 'beautify' && m.sourceDataUrl)))
+      .map((m) => m.previewDataUrl || m.sourceDataUrl)
+      .filter(Boolean)
+    const refs = this.data.refDataUrls || []
+    return faces.concat(refs).slice(0, 3)
   },
 
   downloadImageAsDataUrl(url) {
@@ -462,7 +659,11 @@ Page({
       return
     }
     const hasRefs = (this.data.refDataUrls || []).length > 0
-    const prompt = catalog.buildPrompt(
+    const castLine = (this.data.cast || [])
+      .filter((m) => m.confirmed)
+      .map((m) => `${m.name || '角色'}${m.desc ? `（${String(m.desc).slice(0, 40)}）` : ''}`)
+      .join('、')
+    const promptBase = catalog.buildPrompt(
       world,
       scene,
       shop,
@@ -471,6 +672,9 @@ Page({
       catalog.styleOf(this.data.styleId),
       hasRefs,
     )
+    const prompt = castLine
+      ? `${promptBase}\n【角色锁定】必须使用已确认角色：${castLine}。参考图里的脸和衣服不能换。`
+      : promptBase
     const plan = catalog.planLongformSegmentDurations(total)
     const afford = await erpPoints.checkAddonPointsAffordable('shortvideo', total)
     if (!afford.ok) {

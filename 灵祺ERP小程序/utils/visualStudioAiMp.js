@@ -230,10 +230,12 @@ function normalizeCopyRow(row) {
 
 function localCopyFallback(form) {
   const store = String(form.storeName || '').trim() || '本店'
+  const leaf = String(form.categoryPath || '').split('/').pop()
+  const topic = String(leaf || '').trim() || '到店'
   const pb = PLAYBOOKS.find((p) => p.id === form.playbook) || PLAYBOOKS[0]
   return [
     {
-      headline: `${store}${pb.label}`,
+      headline: `${store}${topic}`,
       subheadline: pb.desc,
       offer: '到店立减',
       timeRange: '限时活动',
@@ -256,24 +258,38 @@ function localCopyFallback(form) {
   ]
 }
 
+function categoryLockLines(form) {
+  const path = String(form.categoryPath || '').trim()
+  const scene = String(form.categoryScene || '').trim()
+  const storePath = String(form.storeIndustryPath || '').trim()
+  const menu = String(form.menuHint || '').trim()
+  return [
+    path
+      ? `【类目锁定】本次三级类目是「${path}」。画面主体、道具、环境只能是这一类的商品或服务：${scene || path}。禁止改成无关行业，禁止通用节日茶席、风景或与该类目无关的海报。`
+      : '',
+    storePath ? `门店档案经营类目：${storePath}。画面须能认出是这家店的业务，不要换成别的行业。` : '',
+    menu ? `门店在售（必须优先画这些，不要另造无关单品）：${menu}。` : '',
+  ].filter(Boolean)
+}
+
 function buildLocalImagePrompt(form, copy) {
-  const industry = INDUSTRIES.find((i) => i.id === form.industry) || INDUSTRIES[0]
   const pb = PLAYBOOKS.find((p) => p.id === form.playbook) || PLAYBOOKS[0]
   const ch = (form.channels || [])
     .map((id) => (CHANNELS.find((c) => c.id === id) || {}).label || id)
     .join('、')
   const c = copy || {}
   return [
-    `中国大陆本地生活营销海报，业态：${industry.label}，玩法：${pb.label}（${pb.desc}）。`,
+    ...categoryLockLines(form),
+    `中国大陆本地生活营销海报，玩法：${pb.label}（${pb.desc}）。`,
     form.variantLabel && form.variantName
       ? `${form.variantLabel}：${form.variantName}${form.variantPeriod ? `（${form.variantPeriod}）` : ''}。`
       : '',
     `投放渠道：${ch || '抖音'}。门店：${form.storeName || '本店'}。`,
-    `画面主标题大字：「${c.headline || '限时优惠'}」，副标题「${c.subheadline || ''}」，优惠信息「${c.offer || ''}」。`,
+    `画面主标题大字只能使用：「${c.headline || '限时优惠'}」。副标题「${c.subheadline || ''}」。优惠信息「${c.offer || ''}」。禁止改写标题，禁止另起一套无关文案。`,
     c.timeRange ? `活动时段：${c.timeRange}。` : '',
     c.note ? `补充说明：${c.note}。` : '',
     form.keywords ? `关键词：${form.keywords}。` : '',
-    `竖构图海报，专业排版，中文清晰可读，无水印乱码，真实质感，适合手机信息流。`,
+    '专业排版，中文清晰可读，无水印乱码，真实质感。不要描述画布比例。',
   ]
     .filter(Boolean)
     .join('')
@@ -281,21 +297,21 @@ function buildLocalImagePrompt(form, copy) {
 
 async function fetchCopySuggestions(form) {
   const fallback = localCopyFallback(form)
-  const industry = INDUSTRIES.find((i) => i.id === form.industry) || INDUSTRIES[0]
   const pb = PLAYBOOKS.find((p) => p.id === form.playbook) || PLAYBOOKS[0]
   const channels = (form.channels || [])
     .map((id) => (CHANNELS.find((c) => c.id === id) || {}).label || id)
     .join('、')
   const jsonExample = '[{"headline":"","subheadline":"","offer":"","timeRange":"","note":""}]'
   const userPrompt = [
-    `你是中国大陆本地生活商家营销文案专家。请为「${industry.label}」门店生成 3 套海报文案。`,
+    '你是中国大陆本地生活商家营销文案专家。文案必须只写下面这一条三级类目，禁止写成别的行业。',
+    ...categoryLockLines(form),
     `门店名：${form.storeName || '（未填，可用「本店」）'}`,
     `营销玩法：${pb.label}（${pb.desc}）`,
     form.variantLabel && form.variantName
       ? `${form.variantLabel}：${form.variantName}${form.variantPeriod ? `，${form.variantPeriod}` : ''}`
       : '',
     `投放平台：${channels || '抖音'}`,
-    '要求：每套含 headline（主标题≤12字）、subheadline、offer、timeRange、note；只输出 JSON 数组。',
+    '要求：每套含 headline（主标题≤12字）、subheadline、offer、timeRange、note；卖点必须是该类目的真实商品或服务；只输出 JSON 数组。',
     `格式：${jsonExample}`,
   ].join('\n')
 
@@ -324,7 +340,10 @@ async function fetchCopySuggestions(form) {
 async function fetchImagePrompt(form, copy) {
   const fallback = buildLocalImagePrompt(form, copy)
   const ctx = {
-    industry: form.industry,
+    categoryPath: form.categoryPath || '',
+    categoryScene: form.categoryScene || '',
+    storeIndustryPath: form.storeIndustryPath || '',
+    menuHint: form.menuHint || '',
     storeName: form.storeName,
     playbook: form.playbook,
     channels: form.channels,
@@ -332,10 +351,14 @@ async function fetchImagePrompt(form, copy) {
     subheadline: copy.subheadline,
     offer: copy.offer,
     timeRange: copy.timeRange,
+    note: copy.note,
+    keywords: form.keywords || '',
   }
   const userPrompt = [
     '你是中国大陆本地生活营销海报的生图 Prompt 工程师。根据 JSON 输出一段可直接交给文生图模型的中文 Prompt（300～600 字，单段，不要 JSON/markdown）。',
-    '必须体现 headline/offer 为画面中文大字，业态匹配，专业海报排版。',
+    '画面主体必须严格等于 categoryPath / categoryScene，并优先画 menuHint 里的在售商品或服务。',
+    '标题大字只能使用 headline、subheadline、offer，禁止改成别的节日文案。',
+    '禁止写画幅、比例、竖构图、横构图、像素尺寸、留白。画幅由系统锁定，你写了也会被删掉。',
     '业务上下文 JSON：',
     JSON.stringify(ctx),
   ].join('\n')
@@ -343,7 +366,8 @@ async function fetchImagePrompt(form, copy) {
     [
       {
         role: 'system',
-        content: '你只输出一段中文文生图 Prompt 正文，禁止解释与代码块。',
+        content:
+          '你只输出一段中文文生图 Prompt 正文，禁止解释与代码块。禁止出现任何画幅比例。画面必须是用户指定的三级类目。',
       },
       { role: 'user', content: userPrompt },
     ],
@@ -357,14 +381,17 @@ async function fetchImagePrompt(form, copy) {
 
 async function generatePosterImage(form, copy, opts) {
   const o = opts || {}
+  const cats = require('./visualStudioCategoryMp.js')
   const packed = await fetchImagePrompt(form, copy)
   const usePro = o.tier === 'pro'
   const economics = require('./mpPointsEconomicsMp.js')
   const aspect = o.aspectRatio || '3:4'
-  const gen = await postAiAgentImage(packed.prompt, {
+  const spec = cats.aspectSpec(aspect)
+  const prompt = cats.lockPromptToAspect(packed.prompt, aspect)
+  const gen = await postAiAgentImage(prompt, {
     preferredVendor: 'qwen',
-    aspectRatio: aspect,
-    wanxSize: ASPECT_WANX[aspect] || ASPECT_WANX['3:4'],
+    aspectRatio: aspect === 'carousel' ? '' : aspect,
+    wanxSize: spec.wanx,
     exactPrompt: true,
     preferWanxPoster: true,
     // 高级 GPT Image 2 暂不支持参考图
@@ -388,10 +415,11 @@ async function generatePosterImage(form, copy, opts) {
 }
 
 async function fetchKeywords(form, copy) {
-  const industry = INDUSTRIES.find((i) => i.id === form.industry) || INDUSTRIES[0]
   const pb = PLAYBOOKS.find((p) => p.id === form.playbook) || PLAYBOOKS[0]
   const userPrompt = [
-    `为「${industry.label}」门店「${form.storeName || '本店'}」的「${pb.label}」海报生成 8～12 个中文关键词。`,
+    `为「${form.categoryPath || '本地生活'}」门店「${form.storeName || '本店'}」的「${pb.label}」海报生成 8～12 个中文关键词。`,
+    form.categoryScene ? `画面只能围绕：${form.categoryScene}` : '',
+    form.menuHint ? `在售：${form.menuHint}` : '',
     `主标题：${(copy && copy.headline) || ''}；优惠：${(copy && copy.offer) || ''}`,
     '只输出用顿号分隔的关键词，不要解释。',
   ].join('\n')

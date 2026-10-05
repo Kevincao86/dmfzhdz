@@ -1,6 +1,8 @@
 const vs = require('../../utils/visualStudioAiMp.js')
 const variants = require('../../utils/visualStudioVariantsMp.js')
 const points = require('../../utils/erpPointsSpendMp.js')
+const cats = require('../../utils/visualStudioCategoryMp.js')
+const intel = require('../../utils/merchantIntelSnapshotMp.js')
 
 function fillStore(text, storeName) {
   const store = String(storeName || '').trim() || '本店'
@@ -37,8 +39,16 @@ Page({
     ],
     channels: mapChannels(['douyin', 'wechat_moments']),
     selectedChannels: ['douyin', 'wechat_moments'],
-    industries: vs.INDUSTRIES,
+    industries: cats.industries(),
     industry: 'catering',
+    level2: cats.childrenOf('catering', 2),
+    midId: '',
+    level3: [],
+    leafId: '',
+    categoryPath: '',
+    categoryScene: '',
+    storeIndustryPath: '',
+    menuHint: '',
     storeName: '',
     playbooks: vs.PLAYBOOKS,
     playbook: 'grand_opening',
@@ -67,6 +77,39 @@ Page({
     imageProPoints: points.VISUAL_STUDIO_IMAGE_PRO_POINTS,
     imageTier: 'standard',
     imagePoints: points.VISUAL_STUDIO_IMAGE_POINTS,
+    aspectLabel: cats.aspectSpec('3:4').label,
+    aspectPixels: `${cats.aspectSpec('3:4').w}×${cats.aspectSpec('3:4').h}`,
+  },
+  onLoad() {
+    const snap = intel.loadSnapshot()
+    const menuHint = String(snap.menuSummary || '')
+      .split('\n')
+      .map((line) => line.replace(/^- /, '').trim())
+      .filter(Boolean)
+      .slice(0, 6)
+      .join('、')
+    const guessed = cats.guessFromPath(`${snap.industryPath || ''} ${snap.storeName || ''} ${menuHint}`)
+    const patch = {
+      storeIndustryPath: snap.industryPath || '',
+      menuHint,
+      storeName: snap.storeName || '',
+    }
+    if (guessed) Object.assign(patch, this._leafPatch(guessed))
+    this.setData(patch)
+  },
+  _leafPatch(leaf) {
+    if (!leaf) {
+      return { leafId: '', categoryPath: '', categoryScene: '' }
+    }
+    return {
+      industry: leaf.industryId,
+      level2: cats.childrenOf(leaf.industryId, 2),
+      midId: leaf.midId,
+      level3: cats.childrenOf(leaf.midId, 3),
+      leafId: leaf.leafId,
+      categoryPath: leaf.path,
+      categoryScene: leaf.scene,
+    }
   },
   onImageTier(e) {
     const tier = e.currentTarget.dataset.tier === 'pro' ? 'pro' : 'standard'
@@ -80,6 +123,10 @@ Page({
     return {
       channels: this.data.selectedChannels,
       industry: this.data.industry,
+      categoryPath: this.data.categoryPath,
+      categoryScene: this.data.categoryScene,
+      storeIndustryPath: this.data.storeIndustryPath,
+      menuHint: this.data.menuHint,
       storeName: this.data.storeName,
       playbook: this.data.playbook,
       variantLabel: this.data.variantLabel,
@@ -102,6 +149,10 @@ Page({
       wx.showToast({ title: '请至少选一个渠道', icon: 'none' })
       return
     }
+    if (this.data.step === 1 && !this.data.leafId) {
+      wx.showToast({ title: '请选到三级类目', icon: 'none' })
+      return
+    }
     if (this.data.step === 3 && !String(this.data.headline || '').trim()) {
       wx.showToast({ title: '请填写主标题或先生成文案', icon: 'none' })
       return
@@ -120,8 +171,19 @@ Page({
   },
   onIndustry(e) {
     const industry = e.currentTarget.dataset.id
-    const view = variantView(this.data.playbook, industry, this.data.playbookVariantId)
-    this.setData(Object.assign({ industry }, view))
+    const view = variantView(this.data.playbook, industry, '')
+    this.setData(
+      Object.assign({ industry, level2: cats.childrenOf(industry, 2), midId: '', level3: [], leafId: '', categoryPath: '', categoryScene: '' }, view),
+    )
+  },
+  onMid(e) {
+    const midId = e.currentTarget.dataset.id
+    this.setData({ midId, level3: cats.childrenOf(midId, 3), leafId: '', categoryPath: '', categoryScene: '' })
+  },
+  onLeaf(e) {
+    const leaf = cats.resolveLeaf(e.currentTarget.dataset.id)
+    const view = variantView(this.data.playbook, leaf ? leaf.industryId : this.data.industry, '')
+    this.setData(Object.assign({}, this._leafPatch(leaf), view))
   },
   onStoreName(e) {
     this.setData({ storeName: e.detail.value })
@@ -186,7 +248,9 @@ Page({
     }
   },
   onAspect(e) {
-    this.setData({ aspect: e.currentTarget.dataset.val })
+    const aspect = e.currentTarget.dataset.val
+    const spec = cats.aspectSpec(aspect)
+    this.setData({ aspect, aspectLabel: spec.label, aspectPixels: `${spec.w}×${spec.h}` })
   },
   onPickCopy(e) {
     const index = Number(e.currentTarget.dataset.index)
@@ -297,6 +361,11 @@ Page({
   async onGenerate() {
     if (this.data.genBusy) return
     const headline = String(this.data.headline || '').trim()
+    if (!this.data.leafId) {
+      wx.showToast({ title: '请先选到三级类目', icon: 'none' })
+      this.setData({ step: 1 })
+      return
+    }
     if (!headline) {
       wx.showToast({ title: '请先填写主标题', icon: 'none' })
       return
@@ -332,7 +401,10 @@ Page({
           tier,
         })
         if (!r.ok) throw new Error(r.message || '出图失败')
-        urls.push(r.imageUrl)
+        this.setData({ progress: `正在按 ${this.data.aspectLabel} 核对比例…` })
+        // eslint-disable-next-line no-await-in-loop
+        const fitted = await this._fitAspect(r.imageUrl, this.data.aspect)
+        urls.push(fitted)
         if (!(r.pointsCharged > 0)) {
           // eslint-disable-next-line no-await-in-loop
           await points.spendVisualStudioImagePoints({
@@ -360,6 +432,75 @@ Page({
       }
     } finally {
       this.setData({ genBusy: false })
+    }
+  },
+  _imageInfo(src) {
+    return new Promise((resolve, reject) => {
+      wx.getImageInfo({ src, success: resolve, fail: reject })
+    })
+  },
+  _downloadLocal(src) {
+    if (!/^https?:/i.test(src)) return Promise.resolve(src)
+    return new Promise((resolve, reject) => {
+      wx.downloadFile({
+        url: src,
+        success: (res) => {
+          if (res.statusCode === 200 && res.tempFilePath) resolve(res.tempFilePath)
+          else reject(new Error('download_failed'))
+        },
+        fail: reject,
+      })
+    })
+  },
+  _cropCover(localPath, info, spec) {
+    return new Promise((resolve, reject) => {
+      wx.createSelectorQuery()
+        .in(this)
+        .select('#vs-aspect-canvas')
+        .fields({ node: true, size: true })
+        .exec((res) => {
+          const canvas = res && res[0] && res[0].node
+          if (!canvas) {
+            reject(new Error('no_canvas'))
+            return
+          }
+          const ctx = canvas.getContext('2d')
+          canvas.width = spec.w
+          canvas.height = spec.h
+          const img = canvas.createImage()
+          img.onload = () => {
+            const scale = Math.max(spec.w / info.width, spec.h / info.height)
+            const dw = info.width * scale
+            const dh = info.height * scale
+            ctx.clearRect(0, 0, spec.w, spec.h)
+            ctx.drawImage(img, (spec.w - dw) / 2, (spec.h - dh) / 2, dw, dh)
+            wx.canvasToTempFilePath({
+              canvas,
+              destWidth: spec.w,
+              destHeight: spec.h,
+              fileType: 'jpg',
+              quality: 0.92,
+              success: (r) => resolve(r.tempFilePath),
+              fail: reject,
+            })
+          }
+          img.onerror = () => reject(new Error('image_decode'))
+          img.src = localPath
+        })
+    })
+  },
+  async _fitAspect(url, aspect) {
+    const spec = cats.aspectSpec(aspect)
+    try {
+      const info = await this._imageInfo(url)
+      const target = spec.w / spec.h
+      const got = info.width / info.height
+      if (Math.abs(got - target) / target < 0.06) return url
+      const local = await this._downloadLocal(url)
+      const localInfo = local === url ? info : await this._imageInfo(local)
+      return await this._cropCover(local, localInfo, spec)
+    } catch (_) {
+      return url
     }
   },
   onPreview() {

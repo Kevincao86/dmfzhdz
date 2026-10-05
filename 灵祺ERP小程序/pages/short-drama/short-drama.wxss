@@ -143,6 +143,78 @@
   margin-bottom: 8rpx;
 }
 
+.op-steps {
+  display: flex;
+  gap: 8rpx;
+  margin: 0 24rpx 16rpx;
+}
+
+.op-step {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 0;
+  border-radius: 16rpx;
+  background: #fff;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.op-step.on {
+  background: #1e3a5f;
+  color: #fff;
+  font-weight: 700;
+}
+
+.op-pair {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.op-pair .op-btn,
+.op-pair .op-btn-ghost {
+  flex: 1;
+}
+
+.op-row {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  margin-top: 12rpx;
+}
+
+.op-row .op-btn,
+.op-row .op-btn-ghost {
+  margin-top: 0;
+  width: auto;
+  flex: 1;
+}
+
+.grow {
+  flex: 1;
+}
+
+.op-box {
+  margin-top: 16rpx;
+  padding: 16rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+}
+
+.op-pack {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
+.op-cast-card {
+  margin-top: 16rpx;
+  padding: 16rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #e2e8f0;
+}
+
 .op-cast {
   margin-top: 12rpx;
 }
