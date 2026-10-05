@@ -321,6 +321,20 @@ const DURATION_OPTIONS: DurationOpt[] = [
   { sec: 900, label: '15 分钟', hint: '先试镜 · 智能全片' },
 ]
 
+/** 故事篇幅必须按成片时长写满，短的写密，长的按时间轴分幕。 */
+function dramaStoryLengthGuide(sec: number): string {
+  const n = Math.round(Number(sec) || 0)
+  if (n <= 8) return '只写 8 秒能演完的剧情：1 个钩子、1 个动作、1 句收尾。全文 40～70 字，不要分场，不要铺垫。'
+  if (n <= 12) return '写成 12 秒剧情：前 3 秒钩子 → 一个冲突动作 → 一句转化。全文 70～110 字，并标出大约秒数。'
+  if (n <= 15) return '写成 15 秒剧情：0-3 秒钩子、3-10 秒冲突、10-15 秒到店或下单。全文 90～140 字，按这三段标注秒数。'
+  if (n <= 30) return '写成能拍满 30 秒的 4 拍，每拍标注秒数（0-5、5-12、12-22、22-30）。全文 160～240 字。禁止缩成 8 秒短句。'
+  if (n <= 60) return '写成能拍满 1 分钟的 4～6 个镜头，每镜标注起止秒。冲突必须在 15 秒内出现，最后 10 秒做转化。全文 280～420 字。'
+  if (n <= 180) return '写成能拍满 3 分钟的三段：0:00-1:00、1:00-2:00、2:00-3:00。每段写清人物动作和转折。全文 500～700 字。禁止写成一句广告语。'
+  if (n <= 300) return '写成能拍满 5 分钟的 5 幕，约 1 分钟一幕，每幕标注时间并写清谁在做什么。全文 700～1000 字。'
+  if (n <= 600) return '写成能拍满 10 分钟的 5 幕，约 2 分钟一幕，每幕有时间轴和冲突推进。全文 900～1300 字。'
+  return '写成能拍满 15 分钟的 5 幕，约 3 分钟一幕，每幕写时间轴、人物动作和对白要点。全文 1200～1800 字。禁止写成短视频文案。'
+}
+
 const WORLDS: {
   id: WorldId
   label: string
@@ -2649,6 +2663,7 @@ export default function ShortDramaPage() {
       formula.hint ? `钩子提示：${formula.hint}` : '',
       `四拍结构（按主角动作写，不要写成客人四拍）：${formula.beats.join(' → ')}`,
       `成片时长：${durOpt.label}（${durOpt.hint}，共 ${durOpt.sec} 秒）`,
+      `【篇幅锁定】${dramaStoryLengthGuide(durOpt.sec)}`,
       `画风：${style.name}`,
       '商家提示（店名/项目/价格/位置必须写进故事，不要空套）：',
       shopLines,
@@ -2660,7 +2675,7 @@ export default function ShortDramaPage() {
       story.trim()
         ? `已有故事草稿（若把客人写成主语，必须改写成「${castBrief.leadName}」视角，禁止照抄客人躺平）：${story.trim()}`
         : '',
-      `根据以上文案写 1–3 句一句话故事：口语、有冲突、有记忆点；主语必须是「${castBrief.leadName}」。${
+      `根据以上文案，按「篇幅锁定」写出刚好能拍满 ${durOpt.sec} 秒的剧情：口语、有冲突、有记忆点；主语必须是「${castBrief.leadName}」。短时长不要注水，长时长必须按时间轴写满，禁止不论时长都写成一两句。${
         cast.filter((m) => m.preview || m.name.trim()).length >= 2
           ? `必须写到每位已确认角色（${cast
               .filter((m) => m.preview || m.name.trim())
@@ -2674,7 +2689,7 @@ export default function ShortDramaPage() {
       .filter(Boolean)
       .join('\n')
     const system =
-      '你是竖屏商家短剧编剧。先读懂钩子、四拍、对白、冲突和商家字段，再按主次角色写一句话故事：画面主角是动作主语和镜头中心，客人/顾客只作配角。短时长更密、冲突更早；长时长可铺垫但前 2 秒仍要有钩子。禁止写成客人躺平加时的视角。不要写技术参数，不要出现字幕/Logo/演职员表。'
+      '你是竖屏商家短剧编剧。先读懂钩子、四拍、对白、冲突和商家字段，再按主次角色写剧情：画面主角是动作主语和镜头中心，客人/顾客只作配角。故事篇幅必须严格等于用户选的成片时长：8～15 秒写短钩子，30 秒及以上按标注秒数把剧情写满，禁止一律写成一两句。前 3 秒仍要有钩子。禁止写成客人躺平加时的视角。不要写技术参数，不要出现字幕/Logo/演职员表。'
     try {
       let lastErr = '生成故事失败，请稍后重试'
       const storyProviders = ['doubao', 'qwen', 'deepseek'] as const
@@ -2701,7 +2716,7 @@ export default function ShortDramaPage() {
           if (!conflict.trim() && parsed.conflict) setConflict(parsed.conflict)
           if (!dialogue.trim() && parsed.dialogue) setDialogue(parsed.dialogue)
           setHint(
-            `已按主角「${castBrief.leadName}」和钩子文案写好一句话故事（配角不抢镜头），可再微调后生成短剧。`,
+            `已按「${durOpt.label}」写好剧情（主角「${castBrief.leadName}」，篇幅对应该时长），可再微调后生成短剧。`,
           )
           setErr(null)
           return
@@ -4496,6 +4511,31 @@ export default function ShortDramaPage() {
                 ) : null}
               </div>
 
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-800">成片时长</span>
+                <select
+                  className={fieldCls}
+                  disabled={busy || storyBusy}
+                  value={durationSelected ? String(durationSec) : ''}
+                  onChange={(e) => {
+                    clearTrial()
+                    setDurationSec(Number(e.target.value) || 0)
+                  }}
+                >
+                  <option value="">请选择成片时长</option>
+                  {DURATION_OPTIONS.map((o) => (
+                    <option key={o.sec} value={o.sec}>
+                      {o.label}（{o.hint}）
+                    </option>
+                  ))}
+                </select>
+                <span className="block text-[11px] leading-relaxed text-slate-500">
+                  先选时长，下面的故事会按这个时长来写：8～15 秒写一个钩子，30 秒起按时间轴把剧情写满。
+                  单段（≤15 秒）直接出有声成片。超过 15 秒先 5 秒试镜，确认后再生成全片。
+                  {cfgLoaded ? dramaXiaoyunqueHint(cfg, cfgLoaded) : ''}
+                </span>
+              </label>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 {world.fields.map((f) => (
                   <label key={f.key} className="space-y-1.5">
@@ -4590,7 +4630,7 @@ export default function ShortDramaPage() {
                   </button>
                 </span>
                 <p className="text-[11px] leading-relaxed text-slate-500">
-                  根据上方钩子、店名/项目等提示生成，可再微调。
+                  按上方所选时长生成：短时长写一个钩子，长时长按秒数把剧情写满。可再微调。
                 </p>
                 <textarea
                   className={cn(fieldCls, 'min-h-[84px] resize-y')}
@@ -5173,30 +5213,6 @@ export default function ShortDramaPage() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <label className="min-w-[140px] flex-1 space-y-1.5">
-                  <span className="text-sm font-medium text-slate-800">成片时长</span>
-                  <select
-                    className={fieldCls}
-                    disabled={busy || storyBusy}
-                    value={durationSelected ? String(durationSec) : ''}
-                    onChange={(e) => {
-                      clearTrial()
-                      setDurationSec(Number(e.target.value) || 0)
-                    }}
-                  >
-                    <option value="">请选择成片时长</option>
-                    {DURATION_OPTIONS.map((o) => (
-                      <option key={o.sec} value={o.sec}>
-                        {o.label}（{o.hint}）
-                      </option>
-                    ))}
-                  </select>
-                  <span className="block text-[11px] text-slate-500">
-                    单段（≤15 秒）直接出有声成片。超过 15 秒：先 5 秒试镜，确认后再生成全片（多镜编排，最长约 15
-                    分钟）；失败时再分段衔接。任务提交后在云端生成，断网刷新后会自动拉回。
-                    {cfgLoaded ? dramaXiaoyunqueHint(cfg, cfgLoaded) : ''}
-                  </span>
-                </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-medium text-slate-800">画风</span>
                   <select

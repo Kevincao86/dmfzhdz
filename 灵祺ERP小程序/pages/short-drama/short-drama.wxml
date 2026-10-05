@@ -47,12 +47,18 @@
   </view>
 
   <view class="op-card" wx:elif="{{dramaStep === 2}}">
+    <text class="op-label">成片时长</text>
+    <picker mode="selector" range="{{durationOptions}}" range-key="label" value="{{durationIdx}}" bindchange="onDuration">
+      <view class="op-picker">{{durationOptions[durationIdx].label}}</view>
+    </picker>
+    <text class="op-meta">{{durationHint}}</text>
     <block wx:for="{{fields}}" wx:key="key">
       <text class="op-label">{{item.label}}</text>
       <input class="op-input" data-key="{{item.key}}" placeholder="{{item.placeholder}}" value="{{item.value}}" bindinput="onField" />
     </block>
     <text class="op-label">一句话故事</text>
-    <textarea class="op-area" maxlength="400" placeholder="可改写故事走向，或点 AI生成故事" value="{{story}}" bindinput="onStory" />
+    <text class="op-body muted">先选时长。8～15 秒写一个钩子，30 秒起按时间轴把剧情写满。</text>
+    <textarea class="op-area" maxlength="2000" placeholder="先选时长，再点 AI生成故事" value="{{story}}" bindinput="onStory" />
     <button class="op-btn-ghost" loading="{{storyBusy}}" bindtap="onAiStory">{{storyBusy ? '正在写故事' : 'AI生成故事'}}</button>
     <view class="op-pair">
       <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
@@ -142,11 +148,7 @@
     <view class="op-chips">
       <text wx:for="{{styles}}" wx:key="id" class="op-chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onStyle">{{item.name}}</text>
     </view>
-    <text class="op-label">成片时长</text>
-    <picker mode="selector" range="{{durationOptions}}" range-key="label" value="{{durationIdx}}" bindchange="onDuration">
-      <view class="op-picker">{{durationOptions[durationIdx].label}}</view>
-    </picker>
-    <text class="op-meta">{{durationHint}}</text>
+    <text class="op-meta" wx:if="{{durationSec}}">成片时长：{{durationOptions[durationIdx].label}}</text>
     <button class="op-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">
       {{busy ? (progress || '生成中') : '生成短剧'}}
     </button>

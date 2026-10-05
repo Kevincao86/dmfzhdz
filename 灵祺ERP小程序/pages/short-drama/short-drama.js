@@ -85,7 +85,7 @@ Page({
     ),
     durationIdx: 0,
     durationSec: 0,
-    durationHint: '单段（≤15 秒）直接出有声成片。超过 15 秒按 15 秒分段衔接（最长约 15 分钟）。',
+    durationHint: '先选时长。故事会按这个时长来写：8～15 秒一个钩子，30 秒起按时间轴写满。',
     rateLabel: economics.formatMpPointsRateLabel('shortvideo'),
     busy: false,
     progress: '',
@@ -491,6 +491,12 @@ Page({
 
   async onAiStory() {
     if (this.data.storyBusy) return
+    const dur = Number(this.data.durationSec) || 0
+    const durOpt = (this.data.durationOptions || []).find((o) => Number(o.sec) === dur)
+    if (!dur || !durOpt) {
+      wx.showToast({ title: '请先选择成片时长', icon: 'none' })
+      return
+    }
     const world = catalog.worldOf(this.data.worldId)
     const scene = catalog.sceneOf(this.data.sceneId, {
       name: this.data.customSceneName,
@@ -498,27 +504,31 @@ Page({
       mustSee: this.data.customSceneMustSee,
     })
     const shop = this.data.shop || emptyShop()
+    const guide = catalog.storyLengthGuide(dur)
     this.setData({ storyBusy: true, err: '' })
     try {
       const r = await vs.postAiChat(
         [
           {
             role: 'system',
-            content: '你是短剧编剧。只输出故事补充正文（120～280字），不要标题。',
+            content:
+              '你是竖屏商家短剧编剧。只输出剧情正文，不要标题。篇幅必须严格等于用户选的成片时长：8～15 秒写短钩子，30 秒及以上按标注秒数把剧情写满，禁止不论时长都写成一两句。前 3 秒要有钩子。',
           },
           {
             role: 'user',
             content: [
               `品类：${world.label}。场景：${scene.name}。钩子：${scene.hook}`,
               `店名/主题：${shop.storeName}，卖点：${shop.offerName}，价格：${shop.price}，位置：${shop.area}`,
-              '写一段可拍的竖屏短剧故事：前三秒钩子、冲突、结尾转化。',
+              `成片时长：${durOpt.label}，共 ${dur} 秒。`,
+              `【篇幅锁定】${guide}`,
+              '按这个时长写能拍满的竖屏短剧剧情。短的不要注水，长的必须按时间轴写满。',
             ].join('\n'),
           },
         ],
         { provider: 'qwen', taskType: 'generate_copywriting', temperature: 0.55 },
       )
       if (!r.ok) throw new Error(r.message)
-      this.setData({ story: String(r.content || '').trim() })
+      this.setData({ story: String(r.content || '').trim(), hint: `已按${durOpt.label}写好剧情，可再改。` })
     } catch (e) {
       this.setData({ err: (e && e.message) || '故事生成失败' })
     } finally {
@@ -553,8 +563,15 @@ Page({
 
   onDuration(e) {
     const idx = Number(e.detail.value) || 0
-    const opt = this.data.durationOptions[idx] || { sec: 0 }
-    this.setData({ durationIdx: idx, durationSec: Number(opt.sec) || 0 })
+    const opt = this.data.durationOptions[idx] || { sec: 0, hint: '' }
+    const sec = Number(opt.sec) || 0
+    this.setData({
+      durationIdx: idx,
+      durationSec: sec,
+      durationHint: sec
+        ? `${opt.hint || ''}。故事会按 ${opt.label} 来写。`
+        : '先选时长。故事会按这个时长来写：8～15 秒一个钩子，30 秒起按时间轴写满。',
+    })
   },
 
   cancelWait() {

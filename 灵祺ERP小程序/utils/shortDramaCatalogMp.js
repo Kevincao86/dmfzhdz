@@ -256,6 +256,20 @@ function pickerLabel(opt) {
   return `${opt.label}（${opt.hint}）`
 }
 
+/** 与网页 dramaStoryLengthGuide 一致：故事篇幅按成片时长写满。 */
+function storyLengthGuide(sec) {
+  const n = Math.round(Number(sec) || 0)
+  if (n <= 8) return '只写 8 秒能演完的剧情：1 个钩子、1 个动作、1 句收尾。全文 40～70 字，不要分场，不要铺垫。'
+  if (n <= 12) return '写成 12 秒剧情：前 3 秒钩子 → 一个冲突动作 → 一句转化。全文 70～110 字，并标出大约秒数。'
+  if (n <= 15) return '写成 15 秒剧情：0-3 秒钩子、3-10 秒冲突、10-15 秒到店或下单。全文 90～140 字，按这三段标注秒数。'
+  if (n <= 30) return '写成能拍满 30 秒的 4 拍，每拍标注秒数（0-5、5-12、12-22、22-30）。全文 160～240 字。禁止缩成 8 秒短句。'
+  if (n <= 60) return '写成能拍满 1 分钟的 4～6 个镜头，每镜标注起止秒。冲突必须在 15 秒内出现，最后 10 秒做转化。全文 280～420 字。'
+  if (n <= 180) return '写成能拍满 3 分钟的三段：0:00-1:00、1:00-2:00、2:00-3:00。每段写清人物动作和转折。全文 500～700 字。禁止写成一句广告语。'
+  if (n <= 300) return '写成能拍满 5 分钟的 5 幕，约 1 分钟一幕，每幕标注时间并写清谁在做什么。全文 700～1000 字。'
+  if (n <= 600) return '写成能拍满 10 分钟的 5 幕，约 2 分钟一幕，每幕有时间轴和冲突推进。全文 900～1300 字。'
+  return '写成能拍满 15 分钟的 5 幕，约 3 分钟一幕，每幕写时间轴、人物动作和对白要点。全文 1200～1800 字。禁止写成短视频文案。'
+}
+
 function planLongformSegmentDurations(targetTotalSec) {
   const target = Math.max(5, Math.round(Number(targetTotalSec) || 5))
   const unit = SEGMENT_UNIT_SEC
@@ -417,6 +431,7 @@ module.exports = {
   SEGMENT_UNIT_SEC,
   MAX_DRAMA_TOTAL_SEC,
   pickerLabel,
+  storyLengthGuide,
   planLongformSegmentDurations,
   snapSeedanceClipSec,
   worldOf,
