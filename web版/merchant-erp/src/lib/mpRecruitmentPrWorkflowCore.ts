@@ -124,11 +124,20 @@ export function isVideoReviewDone(mp: RegistryMpRecruitmentOrder | null | undefi
   })
 }
 
+function isOpenLoopOrder(mp: RegistryMpRecruitmentOrder | null | undefined): boolean {
+  if (!mp) return false
+  if (String(mp.fulfillmentLoop || '').trim() === 'open') return true
+  const meta = mp.mpPublishMeta
+  if (!meta || typeof meta !== 'object') return false
+  return String(meta.fulfillmentLoop || '').trim() === 'open'
+}
+
 export function resolvePrWorkflowStage(mp: RegistryMpRecruitmentOrder | null | undefined): PrWorkflowStage {
   if (!mp) return 'recruiting'
   const meta = readPrWorkflowMeta(mp)
   const explicit = meta.stage
   if (explicit === 'completed' || mp.status === 'done') return 'completed'
+  if (isOpenLoopOrder(mp) && hasNotifiedSelected(mp) && !isIceMpOrder(mp)) return 'completed'
   if (isVideoReviewDone(mp)) return 'completed'
   if (isScheduleSkipped(mp)) return 'pending_video_review'
   if (isVisitScheduleDone(mp)) return 'pending_video_review'
@@ -162,6 +171,9 @@ export function mergePrWorkflowIntoOrder(
 }
 
 export function buildNotifyWorkflowPatch(mp: RegistryMpRecruitmentOrder): Partial<PrWorkflowMeta> {
+  if (isOpenLoopOrder(mp) && !isIceMpOrder(mp)) {
+    return { stage: 'completed', completedAt: nowStr() }
+  }
   if (isIceMpOrder(mp)) return { stage: 'pending_video_review' }
   return buildConfirmScheduleQueuePatch()
 }

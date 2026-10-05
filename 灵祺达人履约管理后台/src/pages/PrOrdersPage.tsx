@@ -48,16 +48,24 @@ import {
 import { shouldHidePrPublishedRow } from '../lib/mpRecruitment/inactiveMpRecruitmentOrder'
 import { isVisitPlanDatesConfirmed } from '../lib/mpSync/visitScheduleRuntime'
 import { buildInviteProgressLabel, isTargetedOrder } from '../lib/mpSync/mpTargetedRecruit'
+import { isXingxuanOpenLoop } from '../lib/mpSync/xingxuanRecruitLoop'
 import { finalizeIfNeeded } from '../lib/mpSync/mpTargetedRecruitApi'
 
 type Tab = PrOrdersTabId
 type SortKey = 'latest' | 'earliest' | 'applicants'
 type ViewMode = 'list' | 'grid'
 type PublishedScope = 'open' | 'targeted'
+type CompletedLoop = 'all' | 'open' | 'closed'
 
 const PUBLISHED_SCOPE_OPTIONS: { id: PublishedScope; label: string }[] = [
   { id: 'open', label: '普通招募' },
   { id: 'targeted', label: '定向邀约' },
+]
+
+const COMPLETED_LOOP_OPTIONS: { id: CompletedLoop; label: string }[] = [
+  { id: 'all', label: '全部' },
+  { id: 'open', label: '开环单' },
+  { id: 'closed', label: '闭环单' },
 ]
 
 const PR_ORDER_STATUS_FILTERS = [
@@ -200,6 +208,7 @@ export default function PrOrdersPage() {
   const [filterKeyword, setFilterKeyword] = useState('')
   const [filterPublishedDate, setFilterPublishedDate] = useState('')
   const [publishedScope, setPublishedScope] = useState<PublishedScope>('open')
+  const [completedLoop, setCompletedLoop] = useState<CompletedLoop>('all')
   const [sortKey, setSortKey] = useState<SortKey>('latest')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [listPage, setListPage] = useState(1)
@@ -366,6 +375,16 @@ export default function PrOrdersPage() {
     return { publishedOpenCount: openCount, publishedTargetedCount: targetedCount }
   }, [recruitingRows])
 
+  const { completedOpenCount, completedClosedCount } = useMemo(() => {
+    let openCount = 0
+    let closedCount = 0
+    for (const row of completedRows) {
+      if (isXingxuanOpenLoop(row.mp)) openCount += 1
+      else closedCount += 1
+    }
+    return { completedOpenCount: openCount, completedClosedCount: closedCount }
+  }, [completedRows])
+
   const tabSourceRows = useMemo(() => {
     if (tab === 'deleted') return deletedRows
     if (tab === 'stopped') return stoppedRows
@@ -395,6 +414,10 @@ export default function PrOrdersPage() {
         if (!matchHallStatusFilter(String(row.statusLabel || ''), filterStatus)) return false
         if (!matchPublishedDate(row.mp, row.publishedAt, filterPublishedDate)) return false
       }
+      if (tab === 'completed' && completedLoop !== 'all') {
+        const open = isXingxuanOpenLoop(row.mp)
+        if (completedLoop === 'open' ? !open : open) return false
+      }
       if (!matchListKeyword(row as Record<string, unknown>, filterKeyword)) return false
       return true
     })
@@ -406,7 +429,7 @@ export default function PrOrdersPage() {
       return sortKey === 'earliest' ? ta - tb : tb - ta
     })
     return sorted
-  }, [tabSourceRows, tab, publishedScope, filterCategory, filterStatus, filterKeyword, filterPublishedDate, sortKey])
+  }, [tabSourceRows, tab, publishedScope, completedLoop, filterCategory, filterStatus, filterKeyword, filterPublishedDate, sortKey])
 
   const filteredDrafts = useMemo(() => {
     const kw = filterKeyword.trim()
@@ -425,7 +448,7 @@ export default function PrOrdersPage() {
 
   useEffect(() => {
     setListPage(1)
-  }, [tab, platformGroup, publishedScope, filterKeyword, filterCategory, filterStatus, filterPublishedDate, sortKey])
+  }, [tab, platformGroup, publishedScope, completedLoop, filterKeyword, filterCategory, filterStatus, filterPublishedDate, sortKey])
 
   const listCount = tab === 'drafts' ? filteredDrafts.length : filteredRows.length
   const totalPages = Math.max(1, Math.ceil(listCount / pageSize))
@@ -610,6 +633,24 @@ export default function PrOrdersPage() {
           </div>
         ) : null}
 
+        {tab === 'completed' && completedRows.length > 0 ? (
+          <div className="pr-orders-platform-group pr-orders-platform-group--page">
+            {COMPLETED_LOOP_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`pr-orders-platform-chip ${completedLoop === opt.id ? 'pr-orders-platform-chip--on' : ''}`}
+                onClick={() => setCompletedLoop(opt.id)}
+              >
+                {opt.label}
+                {opt.id === 'all' && completedRows.length > 0 ? ` (${completedRows.length})` : null}
+                {opt.id === 'open' && completedOpenCount > 0 ? ` (${completedOpenCount})` : null}
+                {opt.id === 'closed' && completedClosedCount > 0 ? ` (${completedClosedCount})` : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         <div className="pr-orders-toolbar">
           <div className="pr-orders-toolbar__search">
             <span className="pr-orders-toolbar__search-icon" aria-hidden>⌕</span>
@@ -743,13 +784,22 @@ export default function PrOrdersPage() {
                 <EmptyState title="暂无待审片发单" desc="完成探店排期或点击「不排期」后，订单会移入此处。" />
               ) : null}
               {!loading && tab === 'completed' && !completedRows.length ? (
-                <EmptyState title="暂无已完成发单" desc="视频审核通过或跳过审核后，订单会出现在此处。" />
+                <EmptyState title="暂无已完成发单" desc="视频审核通过、跳过审核，或开环单通知达人后，订单会出现在此处。" />
               ) : null}
               {!loading && tab === 'stopped' && !stoppedRows.length ? (
                 <EmptyState title="暂无已停止发单" desc="在已发布发单中点击「停止招募」后会移入此处。" />
               ) : null}
               {!loading && tabSourceRows.length && !filteredRows.length ? (
-                <EmptyState title="暂无匹配发单" desc="可调整筛选条件或点击重置。" />
+                <EmptyState
+                  title={
+                    tab === 'completed' && completedLoop === 'open' && !filterKeyword.trim()
+                      ? '暂无开环单'
+                      : tab === 'completed' && completedLoop === 'closed' && !filterKeyword.trim()
+                        ? '暂无闭环单'
+                        : '暂无匹配发单'
+                  }
+                  desc="可调整筛选条件或点击重置。"
+                />
               ) : null}
               <div className={`pr-orders-list${viewMode === 'grid' ? ' pr-orders-list--grid' : ''}`}>
                 {pagedRows.map((row) => {

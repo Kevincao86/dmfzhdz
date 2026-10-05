@@ -94,6 +94,7 @@ list_scopes() {
   login_alt_methods      商家 ERP + 星选 Web 登录页：下方图标登录方式（不含小程序）
   xingxuan_hall_ux       星选网页+微信小程序：大厅按身份、身份切换、推荐大厅说明、培训报名
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
+  xingxuan_open_loop_done 开环：选达人并通知后商单转入已完成；已完成列表筛开环/闭环
   merchant_local_ads     商家 ERP：巨量本地推绑定/投流；与千川账户/取数隔离（不含聚光）
   ads_studio_review      本地推投流读云端绑定；商家小程序 AI 短片/工坊/短剧对齐星选；视频与文稿审核半月拉规则
   mp_ads_today           商家小程序投流「今日数据」按上海时区当天账户报表，不再用近7日汇总
@@ -1556,6 +1557,17 @@ xingxuanRecruitLoop
 灵祺达人履约管理后台/src/lib/mpSync/mpOrderPublishRestore.ts
 灵祺达人履约管理后台/src/pages/RecruitmentDetailPage.tsx
 mpGroupQrHallSlice
+change-scope-guard
+PAT
+      ;;
+    xingxuan_open_loop_done)
+      cat <<'PAT'
+prOrderWorkflowStage
+mpRecruitmentPrWorkflowCore
+PrOrdersPage.tsx
+PrOrderApplicantsPage.tsx
+mine-pr-orders
+mine-pr-order-applicants
 change-scope-guard
 PAT
       ;;

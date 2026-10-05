@@ -28,6 +28,14 @@ function isIceMp(mp: Record<string, unknown> | null | undefined): boolean {
   return mp.hall === 'ice' || mp.orderKind === 'ice'
 }
 
+function isOpenLoopOrder(mp: Record<string, unknown> | null | undefined): boolean {
+  if (!mp) return false
+  if (String(mp.fulfillmentLoop || '').trim() === 'open') return true
+  const meta = mp.mpPublishMeta
+  if (!meta || typeof meta !== 'object') return false
+  return String((meta as Record<string, unknown>).fulfillmentLoop || '').trim() === 'open'
+}
+
 function readMeta(mp: Record<string, unknown> | null | undefined): PrWorkflowMeta {
   const meta = mp?.mpPublishMeta
   if (!meta || typeof meta !== 'object') return {}
@@ -169,6 +177,7 @@ export function resolvePrWorkflowStage(mp: Record<string, unknown> | null | unde
   const meta = readMeta(mp)
   const explicit = meta.stage
   if (explicit === 'completed' || String(mp.status || '') === 'done') return 'completed'
+  if (isOpenLoopOrder(mp) && hasNotifiedSelected(mp) && !isIceMp(mp)) return 'completed'
   if (isDeliveryReviewDone(mp)) return 'completed'
   if (isScheduleSkipped(mp)) return normalizeReviewStage(mp, 'pending_video_review')
   if (isVisitScheduleDone(mp)) return normalizeReviewStage(mp, 'pending_video_review')
@@ -197,6 +206,10 @@ export function buildConfirmScheduleQueuePatch(): Partial<PrWorkflowMeta> {
 }
 
 export function buildNotifyWorkflowPatch(mp: Record<string, unknown> | null | undefined): Partial<PrWorkflowMeta> {
+  if (isOpenLoopOrder(mp) && !isIceMp(mp)) {
+    const now = new Date().toLocaleString('zh-CN', { hour12: false })
+    return { stage: 'completed', completedAt: now }
+  }
   if (isIceMp(mp)) return { stage: 'pending_video_review' }
   return buildConfirmScheduleQueuePatch()
 }

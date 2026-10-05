@@ -82,6 +82,22 @@
       />
     </view>
 
+    <block wx:if="{{tab === 'completed' && completedCount > 0}}">
+      <scroll-view class="pr-target-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+        <view class="pr-target-row">
+          <view
+            wx:for="{{completedLoopOptions}}"
+            wx:key="id"
+            class="pr-target-chip {{completedLoop === item.id ? 'pr-target-chip--on' : ''}}"
+            data-loop="{{item.id}}"
+            bindtap="onCompletedLoopTap"
+          >
+            {{item.label}}<text wx:if="{{item.id === 'all' && completedCount > 0}}" class="pr-tab-count">({{completedCount}})</text><text wx:if="{{item.id === 'open' && completedOpenCount > 0}}" class="pr-tab-count">({{completedOpenCount}})</text><text wx:if="{{item.id === 'closed' && completedClosedCount > 0}}" class="pr-tab-count">({{completedClosedCount}})</text>
+          </view>
+        </view>
+      </scroll-view>
+    </block>
+
     <block wx:if="{{tab === 'published' && publishedCount > 0}}">
       <scroll-view class="pr-target-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
         <view class="pr-target-row">
@@ -255,6 +271,10 @@
   </view>
   <view wx:if="{{!loading && tab === 'completed' && completedCount === 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">暂无已完成发单</text>
+    <text class="hint pr-empty-sub">视频审核通过，或开环单通知达人后会出现在此处</text>
+  </view>
+  <view wx:if="{{!loading && tab === 'completed' && completedCount > 0 && filteredRows.length === 0}}" class="card state-empty">
+    <text class="hint">{{completedLoop === 'open' ? '暂无开环单' : completedLoop === 'closed' ? '暂无闭环单' : '当前筛选下暂无发单'}}</text>
   </view>
   <view wx:if="{{!loading && tab === 'published' && publishedCount === 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">暂无已发布招募单</text>

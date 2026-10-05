@@ -993,7 +993,11 @@ Page({
       wx.showModal({
         title: '已写入站内信',
         content:
-          '订单已进入待排期。达人请在「我的 → 消息通知」中查看（非底部「消息」私信页）。' + linkeSyncMsg,
+          (this._isOpenLoop
+            ? '订单已进入已完成。'
+            : '订单已进入待排期。') +
+          '达人请在「我的 → 消息通知」中查看（非底部「消息」私信页）。' +
+          linkeSyncMsg,
         showCancel: false,
       })
       if (skipped.length) {

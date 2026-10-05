@@ -57,6 +57,7 @@ import { formatCooperationStatsLabel } from '../lib/mpSync/talentPrQuotes'
 import { xingxuanEnhanceApi } from '../lib/mpSync/xingxuanEnhanceApi'
 import ApplicantVisitDeliverablePanel from '../components/mp/ApplicantVisitDeliverablePanel'
 import { resolvePrWorkflowStage } from '../lib/mpRecruitment/prOrderWorkflowStage'
+import { isXingxuanOpenLoop } from '../lib/mpSync/xingxuanRecruitLoop'
 import { canChat, ensureSessionWithTalent, formatChatError, syncProfile } from '../lib/mpSync/talentChat'
 import {
   autoSyncPrLinkeCpsOnNotify,
@@ -771,10 +772,11 @@ export default function PrOrderApplicantsPage() {
           setMpOrder({ ...mpOrder, notifiedApplicantIds: merged })
         }
       }
+      const notifiedStage = isXingxuanOpenLoop(mpOrder) ? '已完成' : '待排期'
       alert(
         (skipped.length
-          ? `已通知 ${entries.length} 人，订单已进入待排期。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`
-          : '通知已发送，订单已进入待排期。达人可在小程序与履约后台「消息 → 系统消息」查看。') + linkeSyncMsg,
+          ? `已通知 ${entries.length} 人，订单已进入${notifiedStage}。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`
+          : `通知已发送，订单已进入${notifiedStage}。达人可在小程序与履约后台「消息 → 系统消息」查看。`) + linkeSyncMsg,
       )
       await loadOrder()
     } catch (e) {

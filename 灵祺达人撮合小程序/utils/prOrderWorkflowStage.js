@@ -6,6 +6,13 @@ function isIceMp(mp) {
   return !!(mp && (mp.hall === 'ice' || mp.orderKind === 'ice'))
 }
 
+function isOpenLoopOrder(mp) {
+  if (!mp) return false
+  if (String(mp.fulfillmentLoop || '').trim() === 'open') return true
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
+  return !!(meta && String(meta.fulfillmentLoop || '').trim() === 'open')
+}
+
 function readMeta(mp) {
   const meta = mp && mp.mpPublishMeta
   if (!meta || typeof meta !== 'object') return {}
@@ -138,6 +145,7 @@ function resolvePrWorkflowStage(mp) {
   const meta = readMeta(mp)
   const explicit = meta.stage
   if (explicit === 'completed' || String(mp.status || '') === 'done') return 'completed'
+  if (isOpenLoopOrder(mp) && hasNotifiedSelected(mp) && !isIceMp(mp)) return 'completed'
   if (isDeliveryReviewDone(mp)) return 'completed'
   if (isScheduleSkipped(mp)) return normalizeReviewStage(mp, 'pending_video_review')
   if (isVisitScheduleDone(mp)) return normalizeReviewStage(mp, 'pending_video_review')
@@ -195,6 +203,9 @@ function buildPrWorkflowOrderPatch(mp, patch, status) {
 }
 
 function buildNotifyWorkflowPatch(mp) {
+  if (isOpenLoopOrder(mp) && !isIceMp(mp)) {
+    return { stage: 'completed', completedAt: nowStr() }
+  }
   if (isIceMp(mp)) return { stage: 'pending_video_review' }
   return buildConfirmScheduleQueuePatch()
 }

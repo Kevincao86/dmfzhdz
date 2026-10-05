@@ -25,6 +25,7 @@ const prWorkflow = require('../../../utils/prOrderWorkflowStage.js')
 const deliveryReview = require('../../../utils/deliveryReviewPlatform.js')
 const appDisplay = require('../../../utils/applicationDisplay.js')
 const mpTargetedRecruit = require('../../../utils/mpTargetedRecruit.js')
+const xingxuanRecruitLoop = require('../../../utils/xingxuanRecruitLoop.js')
 const mpTargetedRecruitApi = require('../../../utils/mpTargetedRecruitApi.js')
 const mpAccountClientSync = require('../../../utils/mpAccountClientSync.js')
 
@@ -139,12 +140,20 @@ Page({
       { id: 'open', label: '普通招募' },
       { id: 'targeted', label: '定向邀约' },
     ],
+    completedLoop: 'all',
+    completedLoopOptions: [
+      { id: 'all', label: '全部' },
+      { id: 'open', label: '开环单' },
+      { id: 'closed', label: '闭环单' },
+    ],
     publishedCount: 0,
     publishedOpenCount: 0,
     publishedTargetedCount: 0,
     pendingScheduleCount: 0,
     pendingVideoReviewCount: 0,
     completedCount: 0,
+    completedOpenCount: 0,
+    completedClosedCount: 0,
     stoppedCount: 0,
     deletedCount: 0,
     draftsCount: 0,
@@ -275,6 +284,15 @@ Page({
         return publishedScope === 'targeted' ? targeted : !targeted
       })
     }
+    if (tab === 'completed') {
+      const loop = this.data.completedLoop || 'all'
+      if (loop !== 'all') {
+        scoped = scoped.filter((row) => {
+          const open = xingxuanRecruitLoop.isXingxuanOpenLoop(row.mp)
+          return loop === 'open' ? open : !open
+        })
+      }
+    }
     const filtered = prOrderFilters.filterPrOrderRows(scoped, this.filterOpts())
     const total = scoped.length
     const filterCountText =
@@ -294,6 +312,12 @@ Page({
     this.setData({ publishedScope: scope })
     this.refreshFiltered(this.data.rows)
   },
+  onCompletedLoopTap(e) {
+    const loop = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.loop) || 'all')
+    if (loop === this.data.completedLoop) return
+    this.setData({ completedLoop: loop })
+    this.refreshFiltered(this.data.rows)
+  },
   setTabCounts(rows) {
     const list = rows || []
     let publishedCount = 0
@@ -302,6 +326,8 @@ Page({
     let pendingScheduleCount = 0
     let pendingVideoReviewCount = 0
     let completedCount = 0
+    let completedOpenCount = 0
+    let completedClosedCount = 0
     let stoppedCount = 0
     let deletedCount = 0
     for (const row of list) {
@@ -317,7 +343,11 @@ Page({
       const stage = row.workflowStage || prWorkflow.resolvePrWorkflowStage(row.mp)
       if (stage === 'pending_schedule') pendingScheduleCount += 1
       else if (stage === 'pending_video_review' || stage === 'pending_script_review') pendingVideoReviewCount += 1
-      else if (stage === 'completed') completedCount += 1
+      else if (stage === 'completed') {
+        completedCount += 1
+        if (xingxuanRecruitLoop.isXingxuanOpenLoop(row.mp)) completedOpenCount += 1
+        else completedClosedCount += 1
+      }
       else if (stage === 'recruiting') {
         publishedCount += 1
         if (mpTargetedRecruit.isTargetedOrder(row.mp)) publishedTargetedCount += 1
@@ -331,6 +361,8 @@ Page({
       pendingScheduleCount,
       pendingVideoReviewCount,
       completedCount,
+      completedOpenCount,
+      completedClosedCount,
       stoppedCount,
       deletedCount,
     })
