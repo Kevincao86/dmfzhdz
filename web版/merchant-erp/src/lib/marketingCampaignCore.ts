@@ -102,12 +102,13 @@ export type RegistryMarketingCenter = {
 export type PublishOrderForCash = {
   id?: string
   publisherIdentity?: string
+  publisherTemplateId?: string
   fulfillmentLoop?: string
   mpPublishMeta?: unknown
 }
 
 const DEFAULT_RULES =
-  'PR 在小程序或星选平台成功发布招募（闭环或开环都算）后，按活动单价发放一笔现金红包，自动进入「我的钱包」。每个招募单只发一次，红包发完即止。累计发单数大于 5 单后，可将钱包余额一次提现。'
+  'PR 通过「发布招募」按钮成功发出招募（闭环或开环都算）后，按活动单价发放一笔现金红包，自动进入「我的钱包」。转发工具发出的招募不计入。每个招募单只发一次，红包发完即止。累计发单数大于 5 单后，可将钱包余额一次提现。'
 
 export function parseCashWithdrawIdentity(value: unknown, fallback: CashWithdrawIdentity = 'pr'): CashWithdrawIdentity {
   return value === 'talent' || value === 'pr' ? value : fallback
@@ -147,7 +148,7 @@ export function defaultCashCampaign(surface: MarketingSurface): CashRedPacketCam
     template: 'cash_red_packet',
     title: xingxuan ? 'PR招募现金红包' : '商家ERP现金红包',
     subtitle: xingxuan
-      ? '完成闭环或开环招募发单，红包自动进入钱包'
+      ? '通过发布招募发出的招募才计入，红包自动进入钱包'
       : '商家 ERP 活动使用同一现金红包模版，价格和海报可单独调整',
     enabled: xingxuan,
     amountCents: 500,
@@ -465,7 +466,19 @@ export function prKeyFromPublishOrder(order: PublishOrderForCash): string {
   return lingqi || registry
 }
 
+/** 转发工具代发的原表招募。这种单不进发单红包。 */
+export function isFormRelayPublishOrder(order: PublishOrderForCash): boolean {
+  if (text(order.publisherTemplateId, 40) === 'form-relay-v1') return true
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+      ? (order.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const relay = meta.externalFormRelay
+  return !!relay && typeof relay === 'object'
+}
+
 export function publishOrderQualifies(order: PublishOrderForCash): boolean {
+  if (isFormRelayPublishOrder(order)) return false
   const key = prKeyFromPublishOrder(order)
   if (!key || !text(order.id, 80)) return false
   const loop = String(order.fulfillmentLoop || '')
@@ -486,6 +499,12 @@ export function grantCashForOrder(center: RegistryMarketingCenter, order: Publis
 } {
   const orderId = text(order.id, 80)
   const prKey = prKeyFromPublishOrder(order)
+  if (isFormRelayPublishOrder(order)) {
+    return {
+      center,
+      outcome: { granted: false, reason: 'form_relay', amountCents: 0, message: '' },
+    }
+  }
   if (!publishOrderQualifies(order)) {
     return {
       center,
