@@ -5,7 +5,7 @@
       <text>星选增值</text>
     </view>
     <text class="addon-hero__title">增值服务</text>
-    <text class="addon-hero__sub">和星选平台是同一套功能，数据会自动同步</text>
+    <text class="addon-hero__sub">和商家端同一套板块：视觉工坊、Brief、短视频、数字人、短剧</text>
   </view>
 
   <view class="addon-section">

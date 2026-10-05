@@ -12,6 +12,7 @@ const PERM_TITLE = {
   digitalHuman: '数字人口播',
   visualStudio: 'AI 视觉工坊',
   brief: 'AI 爆款 Brief',
+  aiDrama: 'AI短剧',
   aiReview: '文稿 AI 审核',
   aiVideoReview: '短视频 AI 审核',
 }
