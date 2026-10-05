@@ -287,9 +287,15 @@ function pickDouyinPlayUrl(item: DouyinAwemeItem | null): string | null {
       if (!candidates.includes(normalized)) candidates.push(normalized)
     }
   }
-  push(item.video.play_addr?.url_list)
-  push(item.video.download_addr?.url_list)
-  for (const br of item.video.bit_rate ?? []) {
+  const video = item.video as DouyinAwemeItem['video'] & {
+    play_addr_h264?: { url_list?: string[] }
+    play_addr_265?: { url_list?: string[] }
+  }
+  push(video?.play_addr?.url_list)
+  push(video?.play_addr_h264?.url_list)
+  push(video?.play_addr_265?.url_list)
+  push(video?.download_addr?.url_list)
+  for (const br of video?.bit_rate ?? []) {
     push(br.play_addr?.url_list)
   }
   return candidates[0] ?? null
@@ -866,8 +872,17 @@ export async function resolveDouyinVideoPublishUrl(raw: string): Promise<DouyinV
   return { ok: true, normalizedUrl, note }
 }
 
-async function fetchIesdouyinItemById(awemeId: string): Promise<DouyinAwemeItem | null> {
-  const apiUrl = `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?reflow_source=reflow_page&item_ids=${encodeURIComponent(awemeId)}`
+function awemeItemFromDetailJson(j: {
+  status_code?: number
+  item_list?: DouyinAwemeItem[]
+  aweme_detail?: DouyinAwemeItem
+  aweme_details?: DouyinAwemeItem[]
+}): DouyinAwemeItem | null {
+  if (j.status_code != null && j.status_code !== 0) return null
+  return j.item_list?.[0] ?? j.aweme_detail ?? j.aweme_details?.[0] ?? null
+}
+
+async function fetchDouyinJsonItem(apiUrl: string): Promise<DouyinAwemeItem | null> {
   try {
     const res = await fetch(apiUrl, {
       headers: {
@@ -877,12 +892,35 @@ async function fetchIesdouyinItemById(awemeId: string): Promise<DouyinAwemeItem 
       signal: AbortSignal.timeout(12_000),
     })
     if (!res.ok) return null
-    const j = (await res.json()) as { status_code?: number; item_list?: DouyinAwemeItem[] }
-    if (j.status_code !== 0 || !j.item_list?.[0]) return null
-    return j.item_list[0]
+    const j = (await res.json()) as {
+      status_code?: number
+      item_list?: DouyinAwemeItem[]
+      aweme_detail?: DouyinAwemeItem
+      aweme_details?: DouyinAwemeItem[]
+    }
+    const item = awemeItemFromDetailJson(j)
+    if (!item?.video && !item?.desc && !item?.video_text) return null
+    return item
   } catch {
     return null
   }
+}
+
+async function fetchIesdouyinItemById(awemeId: string): Promise<DouyinAwemeItem | null> {
+  const id = encodeURIComponent(awemeId)
+  const urls = [
+    `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?reflow_source=reflow_page&item_ids=${id}`,
+    `https://www.iesdouyin.com/aweme/v1/web/aweme/detail/?aweme_id=${id}&aid=1128&version_code=230500`,
+    `https://www.douyin.com/aweme/v1/web/aweme/detail/?aweme_id=${id}&aid=1128`,
+  ]
+  let fallback: DouyinAwemeItem | null = null
+  for (const apiUrl of urls) {
+    const item = await fetchDouyinJsonItem(apiUrl)
+    if (!item) continue
+    if (pickDouyinPlayUrl(item)) return item
+    fallback = fallback ?? item
+  }
+  return fallback
 }
 
 function decodeHtmlEntities(s: string): string {
@@ -1271,6 +1309,30 @@ function parseScriptFromAi(content: string): string {
   return ''
 }
 
+function countHanChars(raw: string): number {
+  return (raw.match(/[\u4e00-\u9fff]/g) || []).length
+}
+
+/** 页面字幕 / 发布文案里能当口播用的正文。分享口令、昵称「的作品」不算。 */
+function pickPageOralScript(page: DouyinPageExtract): string {
+  const candidates = [
+    page.awemeItem?.video_text,
+    page.caption,
+    page.awemeItem?.desc,
+    page.description,
+  ]
+  for (const raw of candidates) {
+    if (!raw) continue
+    const t = stripDouyinMetaBoilerplate(String(raw))
+    if (countHanChars(t) < 12) continue
+    if (/复制打开抖音|打开Dou音|打开抖音搜索|记录美好生活|已经收获了/.test(t)) continue
+    if (/的作品/.test(t) && countHanChars(t) < 20) continue
+    if (/^看看【/.test(t)) continue
+    return t.slice(0, 2000)
+  }
+  return ''
+}
+
 async function extractScriptAndMotionWithDoubao(
   page: DouyinPageExtract,
   normalizedUrl: string,
@@ -1320,7 +1382,9 @@ ${rawUserText.trim()}
   if (script.length < 12) {
     return {
       ok: false,
-      message: '豆包未能还原有效口播文案，请换链接或改用手动输入/文本驱动',
+      message: page.playUrl
+        ? '已找到视频，但没有识别出有效口播。请换一条带人声的视频，或改用自主输入 / 音频输入。'
+        : '已识别分享链接，但没有拿到视频声音或口播正文。请在视频播放页重新点分享，粘贴整段口令（含 https://v.douyin.com/…），或改用自主输入 / 音频输入。',
     }
   }
 
@@ -1410,6 +1474,25 @@ export async function runDouyinLinkParseCore(
         motionInstructions,
         scriptSource: 'asr',
       }
+    }
+  }
+
+  const pageScript = pickPageOralScript(page)
+  if (pageScript.length >= 12) {
+    const motionInstructions = await inferMotionInstructionsFromScript(
+      pageScript,
+      env,
+      authHeader,
+      tenantIdHint,
+    )
+    return {
+      ok: true,
+      normalizedUrl,
+      videoId,
+      sourceTitle: page.title,
+      script: pageScript,
+      motionInstructions,
+      scriptSource: 'page',
     }
   }
 
