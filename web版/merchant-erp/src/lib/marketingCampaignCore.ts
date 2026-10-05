@@ -711,6 +711,7 @@ export function walletViewForIdentity(
   center: RegistryMarketingCenter,
   holderKey: string,
   identity: CashWithdrawIdentity | 'shoot' | 'edit' | '',
+  opts?: { withdrawLimit?: number },
 ) {
   const key = text(holderKey, 80)
   const campaign = campaignBySurface(center, 'xingxuan')
@@ -719,14 +720,16 @@ export function walletViewForIdentity(
   const wallet = matched
     ? center.wallets.find((item) => item.campaignId === campaign.id && item.prKey === key) ?? null
     : null
-  const withdraws = matched
-    ? center.withdraws.filter((item) => item.campaignId === campaign.id && item.prKey === key).slice(0, 20)
+  const matchedWithdraws = matched
+    ? center.withdraws.filter((item) => item.campaignId === campaign.id && item.prKey === key)
     : []
+  const withdrawLimit = Math.max(1, Math.min(2000, opts?.withdrawLimit ?? 20))
+  const withdraws = matchedWithdraws.slice(0, withdrawLimit)
   const orders = wallet?.qualifyingOrders ?? 0
   const grantedCount = center.grants.filter((item) => item.campaignId === campaign.id).length
   const remaining = Math.max(0, campaign.totalQuota - grantedCount)
-  const canWithdraw = matched && !!wallet && orders > campaign.withdrawAfterOrders && wallet.availableCents > 0 && !withdraws.some((item) => item.status === 'pending')
-  const visible = matched && Boolean(key) && (campaign.enabled || orders > 0 || (wallet?.availableCents ?? 0) > 0 || (wallet?.frozenCents ?? 0) > 0 || withdraws.length > 0)
+  const canWithdraw = matched && !!wallet && orders > campaign.withdrawAfterOrders && wallet.availableCents > 0 && !matchedWithdraws.some((item) => item.status === 'pending')
+  const visible = matched && Boolean(key) && (campaign.enabled || orders > 0 || (wallet?.availableCents ?? 0) > 0 || (wallet?.frozenCents ?? 0) > 0 || matchedWithdraws.length > 0)
   const progress = allowed === 'talent' ? '累计达标' : '累计发单'
   const title =
     allowed === 'talent' && (!campaign.title || campaign.title === 'PR招募现金红包')
@@ -735,7 +738,7 @@ export function walletViewForIdentity(
   let hint = ''
   if (matched && !canWithdraw) {
     if (orders <= campaign.withdrawAfterOrders) hint = `${progress}大于 ${campaign.withdrawAfterOrders} 单后可提现，当前 ${orders} 单`
-    else if (withdraws.some((item) => item.status === 'pending')) hint = '提现已提交，等待打款'
+    else if (matchedWithdraws.some((item) => item.status === 'pending')) hint = '提现已提交，等待打款'
     else if ((wallet?.availableCents ?? 0) < 1) hint = '当前没有可提现余额'
   }
   return {

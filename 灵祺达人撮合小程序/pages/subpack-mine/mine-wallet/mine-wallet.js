@@ -226,6 +226,9 @@ Page({
   onOrders() {
     wx.navigateTo({ url: '/pages/subpack-mine/mine-my-orders/mine-my-orders' })
   },
+  onWithdrawOrders() {
+    wx.navigateTo({ url: '/pages/subpack-mine/mine-my-orders/mine-my-orders?tab=withdraw' })
+  },
   async onPayDeposit() {
     if (this._paying) return
     this._paying = true

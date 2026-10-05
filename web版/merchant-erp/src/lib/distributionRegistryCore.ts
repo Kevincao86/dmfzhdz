@@ -1122,7 +1122,7 @@ export function buildAffiliatePortalFromSnapshot(
   const withdrawRequests = (data.distributionWithdrawRequests ?? [])
     .filter((w) => w.ownerType === 'individual_affiliate' && w.ownerId === affiliate.id)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .slice(0, 24)
+    .slice(0, 500)
     .map((w) => ({
       id: w.id,
       amountCents: w.amountCents,

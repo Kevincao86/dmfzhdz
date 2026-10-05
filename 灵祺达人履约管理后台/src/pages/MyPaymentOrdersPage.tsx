@@ -3,7 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { cn } from '../cn'
 import { PointsOrderResumePaySheet } from '../components/PointsOrderResumePaySheet'
-import { fetchMyPaymentOrders, type MpMyUsageDetails } from '../lib/mpApi'
+import { fetchAffiliatePortal, formatCentsYuan } from '@merchant/lib/distributionAffiliatePortalClient'
+import { withdrawRequestStatusLabel } from '@merchant/lib/distributionRegistryCore'
+import { fetchMyPaymentOrders, fetchTraining, postPrCashWallet, type MpMyUsageDetails } from '../lib/mpApi'
+import { getAccount } from '../lib/mpSession'
+import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { pollMembershipWechatPay } from '../lib/mpMembershipApi'
 import { pollPointsWechatPay } from '../lib/mpPointsApi'
 import {
@@ -19,14 +23,85 @@ import {
   yuanFromCents,
 } from '../lib/mpMyOrdersApi'
 
-type TabId = 'spend' | 'quota' | 'membership' | 'recharge'
+type TabId = 'spend' | 'quota' | 'membership' | 'recharge' | 'withdraw'
+
+type WithdrawRow = {
+  id: string
+  kindLabel: string
+  amountYuan: string
+  statusText: string
+  paid: boolean
+  createdAt: string
+  detail: string
+}
 
 function parseTabParam(raw: string | null): TabId {
   const tab = String(raw || '').trim()
   if (tab === 'quota' || tab === 'package') return 'quota'
   if (tab === 'membership') return 'membership'
   if (tab === 'recharge' || tab === 'points') return 'recharge'
+  if (tab === 'withdraw') return 'withdraw'
   return 'spend'
+}
+
+function clipTime(iso: string): string {
+  return String(iso || '').slice(0, 16).replace('T', ' ')
+}
+
+async function loadWithdrawRows(): Promise<WithdrawRow[]> {
+  const rows: WithdrawRow[] = []
+  const cash = await postPrCashWallet({
+    action: 'summary',
+    workIdentity: getWorkIdentity(),
+    allWithdraws: true,
+  }).catch(() => null)
+  const cashRows = Array.isArray(cash?.withdraws) ? (cash.withdraws as Array<Record<string, unknown>>) : []
+  for (const item of cashRows) {
+    const createdAt = String(item.createdAt || '')
+    const paidAt = String(item.paidAt || '')
+    const bankTail = String(item.bankTail || '')
+    rows.push({
+      id: `cash-${String(item.id || createdAt)}`,
+      kindLabel: '活动红包',
+      amountYuan: String(item.amountYuan || '0.00'),
+      statusText: String(item.statusText || (item.status === 'paid' ? '提现成功' : '待打款')),
+      paid: item.status === 'paid',
+      createdAt,
+      detail: [`申请 ${clipTime(createdAt)}`, paidAt ? `打款 ${clipTime(paidAt)}` : '', bankTail ? `尾号${bankTail}` : '']
+        .filter(Boolean)
+        .join(' · '),
+    })
+  }
+  const training = await fetchTraining(getAccount()?.accountId).catch(() => null)
+  const payouts = Array.isArray(training?.myPayouts) ? (training.myPayouts as Array<Record<string, unknown>>) : []
+  for (const item of payouts) {
+    const createdAt = String(item.createdAt || '')
+    const paidAt = String(item.paidAt || '')
+    rows.push({
+      id: `train-${String(item.id || createdAt)}`,
+      kindLabel: '培训结算',
+      amountYuan: Number(item.net || 0).toFixed(2),
+      statusText: item.status === 'paid' ? '提现成功' : '待打款',
+      paid: item.status === 'paid',
+      createdAt,
+      detail: [`申请 ${clipTime(createdAt)}`, paidAt ? `打款 ${clipTime(paidAt)}` : ''].filter(Boolean).join(' · '),
+    })
+  }
+  const portal = await fetchAffiliatePortal().catch(() => null)
+  for (const item of portal?.withdrawRequests || []) {
+    rows.push({
+      id: `aff-${item.id}`,
+      kindLabel: '推广佣金',
+      amountYuan: formatCentsYuan(item.amountCents),
+      statusText: withdrawRequestStatusLabel(item.status),
+      paid: item.status === 'paid',
+      createdAt: item.createdAt,
+      detail: [`申请 ${clipTime(item.createdAt)}`, item.paidAt ? `打款 ${clipTime(item.paidAt)}` : '', item.failReason || '']
+        .filter(Boolean)
+        .join(' · '),
+    })
+  }
+  return rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
 }
 
 function fmtTime(iso: string): string {
@@ -213,6 +288,7 @@ export default function MyPaymentOrdersPage() {
   const [membershipOrders, setMembershipOrders] = useState<MpMembershipOrderRow[]>([])
   const [pointsOrders, setPointsOrders] = useState<MpPointsOrderRow[]>([])
   const [usage, setUsage] = useState<MpMyUsageDetails | null>(null)
+  const [withdraws, setWithdraws] = useState<WithdrawRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [pollMsg, setPollMsg] = useState('')
@@ -232,6 +308,8 @@ export default function MyPaymentOrdersPage() {
     setErr('')
     setLoading(true)
     try {
+      const withdrawRows = await loadWithdrawRows()
+      setWithdraws(withdrawRows)
       const data = await fetchMyPaymentOrders()
       setMembershipOrders(data.membershipOrders)
       setPointsOrders(data.pointsOrders)
@@ -306,6 +384,7 @@ export default function MyPaymentOrdersPage() {
     { id: 'quota', label: '套餐消耗' },
     { id: 'membership', label: '会员开通', count: membershipOrders.length },
     { id: 'recharge', label: '积分充值', count: pointsOrders.length },
+    { id: 'withdraw', label: '提现', count: withdraws.length },
   ]
 
   const paymentEmptyMessage =
@@ -319,7 +398,7 @@ export default function MyPaymentOrdersPage() {
             ← 返回我的
           </Link>
           <h1 className="text-xl font-bold text-[var(--shell-text)] mt-1">我的订单</h1>
-          <p className="text-sm text-[var(--shell-muted)] mt-1">积分与套餐用量明细、会员开通与积分充值记录</p>
+          <p className="text-sm text-[var(--shell-muted)] mt-1">积分与套餐用量、会员开通、积分充值，以及全部提现记录</p>
         </div>
         <button
           type="button"
@@ -388,6 +467,38 @@ export default function MyPaymentOrdersPage() {
                   <td>{payModeLabel(row.payMode)}</td>
                   <td>{row.paidAt ? fmtTime(row.paidAt) : fmtTime(row.createdAt)}</td>
                   <td><OrderStatusBadge status={row.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      ) : null}
+
+      {!loading && tab === 'withdraw' ? (
+        withdraws.length === 0 ? (
+          <div className="surface-card rounded-xl border p-8 text-center text-sm text-[var(--shell-muted)]">
+            暂无提现记录
+          </div>
+        ) : (
+          <table className="xx-pay-table">
+            <thead>
+              <tr>
+                <th>类型</th>
+                <th>金额</th>
+                <th>状态</th>
+                <th>时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {withdraws.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.kindLabel}</td>
+                  <td>¥{row.amountYuan}</td>
+                  <td className={row.paid ? 'text-emerald-700' : 'text-amber-700'}>{row.statusText}</td>
+                  <td>
+                    {clipTime(row.createdAt)}
+                    {row.detail ? <p className="xx-pay-table__sub">{row.detail}</p> : null}
+                  </td>
                 </tr>
               ))}
             </tbody>

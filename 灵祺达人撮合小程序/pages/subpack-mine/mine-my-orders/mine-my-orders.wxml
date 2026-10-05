@@ -20,11 +20,16 @@
       data-tab="recharge"
       bindtap="onPickTab"
     >充值</view>
+    <view
+      class="orders-tab {{tab === 'withdraw' ? 'is-active' : ''}}"
+      data-tab="withdraw"
+      bindtap="onPickTab"
+    >提现</view>
   </view>
 
   <scroll-view class="orders-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view wx:if="{{loading && !usage.pointsSummary}}" class="orders-state">加载中…</view>
-    <view wx:elif="{{err}}" class="orders-state orders-state--err">{{err}}</view>
+    <view wx:elif="{{err && tab !== 'withdraw'}}" class="orders-state orders-state--err">{{err}}</view>
 
     <block wx:elif="{{tab === 'spend'}}">
       <view class="usage-note">{{usage.deductOrderNote}}</view>
@@ -103,6 +108,20 @@
             </view>
           </view>
         </view>
+      </view>
+    </block>
+
+    <block wx:elif="{{tab === 'withdraw'}}">
+      <view wx:if="{{withdraws.length === 0}}" class="orders-state orders-state--compact">暂无提现记录</view>
+      <view wx:for="{{withdraws}}" wx:key="id" class="order-card">
+        <view class="order-head">
+          <view>
+            <text class="order-kind">{{item.kindLabel}}</text>
+            <text class="order-title">¥{{item.amountYuan}}</text>
+          </view>
+          <text class="order-status order-status--{{item.statusClass}}">{{item.statusText}}</text>
+        </view>
+        <text class="order-no">{{item.detail}}</text>
       </view>
     </block>
 

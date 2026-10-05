@@ -2,16 +2,105 @@ const mpMembershipApi = require('../../../utils/mpMembershipApi.js')
 const mpMembershipUi = require('../../../utils/mpMembershipUi.js')
 const { prepareXingxuanSubPage } = require('../../../utils/pageIdentityChrome.js')
 const guestRoutes = require('../../../utils/mpGuestRoutes.js')
+const ecs = require('../../../utils/ecs.js')
+const sessionStore = require('../../../utils/mpSessionStore.js')
+const userProfile = require('../../../utils/userProfile.js')
+const training = require('../../../utils/mpTraining.js')
+const affiliate = require('../../../utils/mpDistributionAffiliatePortal.js')
 
-const VALID_TABS = ['spend', 'quota', 'membership', 'recharge']
+const VALID_TABS = ['spend', 'quota', 'membership', 'recharge', 'withdraw']
 
 function parseTab(raw) {
   const tab = String(raw || '').trim()
   if (tab === 'quota' || tab === 'package') return 'quota'
   if (tab === 'membership') return 'membership'
   if (tab === 'recharge' || tab === 'points') return 'recharge'
+  if (tab === 'withdraw') return 'withdraw'
   if (tab === 'spend' || tab === 'all') return 'spend'
   return VALID_TABS.includes(tab) ? tab : 'spend'
+}
+
+function clipTime(iso) {
+  return String(iso || '').slice(0, 16).replace('T', ' ')
+}
+
+function withdrawStatusClass(status) {
+  if (status === 'paid') return 'confirmed'
+  if (status === 'rejected' || status === 'failed') return 'rejected'
+  return 'pending'
+}
+
+const AFFILIATE_STATUS = {
+  pending_review: '待审核',
+  approved: '已通过',
+  rejected: '已拒绝',
+  paid: '提现成功',
+  failed: '打款失败',
+}
+
+async function loadWithdrawRows() {
+  const rows = []
+  try {
+    const token = sessionStore.readSessionToken()
+    const cash = await ecs.post(
+      '/api/meoo-mp-pr-cash-wallet',
+      { action: 'summary', workIdentity: userProfile.readIdentity(), allWithdraws: true },
+      { 'X-Mp-Session': token },
+    )
+    ;(cash && cash.withdraws ? cash.withdraws : []).forEach((item) => {
+      const createdAt = String(item.createdAt || '')
+      const paidAt = item.paidAt ? String(item.paidAt) : ''
+      const bankTail = item.bankTail ? String(item.bankTail) : ''
+      rows.push({
+        id: `cash-${item.id || createdAt}`,
+        kindLabel: '活动红包',
+        amountYuan: String(item.amountYuan || '0.00'),
+        statusText: String(item.statusText || (item.status === 'paid' ? '提现成功' : '待打款')),
+        statusClass: withdrawStatusClass(item.status),
+        createdAt,
+        detail: [`申请 ${clipTime(createdAt)}`, paidAt ? `打款 ${clipTime(paidAt)}` : '', bankTail ? `尾号${bankTail}` : '']
+          .filter(Boolean)
+          .join(' · '),
+      })
+    })
+  } catch (_) {}
+  try {
+    const summary = await training.walletSummary()
+    ;(summary.payouts || []).forEach((item) => {
+      const createdAt = String(item.createdAt || '')
+      const paidAt = item.paidAt ? String(item.paidAt) : ''
+      const status = item.status === 'paid' ? 'paid' : 'pending'
+      rows.push({
+        id: `train-${item.id || createdAt}`,
+        kindLabel: '培训结算',
+        amountYuan: Number(item.net || 0).toFixed(2),
+        statusText: status === 'paid' ? '提现成功' : '待打款',
+        statusClass: withdrawStatusClass(status),
+        createdAt,
+        detail: [`申请 ${clipTime(createdAt)}`, paidAt ? `打款 ${clipTime(paidAt)}` : ''].filter(Boolean).join(' · '),
+      })
+    })
+  } catch (_) {}
+  try {
+    const portal = await affiliate.fetchPortal()
+    ;(portal.withdrawRequests || []).forEach((item) => {
+      const createdAt = String(item.createdAt || '')
+      const paidAt = item.paidAt ? String(item.paidAt) : ''
+      rows.push({
+        id: `aff-${item.id || createdAt}`,
+        kindLabel: '推广佣金',
+        amountYuan: (Math.max(0, Number(item.amountCents) || 0) / 100).toFixed(2),
+        statusText: AFFILIATE_STATUS[item.status] || String(item.status || '待审核'),
+        statusClass: withdrawStatusClass(item.status),
+        createdAt,
+        detail: [`申请 ${clipTime(createdAt)}`, paidAt ? `打款 ${clipTime(paidAt)}` : '', item.failReason || '']
+          .filter(Boolean)
+          .join(' · '),
+      })
+    })
+  } catch (_) {}
+  rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  return rows
 }
 
 function mapMembershipOrder(row, highlightOutTradeNo) {
@@ -106,6 +195,7 @@ Page({
     empty: false,
     visibleOrders: [],
     highlightOutTradeNo: '',
+    withdraws: [],
     usage: {
       deductOrderNote: '',
       quotaMonth: '',
@@ -152,6 +242,7 @@ Page({
   },
   async loadOrders() {
     this.setData({ loading: true, err: '' })
+    const withdraws = await loadWithdrawRows()
     try {
       const data = await mpMembershipApi.fetchMyPaymentOrders()
       this._membershipOrders = data.membershipOrders || []
@@ -159,6 +250,7 @@ Page({
       this.setData({
         loading: false,
         usage: mapUsage(data.usage),
+        withdraws,
       })
       this.applyFilter(this._membershipOrders, this._pointsOrders)
       const highlight = this.data.highlightOutTradeNo
@@ -185,11 +277,14 @@ Page({
         }
       }
     } catch (e) {
+      this._membershipOrders = []
+      this._pointsOrders = []
       this.setData({
         loading: false,
         err: String(e && e.message ? e.message : e),
         visibleOrders: [],
         empty: false,
+        withdraws,
       })
     }
   },

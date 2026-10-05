@@ -15,15 +15,8 @@
       <image wx:if="{{cashPoster}}" class="wl-poster" src="{{cashPoster}}" mode="widthFix" />
       <text wx:if="{{cashRules}}" class="wl-hint">{{cashRules}}</text>
       <view class="wl-btn wl-btn--block" bindtap="onCashWithdraw">提现</view>
+      <text class="wl-go" bindtap="onWithdrawOrders">提现记录</text>
     </block>
-    <view wx:if="{{!cashLoading && cashWithdraws.length}}" class="wl-payouts">
-      <text class="wl-rules-title">提现记录</text>
-      <view wx:for="{{cashWithdraws}}" wx:key="id" class="wl-payout">
-        <text class="wl-payout-net">¥{{item.amountYuan}}</text>
-        <text class="wl-payout-status {{item.status === 'paid' ? 'wl-payout-status--paid' : ''}}">{{item.statusText}}</text>
-        <text class="wl-hint">申请 {{item.createdAt}}{{item.paidAt ? ' · 打款 ' + item.paidAt : ''}}{{item.bankTail ? ' · 尾号' + item.bankTail : ''}}</text>
-      </view>
-    </view>
   </view>
 
   <view class="wl-card">
@@ -83,14 +76,7 @@
       </view>
     </view>
     <view class="wl-btn wl-btn--block" bindtap="onWithdraw">提现</view>
-    <view wx:if="{{payouts.length}}" class="wl-payouts">
-      <text class="wl-rules-title">提现记录</text>
-      <view wx:for="{{payouts}}" wx:key="id" class="wl-payout">
-        <text class="wl-payout-net">¥{{item.net}}</text>
-        <text class="wl-payout-status {{item.status === 'paid' ? 'wl-payout-status--paid' : ''}}">{{item.statusText}}</text>
-        <text class="wl-hint">申请 {{item.createdAt}}{{item.paidAt ? ' · 打款 ' + item.paidAt : ''}}</text>
-      </view>
-    </view>
+    <text class="wl-go" bindtap="onWithdrawOrders">提现记录</text>
     <text class="wl-go" bindtap="onSettle">查看应付款</text>
   </view>
 

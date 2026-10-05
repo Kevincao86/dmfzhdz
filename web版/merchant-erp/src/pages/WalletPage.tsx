@@ -20,6 +20,11 @@ import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../lib/dbSchemaE
 import { fetchPrimaryTenantId, fetchTenantWalletSummary, insertMerchantPaymentOrder } from '../lib/tenantBilling'
 import { useMembership } from '../context/MembershipContext'
 import {
+  fetchAffiliatePortal,
+  formatCentsYuan,
+} from '../lib/distributionAffiliatePortalClient'
+import { withdrawRequestStatusLabel } from '../lib/distributionRegistryCore'
+import {
   fetchTenantBillingSummary,
   fetchTenantMyOrders,
   fetchTenantPointsLedger,
@@ -34,6 +39,16 @@ function formatSupabaseErr(e: unknown): string {
 }
 
 type WalletTab = 'overview' | 'orders' | 'package' | 'points'
+
+type WithdrawRow = {
+  id: string
+  kindLabel: string
+  amountYuan: string
+  statusText: string
+  paid: boolean
+  createdAt: string
+  detail: string
+}
 
 type LedgerRow = {
   id: string
@@ -69,6 +84,7 @@ export default function WalletPage() {
   const [tab, setTab] = useState<WalletTab>('overview')
   const [summary, setSummary] = useState<TenantBillingSummary | null>(null)
   const [orders, setOrders] = useState<TenantPaymentOrder[]>([])
+  const [withdraws, setWithdraws] = useState<WithdrawRow[]>([])
   const [pointsLedger, setPointsLedger] = useState<TenantPointsLedgerRow[]>([])
   const [walletLedger, setWalletLedger] = useState<LedgerRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -103,6 +119,22 @@ export default function WalletPage() {
       setWalletLedger(wallet.ledger as LedgerRow[])
       setOrders(orderRows)
       setPointsLedger(ptsRows)
+      const portal = await fetchAffiliatePortal().catch(() => null)
+      setWithdraws(
+        (portal?.withdrawRequests || [])
+          .map((row) => ({
+            id: row.id,
+            kindLabel: '推广佣金',
+            amountYuan: formatCentsYuan(row.amountCents),
+            statusText: withdrawRequestStatusLabel(row.status),
+            paid: row.status === 'paid',
+            createdAt: row.createdAt,
+            detail: row.paidAt
+              ? `打款 ${new Date(row.paidAt).toLocaleString('zh-CN', { hour12: false })}`
+              : row.failReason || '',
+          }))
+          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+      )
     } catch (e) {
       const msg = formatSupabaseErr(e)
       setErr(shouldSuggestDbMigration(msg) ? DB_MIGRATION_HINT_ZH : msg)
@@ -276,7 +308,7 @@ export default function WalletPage() {
               <ShoppingBag className="h-5 w-5 text-violet-600" />
               我的订单
             </h2>
-            <p className="mt-1 text-xs text-slate-500">订阅、充值、积分充值与退款申请实时状态</p>
+            <p className="mt-1 text-xs text-slate-500">订阅、充值、积分充值、退款，以及全部提现记录</p>
           </div>
           <div className="max-h-[520px] overflow-auto">
             {orders.length === 0 ? (
@@ -336,6 +368,37 @@ export default function WalletPage() {
                               ? `+${o.points_credit_applied} 积分`
                               : '—'}
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div className="border-t border-slate-100 px-6 py-4">
+            <h3 className="text-sm font-semibold text-slate-900">提现记录</h3>
+            <p className="mt-1 text-xs text-slate-500">推广佣金的全部申请，含待审核、已拒绝和已打款。</p>
+            {withdraws.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-500">暂无提现记录</p>
+            ) : (
+              <table className="mt-3 min-w-full text-sm">
+                <thead className="text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="py-2 pr-3">时间</th>
+                    <th className="py-2 pr-3">类型</th>
+                    <th className="py-2 pr-3">金额</th>
+                    <th className="py-2">状态</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {withdraws.map((row) => (
+                    <tr key={row.id}>
+                      <td className="whitespace-nowrap py-3 pr-3 text-slate-600">
+                        {row.createdAt ? new Date(row.createdAt).toLocaleString('zh-CN', { hour12: false }) : '—'}
+                        {row.detail ? <p className="text-xs text-slate-400">{row.detail}</p> : null}
+                      </td>
+                      <td className="py-3 pr-3">{row.kindLabel}</td>
+                      <td className="py-3 pr-3 font-medium tabular-nums">¥{row.amountYuan}</td>
+                      <td className={cn('py-3', row.paid ? 'text-emerald-700' : 'text-amber-700')}>{row.statusText}</td>
                     </tr>
                   ))}
                 </tbody>

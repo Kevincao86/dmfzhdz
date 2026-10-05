@@ -102,9 +102,6 @@ function CashRedPacketCard({
     canWithdraw?: boolean
     hint?: string
   }
-  const withdraws = Array.isArray(cash.withdraws)
-    ? (cash.withdraws as Array<{ id: string; amountYuan: string; status?: string; statusText: string; createdAt: string; paidAt?: string; bankTail?: string }>)
-    : []
   return (
     <section className="rounded-2xl border border-amber-200 bg-[var(--panel-card)] p-4">
       <div className="flex items-start justify-between gap-3">
@@ -128,26 +125,9 @@ function CashRedPacketCard({
       {note ? <p className="mt-2 text-sm text-amber-800">{note}</p> : null}
       {campaign.posterUrl ? <img src={campaign.posterUrl} alt="" className="mt-3 max-h-40 w-full rounded-xl object-cover" /> : null}
       {campaign.rulesText ? <p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-[var(--shell-muted)]">{campaign.rulesText}</p> : null}
-      {withdraws.length ? (
-        <div className="mt-3 space-y-2">
-          <p className="text-sm font-semibold text-[var(--shell-text)]">提现记录</p>
-          {withdraws.map((row) => (
-            <div key={row.id} className="flex items-center justify-between gap-3 text-sm">
-              <span>¥{row.amountYuan}</span>
-              <span className="text-right">
-                <span className={row.status === 'paid' ? 'text-xs font-semibold text-emerald-700' : 'text-xs font-semibold text-amber-700'}>
-                  {row.statusText}
-                </span>
-                <span className="mt-0.5 block text-xs text-[var(--shell-muted)]">
-                  申请 {row.createdAt}
-                  {row.paidAt ? ` · 打款 ${row.paidAt}` : ''}
-                  {row.bankTail ? ` · 尾号${row.bankTail}` : ''}
-                </span>
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <Link to="/profile/my-orders?tab=withdraw" className="mt-3 inline-block text-xs font-medium text-amber-800">
+        提现记录
+      </Link>
     </section>
   )
 }
@@ -170,7 +150,6 @@ export default function WalletPage() {
   const [idBack, setIdBack] = useState('')
   const [licenseImage, setLicenseImage] = useState('')
   const [orders, setOrders] = useState<SettleOrder[]>([])
-  const [payouts, setPayouts] = useState<Array<{ id: string; net: number; status: string; createdAt: string; paidAt: string }>>([])
   const [busy, setBusy] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(true)
@@ -203,7 +182,6 @@ export default function WalletPage() {
       setQuote((training.settlement as Quote) || null)
       setAccount((training.profile as BoundAccount) || null)
       setOrders(rows)
-      setPayouts(Array.isArray(training.myPayouts) ? (training.myPayouts as Array<{ id: string; net: number; status: string; createdAt: string; paidAt: string }>) : [])
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
     } finally {
@@ -504,25 +482,9 @@ export default function WalletPage() {
             {busy === 'withdraw' ? '提现中' : '提现'}
           </button>
         </div>
-        {payouts.length ? (
-          <div className="mt-4 space-y-2">
-            <p className="text-sm font-semibold text-[var(--shell-text)]">提现记录</p>
-            {payouts.map((row) => (
-              <div key={row.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
-                <div>
-                  <p className="font-medium text-[var(--shell-text)]">¥{Number(row.net || 0).toFixed(2)}</p>
-                  <p className="text-xs text-[var(--shell-muted)]">
-                    申请 {String(row.createdAt || '').slice(0, 16).replace('T', ' ')}
-                    {row.paidAt ? ` · 打款 ${String(row.paidAt).slice(0, 16).replace('T', ' ')}` : ''}
-                  </p>
-                </div>
-                <span className={row.status === 'paid' ? 'text-emerald-700' : 'text-amber-700'}>
-                  {row.status === 'paid' ? '提现成功' : '待打款'}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : null}
+        <Link to="/profile/my-orders?tab=withdraw" className="mt-3 inline-block text-xs font-medium text-violet-700">
+          提现记录
+        </Link>
         {!orders.length ? <p className="mt-3 text-sm text-[var(--shell-muted)]">还没有报名订单</p> : null}
         <div className="mt-3 space-y-2">
           {orders.map((order) => (

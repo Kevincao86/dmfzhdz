@@ -144,7 +144,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     const center = await readMarketingCenter()
-    sendJson(res, 200, { ok: true, ...walletViewForIdentity(center, holderKey, identity) })
+    const withdrawLimit = body.allWithdraws === true ? 2000 : 20
+    sendJson(res, 200, { ok: true, ...walletViewForIdentity(center, holderKey, identity, { withdrawLimit }) })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     sendJson(res, 500, { ok: false, error: 'pr_cash_wallet_failed', message: '钱包加载失败', detail: msg.slice(0, 400) })

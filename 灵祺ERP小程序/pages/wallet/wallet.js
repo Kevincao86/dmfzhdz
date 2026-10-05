@@ -5,6 +5,53 @@ const walletUi = require('../../utils/walletUiMp.js')
 const billing = require('../../utils/tenantBillingApiMp.js')
 const payFlow = require('../../utils/tenantPayFlowMp.js')
 const payChannels = require('../../utils/tenantPayChannelsMp.js')
+const api = require('../../utils/api.js')
+const config = require('../../utils/config.js')
+
+const WITHDRAW_STATUS = {
+  pending_review: '待审核',
+  approved: '已通过',
+  rejected: '已拒绝',
+  paid: '提现成功',
+  failed: '打款失败',
+}
+
+function loadAffiliateWithdraws() {
+  const base = String(config.MERCHANT_API_BASE_URL || '').trim().replace(/\/$/, '')
+  const token = api.getBearerToken()
+  if (!base || !token) return Promise.resolve([])
+  return new Promise((resolve) => {
+    wx.request({
+      url: `${base}/erp-api/meoo-distribution-affiliate-portal`,
+      method: 'GET',
+      timeout: 20000,
+      header: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      success(res) {
+        const json = res.data && typeof res.data === 'object' ? res.data : {}
+        const list = Array.isArray(json.withdrawRequests) ? json.withdrawRequests : []
+        resolve(
+          list.map((row) => {
+            const created = String(row.createdAt || '')
+            let createdLabel = created
+            try {
+              createdLabel = new Date(created).toLocaleString('zh-CN', { hour12: false })
+            } catch (_) {}
+            return {
+              id: String(row.id || created),
+              kindLabel: '推广佣金',
+              amountYuan: (Math.max(0, Number(row.amountCents) || 0) / 100).toFixed(2),
+              statusText: WITHDRAW_STATUS[row.status] || '待审核',
+              createdLabel,
+            }
+          }),
+        )
+      },
+      fail() {
+        resolve([])
+      },
+    })
+  })
+}
 
 function formatPointsLedgerRow(row) {
   const pkg = Number(row.delta_package_points) || 0
@@ -32,6 +79,7 @@ Page({
     pointsPerYuan: walletUi.POINTS_PER_YUAN,
     balanceCents: 0,
     pointsLedger: [],
+    withdraws: [],
     loading: false,
     err: '',
     payOpen: false,
@@ -87,6 +135,7 @@ Page({
     try {
       const summary = await billing.fetchTenantBillingSummary()
       const ledgerRaw = await billing.fetchTenantPointsLedger()
+      const withdraws = await loadAffiliateWithdraws()
       const bc = typeof summary.walletBalanceCents === 'number' ? summary.walletBalanceCents : 0
       const totalPts = typeof summary.totalPoints === 'number' ? summary.totalPoints : 0
       const pkgPts = typeof summary.packagePoints === 'number' ? summary.packagePoints : 0
@@ -98,6 +147,7 @@ Page({
         packagePointsText: walletUi.formatPoints(pkgPts),
         rechargePointsText: walletUi.formatPoints(rechPts),
         pointsLedger: (ledgerRaw || []).slice(0, 20).map(formatPointsLedgerRow),
+        withdraws,
         loading: false,
       })
     } catch (e) {

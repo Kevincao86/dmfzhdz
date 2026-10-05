@@ -45,6 +45,18 @@
       </view>
     </view>
 
+    <view class="wallet-ledger">
+      <text class="wallet-ledger-title">提现记录</text>
+      <view wx:if="{{!withdraws.length}}" class="wallet-card-hint">暂无提现记录</view>
+      <view wx:for="{{withdraws}}" wx:key="id" class="wallet-ledger-row">
+        <view class="wallet-ledger-main">
+          <text class="wallet-ledger-reason">{{item.kindLabel}} ¥{{item.amountYuan}}</text>
+          <text class="wallet-ledger-time">{{item.createdLabel}}</text>
+        </view>
+        <text class="wallet-ledger-delta">{{item.statusText}}</text>
+      </view>
+    </view>
+
     <view wx:if="{{pointsLedger.length}}" class="wallet-ledger">
       <text class="wallet-ledger-title">最近积分明细</text>
       <view wx:for="{{pointsLedger}}" wx:key="id" class="wallet-ledger-row">
