@@ -38,6 +38,25 @@ function packStyles(worldId, styleId) {
   }))
 }
 
+function parsePortraitAi(raw) {
+  const text = String(raw || '').trim()
+  if (!text) return ''
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const jsonStr = (fence && fence[1] ? fence[1] : text).trim()
+  const start = jsonStr.indexOf('{')
+  const end = jsonStr.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try {
+      const o = JSON.parse(jsonStr.slice(start, end + 1))
+      const portrait = String(o.portrait || o.desc || o.description || '').trim()
+      if (portrait) return portrait.replace(/^["「]|["」]$/g, '')
+    } catch (_) {}
+  }
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  if (!cleaned || cleaned.charAt(0) === '{') return ''
+  return cleaned.replace(/^["「]|["」]$/g, '').trim()
+}
+
 function packQualities(resolution) {
   return labels.SEEDANCE_QUALITY_OPTIONS.map((o) => ({
     id: o.id,
@@ -81,6 +100,7 @@ Page({
     dramaStep: 1,
     cast: [castStore.newMember(1)],
     castBusyId: '',
+    portraitBusyId: '',
     castPacks: [],
     showCastSave: false,
     showCastLibrary: false,
@@ -246,6 +266,69 @@ Page({
   },
   onCastDesc(e) {
     this._patchCast(e.currentTarget.dataset.id, { desc: e.detail.value, confirmed: false })
+  },
+  async onEnrichCast(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    if (!member || this.data.portraitBusyId || this.data.castBusyId) return
+    if (member.sourceDataUrl) {
+      wx.showToast({ title: '已选用参考图，请先去掉参考图再补充文字', icon: 'none' })
+      return
+    }
+    const hintText = String(member.desc || member.name || '').trim()
+    if (hintText.length < 2) {
+      wx.showToast({ title: '请先写一句形象提示', icon: 'none' })
+      return
+    }
+    const world = catalog.worldOf(this.data.worldId)
+    const scene = catalog.sceneOf(this.data.sceneId, {
+      name: this.data.customSceneName,
+      hook: this.data.customSceneHook,
+      mustSee: this.data.customSceneMustSee,
+    })
+    const style = catalog.styleOf(this.data.styleId) || {}
+    const shop = this.data.shop || emptyShop()
+    const shopLines = (world.fields || [])
+      .map((f) => `${f.label}：${String(shop[f.key] || '').trim() || '未填'}`)
+      .join('\n')
+    this.setData({ portraitBusyId: member.id, err: '' })
+    try {
+      const r = await vs.postAiChat(
+        [
+          {
+            role: 'system',
+            content:
+              '你是商业短视频角色造型指导。根据简要提示补全竖屏短剧定妆形象词，具体到国籍外观、衣着面料颜色与配饰。偏电影感，不要写成证件照或新闻摄影。不要写技术参数，不要出现字幕、水印、Logo、多人。',
+          },
+          {
+            role: 'user',
+            content: [
+              `场景：${world.label} / ${scene.name}`,
+              `画风：${style.name || ''}${style.visual ? `（${style.visual}）` : ''}`,
+              shopLines,
+              member.name ? `角色身份：${member.name}` : '',
+              this.data.story ? `一句话故事：${String(this.data.story).trim()}` : '',
+              `商家简要提示：${hintText}`,
+              '请把简要提示补成一段可直接用于文生图的角色形象词。',
+              '必须覆盖：性别、年龄段、国籍/族裔外观、发型发色、五官气质、妆容、职业相关衣着与配饰、体态、镜头（半身面对镜头）。',
+              '未给出的项按职业与场景合理补全，不要留空、不要反问。衣着必须符合职业场景。',
+              '只输出 JSON：{"portrait":"..."}，portrait 为一段中文、80–180 字，不要 markdown、不要解释。',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          },
+        ],
+        { provider: 'qwen', taskType: 'generate_copywriting', temperature: 0.6 },
+      )
+      if (!r.ok) throw new Error(r.message || '补充画像失败')
+      const portrait = parsePortraitAi(r.content).slice(0, 300)
+      if (portrait.length < 12) throw new Error('未返回可用画像，请稍后重试')
+      this._patchCast(member.id, { desc: portrait, confirmed: false })
+      this.setData({ hint: '已补全角色形象词，可再微调后点「生成预览」。' })
+    } catch (err) {
+      this.setData({ err: (err && err.message) || '补充画像失败' })
+    } finally {
+      this.setData({ portraitBusyId: '' })
+    }
   },
   onAddCast() {
     const cast = this.data.cast || []

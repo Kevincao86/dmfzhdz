@@ -103,6 +103,14 @@
         <input class="op-input grow" data-id="{{item.id}}" placeholder="角色名" value="{{item.name}}" bindinput="onCastName" />
         <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onRemoveCast">删除</button>
       </view>
+      <button
+        wx:if="{{!item.sourceDataUrl}}"
+        class="op-btn-ghost"
+        loading="{{portraitBusyId === item.id}}"
+        disabled="{{portraitBusyId === item.id}}"
+        data-id="{{item.id}}"
+        bindtap="onEnrichCast"
+      >{{portraitBusyId === item.id ? '正在补充画像' : 'AI补充画像'}}</button>
       <textarea
         class="op-area"
         maxlength="300"
