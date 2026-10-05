@@ -1,9 +1,8 @@
 /**
  * POST /api/meoo-ai-agent-image — 智能体文生图 / 图生图。
- * - builtin：万相 / 豆包 / MiniMax（MERCHANT_AI_*）。
- * - tokenmix：TokenMix OpenAI 兼容 images/generations（须 TOKENMIX_API_KEY）；有参考图时走内置图生图。
- * - phase=start|poll：GPT Image 异步短请求（避免浏览器长连接 Failed to fetch）；禁止回退万相。
- * - phase=fetch：同源代拉 TokenMix CDN（浏览器无 CORS，否则裁切 Failed to fetch）。
+ * 生图固定火山方舟豆包 Seedream。客户端传来的通义万相、MiniMax、TokenMix 只用于计费识别，不出图。
+ * phase=start 与同步请求都直接返回豆包图片地址；phase=poll 不再出图。
+ * phase=fetch：同源代拉图片（浏览器无 CORS，否则裁切 Failed to fetch）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -19,9 +18,7 @@ import {
   isTokenmixBrowserUnsafeImageUrl,
 } from '../vite-plugins/aiGateway/tokenmixImageGenerate.js'
 import {
-  runMeooAgentImagePollTokenmix,
   runMeooAgentImageRequest,
-  runMeooAgentImageStartTokenmix,
   type MeooAgentImageResult,
 } from '../vite-plugins/meooAgentImageCore.js'
 
@@ -266,12 +263,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
   const referenceImage = refRaw.length > 0 ? refRaw : undefined
-  const pvRaw = typeof body.preferred_vendor === 'string' ? body.preferred_vendor.trim().toLowerCase() : ''
-  const preferredVendor =
-    pvRaw === 'qwen' || pvRaw === 'doubao' || pvRaw === 'minimax' ? (pvRaw as 'qwen' | 'doubao' | 'minimax') : undefined
-
   const routeRaw = typeof body.image_route === 'string' ? body.image_route.trim().toLowerCase() : ''
-  const imageRoute = routeRaw === 'tokenmix' || phase === 'start' || phase === 'poll' ? 'tokenmix' : 'builtin'
+  const preferredVendor = 'doubao' as const
+  const imageRoute = 'builtin' as const
   const tokenmixImageModel =
     typeof body.tokenmix_image_model === 'string' ? body.tokenmix_image_model.trim() : undefined
   const preferredModelId =
@@ -295,11 +289,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     process.env as Record<string, string>,
   )
   const wantsProImage =
-    imageRoute === 'tokenmix' && /^gpt-image/i.test(tokenmixImageModel || 'gpt-image-2')
-  const accessProvider =
-    imageRoute === 'tokenmix'
-      ? 'tokenmix'
-      : preferredVendor ?? 'qwen'
+    (routeRaw === 'tokenmix' || phase === 'start' || phase === 'poll') &&
+    /^gpt-image/i.test(tokenmixImageModel || 'gpt-image-2')
+  const accessProvider = 'doubao'
   const userJwt =
     (typeof auth === 'string' && auth.startsWith('Bearer ')
       ? auth.slice('Bearer '.length).trim()
@@ -359,17 +351,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     let out: MeooAgentImageResult
-    if (phase === 'start') {
-      out = await runMeooAgentImageStartTokenmix(access.envForChat, {
-        prompt,
-        tokenmixImageModel: tokenmixImageModel || 'gpt-image-2',
-        wanxSize,
+    if (phase === 'poll') {
+      sendMerchantJson(res, 502, {
+        ok: false,
+        error: 'image_generation_failed',
+        detail: '生图已改为豆包直接出图，请重新生成',
       })
-    } else if (phase === 'poll') {
-      out = await runMeooAgentImagePollTokenmix(access.envForChat, {
-        taskId,
-        tokenmixImageModel: tokenmixImageModel || 'gpt-image-2',
-      })
+      return
     } else {
       out = await runMeooAgentImageRequest(access.envForChat, {
         prompt,

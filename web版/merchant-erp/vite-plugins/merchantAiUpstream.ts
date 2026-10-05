@@ -1,8 +1,8 @@
 /**
  * 抖音商品创建 — AI 网关（仅跑在 Vite Node 端，密钥与厂商顺序仅来自 Vercel / 进程环境变量，勿写入前端包）。
  * 文案：MiniMax / 通义千问 / 豆包 对话 API（与各厂商 OpenAI 兼容或官方路径对齐）；手选 Gemini 时走 TokenMix（`TOKENMIX_API_KEY`）。
- * 生图：通义万相 wanx-v1（异步）、豆包 Seedream（Ark images/generations）、MiniMax image_generation。
- * 厂商尝试顺序：`MERCHANT_AI_GOODS_TEXT_FAILOVER`、`MERCHANT_AI_GOODS_IMAGE_FAILOVER`（逗号分隔 minimax,qwen,doubao），未设时与历史默认一致；见 .env.example。
+ * 生图：只走火山方舟豆包 Seedream（Ark images/generations）。通义万相与 MiniMax 生图函数保留但不再被调度。
+ * 文案尝试顺序：`MERCHANT_AI_GOODS_TEXT_FAILOVER`（逗号分隔 minimax,qwen,doubao）。生图忽略 `MERCHANT_AI_GOODS_IMAGE_FAILOVER`，固定豆包。
  */
 import type { ServerResponse } from 'node:http'
 
@@ -218,21 +218,16 @@ function textVendorOrder(env: MerchantAiEnv): AssistVendorId[] {
   return parseDouyinAssistVendorOrder(env, 'MERCHANT_AI_GOODS_TEXT_FAILOVER', [...DEFAULT_TEXT_FAILOVER])
 }
 
-function imageVendorOrder(env: MerchantAiEnv): AssistVendorId[] {
-  return parseDouyinAssistVendorOrder(env, 'MERCHANT_AI_GOODS_IMAGE_FAILOVER', [...DEFAULT_IMAGE_FAILOVER])
+function imageVendorOrder(_env: MerchantAiEnv): AssistVendorId[] {
+  return ['doubao']
 }
 
 /** 将首选厂商置于轮询首位（须已配置 Key），其余顺序不变 */
 function imageVendorOrderPreferring(
   env: MerchantAiEnv,
-  preferred?: 'qwen' | 'doubao' | 'minimax',
+  _preferred?: 'qwen' | 'doubao' | 'minimax',
 ): AssistVendorId[] {
-  const base = imageVendorOrder(env)
-  if (!preferred) return base
-  if (!isDouyinAssistAiVendorId(preferred)) return base
-  if (!pickKey(env, preferred).key) return base
-  const rest = base.filter((x) => x !== preferred)
-  return [preferred, ...rest]
+  return imageVendorOrder(env)
 }
 
 function pickPrimaryVendorWithKey(env: MerchantAiEnv, order: readonly AssistVendorId[]): AssistVendorId {
@@ -485,6 +480,27 @@ function buildAgentFreeformImageI2iPrompt(userRequest: string): string {
 type AgentImageGenOpts = {
   wanxSize?: string
   doubaoSize?: '1K' | '2K' | '4K'
+  aspectRatio?: '1:1' | '3:4' | '4:3' | '9:16' | '16:9'
+}
+
+function doubaoImageSize(genOpts?: AgentImageGenOpts): string {
+  if (genOpts?.doubaoSize) return genOpts.doubaoSize
+  const wanx = String(genOpts?.wanxSize || '').replace('*', 'x').toLowerCase()
+  const matched = wanx.match(/^(\d+)x(\d+)$/)
+  if (matched) {
+    const w = Number(matched[1])
+    const h = Number(matched[2])
+    if (w > 0 && h > 0) {
+      if (h > w * 1.15) return '1440x2560'
+      if (w > h * 1.15) return '2560x1440'
+      return '2048x2048'
+    }
+  }
+  const aspect = genOpts?.aspectRatio
+  if (aspect === '9:16' || aspect === '3:4') return '1440x2560'
+  if (aspect === '16:9' || aspect === '4:3') return '2560x1440'
+  if (aspect === '1:1') return '2048x2048'
+  return '2K'
 }
 
 async function runAgentT2iSingleVendor(
@@ -520,7 +536,7 @@ async function runAgentT2iSingleVendor(
     const payload: Record<string, unknown> = {
       model: doubaoImageModelId(env),
       prompt,
-      size: genOpts?.doubaoSize ?? '2K',
+      size: doubaoImageSize(genOpts),
       response_format: 'url',
     }
     if (ref) payload.image = ref
@@ -584,6 +600,7 @@ export async function runAgentFreeformTextToImage(
   | { ok: true; imageUrl: string; vendorUsed: 'qwen' | 'doubao' | 'minimax' }
   | { ok: false; message: string }
 > {
+  void preferredVendor
   const ref = opts?.referenceImage?.trim()
   const exact = opts?.exactPrompt === true
   const prompt = exact
@@ -592,30 +609,24 @@ export async function runAgentFreeformTextToImage(
       ? buildAgentFreeformImageI2iPrompt(userLine)
       : buildAgentFreeformImagePrompt(userLine)
   let modelId = opts?.preferredModelId?.trim()
-  if (!modelId && opts?.preferWanxPoster) {
-    /** 营销海报走标准万相文生图；wanx-poster-generation-v1 为独立 input 协议且免费额度易耗尽 */
-    modelId = 'wan2.7-image-pro'
-  } else if (!modelId && exact && (!preferredVendor || preferredVendor === 'qwen')) {
-    modelId = 'wan2.7-image-pro'
-  }
+  if (modelId && !/seedream|doubao-seed/i.test(modelId)) modelId = ''
   let effEnv = env
-  const effVendor = preferredVendor ?? 'qwen'
-  if (modelId && effVendor === 'qwen') {
-    effEnv = { ...env, MERCHANT_AI_QWEN_IMAGE_MODEL: modelId }
-  } else if (modelId && effVendor === 'doubao') {
+  const effVendor = 'doubao' as const
+  if (modelId) {
     effEnv = { ...env, MERCHANT_AI_DOUBAO_IMAGE_MODEL: modelId }
   }
   const genOpts: AgentImageGenOpts = {
     wanxSize: opts?.wanxSize?.trim() || undefined,
     doubaoSize: opts?.doubaoSize,
+    aspectRatio: opts?.aspectRatio,
   }
-  const order = imageVendorOrderPreferring(effEnv, preferredVendor)
+  const order = imageVendorOrderPreferring(effEnv, effVendor)
   const primary = pickPrimaryVendorWithKey(effEnv, order)
   const { key, label } = pickKey(effEnv, primary)
   if (!key) {
     return {
       ok: false,
-      message: `未配置任一文生图服务 API Key。请在服务端环境变量中至少配置 MERCHANT_AI_QWEN_KEY（或 DASHSCOPE_API_KEY）、MERCHANT_AI_DOUBAO_KEY（或 ARK_API_KEY）或 MERCHANT_AI_MINIMAX_KEY（或 MINIMAX_API_KEY）之一；多厂商轮询顺序见 MERCHANT_AI_GOODS_IMAGE_FAILOVER。当前首选厂商缺少凭据：${label}。`,
+      message: `未配置豆包生图 API Key。请在服务端配置 MERCHANT_AI_DOUBAO_KEY 或 ARK_API_KEY。当前缺少凭据：${label}。`,
     }
   }
   try {
@@ -2922,9 +2933,7 @@ export async function handleDouyinGoodsAiAssist(
   const productName = String(body.product_name ?? '').trim() || listingTitle
   const titleDraft = String(body.title_draft ?? '').trim() || productName
   const model = isImageAction
-    ? isDouyinAssistAiVendorId(requestedVendor)
-      ? requestedVendor
-      : pickPrimaryVendorWithKey(env, imageVendorOrder(env))
+    ? 'doubao'
     : resolveGoodsAssistTextModel(requestedVendor, env)
   const imageUrls = Array.isArray(body.image_urls)
     ? (body.image_urls as unknown[]).map((x) => String(x)).filter(Boolean)

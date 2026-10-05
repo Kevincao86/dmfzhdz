@@ -206,69 +206,20 @@ export async function runMeooAgentImageRequest(
   const resolvedRef = await resolveReferenceImageToHttps(env, referenceImage)
   if (!resolvedRef.ok) return { ok: false, message: resolvedRef.message }
   const refHttps = resolvedRef.url
-  const tm = (tokenmixImageModel ?? '').trim()
+  void imageRoute
+  void tokenmixImageModel
+  void preferWanxPoster
+  void preferredVendor
   const imageOpts: AgentFreeformImageOpts = {
     referenceImage: refHttps,
     exactPrompt,
-    preferredModelId,
+    preferredModelId: preferredModelId && /seedream|doubao-seed/i.test(preferredModelId) ? preferredModelId : undefined,
     wanxSize,
     aspectRatio,
     doubaoSize,
-    preferWanxPoster,
   }
 
-  if (imageRoute === 'tokenmix' && tm && !refHttps) {
-    try {
-      const isGptImage = /^gpt-image/i.test(tm)
-      const { size, quality } = resolveGptQualityAndSize(tm, wanxSize)
-      const genPromise = tokenmixImagesGenerate(env, tm, prompt, {
-        quality,
-        ...(size ? { size } : {}),
-      })
-      // gpt-image-2 在 TokenMix 为异步轮询，high/超宽可能 2～3 分钟；失败不切换其它模型（禁止回退万相）
-      const timeoutMs = isGptImage ? 250_000 : 120_000
-      const { imageUrl, modelUsed } = await Promise.race([
-        genPromise,
-        new Promise<never>((_, reject) => {
-          setTimeout(
-            () => reject(new Error(`高级生图超时（${Math.round(timeoutMs / 1000)}秒），请稍后重试`)),
-            timeoutMs,
-          )
-        }),
-      ])
-      return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { ok: false, message: msg.slice(0, 600) }
-    }
-  }
-
-  if (imageRoute === 'tokenmix' && tm && refHttps) {
-    try {
-      const isGptImage = /^gpt-image/i.test(tm)
-      const { size, quality } = resolveGptQualityAndSize(tm, wanxSize)
-      const editPromise = tokenmixImagesEdit(env, tm, prompt, refHttps, {
-        quality,
-        ...(size ? { size } : {}),
-      })
-      const timeoutMs = isGptImage ? 250_000 : 120_000
-      const { imageUrl, modelUsed } = await Promise.race([
-        editPromise,
-        new Promise<never>((_, reject) => {
-          setTimeout(
-            () => reject(new Error(`GPT 参考图生图超时（${Math.round(timeoutMs / 1000)}秒），请稍后重试`)),
-            timeoutMs,
-          )
-        }),
-      ])
-      return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { ok: false, message: msg.slice(0, 600) }
-    }
-  }
-
-  const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, imageOpts)
+  const out = await runAgentFreeformTextToImage(env, prompt, 'doubao', imageOpts)
   if (!out.ok) return { ok: false, message: out.message }
   return { ok: true, imageUrl: out.imageUrl, channel: 'builtin', vendorUsed: out.vendorUsed }
 }
