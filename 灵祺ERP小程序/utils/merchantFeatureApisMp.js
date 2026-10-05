@@ -230,18 +230,47 @@ async function runCompetitorAnalysis(body) {
 
 async function fetchDigitalHumanDouyinLink(url) {
   try {
-    const r = await postJson('/api/meoo-digital-human-douyin-link', { url: String(url || '').trim() })
+    const r = await postJson('/api/meoo-digital-human-douyin-link', {
+      url: String(url || '').trim(),
+      tenantId: tenantId() || undefined,
+    })
     if (r.ok && (r.script || r.text || r.copy)) {
       return {
         ok: true,
         script: String(r.script || r.text || r.copy || '').trim(),
-        motion: String(r.motion || r.action || '').trim(),
+        motion: String(r.motionInstructions || r.motion || r.action || '').trim(),
         title: String(r.title || r.sourceTitle || '').trim(),
       }
     }
     return { ok: false, message: String(r.message || r.error || r.detail || '链接解析失败') }
   } catch (e) {
     return { ok: false, message: (e && e.message) || '链接解析失败' }
+  }
+}
+
+async function transcribeOralAudio(filePath) {
+  const lower = String(filePath || '').toLowerCase()
+  const mime = lower.endsWith('.wav')
+    ? 'audio/wav'
+    : lower.endsWith('.mp3')
+      ? 'audio/mpeg'
+      : lower.endsWith('.m4a')
+        ? 'audio/mp4'
+        : 'audio/aac'
+  let audioBase64 = ''
+  try {
+    audioBase64 = wx.getFileSystemManager().readFileSync(filePath, 'base64')
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || '读取音频失败' }
+  }
+  if (!audioBase64) return { ok: false, message: '音频文件为空' }
+  try {
+    const r = await postJson('/api/meoo-ai-asr', { audioBase64, mime })
+    const text = String((r && (r.text || r.script || r.content)) || '').trim()
+    if (!text) return { ok: false, message: '没有识别到口播内容，请换一段清晰人声' }
+    return { ok: true, text }
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || '语音识别失败' }
   }
 }
 
@@ -357,6 +386,7 @@ module.exports = {
   runCompetitorAnalysis,
   synthesizeDigitalHumanTts,
   fetchDigitalHumanDouyinLink,
+  transcribeOralAudio,
   generateAiOpsPlan,
   runSiteSelection,
 }

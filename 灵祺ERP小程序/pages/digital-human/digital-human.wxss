@@ -70,6 +70,10 @@
   font-size: 28rpx;
 }
 
+.dh-area.short {
+  min-height: 160rpx;
+}
+
 .dh-btns {
   display: flex;
   gap: 16rpx;

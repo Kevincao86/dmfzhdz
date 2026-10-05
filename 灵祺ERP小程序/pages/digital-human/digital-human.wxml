@@ -48,11 +48,36 @@
   </view>
 
   <view wx:elif="{{step === 2}}" class="dh-card">
-    <text class="dh-label">门店 / 卖点（给 AI 写稿）</text>
-    <input class="dh-input" placeholder="店名" value="{{shopName}}" bindinput="onShopName" />
-    <input class="dh-input" placeholder="卖点 / 套餐" value="{{shopOffer}}" bindinput="onShopOffer" />
-    <input class="dh-input" placeholder="主题，如周末双人餐" value="{{aiTopic}}" bindinput="onAiTopic" />
-    <button class="dh-btn ghost" loading="{{aiBusy}}" bindtap="onAiScript">AI 生成口播脚本</button>
+    <text class="dh-label">文案来源</text>
+    <view class="dh-chips">
+      <text class="dh-chip {{copyMode === 'link' ? 'on' : ''}}" data-mode="link" bindtap="onCopyMode">抖音提取</text>
+      <text class="dh-chip {{copyMode === 'text' ? 'on' : ''}}" data-mode="text" bindtap="onCopyMode">自主输入</text>
+      <text class="dh-chip {{copyMode === 'audio' ? 'on' : ''}}" data-mode="audio" bindtap="onCopyMode">音频输入</text>
+    </view>
+
+    <block wx:if="{{copyMode === 'link'}}">
+      <text class="dh-label">粘贴抖音分享的整段口令</text>
+      <textarea class="dh-area short" maxlength="2000" placeholder="含「复制打开抖音」和 https://v.douyin.com/… 的整段" value="{{douyinUrl}}" bindinput="onDouyinUrl" />
+      <button class="dh-btn ghost" loading="{{linkBusy}}" bindtap="onParseLink">从抖音提取口播</button>
+    </block>
+
+    <block wx:elif="{{copyMode === 'audio'}}">
+      <text class="dh-label">上传或录一段口播，识别成文案</text>
+      <view class="dh-btns">
+        <button class="dh-btn ghost" loading="{{audioBusy}}" bindtap="onPickAudio">选择音频</button>
+        <button class="dh-btn ghost" loading="{{audioBusy}}" bindtap="onToggleRecord">{{recording ? '停止录音' : '开始录音'}}</button>
+      </view>
+      <text wx:if="{{audioName}}" class="dh-hint">{{audioName}}</text>
+    </block>
+
+    <block wx:else>
+      <text class="dh-label">门店 / 卖点（给 AI 写稿）</text>
+      <input class="dh-input" placeholder="店名" value="{{shopName}}" bindinput="onShopName" />
+      <input class="dh-input" placeholder="卖点 / 套餐" value="{{shopOffer}}" bindinput="onShopOffer" />
+      <input class="dh-input" placeholder="主题，如周末双人餐" value="{{aiTopic}}" bindinput="onAiTopic" />
+      <button class="dh-btn ghost" loading="{{aiBusy}}" bindtap="onAiScript">AI 生成口播脚本</button>
+    </block>
+
     <text class="dh-label">口播文案</text>
     <textarea class="dh-area" maxlength="2000" placeholder="输入要合成的口播稿…" value="{{script}}" bindinput="onScript" />
     <button class="dh-btn ghost" loading="{{aiBusy}}" bindtap="onAiRewrite">AI 改写口播</button>
@@ -70,9 +95,6 @@
       <button class="dh-btn" loading="{{ttsBusy}}" bindtap="onSynth">合成并试听</button>
       <button wx:if="{{playing}}" class="dh-btn ghost" bindtap="onStop">停止</button>
     </view>
-    <text class="dh-label">抖音链接提取（可选）</text>
-    <input class="dh-input" placeholder="粘贴抖音分享链接" value="{{douyinUrl}}" bindinput="onDouyinUrl" />
-    <button class="dh-btn ghost" loading="{{linkBusy}}" bindtap="onParseLink">从链接提取口播</button>
     <view class="dh-btns">
       <button class="dh-btn ghost" bindtap="onPrev">上一步</button>
       <button class="dh-btn" bindtap="onNext">下一步：动作背景</button>

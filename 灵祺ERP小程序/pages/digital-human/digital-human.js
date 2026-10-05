@@ -45,6 +45,10 @@ Page({
     motion: '',
     background: '',
     douyinUrl: '',
+    copyMode: 'text',
+    audioName: '',
+    audioBusy: false,
+    recording: false,
     durationSec: 8,
     busy: false,
     ttsBusy: false,
@@ -59,6 +63,7 @@ Page({
 
   onUnload() {
     this.stopAudio()
+    this.stopRecord(true)
   },
 
   onStep(e) {
@@ -77,7 +82,11 @@ Page({
       }
     }
     if (this.data.step === 2 && String(this.data.script || '').trim().length < 8) {
-      wx.showToast({ title: '请先填写口播文案（至少 8 字）', icon: 'none' })
+      const mode = this.data.copyMode
+      wx.showToast({
+        title: mode === 'link' ? '请先从抖音提取口播' : mode === 'audio' ? '请先录音或选择音频' : '请先填写口播文案（至少 8 字）',
+        icon: 'none',
+      })
       return
     }
     this.setData({ step: Math.min(5, this.data.step + 1), err: '' })
@@ -133,6 +142,12 @@ Page({
   },
   onDouyinUrl(e) {
     this.setData({ douyinUrl: e.detail.value })
+  },
+  onCopyMode(e) {
+    const mode = e.currentTarget.dataset.mode
+    if (mode !== 'link' && mode !== 'text' && mode !== 'audio') return
+    this.stopRecord(true)
+    this.setData({ copyMode: mode, err: '' })
   },
   onPickVoice(e) {
     this.setData({ voiceId: e.currentTarget.dataset.id })
@@ -258,7 +273,11 @@ Page({
   async onParseLink() {
     const url = String(this.data.douyinUrl || '').trim()
     if (!url) {
-      wx.showToast({ title: '请粘贴抖音链接', icon: 'none' })
+      wx.showToast({ title: '请粘贴整段抖音分享口令', icon: 'none' })
+      return
+    }
+    if (!/douyin\.com|v\.douyin/i.test(url)) {
+      wx.showToast({ title: '请粘贴含抖音链接的整段口令', icon: 'none' })
       return
     }
     this.setData({ linkBusy: true, err: '' })
@@ -273,6 +292,71 @@ Page({
       motion: r.motion || this.data.motion,
     })
     wx.showToast({ title: r.title ? `已提取：${r.title}` : '已提取口播文案', icon: 'none' })
+  },
+
+  stopRecord(drop) {
+    if (drop) this._dropRecord = true
+    if (this._recorder && this.data.recording) {
+      try {
+        this._recorder.stop()
+      } catch (_) {}
+    }
+    if (this.data.recording) this.setData({ recording: false })
+  },
+
+  async transcribePickedAudio(filePath, name) {
+    this.setData({ audioBusy: true, err: '', audioName: name || '正在识别…' })
+    const r = await feat.transcribeOralAudio(filePath)
+    this.setData({ audioBusy: false })
+    if (!r.ok) {
+      this.setData({ err: r.message || '语音识别失败', audioName: '' })
+      return
+    }
+    this.setData({ script: r.text, audioName: name || '已识别' })
+    wx.showToast({ title: '已识别成口播文案', icon: 'none' })
+  },
+
+  onPickAudio() {
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: ['mp3', 'wav', 'm4a', 'aac'],
+      success: (res) => {
+        const f = res.tempFiles && res.tempFiles[0]
+        if (!f || !f.path) return
+        void this.transcribePickedAudio(f.path, f.name || '已选音频')
+      },
+    })
+  },
+
+  ensureRecorder() {
+    if (this._recorder) return this._recorder
+    const rec = wx.getRecorderManager()
+    rec.onStop((res) => {
+      this.setData({ recording: false })
+      if (this._dropRecord) {
+        this._dropRecord = false
+        return
+      }
+      if (res && res.tempFilePath) void this.transcribePickedAudio(res.tempFilePath, '录音')
+    })
+    rec.onError(() => {
+      this.setData({ recording: false, err: '录音失败，请检查麦克风权限' })
+    })
+    this._recorder = rec
+    return rec
+  },
+
+  onToggleRecord() {
+    const rec = this.ensureRecorder()
+    if (this.data.recording) {
+      try {
+        rec.stop()
+      } catch (_) {}
+      return
+    }
+    this.setData({ recording: true, err: '' })
+    rec.start({ duration: 60000, format: 'mp3' })
   },
 
   stopAudio() {
