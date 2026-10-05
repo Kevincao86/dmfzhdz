@@ -4,11 +4,89 @@ const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
 const media = require('../../../utils/mpAddonMedia.js')
 const castStore = require('../../../utils/shortDramaCastMp.js')
+const ecs = require('../../../utils/ecs.js')
+const sessionStore = require('../../../utils/mpSessionStore.js')
 
 const QUALITIES = [
   { id: '720p', label: '720p' },
   { id: '1080p', label: '1080p' },
 ]
+
+function needProxyDownload(message) {
+  return /domain list|not in domain|downloadFile:fail/i.test(String(message || ''))
+}
+
+function decodeUtf8(buf) {
+  try {
+    if (typeof TextDecoder !== 'undefined') return new TextDecoder('utf-8').decode(buf)
+  } catch (_) {}
+  try {
+    const bytes = new Uint8Array(buf)
+    const n = Math.min(bytes.length, 400)
+    let s = ''
+    for (let i = 0; i < n; i += 1) s += String.fromCharCode(bytes[i])
+    return s
+  } catch (_) {
+    return ''
+  }
+}
+
+function writeMp4(buf) {
+  return new Promise((resolve, reject) => {
+    const path = `${wx.env.USER_DATA_PATH}/drama-save-${Date.now()}.mp4`
+    wx.getFileSystemManager().writeFile({
+      filePath: path,
+      data: buf,
+      success: () => resolve(path),
+      fail: (e) => reject(new Error((e && e.errMsg) || '写入视频失败')),
+    })
+  })
+}
+
+function saveVideoFile(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.saveVideoToPhotosAlbum({
+      filePath,
+      success: () => resolve(),
+      fail: (e) => reject(new Error((e && e.errMsg) || '保存到相册失败')),
+    })
+  })
+}
+
+function proxyDramaVideo(remoteUrl) {
+  const full = ecs.url('/api/meoo-merchant-ai-video-download-url')
+  if (!full) return Promise.reject(new Error('暂时连不上'))
+  const token = sessionStore.readSessionToken()
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: full,
+      method: 'POST',
+      timeout: 120000,
+      responseType: 'arraybuffer',
+      dataType: '其他',
+      header: {
+        'Content-Type': 'application/json',
+        Accept: 'video/mp4',
+        ...(token ? { 'X-Mp-Session': token, Authorization: `Bearer ${token}` } : {}),
+      },
+      data: { url: remoteUrl },
+      success(res) {
+        const buf = res.data
+        if (!(res.statusCode >= 200 && res.statusCode < 300 && buf && buf.byteLength > 1024)) {
+          let message = '视频下载失败'
+          try {
+            const parsed = JSON.parse(decodeUtf8(buf))
+            if (parsed && parsed.message) message = String(parsed.message)
+          } catch (_) {}
+          reject(new Error(message))
+          return
+        }
+        writeMp4(buf).then(resolve, reject)
+      },
+      fail: (e) => reject(new Error((e && e.errMsg) || '下载失败')),
+    })
+  })
+}
 
 function emptyShop() {
   return { storeName: '', offerName: '', price: '', area: '' }
@@ -721,9 +799,24 @@ Page({
   onSaveVideo() {
     const url = this.data.resultUrl
     if (!url) return
+    wx.showLoading({ title: '保存中', mask: true })
     media
       .saveVideoToAlbum(url)
-      .then(() => wx.showToast({ title: '已保存到相册', icon: 'success' }))
-      .catch((e) => wx.showToast({ title: String(e.message || '保存失败').slice(0, 24), icon: 'none' }))
+      .catch((e) => {
+        if (!needProxyDownload(e && e.message)) throw e
+        return proxyDramaVideo(url).then(saveVideoFile)
+      })
+      .then(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '已保存到相册', icon: 'success' })
+      })
+      .catch((e) => {
+        wx.hideLoading()
+        const msg = String((e && e.message) || '')
+        wx.showToast({
+          title: /auth deny|authorize|permission|权限/i.test(msg) ? '请允许保存到相册' : '保存失败，请再试一次',
+          icon: 'none',
+        })
+      })
   },
 })
