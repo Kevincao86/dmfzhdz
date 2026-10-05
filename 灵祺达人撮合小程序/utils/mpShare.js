@@ -5,7 +5,7 @@ const mpRuntime = require('./mpRuntime.js')
 /** 历史包内路径（已 pack ignore，仅作占位常量） */
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
 const SHARE_COVER_FILE = 'share/share-cover-ai-match.jpg'
-const DEFAULT_TITLE = '灵祺星选 · AI 智能匹配本地生活招募'
+const DEFAULT_TITLE = '灵祺星选 | AI按城市品类匹配商单'
 
 let cachedShareCoverPath = ''
 let coverPreparePromise = null
