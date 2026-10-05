@@ -1211,7 +1211,13 @@ export async function mpAuthEmailLogin(
 export async function mpAuthEmailRegister(
   supabaseUrl: string,
   serviceRole: string,
-  input: { email: string; emailCode: string; password: string; role?: MpAccountRole },
+  input: {
+    email: string
+    emailCode: string
+    password: string
+    role?: MpAccountRole
+    workIdentity?: MpFixedWorkIdentity
+  },
 ): Promise<{ token: string; account: MpAccountRow; isNew: true }> {
   const rest = restClient(supabaseUrl, serviceRole)
   const mail = normalizeMpLoginEmail(input.email)
@@ -1223,7 +1229,7 @@ export async function mpAuthEmailRegister(
   if (!verifyAuthEmailCode(mail, emailCode)) throw new Error('email_code_invalid')
   const existing = await findAccountByLoginName(rest, mail)
   if (existing) throw new Error('email_taken')
-  const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
+  const role: MpAccountRole = input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent'
   const { hash, salt } = hashPassword(password)
   let account = await insertAccount(rest, {
     openid: null,
@@ -1235,6 +1241,16 @@ export async function mpAuthEmailRegister(
     wx_avatar_url: '',
   })
   account = await provisionRegistryForAccount(supabaseUrl, serviceRole, account, role, '', '')
+  if (input.workIdentity === 'shoot' || input.workIdentity === 'edit') {
+    account = await mpAuthEnsureIdentity(
+      supabaseUrl,
+      serviceRole,
+      account.id,
+      'talent',
+      input.workIdentity,
+      { initial: true },
+    )
+  }
   const token = await createSession(rest, account.id)
   return { token, account, isNew: true }
 }

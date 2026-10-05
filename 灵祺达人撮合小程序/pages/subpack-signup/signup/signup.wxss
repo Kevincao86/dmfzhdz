@@ -242,6 +242,30 @@
   color: #78716c;
 }
 
+.reg-channels {
+  display: flex;
+  margin: 0 4rpx 16rpx;
+}
+
+.reg-channel {
+  margin-right: 28rpx;
+  font-size: 28rpx;
+  color: #78716c;
+}
+
+.reg-channel--on {
+  font-weight: 600;
+  color: #6d28d9;
+}
+
+.reg-page--talent .reg-channel--on {
+  color: #a16207;
+}
+
+.reg-page--edit .reg-channel--on {
+  color: #44403c;
+}
+
 .reg-picks {
   display: flex;
   flex-wrap: wrap;

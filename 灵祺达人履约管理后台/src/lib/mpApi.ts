@@ -294,12 +294,14 @@ export async function emailRegister(input: {
   emailCode: string
   password: string
   role: 'talent' | 'pr'
+  workIdentity?: 'talent' | 'pr' | 'shoot' | 'edit'
 }) {
   const data = await mpAuthRequest('email_register', {
     email: input.email.trim(),
     emailCode: input.emailCode.trim(),
     password: input.password,
-    role: input.role,
+    role: input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent',
+    workIdentity: input.workIdentity,
   })
   return { token: String(data.token), account: data.account as MpAccount }
 }

@@ -143,6 +143,17 @@ async function phoneRegister({ phone, smsCode, password, role, workIdentity }) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function emailRegister({ email, emailCode, password, role, workIdentity }) {
+  const data = await authPost('email_register', {
+    email: String(email || '').trim(),
+    emailCode: String(emailCode || '').trim(),
+    password: String(password || ''),
+    role: role === 'pr' || workIdentity === 'pr' ? 'pr' : 'talent',
+    workIdentity,
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 async function sendRegisterSms(phone) {
   return ecs.post('/api/meoo-auth-sms-send', { phone: String(phone || '').trim() })
 }
@@ -276,6 +287,7 @@ module.exports = {
   rebindPhoneSms,
   rebindEmailLogin,
   phoneRegister,
+  emailRegister,
   readSessionToken,
   readAccount,
   writeSession,

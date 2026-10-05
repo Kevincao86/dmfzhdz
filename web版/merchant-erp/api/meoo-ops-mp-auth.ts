@@ -372,11 +372,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     if (action === 'email_register') {
       const roleRaw = pickAuthField(req, body, 'role')
+      const workRaw = pickAuthField(req, body, 'workIdentity')
+      const workIdentity =
+        workRaw === 'pr' || workRaw === 'shoot' || workRaw === 'edit' || workRaw === 'talent'
+          ? workRaw
+          : undefined
       const { token, account, isNew } = await mpAuthEmailRegister(supabaseUrl, serviceRole, {
         email: String(body.email || ''),
         emailCode: String(body.emailCode || ''),
         password: String(body.password || ''),
         role: roleRaw === 'pr' ? 'pr' : 'talent',
+        workIdentity,
       })
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, token, isNew, account: payload })

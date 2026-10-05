@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { phoneRegister, sendRegisterSms } from '../lib/mpApi'
+import { emailRegister, phoneRegister, sendEmailCode, sendRegisterSms } from '../lib/mpApi'
 import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
 import { formatMpApiErr } from '../lib/mpApiErrors'
 import { workIdentityToAccountRole, type MpWorkIdentity } from '../lib/mpWorkIdentity'
@@ -9,6 +9,25 @@ import './RegisterPage.css'
 function normalizePhone(raw: string) {
   const digits = raw.replace(/\D/g, '')
   return /^1\d{10}$/.test(digits) ? digits : ''
+}
+
+function normalizeEmail(raw: string) {
+  const mail = raw.trim().toLowerCase()
+  if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(mail)) return ''
+  return mail
+}
+
+function startCooldown(setCooldown: React.Dispatch<React.SetStateAction<number>>) {
+  setCooldown(60)
+  const t = setInterval(() => {
+    setCooldown((c) => {
+      if (c <= 1) {
+        clearInterval(t)
+        return 0
+      }
+      return c - 1
+    })
+  }, 1000)
 }
 
 const IDENTITY_SCENES: Record<MpWorkIdentity, { label: string; line: string; file: string }> = {
@@ -28,13 +47,17 @@ export default function RegisterPage() {
     preset === 'pr' || preset === 'shoot' || preset === 'edit' || preset === 'talent' ? preset : 'talent',
   )
 
+  const [channel, setChannel] = useState<'phone' | 'email'>('phone')
   const [phone, setPhone] = useState('')
   const [smsCode, setSmsCode] = useState('')
+  const [email, setEmail] = useState('')
+  const [emailCode, setEmailCode] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [smsCooldown, setSmsCooldown] = useState(0)
+  const [mailCooldown, setMailCooldown] = useState(0)
   const [playing, setPlaying] = useState(true)
   const scene = IDENTITY_SCENES[workIdentity]
 
@@ -55,31 +78,50 @@ export default function RegisterPage() {
     setErr('')
     try {
       await sendRegisterSms(p)
-      setSmsCooldown(60)
-      const t = setInterval(() => {
-        setSmsCooldown((c) => {
-          if (c <= 1) {
-            clearInterval(t)
-            return 0
-          }
-          return c - 1
-        })
-      }, 1000)
+      startCooldown(setSmsCooldown)
     } catch (e) {
       setErr(formatMpApiErr(e, '验证码发送失败'))
     }
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const p = normalizePhone(phone)
-    if (!p) {
-      setErr('请输入有效大陆手机号')
+  async function onSendMail() {
+    const mail = normalizeEmail(email)
+    if (!mail) {
+      setErr('请输入有效邮箱')
       return
     }
-    if (!/^\d{6}$/.test(smsCode.trim())) {
-      setErr('请输入 6 位验证码')
-      return
+    setErr('')
+    try {
+      await sendEmailCode(mail)
+      startCooldown(setMailCooldown)
+    } catch (e) {
+      setErr(formatMpApiErr(e, '邮箱验证码发送失败'))
+    }
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const useEmail = channel === 'email'
+    const p = normalizePhone(phone)
+    const mail = normalizeEmail(email)
+    if (useEmail) {
+      if (!mail) {
+        setErr('请输入有效邮箱')
+        return
+      }
+      if (!/^\d{6}$/.test(emailCode.trim())) {
+        setErr('请输入 6 位邮箱验证码')
+        return
+      }
+    } else {
+      if (!p) {
+        setErr('请输入有效大陆手机号')
+        return
+      }
+      if (!/^\d{6}$/.test(smsCode.trim())) {
+        setErr('请输入 6 位验证码')
+        return
+      }
     }
     if (password.length < 6) {
       setErr('密码至少 6 位')
@@ -92,13 +134,22 @@ export default function RegisterPage() {
     setLoading(true)
     setErr('')
     try {
-      const { token, account } = await phoneRegister({
-        phone: p,
-        smsCode: smsCode.trim(),
-        password,
-        role: workIdentityToAccountRole(workIdentity),
-        workIdentity,
-      })
+      const role = workIdentityToAccountRole(workIdentity)
+      const { token, account } = useEmail
+        ? await emailRegister({
+            email: mail,
+            emailCode: emailCode.trim(),
+            password,
+            role,
+            workIdentity,
+          })
+        : await phoneRegister({
+            phone: p,
+            smsCode: smsCode.trim(),
+            password,
+            role,
+            workIdentity,
+          })
       await applyWorkIdentityAfterLogin(token, account, workIdentity)
       nav('/hall', { replace: true })
     } catch (e) {
@@ -121,7 +172,7 @@ export default function RegisterPage() {
         </div>
         <p className="reg-stage__line">{scene.line}</p>
         <h1 className="reg-title">注册 · {scene.label}</h1>
-        <p className="reg-note">手机号就是登录账号。身份选定后不可更改，之后登录自动进入这一版。</p>
+        <p className="reg-note">手机号或邮箱就是登录账号。身份选定后不可更改，之后登录自动进入这一版。</p>
         <div className="reg-picks">
           {IDENTITY_OPTIONS.map((id) => (
             <button
@@ -135,26 +186,76 @@ export default function RegisterPage() {
           ))}
         </div>
 
-        <label className="reg-field">
-          <span>手机号</span>
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-            placeholder="11 位大陆手机号"
-          />
-        </label>
-
-        <div className="reg-sms">
-          <input
-            value={smsCode}
-            onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            placeholder="6 位验证码"
-            aria-label="验证码"
-          />
-          <button type="button" disabled={smsCooldown > 0} onClick={() => void onSendSms()}>
-            {smsCooldown > 0 ? `${smsCooldown}s` : '获取验证码'}
+        <div className="reg-channels">
+          <button
+            type="button"
+            className={channel === 'phone' ? 'reg-channel reg-channel--on' : 'reg-channel'}
+            onClick={() => {
+              setChannel('phone')
+              setErr('')
+            }}
+          >
+            手机号注册
+          </button>
+          <button
+            type="button"
+            className={channel === 'email' ? 'reg-channel reg-channel--on' : 'reg-channel'}
+            onClick={() => {
+              setChannel('email')
+              setErr('')
+            }}
+          >
+            邮箱注册
           </button>
         </div>
+
+        {channel === 'phone' ? (
+          <>
+            <label className="reg-field">
+              <span>手机号</span>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="11 位大陆手机号"
+              />
+            </label>
+            <div className="reg-sms">
+              <input
+                value={smsCode}
+                onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6 位验证码"
+                aria-label="验证码"
+              />
+              <button type="button" disabled={smsCooldown > 0} onClick={() => void onSendSms()}>
+                {smsCooldown > 0 ? `${smsCooldown}s` : '获取验证码'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="reg-field">
+              <span>邮箱</span>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value.trim())}
+                placeholder="邮箱"
+                inputMode="email"
+                autoComplete="email"
+              />
+            </label>
+            <div className="reg-sms">
+              <input
+                value={emailCode}
+                onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6 位邮箱验证码"
+                aria-label="邮箱验证码"
+              />
+              <button type="button" disabled={mailCooldown > 0} onClick={() => void onSendMail()}>
+                {mailCooldown > 0 ? `${mailCooldown}s` : '获取验证码'}
+              </button>
+            </div>
+          </>
+        )}
 
         <label className="reg-field">
           <span>密码</span>
