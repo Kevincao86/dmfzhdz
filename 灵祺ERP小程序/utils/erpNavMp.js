@@ -41,6 +41,8 @@ function openUrl(url) {
     wx.showToast({ title: '功能暂未开放', icon: 'none' })
     return
   }
+  const api = require('./api.js')
+  if (!api.requireRealAuth(raw)) return
   if (isTabUrl(raw)) {
     wx.switchTab({
       url: raw.split('?')[0],

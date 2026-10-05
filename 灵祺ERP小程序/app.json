@@ -1,8 +1,9 @@
 {
+  "entryPagePath": "pages/dashboard/dashboard",
   "pages": [
+    "pages/dashboard/dashboard",
     "pages/login/login",
     "pages/functions/functions",
-    "pages/dashboard/dashboard",
     "pages/shop-eval/shop-eval",
     "pages/ai-agent/ai-agent",
     "pages/mine/mine"

@@ -1,3 +1,4 @@
+const api = require('../../utils/api.js')
 const config = require('../../utils/config.js')
 const reviews = require('../../utils/reviewsMp.js')
 const ops = require('../../utils/opsRegistryMp.js')
@@ -64,6 +65,22 @@ function isVideoUrl(item) {
   return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(String(item.imageUrl || ''))
 }
 
+function openAfterAuth(url, tab) {
+  const target = String(url || '').trim()
+  if (!target) return
+  if (!api.requireRealAuth(target)) return
+  if (tab) {
+    wx.switchTab({ url: target.split('?')[0] })
+    return
+  }
+  wx.navigateTo({
+    url: target,
+    fail: () => {
+      wx.switchTab({ url: target.split('?')[0], fail: () => {} })
+    },
+  })
+}
+
 function openDecorLink(item) {
   if (!item) return
   const type = String(item.linkType || 'none')
@@ -71,16 +88,11 @@ function openDecorLink(item) {
   if (type === 'none' || !val) return
   if (type === 'mp_path') {
     const url = val.startsWith('/') ? val : `/${val}`
-    wx.navigateTo({
-      url,
-      fail: () => {
-        wx.switchTab({ url: url.split('?')[0], fail: () => {} })
-      },
-    })
+    openAfterAuth(url, false)
     return
   }
   if (type === 'marketing') {
-    wx.navigateTo({ url: '/pages/subscription/subscription', fail: () => {} })
+    openAfterAuth('/pages/subscription/subscription', false)
     return
   }
   if (type === 'web_url') {
@@ -248,23 +260,19 @@ Page({
     const id = e.currentTarget.dataset.id
     const item = (this.data.entries || []).find((it) => it.id === id)
     if (!item) return
-    if (item.tab) {
-      wx.switchTab({ url: item.url })
-      return
-    }
-    wx.navigateTo({ url: item.url })
+    openAfterAuth(item.url, Boolean(item.tab))
   },
 
   onTodoTap(e) {
     const url = String(e.currentTarget.dataset.url || '')
-    if (url) wx.navigateTo({ url })
+    if (url) openAfterAuth(url, false)
   },
 
   onRecruitTap() {
-    wx.navigateTo({ url: '/pages/recruitment/recruitment' })
+    openAfterAuth('/pages/recruitment/recruitment', false)
   },
 
   onRecruitPublish() {
-    wx.navigateTo({ url: '/pages/recruit-hub/recruit-hub' })
+    openAfterAuth('/pages/recruit-hub/recruit-hub', false)
   },
 })
