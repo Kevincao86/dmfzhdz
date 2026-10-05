@@ -112,7 +112,7 @@ function CashRedPacketCard({
           <h2 className="text-sm font-semibold text-[var(--shell-text)]">{campaign.title || (getWorkIdentity() === 'talent' ? '达人活动红包提现' : 'PR招募现金红包')}</h2>
           <p className="mt-1 text-2xl font-bold text-amber-700">¥{wallet.availableYuan || '0.00'}</p>
           <p className="mt-1 text-xs text-[var(--shell-muted)]">
-            {campaign.subtitle || '发单红包自动进入钱包'} · 已达标 {wallet.qualifyingOrders || 0} 单 · 剩余 {campaign.remaining ?? 0} 个
+            发出去并分享商单后可领取红包 · 已达标 {wallet.qualifyingOrders || 0} 单
           </p>
           {wallet.hint ? <p className="mt-1 text-xs text-amber-800">{wallet.hint}</p> : null}
         </div>
