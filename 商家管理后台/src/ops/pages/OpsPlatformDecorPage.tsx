@@ -11,6 +11,7 @@ import {
   isCarouselBannerSlot,
   isDecorVideoMedia,
   isLaunchSplashSlot,
+  isShareCardSlot,
   type PlatformDecorFreq,
   type PlatformDecorLinkType,
   type PlatformDecorMediaType,
@@ -236,7 +237,11 @@ function emptyItem(slotKey: string): RegistryPlatformDecorItem {
     id: newId(),
     slotKey,
     enabled: true,
-    title: PLATFORM_DECOR_SLOT_LABELS[slotKey] || slotKey,
+    title: isShareCardSlot(slotKey)
+      ? slotKey === 'erp.mp.share.card'
+        ? '灵祺经营管理助手'
+        : '灵祺星选 | AI按城市品类匹配商单'
+      : PLATFORM_DECOR_SLOT_LABELS[slotKey] || slotKey,
     imageUrl: '',
     mediaType: 'image',
     linkType: 'none',
@@ -279,7 +284,8 @@ function DecorMediaThumb({ item }: { item: RegistryPlatformDecorItem }) {
 
 export default function OpsPlatformDecorPage() {
   const [params] = useSearchParams()
-  const kind = params.get('kind') === 'banner' ? 'banner' : 'popup'
+  const kindParam = params.get('kind')
+  const kind = kindParam === 'banner' ? 'banner' : kindParam === 'share' ? 'share' : 'popup'
   const [items, setItems] = useState<RegistryPlatformDecorItem[]>([])
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -290,14 +296,21 @@ export default function OpsPlatformDecorPage() {
 
   const slotOptions = useMemo(
     () =>
-      PLATFORM_DECOR_SLOT_KEYS.filter((k) =>
-        kind === 'popup' ? isPopupSlot(k) : !isPopupSlot(k),
-      ),
+      PLATFORM_DECOR_SLOT_KEYS.filter((k) => {
+        if (kind === 'share') return isShareCardSlot(k)
+        if (kind === 'popup') return isPopupSlot(k)
+        return !isPopupSlot(k) && !isShareCardSlot(k)
+      }),
     [kind],
   )
 
   const visibleItems = useMemo(
-    () => items.filter((it) => (kind === 'popup' ? isPopupSlot(it.slotKey) : !isPopupSlot(it.slotKey))),
+    () =>
+      items.filter((it) => {
+        if (kind === 'share') return isShareCardSlot(it.slotKey)
+        if (kind === 'popup') return isPopupSlot(it.slotKey)
+        return !isPopupSlot(it.slotKey) && !isShareCardSlot(it.slotKey)
+      }),
     [items, kind],
   )
 
@@ -328,7 +341,7 @@ export default function OpsPlatformDecorPage() {
   }
 
   function onAdd() {
-    const slotKey = slotOptions[0] || 'mp.home.popup'
+    const slotKey = slotOptions[0] || (kind === 'share' ? 'mp.share.card' : 'mp.home.popup')
     if (isCarouselBannerSlot(slotKey) && bannerCount(items, slotKey) >= MP_HOME_BANNER_MAX) {
       window.alert(`首页海报轮播最多 ${MP_HOME_BANNER_MAX} 张`)
       return
@@ -346,7 +359,12 @@ export default function OpsPlatformDecorPage() {
 
   async function onUpload(id: string, file: File | null) {
     if (!file) return
+    const row = items.find((it) => it.id === id)
     const isVideo = /^video\//i.test(file.type) || /\.(mp4|webm|mov|m4v)$/i.test(file.name)
+    if (row && isShareCardSlot(row.slotKey) && isVideo) {
+      window.alert('分享卡片请上传图片，不要传视频')
+      return
+    }
     const maxMb = isVideo ? 15 : 8
     if (file.size > maxMb * 1024 * 1024) {
       window.alert(isVideo ? `视频请不超过 ${maxMb}MB` : `图片/GIF 请不超过 ${maxMb}MB`)
@@ -397,10 +415,12 @@ export default function OpsPlatformDecorPage() {
     <div className="mx-auto max-w-4xl space-y-6 text-[var(--ops-text)]">
       <div>
         <h1 className="ops-page-title text-xl font-semibold">
-          {kind === 'popup' ? '海报弹窗' : '页面广告位'}
+          {kind === 'popup' ? '海报弹窗' : kind === 'share' ? '分享卡片' : '页面广告位'}
         </h1>
         <p className="ops-muted mt-1 text-sm">
-          {kind === 'popup'
+          {kind === 'share'
+            ? '达人小程序和商家小程序各配一张转发卡片。海报是卡片图，标题是分享副标题。可新增多条，保存后生效的是已启用且优先级最小的一条。未配置时小程序仍用原来的默认图和文案。商单、招募等单独分享不受这里影响。'
+            : kind === 'popup'
             ? '活动海报首页弹窗：与公告弹窗互斥，优先紧急/入选/档期类通知。支持 once / daily / always 频控。素材支持静图、GIF、短视频（OSS）。'
             : `达人小程序首页海报最多 ${MP_HOME_BANNER_MAX} 张（当前 ${bannerCount(items, 'mp.home.banner')}），商家小程序首页海报同样最多 ${MP_HOME_BANNER_MAX} 张（当前 ${bannerCount(items, 'erp.mp.home.banner')}）。都启用后按优先级从小到大轮播，每张单独设置跳转，整组共用一个轮播时长。其它广告位仍取优先级最小的一条。开屏海报在打开小程序时全屏播放，时长 3 秒或 5 秒，到时关闭，也可点跳过。素材支持静图、GIF、短视频（OSS）。`}
         </p>
@@ -542,16 +562,23 @@ export default function OpsPlatformDecorPage() {
           </label>
 
           <label className="ops-label">
-            标题
+            {isShareCardSlot(editing.slotKey) ? '分享副标题' : '标题'}
             <input
               className="ops-field mt-1"
               value={editing.title}
+              maxLength={isShareCardSlot(editing.slotKey) ? 32 : undefined}
+              placeholder={isShareCardSlot(editing.slotKey) ? '转发卡片上显示的文字' : ''}
               onChange={(e) => patchItem(editing.id, { title: e.target.value })}
             />
+            {isShareCardSlot(editing.slotKey) ? (
+              <p className="ops-hint mt-1">显示在小程序名称下面，建议 32 字以内。</p>
+            ) : null}
           </label>
 
           <div className="space-y-2">
-            <p className="ops-label">海报素材（静图 / GIF / 视频）</p>
+            <p className="ops-label">
+              {isShareCardSlot(editing.slotKey) ? '分享卡片海报' : '海报素材（静图 / GIF / 视频）'}
+            </p>
             {editing.imageUrl ? (
               <div className="overflow-hidden rounded-lg border border-[var(--ops-border)] bg-[var(--ops-hover)]">
                 {isDecorVideoMedia(editing) ? (
@@ -591,7 +618,11 @@ export default function OpsPlatformDecorPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.gif,.mp4,.webm,.mov,.m4v"
+              accept={
+                isShareCardSlot(editing.slotKey)
+                  ? 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
+                  : 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.gif,.mp4,.webm,.mov,.m4v'
+              }
               className="hidden"
               onChange={(e) => void onUpload(editing.id, e.target.files?.[0] || null)}
             />
@@ -615,6 +646,7 @@ export default function OpsPlatformDecorPage() {
             </label>
           </div>
 
+          {isShareCardSlot(editing.slotKey) ? null : (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="ops-label">
               跳转类型
@@ -667,6 +699,7 @@ export default function OpsPlatformDecorPage() {
             </label>
             )}
           </div>
+          )}
           {isCarouselBannerSlot(editing.slotKey) ? (
             <p className="ops-hint">这一张单独跳转。最多 {MP_HOME_BANNER_MAX} 张，下面的秒数整组共用。</p>
           ) : null}

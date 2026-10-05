@@ -6,9 +6,39 @@ const mpRuntime = require('./mpRuntime.js')
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
 const SHARE_COVER_FILE = 'share/share-cover-ai-match.jpg'
 const DEFAULT_TITLE = '灵祺星选 | AI按城市品类匹配商单'
+const SHARE_CARD_SLOT = 'mp.share.card'
 
 let cachedShareCoverPath = ''
+let cachedShareCoverSource = ''
 let coverPreparePromise = null
+let decorShare = { title: '', imageUrl: '' }
+let decorSharePromise = null
+
+function usableDecorTitle(raw) {
+  const title = String(raw || '').trim()
+  if (!title || title === SHARE_CARD_SLOT || title === '达人小程序 · 分享卡片') return ''
+  return title.slice(0, 32)
+}
+
+function applyDecorShare(item) {
+  if (!item) return decorShare
+  decorShare.title = usableDecorTitle(item.title)
+  const imageUrl = String(item.imageUrl || '').trim()
+  decorShare.imageUrl = /^https?:\/\//i.test(imageUrl) ? imageUrl : ''
+  return decorShare
+}
+
+function ensureDecorShare() {
+  if (decorSharePromise) return decorSharePromise
+  decorSharePromise = require('./mpPlatformDecor.js')
+    .fetchDecorItem(SHARE_CARD_SLOT)
+    .then((item) => applyDecorShare(item))
+    .catch(() => decorShare)
+    .finally(() => {
+      decorSharePromise = null
+    })
+  return decorSharePromise
+}
 
 function shareCoverCacheVer() {
   return String(config.MP_ASSET_CACHE_VER || '1').trim() || '1'
@@ -36,6 +66,7 @@ function persistCoverPath(path) {
   const p = String(path || '').trim()
   if (!p) return ''
   cachedShareCoverPath = p
+  cachedShareCoverSource = remoteShareCoverUrl()
   try {
     const app = getApp()
     if (app && app.globalData) app.globalData.shareCoverPath = p
@@ -44,6 +75,11 @@ function persistCoverPath(path) {
 }
 
 function readCoverPath() {
+  const expected = remoteShareCoverUrl()
+  if (cachedShareCoverSource && cachedShareCoverSource !== expected) {
+    cachedShareCoverPath = ''
+    cachedShareCoverSource = ''
+  }
   if (cachedShareCoverPath && isCurrentShareCoverCache(cachedShareCoverPath)) {
     return cachedShareCoverPath
   }
@@ -51,8 +87,9 @@ function readCoverPath() {
   try {
     const app = getApp()
     const g = app && app.globalData && app.globalData.shareCoverPath
-    if (g && isCurrentShareCoverCache(g)) {
+    if (g && isCurrentShareCoverCache(g) && !decorShare.imageUrl) {
       cachedShareCoverPath = String(g)
+      cachedShareCoverSource = expected
       return cachedShareCoverPath
     }
     if (app && app.globalData) app.globalData.shareCoverPath = ''
@@ -61,7 +98,8 @@ function readCoverPath() {
 }
 
 function remoteShareCoverUrl() {
-  const fromConfig = String(config.MP_SHARE_COVER_URL || '').trim()
+  const fromDecor = String(decorShare.imageUrl || '').trim()
+  const fromConfig = fromDecor || String(config.MP_SHARE_COVER_URL || '').trim()
   const ver = shareCoverCacheVer()
   const withVer = (url) => {
     const u = String(url || '').trim()
@@ -151,38 +189,38 @@ function prepareShareCoverPath() {
   return coverPreparePromise
 }
 
+function resolvedShareTitle(opts) {
+  const custom = opts && opts.title ? String(opts.title).trim() : ''
+  if (custom) return custom
+  return decorShare.title || DEFAULT_TITLE
+}
+
 function buildSharePayload(path, opts, forTimeline) {
-  const title =
-    opts && opts.title ? String(opts.title).trim() || DEFAULT_TITLE : DEFAULT_TITLE
   const sharePath = path || '/pages/index/index'
   const query = opts && opts.query ? String(opts.query) : ''
   const customImage = opts && opts.imageUrl ? String(opts.imageUrl).trim() : ''
   const recruitShareCover = require('./recruitShareCover.js')
+  const title = resolvedShareTitle(opts)
   const shareBase = forTimeline ? { title, query } : { title, path: sharePath }
-  const remotePlaceholder = placeholderShareCoverUrl()
 
   if (customImage) {
     return recruitShareCover.attachShareCoverPromise(shareBase, customImage)
   }
 
-  const ready = readCoverPath()
-  if (ready) {
+  const finish = (imageUrl) => {
+    const nextTitle = resolvedShareTitle(opts)
+    const url = String(imageUrl || remoteShareCoverUrl()).trim()
     return forTimeline
-      ? { title, query, imageUrl: ready }
-      : { title, path: sharePath, imageUrl: ready }
-  }
-
-  if (mpRuntime.isAndroidWechat()) {
-    return recruitShareCover.attachShareCoverPromise(shareBase, remotePlaceholder)
+      ? { title: nextTitle, query, imageUrl: url }
+      : { title: nextTitle, path: sharePath, imageUrl: url }
   }
 
   return {
-    ...(forTimeline ? { title, query } : { title, path: sharePath }),
-    imageUrl: remotePlaceholder,
-    promise: prepareShareCoverPath().then((imageUrl) => {
-      const url = String(imageUrl || remotePlaceholder).trim()
-      return forTimeline ? { title, query, imageUrl: url } : { title, path: sharePath, imageUrl: url }
-    }),
+    ...shareBase,
+    imageUrl: readCoverPath() || remoteShareCoverUrl(),
+    promise: ensureDecorShare()
+      .then(() => prepareShareCoverPath())
+      .then((imageUrl) => finish(imageUrl)),
   }
 }
 
@@ -205,7 +243,7 @@ function enableShareMenu() {
 }
 
 function preloadShareCover() {
-  void prepareShareCoverPath()
+  void ensureDecorShare().then(() => prepareShareCoverPath())
 }
 
 module.exports = {

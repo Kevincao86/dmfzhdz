@@ -151,6 +151,13 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
       },
       {
         kind: 'leaf',
+        to: '/platform-decor?kind=share',
+        label: '分享卡片',
+        icon: PanelTop,
+        permission: 'platform_decor',
+      },
+      {
+        kind: 'leaf',
         to: '/lecturer-review',
         label: '讲师审核',
         icon: UserRound,
@@ -296,7 +303,7 @@ export function resolveOpsPageMeta(pathname: string, search = ''): { title: stri
     if (path === '/platform-decor') {
       const kind = new URLSearchParams(search).get('kind') || 'popup'
       return {
-        title: kind === 'banner' ? '页面广告位' : '海报弹窗',
+        title: kind === 'banner' ? '页面广告位' : kind === 'share' ? '分享卡片' : '海报弹窗',
         group,
       }
     }

@@ -15,6 +15,8 @@ export const PLATFORM_DECOR_SLOT_KEYS = [
   'erp.launch.splash',
   'mp.home.banner',
   'erp.mp.home.banner',
+  'mp.share.card',
+  'erp.mp.share.card',
   'mp.mine.entry',
   'mp.hall.strip',
   'dr.home.popup',
@@ -32,7 +34,13 @@ export type PlatformDecorSlotKey = (typeof PLATFORM_DECOR_SLOT_KEYS)[number]
 /** 达人小程序首页海报轮播：最多 5 张，共用一个轮播秒数 */
 export const MP_HOME_BANNER_SLOT = 'mp.home.banner'
 export const ERP_MP_HOME_BANNER_SLOT = 'erp.mp.home.banner'
+export const MP_SHARE_CARD_SLOT = 'mp.share.card'
+export const ERP_MP_SHARE_CARD_SLOT = 'erp.mp.share.card'
 export const MP_HOME_BANNER_MAX = 5
+
+export function isShareCardSlot(slotKey: string): boolean {
+  return slotKey === MP_SHARE_CARD_SLOT || slotKey === ERP_MP_SHARE_CARD_SLOT
+}
 
 export function isCarouselBannerSlot(slotKey: string): boolean {
   return slotKey === MP_HOME_BANNER_SLOT || slotKey === ERP_MP_HOME_BANNER_SLOT
@@ -50,6 +58,8 @@ export const PLATFORM_DECOR_SLOT_LABELS: Record<string, string> = {
   'erp.launch.splash': '商家小程序 · 开屏海报',
   'mp.home.banner': '达人小程序 · 首页海报轮播',
   'erp.mp.home.banner': '商家小程序 · 首页海报轮播',
+  'mp.share.card': '达人小程序 · 分享卡片',
+  'erp.mp.share.card': '商家小程序 · 分享卡片',
   'mp.mine.entry': '小程序 · 我的推广上方',
   'mp.hall.strip': '小程序 · 大厅顶细条',
   'dr.home.popup': '星选 DR · 首页弹窗',
@@ -71,6 +81,8 @@ export const PLATFORM_DECOR_SLOT_SIZE_HINTS: Record<string, string> = {
   'erp.launch.splash': '建议 750×1334（竖版 9:16，打开商家小程序时全屏）',
   'mp.home.banner': '建议 750×420（最多 5 张，按优先级轮播，每张单独跳转，轮播秒数可设）',
   'erp.mp.home.banner': '建议 750×420（商家小程序首页，最多 5 张，按优先级轮播，每张单独跳转，轮播秒数可设）',
+  'mp.share.card': '建议 500×400（5:4）。海报是转发卡片图，标题栏填写分享副标题。多条时用优先级最小且已启用的一条。',
+  'erp.mp.share.card': '建议 500×400（5:4）。海报是转发卡片图，标题栏填写分享副标题。多条时用优先级最小且已启用的一条。',
   'mp.mine.entry': '建议 750×180（横条）',
   'mp.hall.strip': '建议 750×96（细条）',
   'dr.home.popup': '建议 720×960（竖版 3:4）',
