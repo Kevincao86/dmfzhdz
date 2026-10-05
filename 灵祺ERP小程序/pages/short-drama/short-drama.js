@@ -740,33 +740,111 @@ Page({
     return faces.concat(refs).slice(0, 3)
   },
 
-  downloadImageAsDataUrl(url) {
+  _fileToDataUrl(filePath) {
     return new Promise((resolve) => {
-      if (!url) {
+      const path = String(filePath || '').trim()
+      if (!path) {
         resolve('')
         return
       }
-      if (/^data:image\//i.test(url)) {
-        resolve(url)
-        return
-      }
-      wx.downloadFile({
-        url,
-        success: (res) => {
-          if (res.statusCode !== 200 || !res.tempFilePath) {
-            resolve('')
-            return
-          }
+      wx.getFileSystemManager().readFile({
+        filePath: path,
+        encoding: 'base64',
+        success: (r) => {
+          const b64 = typeof r.data === 'string' ? r.data : ''
+          resolve(b64 ? `data:image/jpeg;base64,${b64}` : '')
+        },
+        fail: () => {
           try {
-            const b64 = wx.getFileSystemManager().readFileSync(res.tempFilePath, 'base64')
+            const b64 = wx.getFileSystemManager().readFileSync(path, 'base64')
             resolve(b64 ? `data:image/jpeg;base64,${b64}` : '')
           } catch (_) {
             resolve('')
           }
         },
+      })
+    })
+  },
+  _isLocalImagePath(src) {
+    const s = String(src || '')
+    if (/^(wxfile:|file:|http:\/\/tmp|https:\/\/tmp)/i.test(s)) return true
+    const root = wx.env && wx.env.USER_DATA_PATH
+    return !!(root && s.indexOf(root) === 0)
+  },
+  _downloadFileLocal(url) {
+    return new Promise((resolve) => {
+      wx.downloadFile({
+        url,
+        success: (res) => {
+          resolve(res.statusCode === 200 && res.tempFilePath ? res.tempFilePath : '')
+        },
         fail: () => resolve(''),
       })
     })
+  },
+  _canvasImageToDataUrl(src) {
+    return new Promise((resolve) => {
+      let canvas
+      try {
+        canvas = wx.createOffscreenCanvas({ type: '2d', width: 32, height: 32 })
+      } catch (_) {
+        resolve('')
+        return
+      }
+      const ctx = canvas.getContext('2d')
+      const img = canvas.createImage()
+      img.onload = () => {
+        const w = img.width || 768
+        const h = img.height || 1024
+        const scale = Math.min(1, 1024 / Math.max(w, h))
+        const dw = Math.max(1, Math.round(w * scale))
+        const dh = Math.max(1, Math.round(h * scale))
+        canvas.width = dw
+        canvas.height = dh
+        ctx.drawImage(img, 0, 0, dw, dh)
+        if (typeof canvas.toDataURL === 'function') {
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.86)
+            if (/^data:image\//i.test(dataUrl)) {
+              resolve(dataUrl)
+              return
+            }
+          } catch (_) {}
+        }
+        wx.canvasToTempFilePath({
+          canvas,
+          destWidth: dw,
+          destHeight: dh,
+          fileType: 'jpg',
+          quality: 0.86,
+          success: (r) => this._fileToDataUrl(r.tempFilePath).then(resolve),
+          fail: () => resolve(''),
+        })
+      }
+      img.onerror = () => resolve('')
+      img.src = src
+    })
+  },
+  async downloadImageAsDataUrl(url) {
+    const src = String(url || '').trim()
+    if (!src) return ''
+    if (/^data:image\//i.test(src)) return src
+    let localPath = ''
+    if (this._isLocalImagePath(src)) localPath = src
+    if (!localPath) {
+      localPath = await new Promise((resolve) => {
+        wx.getImageInfo({
+          src,
+          success: (info) => resolve((info && (info.path || info.tempFilePath)) || ''),
+          fail: () => resolve(''),
+        })
+      })
+    }
+    if (!localPath) localPath = await this._downloadFileLocal(src)
+    let dataUrl = localPath ? await this._fileToDataUrl(localPath) : ''
+    if (!dataUrl) dataUrl = await this._canvasImageToDataUrl(src)
+    if (!dataUrl && /^https?:/i.test(src)) dataUrl = await vs.fetchRemoteImageDataUrl(src)
+    return dataUrl || ''
   },
 
   async onGenerate() {

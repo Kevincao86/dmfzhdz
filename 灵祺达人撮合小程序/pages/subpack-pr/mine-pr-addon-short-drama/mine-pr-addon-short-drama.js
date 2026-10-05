@@ -3,6 +3,7 @@ const catalog = require('../../../utils/shortDramaCatalogMp.js')
 const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
 const media = require('../../../utils/mpAddonMedia.js')
+const castStore = require('../../../utils/shortDramaCastMp.js')
 
 const QUALITIES = [
   { id: '720p', label: '720p' },
@@ -30,8 +31,23 @@ function shopFromFields(fields, prev) {
   return shop
 }
 
-function newCast() {
-  return { id: `c_${Date.now()}_${Math.floor(Math.random() * 1000)}`, name: '', desc: '' }
+function parsePortraitAi(raw) {
+  const text = String(raw || '').trim()
+  if (!text) return ''
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const jsonStr = (fence && fence[1] ? fence[1] : text).trim()
+  const start = jsonStr.indexOf('{')
+  const end = jsonStr.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try {
+      const o = JSON.parse(jsonStr.slice(start, end + 1))
+      const portrait = String(o.portrait || o.desc || o.description || '').trim()
+      if (portrait) return portrait.replace(/^["「]|["」]$/g, '')
+    } catch (_) {}
+  }
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  if (!cleaned || cleaned.charAt(0) === '{') return ''
+  return cleaned.replace(/^["「]|["」]$/g, '').trim()
 }
 
 Page({
@@ -62,7 +78,14 @@ Page({
     shop: emptyShop(),
     story: '',
     storyBusy: false,
-    cast: [newCast()],
+    cast: [castStore.newMember(1)],
+    castPacks: [],
+    castPackName: '',
+    showCastSave: false,
+    showCastLibrary: false,
+    castBusyId: '',
+    portraitBusyId: '',
+    hint: '',
     busy: false,
     err: '',
     progress: '',
@@ -267,29 +290,361 @@ Page({
     }
   },
 
-  onAddCast() {
-    const cast = (this.data.cast || []).concat([newCast()])
-    this.setData({ cast: cast.slice(0, 6) })
+  _patchCast(id, patch) {
+    const cast = (this.data.cast || []).map((m) => (m.id === id ? Object.assign({}, m, patch) : m))
+    this.setData({ cast })
+    return cast
   },
-
+  _member(id) {
+    return (this.data.cast || []).find((m) => m.id === id) || null
+  },
+  _readImageDataUrl(path) {
+    try {
+      const b64 = wx.getFileSystemManager().readFileSync(path, 'base64')
+      return b64 ? `data:image/jpeg;base64,${b64}` : ''
+    } catch (_) {
+      return ''
+    }
+  },
+  _fileToDataUrl(filePath) {
+    return new Promise((resolve) => {
+      const path = String(filePath || '').trim()
+      if (!path) {
+        resolve('')
+        return
+      }
+      wx.getFileSystemManager().readFile({
+        filePath: path,
+        encoding: 'base64',
+        success: (r) => {
+          const b64 = typeof r.data === 'string' ? r.data : ''
+          resolve(b64 ? `data:image/jpeg;base64,${b64}` : '')
+        },
+        fail: () => resolve(this._readImageDataUrl(path)),
+      })
+    })
+  },
+  _isLocalImagePath(src) {
+    const s = String(src || '')
+    if (/^(wxfile:|file:|http:\/\/tmp|https:\/\/tmp)/i.test(s)) return true
+    const root = wx.env && wx.env.USER_DATA_PATH
+    return !!(root && s.indexOf(root) === 0)
+  },
+  async downloadImageAsDataUrl(url) {
+    const src = String(url || '').trim()
+    if (!src) return ''
+    if (/^data:image\//i.test(src)) return src
+    let localPath = this._isLocalImagePath(src) ? src : ''
+    if (!localPath) {
+      localPath = await new Promise((resolve) => {
+        wx.getImageInfo({
+          src,
+          success: (info) => resolve((info && (info.path || info.tempFilePath)) || ''),
+          fail: () => resolve(''),
+        })
+      })
+    }
+    if (!localPath) {
+      localPath = await new Promise((resolve) => {
+        wx.downloadFile({
+          url: src,
+          success: (res) => resolve(res.statusCode === 200 && res.tempFilePath ? res.tempFilePath : ''),
+          fail: () => resolve(''),
+        })
+      })
+    }
+    let dataUrl = localPath ? await this._fileToDataUrl(localPath) : ''
+    if (!dataUrl) dataUrl = await this._canvasImageToDataUrl(src)
+    if (!dataUrl && /^https?:/i.test(src)) dataUrl = await addonApi.fetchRemoteImageDataUrl(src)
+    return dataUrl || ''
+  },
+  _canvasImageToDataUrl(src) {
+    return new Promise((resolve) => {
+      let canvas
+      try {
+        canvas = wx.createOffscreenCanvas({ type: '2d', width: 32, height: 32 })
+      } catch (_) {
+        resolve('')
+        return
+      }
+      const ctx = canvas.getContext('2d')
+      const img = canvas.createImage()
+      img.onload = () => {
+        const w = img.width || 768
+        const h = img.height || 1024
+        const scale = Math.min(1, 1024 / Math.max(w, h))
+        const dw = Math.max(1, Math.round(w * scale))
+        const dh = Math.max(1, Math.round(h * scale))
+        canvas.width = dw
+        canvas.height = dh
+        ctx.drawImage(img, 0, 0, dw, dh)
+        if (typeof canvas.toDataURL === 'function') {
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.86)
+            if (/^data:image\//i.test(dataUrl)) {
+              resolve(dataUrl)
+              return
+            }
+          } catch (_) {}
+        }
+        wx.canvasToTempFilePath({
+          canvas,
+          destWidth: dw,
+          destHeight: dh,
+          fileType: 'jpg',
+          quality: 0.86,
+          success: (r) => this._fileToDataUrl(r.tempFilePath).then(resolve),
+          fail: () => resolve(''),
+        })
+      }
+      img.onerror = () => resolve('')
+      img.src = src
+    })
+  },
+  onAddCast() {
+    const cast = this.data.cast || []
+    if (cast.length >= castStore.MAX) {
+      wx.showToast({ title: `最多 ${castStore.MAX} 个角色`, icon: 'none' })
+      return
+    }
+    this.setData({ cast: cast.concat(castStore.newMember(cast.length + 1)) })
+  },
   onRemoveCast(e) {
     const id = e.currentTarget.dataset.id
     const cast = (this.data.cast || []).filter((c) => c.id !== id)
-    this.setData({ cast: cast.length ? cast : [newCast()] })
+    this.setData({ cast: cast.length ? cast : [castStore.newMember(1)] })
   },
-
   onCastName(e) {
-    const id = e.currentTarget.dataset.id
-    this.setData({
-      cast: (this.data.cast || []).map((c) => (c.id === id ? { ...c, name: e.detail.value } : c)),
+    this._patchCast(e.currentTarget.dataset.id, { name: e.detail.value })
+  },
+  onCastDesc(e) {
+    this._patchCast(e.currentTarget.dataset.id, { desc: e.detail.value, confirmed: false })
+  },
+  async onEnrichCast(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    if (!member || this.data.portraitBusyId || this.data.castBusyId) return
+    const hintText = String(member.desc || member.name || '').trim()
+    if (hintText.length < 2) {
+      wx.showToast({ title: '请先写一句形象提示', icon: 'none' })
+      return
+    }
+    const world = catalog.worldOf(this.data.worldId)
+    const scene = catalog.sceneOf(this.data.sceneId, this.sceneDraft())
+    this.setData({ portraitBusyId: member.id, err: '' })
+    try {
+      const r = await addonApi.postAiChat(
+        [
+          {
+            role: 'system',
+            content:
+              '你是商业短视频角色造型指导。根据简要提示补全竖屏短剧定妆形象词。只输出 JSON：{"portrait":"..."}，portrait 为 80 到 180 字中文。',
+          },
+          {
+            role: 'user',
+            content: `场景：${world.label} / ${scene.name}\n角色：${member.name || '主角'}\n提示：${hintText}`,
+          },
+        ],
+        { provider: 'qwen', taskType: 'generate_copywriting', temperature: 0.6 },
+      )
+      if (!r.ok) throw new Error(r.message || '补充画像失败')
+      const portrait = parsePortraitAi(r.content).slice(0, 300)
+      if (portrait.length < 12) throw new Error('未返回可用画像')
+      this._patchCast(member.id, { desc: portrait, confirmed: false })
+      this.setData({ hint: '已补全角色形象词，可再点「生成预览」。' })
+    } catch (err) {
+      this.setData({ err: (err && err.message) || '补充画像失败' })
+    } finally {
+      this.setData({ portraitBusyId: '' })
+    }
+  },
+  onClearCastPhoto(e) {
+    this._patchCast(e.currentTarget.dataset.id, {
+      sourcePath: '',
+      sourceDataUrl: '',
+      previewPath: '',
+      previewDataUrl: '',
+      refMode: '',
+      confirmed: false,
     })
   },
-
-  onCastDesc(e) {
+  onClearCastText(e) {
+    this._patchCast(e.currentTarget.dataset.id, { desc: '', confirmed: false })
+  },
+  onCastRefMode(e) {
+    const patch = { refMode: e.currentTarget.dataset.mode }
+    if (patch.refMode === 'beautify') patch.desc = ''
+    this._patchCast(e.currentTarget.dataset.id, patch)
+  },
+  onPickCastPhoto(e) {
     const id = e.currentTarget.dataset.id
-    this.setData({
-      cast: (this.data.cast || []).map((c) => (c.id === id ? { ...c, desc: e.detail.value } : c)),
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      success: (res) => {
+        const f = res.tempFiles && res.tempFiles[0]
+        if (!f || !f.tempFilePath) return
+        this._patchCast(id, {
+          sourcePath: f.tempFilePath,
+          sourceDataUrl: this._readImageDataUrl(f.tempFilePath),
+          previewPath: '',
+          previewDataUrl: '',
+          desc: '',
+          refMode: '',
+          confirmed: false,
+        })
+        this.setData({ hint: '已上传参考图。请选择按图美化，或识别成文字。' })
+      },
     })
+  },
+  async _genPreview(member, usePhoto) {
+    const name = String(member.name || '').trim() || '主角'
+    const desc = String(member.desc || '').trim()
+    const prompt = usePhoto
+      ? '图生图：必须与参考图为同一人。去掉字幕和水印。竖屏半身短剧定妆，单人，禁止文字。'
+      : `竖屏半身短剧定妆，单人，五官清晰。角色：${name}。外貌：${desc}。禁止字幕、水印、多人。`
+    const r = await addonApi.postAiAgentImage(prompt, {
+      preferredVendor: 'qwen',
+      aspectRatio: '3:4',
+      exactPrompt: true,
+      referenceImage: usePhoto ? member.sourceDataUrl || '' : '',
+    })
+    if (!r.ok || !r.imageUrl) throw new Error(r.message || '角色生成失败')
+    this._patchCast(member.id, { previewPath: r.imageUrl, previewDataUrl: '', confirmed: false })
+    this.setData({ hint: `已为${name}生成预览，请点「用此图确认角色」。` })
+  },
+  async onGenCast(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    if (!member || this.data.castBusyId) return
+    if (String(member.desc || '').trim().length < 6) {
+      wx.showToast({ title: '请先写形象词（至少 6 字）', icon: 'none' })
+      return
+    }
+    this.setData({ castBusyId: member.id, err: '' })
+    try {
+      await this._genPreview(member, false)
+    } catch (err) {
+      this.setData({ err: (err && err.message) || '角色生成失败' })
+    } finally {
+      this.setData({ castBusyId: '' })
+    }
+  },
+  async onApplyCastRef(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    if (!member || this.data.castBusyId) return
+    if (member.refMode !== 'beautify' && member.refMode !== 'describe') {
+      wx.showToast({ title: '请先选一种用法', icon: 'none' })
+      return
+    }
+    this.setData({ castBusyId: member.id, err: '' })
+    try {
+      if (member.refMode === 'beautify') {
+        await this._genPreview(member, true)
+        return
+      }
+      const chat = await addonApi.postAiChat(
+        [
+          {
+            role: 'system',
+            content: '你是人像核验员。只根据参考图写一段中文形象词，60到140字。',
+          },
+          {
+            role: 'user',
+            content: `角色：${member.name || '主角'}。请按参考图写下发型、发色、五官和衣着。`,
+          },
+        ],
+        {
+          provider: 'qwen',
+          taskType: 'generate_copywriting',
+          temperature: 0.2,
+          imageDataUrls: member.sourceDataUrl ? [member.sourceDataUrl] : [],
+        },
+      )
+      if (!chat.ok) throw new Error(chat.message || '识别失败')
+      this._patchCast(member.id, {
+        desc: String(chat.content || '').trim().slice(0, 300),
+        sourcePath: '',
+        sourceDataUrl: '',
+        refMode: 'describe',
+        confirmed: false,
+      })
+      this.setData({ hint: '已把参考图识别成形象词。可再点「生成预览」。' })
+    } catch (err) {
+      this.setData({ err: (err && err.message) || '参考图处理失败' })
+    } finally {
+      this.setData({ castBusyId: '' })
+    }
+  },
+  async onConfirmCast(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    if (!member) return
+    const preview = String(member.previewPath || member.sourcePath || '').trim()
+    if (!preview) {
+      wx.showToast({ title: '请先生成或上传角色预览', icon: 'none' })
+      return
+    }
+    if (/^data:image\//i.test(member.previewDataUrl || '') || /^data:image\//i.test(preview)) {
+      const cast = this._patchCast(member.id, {
+        previewDataUrl: member.previewDataUrl || preview,
+        confirmed: true,
+      })
+      castStore.saveCurrent(cast)
+      this.setData({ hint: `已确认${member.name || '角色'}，出片将锁这张脸。`, err: '' })
+      return
+    }
+    wx.showLoading({ title: '确认角色…', mask: true })
+    try {
+      const local = await this.downloadImageAsDataUrl(preview)
+      if (!local) {
+        this.setData({ hint: '角色图未能转成本地文件' })
+        return
+      }
+      const cast = this._patchCast(member.id, { previewDataUrl: local, confirmed: true })
+      castStore.saveCurrent(cast)
+      this.setData({ hint: `已确认${member.name || '角色'}，出片将锁这张脸。`, err: '' })
+    } catch (err) {
+      this.setData({ err: (err && err.message) || '确认角色失败' })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+  onPreviewCast(e) {
+    const member = this._member(e.currentTarget.dataset.id)
+    const url = member && (member.previewPath || member.sourcePath)
+    if (url) wx.previewImage({ urls: [url], current: url })
+  },
+  onToggleCastSave() {
+    this.setData({ showCastSave: !this.data.showCastSave, showCastLibrary: false })
+  },
+  onToggleCastLibrary() {
+    this.setData({
+      showCastLibrary: !this.data.showCastLibrary,
+      showCastSave: false,
+      castPacks: castStore.loadPacks(),
+    })
+  },
+  onCastPackName(e) {
+    this.setData({ castPackName: e.detail.value.slice(0, 32) })
+  },
+  onSaveCastPack() {
+    const name = String(this.data.castPackName || '').trim() || '续集角色'
+    const packs = castStore.loadPacks().filter((p) => p.name !== name)
+    packs.unshift({ id: `p${Date.now().toString(36)}`, name, savedAt: Date.now(), members: this.data.cast || [] })
+    try {
+      castStore.savePacks(packs)
+      this.setData({ castPacks: castStore.loadPacks(), showCastSave: false, hint: `已保存角色组「${name}」。` })
+    } catch (_) {
+      this.setData({ err: '角色图太大，保存失败。请先确认角色后再存。' })
+    }
+  },
+  onLoadCastPack(e) {
+    const pack = (this.data.castPacks || []).find((p) => p.id === e.currentTarget.dataset.id)
+    if (!pack || !pack.members || !pack.members.length) return
+    this.setData({ cast: pack.members.slice(0, castStore.MAX), showCastLibrary: false, hint: `已载入「${pack.name}」。` })
+  },
+  onDeleteCastPack(e) {
+    const packs = castStore.loadPacks().filter((p) => p.id !== e.currentTarget.dataset.id)
+    castStore.savePacks(packs)
+    this.setData({ castPacks: packs })
   },
 
   async onGenerate() {
@@ -312,13 +667,19 @@ Page({
     this.setData({ busy: true, err: '', progress: '提交任务…', resultUrl: '', promptPreview: prompt })
     try {
       const resolution = this.data.qualityId === '1080p' ? '1080p' : '720p'
+      const faces = (this.data.cast || [])
+        .filter((m) => m.confirmed && m.previewDataUrl)
+        .map((m) => m.previewDataUrl)
+        .slice(0, 2)
+      const body = {
+        prompt,
+        flags: `--dur ${clip} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`,
+        generate_audio: true,
+      }
+      if (faces.length) body.images_base64 = faces
       const start = await addonApi.postShortVideoWithFailover({
         engine: 'seedance',
-        body: {
-          prompt,
-          flags: `--dur ${clip} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`,
-          generate_audio: true,
-        },
+        body,
       })
       if (!start.ok) {
         this.setData({ err: start.message || '发起失败' })

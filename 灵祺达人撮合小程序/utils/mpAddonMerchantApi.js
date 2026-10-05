@@ -311,12 +311,29 @@ async function postLongformVideoPlan(body) {
   return { ok: false, message: lastErr || '长片策划接口未部署' }
 }
 
+/** 小程序 downloadFile 拉不到的成图，改由接口代拉成 data URL。 */
+async function fetchRemoteImageDataUrl(imageUrl) {
+  const url = String(imageUrl || '').trim()
+  if (!url) return ''
+  if (/^data:image\//i.test(url)) return url
+  let r
+  try {
+    r = await postPaths(['/api/meoo-ai-agent-image'], { phase: 'fetch', image_url: url }, mpAuthHeaders())
+  } catch (_) {
+    return ''
+  }
+  if (!r.ok) return ''
+  const out = String((r.data && r.data.imageUrl) || '').trim()
+  return /^data:image\//i.test(out) ? out : ''
+}
+
 module.exports = {
   TEXT_MODELS,
   hasDouyinLinkeToken,
   postDouyinAiAssist,
   postAiChat,
   postAiAgentImage,
+  fetchRemoteImageDataUrl,
   postDouyinLinkForDh,
   fetchVideoAiConfig,
   postShortVideoWithFailover,

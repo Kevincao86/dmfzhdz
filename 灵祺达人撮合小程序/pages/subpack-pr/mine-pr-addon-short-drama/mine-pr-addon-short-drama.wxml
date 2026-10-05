@@ -75,22 +75,66 @@
 
   <view class="op-card" wx:elif="{{dramaStep === 3}}">
     <text class="op-label">角色形象</text>
-    <text class="op-body muted">写出角色名和形象词，会写进成片提示词。可加多位。</text>
-    <button class="op-btn-ghost" bindtap="onAddCast">新建角色</button>
+    <text class="op-body muted">和商家端同一套：写形象或上传参考图，生成预览后点「用此图确认角色」。</text>
+    <view class="op-row">
+      <button class="op-btn-ghost" bindtap="onToggleCastLibrary">选用已存{{castPacks.length ? ' ' + castPacks.length : ''}}</button>
+      <button class="op-btn-ghost" bindtap="onToggleCastSave">保存角色</button>
+      <button class="op-btn-ghost" bindtap="onAddCast">新建角色</button>
+    </view>
+    <view wx:if="{{showCastSave}}" class="op-box">
+      <input class="op-input" placeholder="角色组名称" value="{{castPackName}}" bindinput="onCastPackName" />
+      <button class="op-btn" bindtap="onSaveCastPack">确认保存</button>
+    </view>
+    <view wx:if="{{showCastLibrary}}" class="op-box">
+      <text wx:if="{{!castPacks.length}}" class="op-body muted">还没有已存角色组。</text>
+      <view wx:for="{{castPacks}}" wx:key="id" class="op-pack">
+        <text class="op-body">{{item.name}} · {{item.members.length}} 人</text>
+        <button class="op-btn" data-id="{{item.id}}" bindtap="onLoadCastPack">载入</button>
+        <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onDeleteCastPack">删除</button>
+      </view>
+    </view>
     <view wx:for="{{cast}}" wx:key="id" class="op-cast-card">
       <view class="op-row">
         <input class="op-input grow" data-id="{{item.id}}" placeholder="角色名" value="{{item.name}}" bindinput="onCastName" />
         <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onRemoveCast">删除</button>
       </view>
+      <button
+        wx:if="{{!item.sourceDataUrl}}"
+        class="op-btn-ghost"
+        loading="{{portraitBusyId === item.id}}"
+        data-id="{{item.id}}"
+        bindtap="onEnrichCast"
+      >{{portraitBusyId === item.id ? '正在补充画像' : 'AI补充画像'}}</button>
       <textarea
         class="op-area"
         maxlength="300"
         data-id="{{item.id}}"
-        placeholder="形象词：年龄、发型发色、衣着"
+        disabled="{{item.sourceDataUrl ? true : false}}"
+        placeholder="{{item.sourceDataUrl ? '已选用参考图，文字已锁定。' : '形象词：年龄、发型发色、衣着。写完后点生成预览。'}}"
         value="{{item.desc}}"
         bindinput="onCastDesc"
       />
+      <button wx:if="{{item.sourceDataUrl}}" class="op-btn-ghost" data-id="{{item.id}}" bindtap="onClearCastPhoto">改用文字描述（去掉参考图）</button>
+      <button wx:elif="{{item.desc}}" class="op-btn-ghost" data-id="{{item.id}}" bindtap="onClearCastText">改用参考图（清空文字）</button>
+      <button wx:if="{{!item.sourceDataUrl}}" class="op-btn-ghost" loading="{{castBusyId === item.id}}" data-id="{{item.id}}" bindtap="onGenCast">生成预览</button>
+      <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onPickCastPhoto">上传参考图</button>
+      <view wx:if="{{item.sourceDataUrl}}" class="op-box">
+        <view class="op-chips">
+          <text class="op-chip {{item.refMode === 'beautify' ? 'on' : ''}}" data-id="{{item.id}}" data-mode="beautify" bindtap="onCastRefMode">按图美化</text>
+          <text class="op-chip {{item.refMode === 'describe' ? 'on' : ''}}" data-id="{{item.id}}" data-mode="describe" bindtap="onCastRefMode">识别成文字</text>
+        </view>
+        <button class="op-btn" loading="{{castBusyId === item.id}}" data-id="{{item.id}}" bindtap="onApplyCastRef">
+          {{item.refMode === 'describe' ? '识别并填入文案' : item.refMode === 'beautify' ? '按图美化生成' : '请先选一种用法'}}
+        </button>
+      </view>
+      <view wx:if="{{item.previewPath || item.sourcePath}}" class="op-cast">
+        <image class="op-cast-img" src="{{item.previewPath || item.sourcePath}}" mode="aspectFill" data-id="{{item.id}}" bindtap="onPreviewCast" />
+        <text class="op-meta">{{item.confirmed ? '角色形象 · 已确认' : '角色形象 · 待确认'}}</text>
+        <button class="op-btn-ghost" data-id="{{item.id}}" bindtap="onConfirmCast">{{item.confirmed ? '已确认角色' : '用此图确认角色'}}</button>
+      </view>
     </view>
+    <text wx:if="{{hint}}" class="op-meta">{{hint}}</text>
+    <text wx:if="{{err}}" class="op-err">{{err}}</text>
     <view class="op-pair">
       <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
       <button class="op-btn" bindtap="onDramaNext">下一步：出片</button>

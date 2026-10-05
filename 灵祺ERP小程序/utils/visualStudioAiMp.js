@@ -434,12 +434,27 @@ async function fetchKeywords(form, copy) {
   return { ok: true, keywords: String(res.content || '').replace(/\s+/g, ' ').trim() }
 }
 
+/** 小程序 downloadFile 拉不到的成图（TokenMix / 火山），改由接口代拉成 data URL。 */
+async function fetchRemoteImageDataUrl(imageUrl) {
+  const url = String(imageUrl || '').trim()
+  if (!url) return ''
+  if (/^data:image\//i.test(url)) return url
+  try {
+    const data = await requestJson('/api/meoo-ai-agent-image', { phase: 'fetch', image_url: url }, 40000)
+    const out = String((data && data.imageUrl) || '').trim()
+    return /^data:image\//i.test(out) ? out : ''
+  } catch (_) {
+    return ''
+  }
+}
+
 module.exports = {
   CHANNELS,
   PLAYBOOKS,
   INDUSTRIES,
   postAiChat,
   postAiAgentImage,
+  fetchRemoteImageDataUrl,
   fetchCopySuggestions,
   fetchImagePrompt,
   generatePosterImage,
