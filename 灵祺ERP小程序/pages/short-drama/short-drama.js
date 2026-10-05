@@ -38,6 +38,14 @@ function packStyles(worldId, styleId) {
   }))
 }
 
+function packQualities(resolution) {
+  return labels.SEEDANCE_QUALITY_OPTIONS.map((o) => ({
+    id: o.id,
+    label: o.label,
+    on: o.id === resolution,
+  }))
+}
+
 function packFields(world, shop) {
   const s = shop || emptyShop()
   return (world.fields || []).map((f) => ({
@@ -58,6 +66,10 @@ Page({
     sceneId: 'hotpot',
     styles: packStyles('catering', catalog.defaultStyleId('catering')),
     styleId: catalog.defaultStyleId('catering'),
+    styleName: (catalog.styleOf(catalog.defaultStyleId('catering')) || {}).name || '',
+    qualities: packQualities('720p'),
+    resolution: '720p',
+    qualityLabel: '标准 720p',
     sceneHook: catalog.sceneOf('hotpot').hook,
     customSceneName: '',
     customSceneHook: '',
@@ -141,6 +153,7 @@ Page({
       sceneId,
       styles: packStyles(world.id, styleId),
       styleId,
+      styleName: (catalog.styleOf(styleId) || {}).name || '',
       sceneHook: scene.hook,
       customSceneName: '',
       customSceneHook: '',
@@ -160,7 +173,19 @@ Page({
     if (!id || id === this.data.styleId) return
     this.setData({
       styleId: id,
+      styleName: (catalog.styleOf(id) || {}).name || '',
       styles: packStyles(this.data.worldId, id),
+    })
+  },
+
+  onQuality(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.resolution) return
+    const row = labels.SEEDANCE_QUALITY_OPTIONS.find((o) => o.id === id)
+    this.setData({
+      resolution: id,
+      qualityLabel: row ? row.label : id,
+      qualities: packQualities(id),
     })
   },
 
@@ -607,7 +632,7 @@ Page({
     const body = {
       model: SEEDANCE_MODEL,
       prompt,
-      flags: `--dur ${clip} --fps 24 --ratio 9:16 --wm false --rsn 720p`,
+      flags: `--dur ${clip} --fps 24 --ratio 9:16 --wm false --resolution ${this.data.resolution || '720p'}`,
       generate_audio: true,
       durationSec: clip,
     }

@@ -3677,10 +3677,12 @@ export default function ShortDramaPage() {
       hasSceneRefs: sceneLocked,
       actionPlaybook,
     })
+    const clipSec = Math.max(5, opts.durationSec)
     const xyq = await runXiaoyunqueVideoJob({
       prompt: xyqPrompt,
-      durationSec: Math.max(5, opts.durationSec),
+      durationSec: clipSec,
       aspectRatio: '9:16',
+      flags: `--dur ${clipSec} --fps 24 --ratio 9:16 --wm false --resolution ${resolution}`,
       images_base64: imgs,
       shouldCancel: () => cancelRef.current,
       onProgress: opts.onProgress,
@@ -4536,6 +4538,42 @@ export default function ShortDramaPage() {
                 </span>
               </label>
 
+              <div className="flex flex-wrap gap-3">
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-800">画风</span>
+                  <select
+                    className={fieldCls}
+                    disabled={busy}
+                    value={visibleStyles.some((s) => s.id === styleId) ? styleId : world.defaultStyle}
+                    onChange={(e) => {
+                      clearTrial()
+                      setStyleId(e.target.value as StyleId)
+                    }}
+                  >
+                    {visibleStyles.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-sm font-medium text-slate-800">清晰度</span>
+                  <select
+                    className={fieldCls}
+                    disabled={busy}
+                    value={resolution}
+                    onChange={(e) => setResolution(e.target.value as SeedanceQualityId)}
+                  >
+                    {SEEDANCE_QUALITY_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 {world.fields.map((f) => (
                   <label key={f.key} className="space-y-1.5">
@@ -5210,42 +5248,6 @@ export default function ShortDramaPage() {
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-800">画风</span>
-                  <select
-                    className={fieldCls}
-                    disabled={busy}
-                    value={visibleStyles.some((s) => s.id === styleId) ? styleId : world.defaultStyle}
-                    onChange={(e) => {
-                      clearTrial()
-                      setStyleId(e.target.value as StyleId)
-                    }}
-                  >
-                    {visibleStyles.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-800">清晰度</span>
-                  <select
-                    className={fieldCls}
-                    disabled={busy}
-                    value={resolution}
-                    onChange={(e) => setResolution(e.target.value as SeedanceQualityId)}
-                  >
-                    {SEEDANCE_QUALITY_OPTIONS.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
             </section>
 
