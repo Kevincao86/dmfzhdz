@@ -102,7 +102,9 @@ function CashRedPacketCard({
     canWithdraw?: boolean
     hint?: string
   }
-  const withdraws = Array.isArray(cash.withdraws) ? (cash.withdraws as Array<{ id: string; amountYuan: string; statusText: string; createdAt: string }>) : []
+  const withdraws = Array.isArray(cash.withdraws)
+    ? (cash.withdraws as Array<{ id: string; amountYuan: string; status?: string; statusText: string; createdAt: string; paidAt?: string; bankTail?: string }>)
+    : []
   return (
     <section className="rounded-2xl border border-amber-200 bg-[var(--panel-card)] p-4">
       <div className="flex items-start justify-between gap-3">
@@ -128,10 +130,20 @@ function CashRedPacketCard({
       {campaign.rulesText ? <p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-[var(--shell-muted)]">{campaign.rulesText}</p> : null}
       {withdraws.length ? (
         <div className="mt-3 space-y-2">
+          <p className="text-sm font-semibold text-[var(--shell-text)]">提现记录</p>
           {withdraws.map((row) => (
-            <div key={row.id} className="flex items-center justify-between text-sm">
+            <div key={row.id} className="flex items-center justify-between gap-3 text-sm">
               <span>¥{row.amountYuan}</span>
-              <span className="text-xs text-[var(--shell-muted)]">{row.statusText} · {row.createdAt}</span>
+              <span className="text-right">
+                <span className={row.status === 'paid' ? 'text-xs font-semibold text-emerald-700' : 'text-xs font-semibold text-amber-700'}>
+                  {row.statusText}
+                </span>
+                <span className="mt-0.5 block text-xs text-[var(--shell-muted)]">
+                  申请 {row.createdAt}
+                  {row.paidAt ? ` · 打款 ${row.paidAt}` : ''}
+                  {row.bankTail ? ` · 尾号${row.bankTail}` : ''}
+                </span>
+              </span>
             </div>
           ))}
         </div>

@@ -12,9 +12,11 @@ import {
   type RegistryMarketingCenter,
   applyBoardSave,
   applyCampaignSave,
+  type CashPayoutAccount,
   grantCashForOrder,
   isPromoBoardKind,
   markCashWithdrawPaid,
+  markCashWithdrawsPaid,
   normalizeMarketingCenter,
   requestCashWithdraw,
 } from './marketingCampaignCore.js'
@@ -167,16 +169,28 @@ export async function grantPrCashRedPacketForPublishedOrder(order: PublishOrderF
   })
 }
 
-export async function withdrawPrCashWallet(prKey: string, displayName = '', identity: CashWithdrawIdentity = 'pr') {
+export async function withdrawPrCashWallet(
+  prKey: string,
+  displayName = '',
+  identity: CashWithdrawIdentity = 'pr',
+  account?: CashPayoutAccount | null,
+) {
   return mutateMarketingCenter((center) => {
-    const next = requestCashWithdraw(center, prKey, displayName, identity)
-    return { center: next.center, result: next }
+    const next = requestCashWithdraw(center, prKey, displayName, identity, account)
+    return { center: next.center, result: next, write: next.ok }
   })
 }
 
 export async function markPrCashWithdrawPaid(withdrawId: string) {
   return mutateMarketingCenter((center) => {
     const next = markCashWithdrawPaid(center, withdrawId)
-    return { center: next.center, result: next }
+    return { center: next.center, result: next, write: next.ok }
+  })
+}
+
+export async function markPrCashWithdrawsPaid(withdrawIds: string[]) {
+  return mutateMarketingCenter((center) => {
+    const next = markCashWithdrawsPaid(center, withdrawIds)
+    return { center: next.center, result: next, write: next.updated.length > 0 }
   })
 }

@@ -1,9 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { uploadOpsContentImage } from '../opsContentImageApi'
+import { parsePayoutCallbackIds, payoutCallbackSummary } from '../payoutCallbackCsv'
 import {
   loadMarketingCampaign,
   markMarketingWithdrawPaid,
+  markMarketingWithdrawsPaid,
   saveMarketingBoard,
   saveMarketingCampaign,
   type MarketingBoardForm,
@@ -39,6 +41,32 @@ const TALENT_CASH_RULES =
 const PR_CASH_RULES =
   'PR 在小程序或星选平台成功发布招募（闭环或开环都算）后，按活动单价发放一笔现金红包，自动进入「我的钱包」。每个招募单只发一次，红包发完即止。累计发单数大于设定值后，可将钱包余额一次提现。'
 
+function csvCell(value: string) {
+  const s = String(value ?? '')
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+
+function exportWithdraws(rows: MarketingWithdrawRow[]) {
+  const header = ['收款户名', '收款账号', '开户行', '金额', '主体', '达标单数', '申请时间', '提现编号', '备注']
+  const lines = [header.join(',')]
+  rows.forEach((row) => {
+    const account = row.bankNo ? `="${row.bankNo}"` : ''
+    lines.push(
+      [row.payeeName || row.displayName || row.prKey, account, row.bank || '', row.amountYuan, row.accountKind === 'entity' ? '企业' : '个人', String(row.qualifyingOrders), row.createdAt, row.id, '活动红包提现']
+        .map(csvCell)
+        .join(','),
+    )
+  })
+  const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `活动提现申请.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function Field(props: { label: string; children: ReactNode }) {
   return (
     <label className="mkt-field-wrap">
@@ -63,6 +91,7 @@ export default function OpsMarketingCenterPage() {
   const [savingBoard, setSavingBoard] = useState('')
   const [uploading, setUploading] = useState('')
   const [category, setCategory] = useState<'cash' | 'version' | 'open'>('cash')
+  const [callbackBusy, setCallbackBusy] = useState(false)
 
   useEffect(() => {
     let stop = false
@@ -141,6 +170,13 @@ export default function OpsMarketingCenterPage() {
     setMsg(board.enabled ? `「${board.title}」已保存并上线` : `「${board.title}」已保存，当前未上线`)
   }
 
+  function applyCenter(result: { data: { campaign: MarketingCampaignForm; boards: MarketingBoardForm[]; grants: MarketingGrantRow[]; withdraws: MarketingWithdrawRow[] } }) {
+    setForm(result.data.campaign)
+    setBoards(result.data.boards)
+    setGrants(result.data.grants)
+    setWithdraws(result.data.withdraws)
+  }
+
   async function onPaid(id: string) {
     setErr('')
     const result = await markMarketingWithdrawPaid(surface, id)
@@ -148,8 +184,27 @@ export default function OpsMarketingCenterPage() {
       setErr(result.error)
       return
     }
-    setWithdraws(result.data.withdraws)
-    setMsg('已标记打款')
+    applyCenter(result)
+    setMsg('已标记打款，小程序和星选钱包会显示提现成功')
+  }
+
+  async function onCallbackFile(file: File) {
+    const ids = parsePayoutCallbackIds(await file.text())
+    if (!ids.length) {
+      setErr('回传文件里没有提现编号')
+      return
+    }
+    setCallbackBusy(true)
+    setErr('')
+    setMsg('')
+    const result = await markMarketingWithdrawsPaid(surface, ids)
+    setCallbackBusy(false)
+    if (!result.ok) {
+      setErr(result.error)
+      return
+    }
+    applyCenter(result)
+    setMsg(result.batch ? payoutCallbackSummary(result.batch) : '已回传打款')
   }
 
   return (
@@ -191,9 +246,13 @@ export default function OpsMarketingCenterPage() {
         .mkt-btn { border: 0; border-radius: 0.6rem; background: #5b21b6; color: #fff; padding: 0.55rem 0.95rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
         .mkt-btn:disabled { opacity: 0.6; cursor: default; }
         .mkt-file { border: 1.5px solid color-mix(in srgb, var(--ops-text) 42%, var(--ops-border)); border-radius: 0.6rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; font-weight: 650; color: var(--ops-text); background: var(--ops-panel); cursor: pointer; }
+        button.mkt-file:disabled { opacity: 0.55; cursor: default; }
         .mkt-meta { font-size: 0.875rem; line-height: 1.6; color: var(--ops-text); }
         .mkt-table-wrap { overflow-x: auto; border: 2px solid color-mix(in srgb, var(--ops-text) 32%, var(--ops-border)); border-radius: 1rem; background: var(--ops-panel); }
-        .mkt-table-wrap h2 { margin: 0; padding: 0.85rem 1.1rem; border-bottom: 1.5px solid color-mix(in srgb, var(--ops-text) 24%, var(--ops-border)); font-size: 0.95rem; }
+        .mkt-table-wrap h2 { margin: 0; font-size: 0.95rem; }
+        .mkt-table-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.85rem 1.1rem; border-bottom: 1.5px solid color-mix(in srgb, var(--ops-text) 24%, var(--ops-border)); }
+        .mkt-note { margin: 0; padding: 0.65rem 1.1rem 0; font-size: 0.8125rem; line-height: 1.5; color: var(--ops-muted); }
+        .mkt-account { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
         .mkt-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; color: var(--ops-text); }
         .mkt-table th { padding: 0.75rem; color: var(--ops-muted); font-weight: 700; }
         .mkt-table td { padding: 0.75rem; border-top: 1px solid color-mix(in srgb, var(--ops-text) 18%, var(--ops-border)); }
@@ -449,14 +508,45 @@ export default function OpsMarketingCenterPage() {
             {!grants.length ? <p className="mkt-empty">还没有发放</p> : null}
           </section>
           <section className="mkt-table-wrap">
-            <h2>提现申请</h2>
+            <div className="mkt-table-head">
+              <h2>提现申请</h2>
+              <div className="mkt-actions">
+                <button
+                  type="button"
+                  className="mkt-file"
+                  disabled={!withdraws.some((row) => row.status === 'pending')}
+                  onClick={() => exportWithdraws(withdraws.filter((row) => row.status === 'pending'))}
+                >
+                  导出待打款
+                </button>
+                <label className={`mkt-file ${callbackBusy ? 'pointer-events-none opacity-60' : ''}`}>
+                  {callbackBusy ? '回传中…' : '回传打款记录'}
+                  <input
+                    className="hidden"
+                    type="file"
+                    accept=".csv,text/csv"
+                    disabled={callbackBusy}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0]
+                      event.target.value = ''
+                      if (file) void onCallbackFile(file)
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+            <p className="mkt-note">按收款账户打款后，把带「提现编号」的表格回传。回传成功后，这里变为已打款，小程序和星选钱包显示提现成功。</p>
             <table className="mkt-table">
               <thead>
                 <tr>
                   <th>PR</th>
+                  <th>收款户名</th>
+                  <th>收款账号</th>
+                  <th>开户行</th>
                   <th>金额</th>
                   <th>达标单数</th>
                   <th>状态</th>
+                  <th>提现编号</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -464,9 +554,16 @@ export default function OpsMarketingCenterPage() {
                 {withdraws.map((row) => (
                   <tr key={row.id}>
                     <td>{row.displayName || row.prKey}</td>
+                    <td>
+                      {row.payeeName || '—'}
+                      <div className="mkt-sub">{row.payeeName || row.bankNo ? (row.accountKind === 'entity' ? '企业' : '个人') : '未记录账户'}</div>
+                    </td>
+                    <td className="mkt-account">{row.bankNo || '—'}</td>
+                    <td>{row.bank || '—'}</td>
                     <td>¥{row.amountYuan}</td>
                     <td>{row.qualifyingOrders}</td>
                     <td>{row.status === 'paid' ? '已打款' : '待打款'}</td>
+                    <td className="mkt-account">{row.id}</td>
                     <td>
                       {row.status === 'pending' ? (
                         <button type="button" className="mkt-link" onClick={() => void onPaid(row.id)}>

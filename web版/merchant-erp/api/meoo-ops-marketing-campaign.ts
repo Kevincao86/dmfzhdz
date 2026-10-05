@@ -5,6 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { adminCenterView, type MarketingSurface } from '../src/lib/marketingCampaignCore.js'
 import {
   markPrCashWithdrawPaid,
+  markPrCashWithdrawsPaid,
   readMarketingCenter,
   saveMarketingBoard,
   saveMarketingCampaign,
@@ -85,6 +86,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       sendJson(res, 200, { ok: true, ...adminCenterView(marked.center, surface) })
+      return
+    }
+    if (action === 'markPaidBatch') {
+      const ids = Array.isArray(body.ids) ? body.ids.map((id) => String(id || '').trim()).filter(Boolean) : []
+      if (!ids.length) {
+        sendJson(res, 400, { ok: false, error: 'withdraw_ids_required', detail: '回传文件里没有提现编号' })
+        return
+      }
+      const marked = await markPrCashWithdrawsPaid(ids)
+      sendJson(res, 200, {
+        ok: true,
+        updated: marked.updated.length,
+        alreadyPaid: marked.alreadyPaid,
+        missing: marked.missing,
+        ...adminCenterView(marked.center, surface),
+      })
       return
     }
     const center = await readMarketingCenter()

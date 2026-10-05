@@ -66,6 +66,13 @@ export type MarketingWallet = {
   updatedAt: string
 }
 
+export type CashPayoutAccount = {
+  payeeName: string
+  bank: string
+  bankNo: string
+  kind: 'person' | 'entity'
+}
+
 export type MarketingWithdraw = {
   id: string
   campaignId: string
@@ -76,6 +83,11 @@ export type MarketingWithdraw = {
   displayName: string
   createdAt: string
   paidAt?: string
+  /** 申请时快照的收款账户，供运营打款。 */
+  payeeName: string
+  bank: string
+  bankNo: string
+  accountKind: 'person' | 'entity'
 }
 
 export type RegistryMarketingCenter = {
@@ -339,6 +351,10 @@ function asWithdraw(raw: unknown): MarketingWithdraw | null {
     displayName: text(row.displayName, 40),
     createdAt: text(row.createdAt, 40),
     ...(paidAt ? { paidAt } : {}),
+    payeeName: text(row.payeeName, 40),
+    bank: text(row.bank, 40),
+    bankNo: text(row.bankNo, 40),
+    accountKind: row.accountKind === 'entity' ? 'entity' : 'person',
   }
 }
 
@@ -541,6 +557,7 @@ export function requestCashWithdraw(
   prKey: string,
   displayName = '',
   identity: CashWithdrawIdentity = 'pr',
+  account?: CashPayoutAccount | null,
 ): { center: RegistryMarketingCenter; ok: true; withdraw: MarketingWithdraw } | { center: RegistryMarketingCenter; ok: false; error: string; message: string } {
   const key = text(prKey, 80)
   const campaign = campaignBySurface(center, 'xingxuan')
@@ -569,6 +586,11 @@ export function requestCashWithdraw(
   if (center.withdraws.some((item) => item.campaignId === campaign.id && item.prKey === key && item.status === 'pending')) {
     return { center, ok: false, error: 'pending_exists', message: '已有一笔提现待打款' }
   }
+  const payeeName = text(account?.payeeName, 40)
+  const bankNo = text(account?.bankNo, 40)
+  if (!payeeName || !bankNo) {
+    return { center, ok: false, error: 'account_required', message: '请先在钱包绑定收款账户后再提现' }
+  }
   const createdAt = nowText()
   const withdraw: MarketingWithdraw = {
     id: `wd_${Date.now()}_${key.slice(-6)}`,
@@ -579,6 +601,10 @@ export function requestCashWithdraw(
     status: 'pending',
     displayName: text(displayName, 40) || wallet.displayName,
     createdAt,
+    payeeName,
+    bank: text(account?.bank, 40),
+    bankNo,
+    accountKind: account?.kind === 'entity' ? 'entity' : 'person',
   }
   const nextWallet: MarketingWallet = {
     ...wallet,
@@ -625,6 +651,41 @@ export function markCashWithdrawPaid(
     }
   }
   return { center: { ...center, withdraws, wallets, updatedAt: paidAt }, ok: true }
+}
+
+export function markCashWithdrawsPaid(
+  center: RegistryMarketingCenter,
+  withdrawIds: string[],
+): { center: RegistryMarketingCenter; updated: string[]; alreadyPaid: string[]; missing: string[] } {
+  const unique = [...new Set(withdrawIds.map((id) => text(id, 80)).filter(Boolean))]
+  const known = new Set(center.withdraws.map((item) => item.id))
+  const missing: string[] = []
+  const alreadyPaid: string[] = []
+  const updated: string[] = []
+  let next = center
+  for (const id of unique) {
+    if (!known.has(id)) {
+      missing.push(id)
+      continue
+    }
+    const row = next.withdraws.find((item) => item.id === id)
+    if (!row) {
+      missing.push(id)
+      continue
+    }
+    if (row.status === 'paid') {
+      alreadyPaid.push(id)
+      continue
+    }
+    const marked = markCashWithdrawPaid(next, id)
+    if (!marked.ok) {
+      missing.push(id)
+      continue
+    }
+    next = marked.center
+    updated.push(id)
+  }
+  return { center: next, updated, alreadyPaid, missing }
 }
 
 export function walletViewForIdentity(
@@ -688,6 +749,9 @@ export function walletViewForIdentity(
       statusText: item.status === 'paid' ? '提现成功' : '待打款',
       createdAt: item.createdAt,
       paidAt: item.paidAt || '',
+      payeeName: item.payeeName,
+      bank: item.bank,
+      bankTail: item.bankNo ? item.bankNo.slice(-4) : '',
     })),
   }
 }
@@ -711,9 +775,19 @@ export function adminCenterView(center: RegistryMarketingCenter, surface: Market
       ...item,
       amountYuan: yuanFromCents(item.amountCents),
     })),
-    withdraws: withdraws.slice(0, 50).map((item) => ({
-      ...item,
+    withdraws: withdraws.slice(0, 200).map((item) => ({
+      id: item.id,
+      prKey: item.prKey,
+      displayName: item.displayName,
       amountYuan: yuanFromCents(item.amountCents),
+      qualifyingOrders: item.qualifyingOrders,
+      status: item.status,
+      createdAt: item.createdAt,
+      paidAt: item.paidAt || '',
+      payeeName: item.payeeName,
+      bank: item.bank,
+      bankNo: item.bankNo,
+      accountKind: item.accountKind,
     })),
     boards: center.boards
       .filter((item) => item.surface === surface)

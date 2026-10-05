@@ -1,14 +1,45 @@
 /**
  * POST /api/meoo-mp-pr-cash-wallet — 达人小程序与星选钱包：查看 PR 现金红包、发起提现。
  */
+import fs from 'node:fs'
+import path from 'node:path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createMpAuthRest, resolveSession } from '../src/lib/mpAccountAuth.js'
-import { parseCashWithdrawIdentity, walletViewForIdentity, type CashWithdrawIdentity } from '../src/lib/marketingCampaignCore.js'
+import {
+  parseCashWithdrawIdentity,
+  walletViewForIdentity,
+  type CashPayoutAccount,
+  type CashWithdrawIdentity,
+} from '../src/lib/marketingCampaignCore.js'
 import { readMarketingCenter, withdrawPrCashWallet } from '../src/lib/marketingCampaignStore.js'
+
+const TRAINING_FILE = path.join(process.cwd(), 'data', 'mp-training.json')
+
+function boundPayoutAccount(hostId: string): CashPayoutAccount | null {
+  const id = hostId.trim()
+  if (!id) return null
+  try {
+    const data = JSON.parse(fs.readFileSync(TRAINING_FILE, 'utf8')) as { profiles?: Array<Record<string, unknown>> }
+    const profiles = Array.isArray(data?.profiles) ? data.profiles : []
+    const profile = profiles.find((row) => String(row.hostId || '').trim() === id)
+    if (!profile) return null
+    const payeeName = String(profile.name || '').trim()
+    const bankNo = String(profile.bankNo || '').trim()
+    if (!payeeName || !bankNo) return null
+    return {
+      payeeName: payeeName.slice(0, 40),
+      bank: String(profile.bank || '').trim().slice(0, 40),
+      bankNo: bankNo.slice(0, 40),
+      kind: profile.kind === 'entity' ? 'entity' : 'person',
+    }
+  } catch {
+    return null
+  }
+}
 
 export const config = { maxDuration: 30 }
 
@@ -98,7 +129,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         })
         return
       }
-      const result = await withdrawPrCashWallet(holderKey, displayName, cashIdentity)
+      const payoutAccount = boundPayoutAccount(String(session.account.id || ''))
+      if (!payoutAccount) {
+        sendJson(res, 400, { ok: false, error: 'account_required', message: '请先在钱包绑定收款账户后再提现' })
+        return
+      }
+      const result = await withdrawPrCashWallet(holderKey, displayName, cashIdentity, payoutAccount)
       if (!result.ok) {
         sendJson(res, 400, { ok: false, error: result.error, message: result.message })
         return

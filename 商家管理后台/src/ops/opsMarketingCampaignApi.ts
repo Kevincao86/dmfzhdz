@@ -36,6 +36,16 @@ export type MarketingWithdrawRow = {
   status: 'pending' | 'paid'
   createdAt: string
   paidAt?: string
+  payeeName: string
+  bank: string
+  bankNo: string
+  accountKind: 'person' | 'entity'
+}
+
+export type MarketingPaidBatch = {
+  updated: number
+  alreadyPaid: string[]
+  missing: string[]
 }
 
 export type MarketingBoardKind = 'version_discount' | 'pr_plan' | 'talent_plan' | 'member_bonus' | 'flash_open'
@@ -68,7 +78,7 @@ function surfaceBody(surface: MarketingSurface) {
 }
 
 async function postCampaign(body: Record<string, unknown>): Promise<
-  { ok: true; data: MarketingCenterPayload } | { ok: false; error: string }
+  { ok: true; data: MarketingCenterPayload; batch?: MarketingPaidBatch } | { ok: false; error: string }
 > {
   const res = await fetchOpsErpApi('/api/meoo-ops-marketing-campaign', {
     method: 'POST',
@@ -87,6 +97,14 @@ async function postCampaign(body: Record<string, unknown>): Promise<
   }
   const campaign = data.campaign && typeof data.campaign === 'object' ? (data.campaign as MarketingCampaignForm) : null
   if (!campaign) return { ok: false, error: '活动数据为空' }
+  const batch =
+    body.action === 'markPaidBatch'
+      ? {
+          updated: Number(data.updated) || 0,
+          alreadyPaid: Array.isArray(data.alreadyPaid) ? data.alreadyPaid.map(String) : [],
+          missing: Array.isArray(data.missing) ? data.missing.map(String) : [],
+        }
+      : undefined
   return {
     ok: true,
     data: {
@@ -95,6 +113,7 @@ async function postCampaign(body: Record<string, unknown>): Promise<
       withdraws: Array.isArray(data.withdraws) ? (data.withdraws as MarketingWithdrawRow[]) : [],
       boards: Array.isArray(data.boards) ? (data.boards as MarketingBoardForm[]) : [],
     },
+    ...(batch ? { batch } : {}),
   }
 }
 
@@ -148,4 +167,10 @@ export async function markMarketingWithdrawPaid(surface: MarketingSurface, withd
   const denied = requireOpsModuleEdit('marketing')
   if (denied) return { ok: false as const, error: denied }
   return postCampaign({ action: 'markPaid', surface: surfaceBody(surface), withdrawId })
+}
+
+export async function markMarketingWithdrawsPaid(surface: MarketingSurface, ids: string[]) {
+  const denied = requireOpsModuleEdit('marketing')
+  if (denied) return { ok: false as const, error: denied }
+  return postCampaign({ action: 'markPaidBatch', surface: surfaceBody(surface), ids })
 }

@@ -17,10 +17,11 @@
       <view class="wl-btn wl-btn--block" bindtap="onCashWithdraw">提现</view>
     </block>
     <view wx:if="{{!cashLoading && cashWithdraws.length}}" class="wl-payouts">
+      <text class="wl-rules-title">提现记录</text>
       <view wx:for="{{cashWithdraws}}" wx:key="id" class="wl-payout">
         <text class="wl-payout-net">¥{{item.amountYuan}}</text>
         <text class="wl-payout-status {{item.status === 'paid' ? 'wl-payout-status--paid' : ''}}">{{item.statusText}}</text>
-        <text class="wl-hint">{{item.createdAt}}</text>
+        <text class="wl-hint">申请 {{item.createdAt}}{{item.paidAt ? ' · 打款 ' + item.paidAt : ''}}{{item.bankTail ? ' · 尾号' + item.bankTail : ''}}</text>
       </view>
     </view>
   </view>
