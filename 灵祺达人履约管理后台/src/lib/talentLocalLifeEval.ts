@@ -320,7 +320,7 @@ export function describeEvalBasis(raw: EvalAccountInput) {
   if (spec.id === 'douyin' && row.salesLevel) bits.push(`带货等级 ${row.salesLevel}`)
   if (spec.id === 'kuaishou' && row.talentGrade) bits.push(`达人等级 ${row.talentGrade}`)
   if (row.quotePrice) bits.push(`报价 ${row.quotePrice}`)
-  bits.push('联网检索公开主页')
+  if (row.nickname || row.accountId) bits.push('联网检索公开主页')
   return bits.join(' · ')
 }
 

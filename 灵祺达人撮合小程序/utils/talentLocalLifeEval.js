@@ -300,7 +300,7 @@ function describeEvalBasis(raw) {
   if (spec.id === 'douyin' && row.salesLevel) bits.push(`带货等级 ${row.salesLevel}`)
   if (spec.id === 'kuaishou' && row.talentGrade) bits.push(`达人等级 ${row.talentGrade}`)
   if (row.quotePrice) bits.push(`报价 ${row.quotePrice}`)
-  bits.push('联网检索公开主页')
+  if (row.nickname || row.accountId) bits.push('联网检索公开主页')
   return bits.join(' · ')
 }
 
@@ -486,6 +486,7 @@ function rememberEvalSync(platformId, payload) {
 
 function loadCache(row) {
   const key = cacheKey(row)
+  if (!auth.isLoggedIn() || (!row.nickname && !row.accountId)) return { key, data: null }
   const local = readCache(key)
   const synced = readEvalSyncMap()[row.platformId]
   const localAt = Date.parse(local && local.updatedAt) || 0
@@ -697,6 +698,7 @@ function savedFromCache(cached) {
 
 function readSavedTalentEval(raw) {
   const row = normalizeInput(raw).row
+  if (!auth.isLoggedIn() || (!row.nickname && !row.accountId)) return null
   return savedFromCache(loadCache(row).data)
 }
 

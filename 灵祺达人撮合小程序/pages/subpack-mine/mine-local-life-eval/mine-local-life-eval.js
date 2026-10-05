@@ -1,3 +1,4 @@
+const auth = require('../../../utils/auth.js')
 const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
 const talentMember = require('../../../utils/talentMember.js')
 const wxAccount = require('../../../utils/wxAccount.js')
@@ -72,6 +73,7 @@ Page({
     evalCostText: '免费评估',
     reevalCostText: '重新评估',
     adviceCostText: '分析提升 · ' + evalApi.TALENT_ADVICE_POINTS + '积分',
+    loggedIn: false,
   },
 
   onLoad() {
@@ -83,6 +85,7 @@ Page({
 
   onShow() {
     syncPageIdentity(this)
+    this.setData({ loggedIn: auth.isLoggedIn() })
     this.loadIdentity()
     this.setData({ tabs: getTabList(userProfile.readIdentity()) })
     void this.refreshQuota()
@@ -149,6 +152,7 @@ Page({
     const wx = wxAccount.readWxAccount() || {}
     this._input = input
     this.setData({
+      loggedIn: auth.isLoggedIn(),
       avatarUrl: String(wx.wxAvatarUrl || '').trim(),
       avatarLetter: letterOf(input.nickname || input.accountId),
       nickname: input.nickname,
@@ -282,6 +286,10 @@ Page({
   },
 
   async onEvaluate() {
+    if (!auth.isLoggedIn()) {
+      wx.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
     if (this.data.quotaRemaining === 0) {
       if (this.data.quotaPaid) {
         const msg = '本月 15 次评估已用完，下月恢复'
@@ -352,6 +360,10 @@ Page({
   },
 
   async onAdvise() {
+    if (!auth.isLoggedIn()) {
+      wx.showToast({ title: '请先登录', icon: 'none' })
+      return
+    }
     if (!prFeatureAccess.canUseAddonPerm(null, 'talentAdvice')) {
       this.setData({ upgradeOpen: true })
       return
