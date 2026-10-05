@@ -460,6 +460,7 @@ export default function PrOrdersPage() {
     setFilterCategory('全部')
     setFilterStatus(HALL_DEFAULT_STATUS_FILTER)
     setFilterPublishedDate('')
+    setCompletedLoop('all')
     setSortKey('latest')
     setListPage(1)
   }
@@ -633,24 +634,6 @@ export default function PrOrdersPage() {
           </div>
         ) : null}
 
-        {tab === 'completed' && completedRows.length > 0 ? (
-          <div className="pr-orders-platform-group pr-orders-platform-group--page">
-            {COMPLETED_LOOP_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                className={`pr-orders-platform-chip ${completedLoop === opt.id ? 'pr-orders-platform-chip--on' : ''}`}
-                onClick={() => setCompletedLoop(opt.id)}
-              >
-                {opt.label}
-                {opt.id === 'all' && completedRows.length > 0 ? ` (${completedRows.length})` : null}
-                {opt.id === 'open' && completedOpenCount > 0 ? ` (${completedOpenCount})` : null}
-                {opt.id === 'closed' && completedClosedCount > 0 ? ` (${completedClosedCount})` : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
         <div className="pr-orders-toolbar">
           <div className="pr-orders-toolbar__search">
             <span className="pr-orders-toolbar__search-icon" aria-hidden>⌕</span>
@@ -704,6 +687,21 @@ export default function PrOrdersPage() {
               </button>
             </>
           ) : null}
+          {tab === 'completed'
+            ? COMPLETED_LOOP_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`pr-orders-platform-chip ${completedLoop === opt.id ? 'pr-orders-platform-chip--on' : ''}`}
+                  onClick={() => setCompletedLoop(opt.id)}
+                >
+                  {opt.label}
+                  {opt.id === 'all' && completedRows.length > 0 ? ` (${completedRows.length})` : null}
+                  {opt.id === 'open' && completedOpenCount > 0 ? ` (${completedOpenCount})` : null}
+                  {opt.id === 'closed' && completedClosedCount > 0 ? ` (${completedClosedCount})` : null}
+                </button>
+              ))
+            : null}
           <button type="button" className="pr-orders-toolbar__reset" onClick={resetFilters}>
             <RotateCcw size={14} aria-hidden />
             重置

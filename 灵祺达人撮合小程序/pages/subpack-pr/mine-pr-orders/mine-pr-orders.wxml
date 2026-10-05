@@ -66,7 +66,7 @@
   </scroll-view>
 
   <view
-    wx:if="{{(tab === 'published' && publishedCount > 0) || (tab === 'pending_schedule' && pendingScheduleCount > 0) || (tab === 'pending_video_review' && pendingVideoReviewCount > 0) || (tab === 'completed' && completedCount > 0) || (tab === 'drafts' && draftsCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
+    wx:if="{{tab === 'completed' || (tab === 'published' && publishedCount > 0) || (tab === 'pending_schedule' && pendingScheduleCount > 0) || (tab === 'pending_video_review' && pendingVideoReviewCount > 0) || (tab === 'drafts' && draftsCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
     class="pr-list-toolbar"
   >
     <view class="pr-search-bar">
@@ -82,7 +82,7 @@
       />
     </view>
 
-    <block wx:if="{{tab === 'completed' && completedCount > 0}}">
+    <block wx:if="{{tab === 'completed'}}">
       <scroll-view class="pr-target-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
         <view class="pr-target-row">
           <view
