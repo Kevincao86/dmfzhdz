@@ -90,6 +90,7 @@ list_scopes() {
   modian_official        墨典官网 m.mofangdianai.com（案例库入口）
   xingxuan_dy_oauth      星选履约 Web 抖音扫码登录（不含商家 cs / 小程序）
   xingxuan_reg_email     星选网页与达人小程序注册页：切换邮箱注册（身份一并写入）
+  mp_share_card_title    达人/商家微信小程序分享卡片：title 不含小程序昵称（微信会自动加「昵称｜」）
   login_alt_methods      商家 ERP + 星选 Web 登录页：下方图标登录方式（不含小程序）
   xingxuan_hall_ux       星选网页+微信小程序：大厅按身份、身份切换、推荐大厅说明、培训报名
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
@@ -1289,6 +1290,14 @@ pages/subpack-signup/signup/
 灵祺达人撮合小程序/utils/auth.js
 mpAccountAuth.ts
 meoo-ops-mp-auth.ts
+change-scope-guard
+PAT
+      ;;
+    mp_share_card_title)
+      cat <<'PAT'
+灵祺达人撮合小程序/utils/mpShare.js
+灵祺达人撮合小程序/pages/publish/publish.js
+灵祺ERP小程序/utils/mpDefaultShare.js
 change-scope-guard
 PAT
       ;;

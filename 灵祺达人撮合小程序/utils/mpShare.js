@@ -5,7 +5,9 @@ const mpRuntime = require('./mpRuntime.js')
 /** 历史包内路径（已 pack ignore，仅作占位常量） */
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
 const SHARE_COVER_FILE = 'share/share-cover-ai-match.jpg'
-const DEFAULT_TITLE = '灵祺星选 | AI按城市品类匹配商单'
+/** 微信聊天卡片会显示成「公众平台昵称｜title」，title 里不要再写小程序名 */
+const APP_NICKNAME = '灵祺星选'
+const DEFAULT_TITLE = 'AI按城市品类匹配商单'
 const SHARE_CARD_SLOT = 'mp.share.card'
 
 let cachedShareCoverPath = ''
@@ -189,10 +191,18 @@ function prepareShareCoverPath() {
   return coverPreparePromise
 }
 
+function titleForShareCard(raw) {
+  const title = String(raw || '').trim()
+  if (!title || title === APP_NICKNAME || title === '灵祺星选平台') return DEFAULT_TITLE
+  const prefixed = title.match(/^灵祺星选\s*[|｜]\s*(.+)$/)
+  if (prefixed && prefixed[1].trim()) return prefixed[1].trim()
+  return title
+}
+
 function resolvedShareTitle(opts) {
   const custom = opts && opts.title ? String(opts.title).trim() : ''
-  if (custom) return custom
-  return decorShare.title || DEFAULT_TITLE
+  if (custom) return titleForShareCard(custom)
+  return titleForShareCard(decorShare.title || DEFAULT_TITLE)
 }
 
 function buildSharePayload(path, opts, forTimeline) {

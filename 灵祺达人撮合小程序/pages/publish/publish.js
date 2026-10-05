@@ -2240,7 +2240,7 @@ Page({
   },
   onShareAppMessage() {
     const order = this.data.createdOrder
-    if (!order) return { title: '灵祺星选平台', path: '/pages/index/index' }
+    if (!order) return require('../../utils/mpShare.js').defaultShare('/pages/index/index')
     const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
     const share = {
       title: this.data.shareTitle || order.title,

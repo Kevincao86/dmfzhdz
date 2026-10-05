@@ -2,7 +2,9 @@
 
 const config = require('./config.js')
 
-const SHARE_TITLE = '灵祺经营管理助手'
+/** 微信聊天卡片会显示成「公众平台昵称｜title」。昵称是「灵祺商家」，title 只写后面这句 */
+const APP_NICKNAME = '灵祺商家'
+const SHARE_TITLE = '经营管理助手'
 const SHARE_PATH = '/pages/functions/functions'
 const SHARE_IMAGE = '/images/share-cover.jpg'
 const SHARE_CARD_SLOT = 'erp.mp.share.card'
@@ -46,15 +48,23 @@ function refreshDecorShare() {
   return decorSharePromise
 }
 
+function titleForShareCard(raw) {
+  const title = String(raw || '').trim()
+  if (!title || title === APP_NICKNAME || title === '灵祺经营管理助手') return SHARE_TITLE
+  const prefixed = title.match(/^灵祺商家\s*[|｜]\s*(.+)$/)
+  if (prefixed && prefixed[1].trim()) return prefixed[1].trim()
+  return title
+}
+
 function sharePayload() {
-  const title = decorShare.title || SHARE_TITLE
+  const title = titleForShareCard(decorShare.title || SHARE_TITLE)
   const imageUrl = decorShare.imageUrl || SHARE_IMAGE
   return {
     title,
     path: SHARE_PATH,
     imageUrl,
     promise: refreshDecorShare().then((next) => ({
-      title: next.title || SHARE_TITLE,
+      title: titleForShareCard(next.title || SHARE_TITLE),
       path: SHARE_PATH,
       imageUrl: next.imageUrl || SHARE_IMAGE,
     })),
