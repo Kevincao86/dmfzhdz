@@ -106,9 +106,10 @@ const PLATFORM_SPECS: Record<string, PlatformSpec> = {
 }
 
 const ADVICE_SYSTEM = [
-  '你是豆包。根据这个账号已绑定的粉丝、报价、等级、标签、主页，以及公网检索和这次六维现状，写给达人本人的账号分析和提升，用「你」来写。',
+  '你是豆包。这个账号是本地生活达人，用个人号做同城探店、团购挂车和到店内容，不是企业号，不是商家号。根据已绑定的粉丝、报价、等级、标签、主页，以及公网检索和这次六维现状，写给达人本人的分析和提升，用「你」来写。',
   '必须用上已绑定的粉丝、报价、带货等级或达人等级、标签。公网检索里对得上的作品、挂车、互动可以引用。',
-  '分析和提升只谈账号本身：内容、更新节奏、人设、团购挂车、转化和口碑。按公网上能执行的做法来写。',
+  '分析和提升只谈这个本地生活账号本身：同城内容、更新节奏、探店人设、团购挂车、到店转化和口碑。按公网上个人达人能执行的做法来写。',
+  '不要建议认证蓝V、企业认证、机构认证，不要把没蓝V写成短板。个人黄V只有资料或公网里已经写明时才可以提到，不要要求去申请。',
   '不要套用任何系统功能。不要出现「我的资料」「招募大厅」「培训课程」「商单日历」「用到」。不要让用户去打开某个模块、登录后台或把数据填回资料栏。',
   '不要用商家口吻，不要写合作、履约、核销、不建议合作。',
   '用户已绑定的数字按原数使用。公网没有的单量、完播、画像按同类达人预估，写成确定判断。',
@@ -198,10 +199,11 @@ function scoreSystem(spec: PlatformSpec) {
     '你是豆包。按 6 维本地生活达人模型打分，满分 100。',
     spec.scene,
     `六维及满分：${weights}。团购带货能力权重最高。口碑合规风险是得分，不是另外扣分，越好越高。`,
-    '各维看这些信号：本地人群匹配看属地、同城粉丝、年龄性别、本地深耕、是否跨城。内容产能稳定看近 90 天更新、断更、持续时长、垂类是否漂移。内容质量人设看真人出镜、人设是否统一、画质剪辑话术、团购话术。团购带货能力看挂车或带货案例、价格带、预估单量或稿均单量、同品类经验，没有同品类挂车时这项要明显低于有同品类案例的达人。内容转化潜力看稿均播放点赞收藏评论、到店或商品点击、爆款占比、是否像投流刷量。口碑合规风险看违规限流、刷量、负面口碑、评论区、平台认证。',
+    '被评估的是本地生活达人，个人创作者，做同城探店、团购挂车和到店内容。不是企业号，不是商家号。',
+    '各维看这些信号：本地人群匹配看属地、同城粉丝、年龄性别、本地深耕、是否跨城。内容产能稳定看近 90 天更新、断更、持续时长、垂类是否漂移。内容质量人设看真人出镜、人设是否统一、画质剪辑话术、团购话术。团购带货能力看挂车或带货案例、价格带、预估单量或稿均单量、同品类经验，没有同品类挂车时这项要明显低于有同品类案例的达人。内容转化潜力看稿均播放点赞收藏评论、到店或商品点击、爆款占比、是否像投流刷量。口碑合规风险看违规限流、刷量、负面口碑、评论区。不看企业蓝V，不把没认证蓝V写成失分。',
     '这不是平台官方接口，不要声称读到了官方后台或官方等级。',
     '用户填了的粉丝、报价按原数使用，不要改成另一个数。同名但账号对不上的人不要写进来。',
-    '公开检索里对得上这个账号的说法可以引用。检索里没有的画像、完播、单量、认证，按账号资料和同类本地生活达人做预估，写成确定判断。',
+    '公开检索里对得上这个账号的说法可以引用。检索里没有的画像、完播、单量，按账号资料和同类本地生活达人做预估，写成确定判断。不要用蓝V、企业认证、机构认证来打分或写现状。',
     '不要写「公网未检索到」「未检索到」「无公开」「公开资料不足」「无法验证」「待补充」「没有数据」「查不到」「仅供参考」「弱预估」「无公开账号记录」。',
     '不要写成平台上没有这个人。',
     '用户自填的带货等级或达人等级只是用户自己填的，用来对照，不能当成官方读数。',
@@ -787,7 +789,18 @@ function clipPlan(value: unknown, max: number) {
 }
 
 function planText(value: unknown) {
-  return String(value ?? '')
+  const parts = String(value ?? '').split(/([。！？\n])/)
+  let sentence = ''
+  let kept = ''
+  for (const part of parts) {
+    sentence += part
+    if (part === '。' || part === '！' || part === '？' || part === '\n') {
+      if (!/蓝\s*V|企业认证|机构认证|企业号/.test(sentence)) kept += sentence
+      sentence = ''
+    }
+  }
+  if (sentence && !/蓝\s*V|企业认证|机构认证|企业号/.test(sentence)) kept += sentence
+  return kept
     .replace(/我的资料|招募大厅|培训课程|商单日历/g, '')
     .replace(/用到/g, '')
     .replace(/[ \t]{2,}/g, ' ')
@@ -833,7 +846,7 @@ function adviceUsesBoundAccount(rows: unknown) {
   return (Array.isArray(rows) ? rows : []).some((row) => {
     const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
     const text = [item.module, item.finding, item.adjust, item.soon, item.next].join('\n')
-    return /我的资料|招募大厅|培训课程|商单日历/.test(text)
+    return /我的资料|招募大厅|培训课程|商单日历|蓝\s*V|企业认证|机构认证|企业号/.test(text)
   })
 }
 
@@ -1029,13 +1042,13 @@ export async function adviseTalent(
   const publicBlock = notes && !/无公开账号记录/.test(notes)
     ? `公网检索：\n${notes}\n检索里没有的指标按绑定资料和同类达人预估，写成确定判断。`
     : '公网检索没有可用条目。按已绑定的粉丝、报价、等级、标签和同类达人做预估。'
-  const ask = `已绑定资料：\n${accountFacts(spec, row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n这次评估解读出的现状：\n${lines}\n用绑定资料和公网情况写账号分析和提升，不要套用系统功能。\n只为这些短板各写一套方案：${defectBrief(score)}。`
+  const ask = `已绑定资料：\n${accountFacts(spec, row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n这次评估解读出的现状：\n${lines}\n按本地生活达人写账号分析和提升，不要套用系统功能，不要出现蓝V、企业认证、机构认证。\n只为这些短板各写一套方案：${defectBrief(score)}。`
   let j = await askDoubaoJson(ADVICE_SYSTEM, ask)
   if (adviceUsesBoundAccount(asSectionList(j.sections).length ? j.sections : j)) {
     try {
       const retry = await askDoubaoJson(
         ADVICE_SYSTEM,
-        `${ask}\n上次写到了系统功能。整份重写，正文不能出现我的资料、招募大厅、培训课程、商单日历。`,
+        `${ask}\n上次写到了系统功能或企业认证。整份重写，正文不能出现我的资料、招募大厅、培训课程、商单日历、蓝V、企业认证、机构认证。`,
       )
       const retryRows = asSectionList(retry.sections || retry.suggestions)
       if (retryRows.length) j = retry
