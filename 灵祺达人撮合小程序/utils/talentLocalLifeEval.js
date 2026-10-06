@@ -89,19 +89,25 @@ const PLATFORM_SPECS = {
   },
 }
 
+const PLAN_MODULES = ['我的资料', '招募大厅', '培训课程', '商单日历']
+
 const ADVICE_SYSTEM = [
-  '你是豆包。这是达人自己看的体检，按现状写给达人本人的改法，用「你」来写。',
+  '你是豆包。这是达人自己看的体检，只按短板写给达人本人的改法，用「你」来写。',
   '不要用商家口吻，不要写合作、履约、核销、不建议合作。',
-  '不要编造用户没填、现状里也没出现的粉丝数和 GMV。现状里的预估可以沿用。不要写未检索到、无公开、无法验证、待补充。',
-  '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
+  '不要编造用户没填、现状里也没出现的粉丝数和 GMV。已经进入评估的粉丝、报价、带货等级按原数引用。',
+  '不要写未检索到、无公开、无法验证、待补充、公开资料不足、仅供参考、无法判断。',
   '只输出一个 JSON 对象，不要 Markdown。',
   '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
-  '字段：sections 为 4 到 5 项。每项含 name、finding、adjust、soon。',
-  'name 与现状里的板块一致，不超过 8 个字。',
-  'finding 是分析结果：写出这个板块现在卡在哪里、原因是什么，不要复述现状原句，60 到 100 字。',
-  'adjust 是怎么调整：写出改哪一类内容、具体怎么改、改完应看到什么变化，至少两句，80 到 160 字。',
-  'soon 是近期要做：写出近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，每件写清动作和频率，80 到 160 字。',
-  '不要一句口号带过。不要编造现状里没有的播放量、GMV 或粉丝数。',
+  '字段：sections 正好覆盖用户消息里点名的短板，一项对一个维度，不要另起维度。',
+  '每项含 name、finding、adjust、soon、module。',
+  'name 必须与短板维度名称一致。',
+  'finding 是分析结果：这个短板卡在哪、为什么拉低总分，60 到 100 字。引用已经进来的平台资料。',
+  'adjust 是怎么调整：必须落到 module 对应的功能里，写改什么、改完应看到什么，80 到 160 字。',
+  'soon 是近期要做：近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，每件写清动作和频率，80 到 160 字。',
+  'module 只能是：' + PLAN_MODULES.join('、') + '。',
+  '对照：本地人群匹配用我的资料补属地和标签，再用招募大厅只接同城单。内容产能稳定用商单日历排更新。内容质量人设用培训课程补出镜、剪辑和团购话术。团购带货能力用招募大厅接同品类团购单，把真实成交写回我的资料。内容转化潜力用培训课程改开头和收藏点，再用招募大厅对照同类任务。口碑合规风险用我的资料核对账号，用培训课程改合规话术。',
+  '在「我的资料」启用平台后，粉丝、带货等级、报价、标签、主页链接会进入这次评估。缺的项写去「我的资料」补上后再重新评估。已经进来的数字直接用。',
+  '不要写成已经读到官方后台。',
 ].join('')
 
 function specOf(platformId) {
@@ -166,7 +172,7 @@ function scoreSystem(spec) {
     '你是豆包。按 6 维本地生活达人模型打分，满分 100。',
     spec.scene,
     `六维及满分：${weights}。团购带货能力权重最高。口碑合规风险是得分，不是另外扣分，越好越高。`,
-    '各维看这些信号：本地人群匹配看属地、同城粉丝、年龄性别、本地深耕、是否跨城。内容产能稳定看近 90 天更新、断更、持续时长、垂类是否漂移。内容质量人设看真人出镜、人设是否统一、画质剪辑话术、团购话术。团购带货能力看挂车或带货案例、价格带、预估单量或稿均单量、同品类经验。内容转化潜力看稿均播放点赞收藏评论、到店或商品点击、爆款占比、是否像投流刷量。口碑合规风险看违规限流、刷量、负面口碑、评论区、平台认证。',
+    '各维看这些信号：本地人群匹配看属地、同城粉丝、年龄性别、本地深耕、是否跨城。内容产能稳定看近 90 天更新、断更、持续时长、垂类是否漂移。内容质量人设看真人出镜、人设是否统一、画质剪辑话术、团购话术。团购带货能力看挂车或带货案例、价格带、预估单量或稿均单量、同品类经验，没有同品类挂车时这项要明显低于有同品类案例的达人。内容转化潜力看稿均播放点赞收藏评论、到店或商品点击、爆款占比、是否像投流刷量。口碑合规风险看违规限流、刷量、负面口碑、评论区、平台认证。',
     '这不是平台官方接口，不要声称读到了官方后台或官方等级。',
     '用户填了的粉丝、报价按原数使用，不要改成另一个数。同名但账号对不上的人不要写进来。',
     '公开检索里对得上这个账号的说法可以引用。检索里没有的画像、完播、单量、认证，按账号资料和同类本地生活达人做预估，写成确定判断。',
@@ -632,20 +638,55 @@ function clipText(value, max) {
 }
 
 function mapSuggestions(rows) {
+  const allowed = {}
+  PLAN_MODULES.forEach((name) => {
+    allowed[name] = true
+  })
   return (Array.isArray(rows) ? rows : [])
     .map((row) => {
-      const next = clipText(row && row.next, 80)
-      const adjust = clipText(row && row.adjust, 180) || next
+      const adjust = clipText(row && row.adjust, 200) || clipText(row && row.next, 200)
+      const moduleName = clipText(row && row.module, 8)
       return {
         name: clipText(row && row.name, 12),
-        finding: clipText(row && row.finding, 140),
+        finding: clipText(row && row.finding, 160),
         adjust,
-        soon: clipText(row && row.soon, 180),
+        soon: clipText(row && row.soon, 200),
+        module: moduleName,
         next: adjust,
       }
     })
-    .filter((row) => row.name && (row.finding || row.adjust || row.soon))
-    .slice(0, 5)
+    .filter((row) => row.name && row.finding && row.adjust && allowed[row.module])
+    .slice(0, 4)
+}
+
+function defectBrief(score) {
+  const rows = (score && score.situations ? score.situations : [])
+    .map((item) => ({
+      name: item.name,
+      points: item.points || 0,
+      max: item.max || 0,
+      ratio: item.max ? (item.points || 0) / item.max : 1,
+    }))
+    .sort((a, b) => a.ratio - b.ratio || a.points - b.points)
+    .slice(0, 4)
+  return rows.map((item) => item.name + ' ' + item.points + '/' + item.max).join('、')
+}
+
+function enteredProfile(row) {
+  const pairs = [
+    ['粉丝', row.followers],
+    ['报价', row.quotePrice],
+    ['标签', row.tags.join('、')],
+    ['主页链接', row.profileLink],
+  ]
+  if (row.platformId === 'douyin') pairs.push(['带货等级', row.salesLevel])
+  if (row.platformId === 'kuaishou') pairs.push(['达人等级', row.talentGrade])
+  const entered = pairs.filter((pair) => pair[1]).map((pair) => pair[0] + ' ' + pair[1])
+  const missing = pairs.filter((pair) => !pair[1]).map((pair) => pair[0])
+  return (
+    (entered.length ? '已进入评估的平台资料：' + entered.join('，') + '。' : '已进入评估的平台资料：还没有粉丝、报价、标签或主页链接。') +
+    (missing.length ? '还没进来的资料：' + missing.join('、') + '。这些要写去「我的资料」补上。' : '平台资料已经进来，方案直接用这些数字。')
+  )
 }
 
 function readCache(key) {
@@ -835,7 +876,8 @@ async function adviseTalent(raw, score, opts) {
   if (!(opts && opts.force)) {
     const cached = loaded.data
     if (cached && cached.advice && Array.isArray(cached.advice.sections) && cached.advice.sections.length) {
-      return { lift: clampLift(cached.advice.lift), sections: mapSuggestions(cached.advice.sections) }
+      const sections = mapSuggestions(cached.advice.sections)
+      if (sections.length) return { lift: clampLift(cached.advice.lift), sections }
     }
   }
   await pointsSpend.assertTalentEvalAffordable('talent_advice')
@@ -846,9 +888,10 @@ async function adviseTalent(raw, score, opts) {
     : '公开检索没有可用条目。按现状里的预估来写改法，不要写未检索到或无数据。'
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,
-    `${accountFacts(spec, row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请按每个板块写出分析结果、怎么调整、近两周要做的三件事。写具体动作，不要一句带过。`,
+    `${accountFacts(spec, row)}\n${enteredProfile(row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n只为这些短板各写一套方案：${defectBrief(score)}。`,
   )
   const advice = { lift: clampLift(j.lift), sections: mapSuggestions(j.sections) }
+  if (!advice.sections.length) throw new Error('提升方案不完整，请再点一次')
   await pointsSpend.spendTalentEvalPoints('talent_advice', '达人账号分析提升')
   writeCache(key, { advice })
   return advice

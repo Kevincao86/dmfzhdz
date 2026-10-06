@@ -106,6 +106,10 @@
             <text class="plan-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
             <text class="plan-name">{{item.name}}</text>
           </view>
+          <view class="plan-block plan-block--module" wx:if="{{item.module}}">
+            <text class="plan-tag">用到</text>
+            <text class="plan-text">{{item.module}}</text>
+          </view>
           <view class="plan-block plan-block--find" wx:if="{{item.finding}}">
             <text class="plan-tag">分析结果</text>
             <text class="plan-text">{{item.finding}}</text>

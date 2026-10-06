@@ -329,6 +329,10 @@
   border-radius: 16rpx;
 }
 
+.plan-block--module {
+  background: #ecfdf5;
+}
+
 .plan-block--find {
   background: #e8f1ff;
 }
@@ -349,6 +353,11 @@
   font-size: 20rpx;
   font-weight: 700;
   line-height: 1.6;
+}
+
+.plan-block--module .plan-tag {
+  color: #047857;
+  background: #d1fae5;
 }
 
 .plan-block--find .plan-tag {

@@ -398,14 +398,16 @@ export default function TalentLocalLifeEvalPage() {
           {advice?.sections?.length ? (
             <div className="surface-card rounded-xl border p-5">
               <p className="text-xs tracking-wide text-[var(--shell-muted)]">分析与提升方案</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-3 grid gap-4">
                 {advice.sections.map((row, index) => (
-                  <div key={row.name} className="eval-plate eval-plate--stack">
-                    <span className="eval-plate-no">{String(index + 1).padStart(2, '0')}</span>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{row.name}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-600">{row.next}</p>
-                    </div>
+                  <div key={row.name} className="rounded-xl border border-slate-200 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {String(index + 1).padStart(2, '0')} {row.name}
+                      <span className="ml-2 text-xs font-medium text-violet-700">用到 {row.module}</span>
+                    </p>
+                    {row.finding ? <p className="mt-2 text-sm leading-6 text-slate-700">分析结果：{row.finding}</p> : null}
+                    {row.adjust ? <p className="mt-2 text-sm leading-6 text-slate-700">怎么调整：{row.adjust}</p> : null}
+                    {row.soon ? <p className="mt-2 text-sm leading-6 text-slate-700">近期要做：{row.soon}</p> : null}
                   </div>
                 ))}
               </div>
