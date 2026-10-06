@@ -100,7 +100,7 @@ const ADVICE_SYSTEM = [
   '不要写未检索到、无公开、无法验证、待补充、公开资料不足、仅供参考、无法判断。',
   '只输出一个 JSON 对象，不要 Markdown。',
   '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
-  '字段：sections 正好覆盖用户消息里点名的短板，一项对一个维度，不要另起维度。',
+  '字段：sections 正好 6 项，顺序与六维一致，一项对一个维度，不要少项，不要另起维度。',
   '每项只含 name、finding、adjust、soon。不要输出 module。',
   'name 必须与短板维度名称一致。',
   'finding 是分析结果：按这条现状，结合绑定数据和公网情况，说明卡在哪、为什么拉低总分，60 到 100 字。',
@@ -688,7 +688,7 @@ function mapSuggestions(rows) {
       }
     })
     .filter((row) => row.name && (row.finding || row.adjust))
-    .slice(0, 4)
+    .slice(0, 6)
 }
 
 function adviceUsesBoundAccount(rows) {
@@ -699,16 +699,9 @@ function adviceUsesBoundAccount(rows) {
 }
 
 function defectBrief(score) {
-  const rows = (score && score.situations ? score.situations : [])
-    .map((item) => ({
-      name: item.name,
-      points: item.points || 0,
-      max: item.max || 0,
-      ratio: item.max ? (item.points || 0) / item.max : 1,
-    }))
-    .sort((a, b) => a.ratio - b.ratio || a.points - b.points)
-    .slice(0, 4)
-  return rows.map((item) => item.name + ' ' + item.points + '/' + item.max).join('、')
+  return (score && score.situations ? score.situations : [])
+    .map((item) => item.name + (item.max ? ' ' + item.points + '/' + item.max : ''))
+    .join('、')
 }
 
 
@@ -781,7 +774,7 @@ function savedFromCache(cached) {
   let advice = null
   if (adviceRaw && Array.isArray(adviceRaw.sections) && !adviceUsesBoundAccount(adviceRaw.sections)) {
     const sections = mapSuggestions(adviceRaw.sections)
-    if (sections.length) advice = { lift: clampLift(adviceRaw.lift), sections }
+    if (sections.length >= 6) advice = { lift: clampLift(adviceRaw.lift), sections }
   }
   const levels = levelsFromScore(cached.videoLevel, cached.liveLevel, cached.score)
   return {
@@ -900,7 +893,7 @@ async function adviseTalent(raw, score, opts) {
     const cached = loaded.data
     if (cached && cached.advice && Array.isArray(cached.advice.sections) && cached.advice.sections.length && !adviceUsesBoundAccount(cached.advice.sections)) {
       const sections = mapSuggestions(cached.advice.sections)
-      if (sections.length) return { lift: clampLift(cached.advice.lift), sections }
+      if (sections.length >= 6) return { lift: clampLift(cached.advice.lift), sections }
     }
   }
   await pointsSpend.assertTalentEvalAffordable('talent_advice')
@@ -911,20 +904,21 @@ async function adviseTalent(raw, score, opts) {
   const publicBlock = notes && !/无公开账号记录/.test(notes)
     ? '公网检索：\n' + notes + '\n检索里没有的指标按绑定资料和同类达人预估，写成确定判断。'
     : '公网检索没有可用条目。按已绑定的粉丝、报价、等级、标签和同类达人做预估。'
-  const ask = '已绑定资料：\n' + accountFacts(spec, row) + '\n' + publicBlock + '\n评分：' + score.score + '/100，' + spec.levelA + ' ' + score.videoLevel + '，' + spec.levelB + ' ' + score.liveLevel + '。\n这次评估解读出的现状：\n' + lines + '\n按本地生活达人写账号分析和提升，不要套用系统功能，不要出现蓝V、企业认证、机构认证。\n只为这些短板各写一套方案：' + defectBrief(score) + '。'
+  const ask = '已绑定资料：\n' + accountFacts(spec, row) + '\n' + publicBlock + '\n评分：' + score.score + '/100，' + spec.levelA + ' ' + score.videoLevel + '，' + spec.levelB + ' ' + score.liveLevel + '。\n这次评估解读出的现状：\n' + lines + '\n按本地生活达人写账号分析和提升，不要套用系统功能，不要出现蓝V、企业认证、机构认证。\n六个维度都要各写一套方案，顺序保持一致：' + defectBrief(score) + '。'
   let j = await askDoubaoJson(ADVICE_SYSTEM, ask)
   const firstRows = asSectionList(j && (j.sections || j.suggestions))
-  if (adviceUsesBoundAccount(firstRows.length ? firstRows : j)) {
+  if (adviceUsesBoundAccount(firstRows.length ? firstRows : j) || mapSuggestions(j && (j.sections || j.suggestions || j.plans)).length < 6) {
     try {
-      const retry = await askDoubaoJson(ADVICE_SYSTEM, ask + '\n上次写到了系统功能或企业认证。整份重写，正文不能出现我的资料、招募大厅、培训课程、商单日历、蓝V、企业认证、机构认证。')
-      const retryRows = asSectionList(retry && (retry.sections || retry.suggestions))
-      if (retryRows.length) j = retry
+      const retry = await askDoubaoJson(ADVICE_SYSTEM, ask + '\n上次没有写全六个维度，或写到了系统功能、企业认证。整份重写为正好 6 项。正文不能出现我的资料、招募大厅、培训课程、商单日历、蓝V、企业认证、机构认证。')
+      const retrySections = mapSuggestions(retry && (retry.sections || retry.suggestions || retry.plans))
+      const firstSections = mapSuggestions(j && (j.sections || j.suggestions || j.plans))
+      if (retrySections.length >= firstSections.length) j = retry
     } catch (e) {
       /* 重写失败时保留第一次结果，模块名在整理正文时去掉 */
     }
   }
   const advice = { lift: clampLift(j && j.lift), sections: mapSuggestions(j && (j.sections || j.suggestions || j.plans)) }
-  if (!advice.sections.length) throw new Error('提升方案不完整，请再点一次')
+  if (advice.sections.length < 6) throw new Error('提升方案不完整，请再点一次')
   await pointsSpend.spendTalentEvalPoints('talent_advice', '达人账号分析提升')
   writeCache(key, { advice })
   return advice
