@@ -106,20 +106,21 @@ const PLATFORM_SPECS: Record<string, PlatformSpec> = {
 }
 
 const ADVICE_SYSTEM = [
-  '你是豆包。根据已经解读出的达人现状，写给达人本人的账号分析和提升，用「你」来写。',
-  '只根据给出的六维现状和得分来写。不要结合系统里绑定的粉丝、报价、带货等级、标签或主页链接。',
-  '不要提「我的资料」「招募大厅」「培训课程」「商单日历」，不要让用户去系统里补资料或改绑定账号。',
+  '你是豆包。根据这个账号已绑定的粉丝、报价、等级、标签、主页，以及公网检索和这次六维现状，写给达人本人的账号分析和提升，用「你」来写。',
+  '必须用上已绑定的粉丝、报价、带货等级或达人等级、标签。公网检索里对得上的作品、挂车、互动可以引用。',
+  '分析和提升只谈账号本身：内容、更新节奏、人设、团购挂车、转化和口碑。按公网上能执行的做法来写。',
+  '不要套用任何系统功能。不要出现「我的资料」「招募大厅」「培训课程」「商单日历」「用到」。不要让用户去打开某个模块、登录后台或把数据填回资料栏。',
   '不要用商家口吻，不要写合作、履约、核销、不建议合作。',
-  '不要编造现状里没有的粉丝数和 GMV。现状里已经写出的判断可以沿用。',
+  '用户已绑定的数字按原数使用。公网没有的单量、完播、画像按同类达人预估，写成确定判断。',
   '不要写未检索到、无公开、无法验证、待补充、公开资料不足、仅供参考、无法判断。',
   '只输出一个 JSON 对象，不要 Markdown。',
   '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
   '字段：sections 正好覆盖用户消息里点名的短板，一项对一个维度，不要另起维度。',
   '每项只含 name、finding、adjust、soon。不要输出 module。',
   'name 必须与短板维度名称一致。',
-  'finding 是分析结果：按这条现状说明卡在哪、为什么拉低总分，60 到 100 字。必须扣住现状原意。',
-  'adjust 是怎么调整：针对这个账号的现状改内容、话术或发布节奏，写改什么、改完应看到什么，80 到 160 字。',
-  'soon 是近期要做：近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，每件写清动作和频率，80 到 160 字。',
+  'finding 是分析结果：按这条现状，结合绑定数据和公网情况，说明卡在哪、为什么拉低总分，60 到 100 字。',
+  'adjust 是怎么调整：写这个账号在公网内容上怎么改，改什么、改完应看到什么，80 到 160 字。',
+  'soon 是近期要做：近两周在账号上直接执行的 3 件事，用「1.」「2.」「3.」分开，每件写清动作和频率，80 到 160 字。',
   '不要写成已经读到官方后台。',
 ].join('')
 
@@ -785,16 +786,25 @@ function clipPlan(value: unknown, max: number) {
   return String(value || '').trim().slice(0, max)
 }
 
+function dropSystemToolSentences(value: unknown) {
+  return String(value ?? '')
+    .split(/(?<=[。！？\n])/)
+    .filter((part) => !/我的资料|招募大厅|培训课程|商单日历/.test(part))
+    .join('')
+    .replace(/用到/g, '')
+    .trim()
+}
+
 function mapSuggestions(rows: unknown): LocalLifeSuggestion[] {
   return (Array.isArray(rows) ? rows : [])
     .map((row) => {
       const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
-      const adjust = clipPlan(item.adjust, 200) || clipPlan(item.next, 200)
+      const adjust = clipPlan(dropSystemToolSentences(item.adjust), 200) || clipPlan(dropSystemToolSentences(item.next), 200)
       return {
         name: clipPlan(item.name, 12),
-        finding: clipPlan(item.finding, 160),
+        finding: clipPlan(dropSystemToolSentences(item.finding), 160),
         adjust,
-        soon: clipPlan(item.soon, 200),
+        soon: clipPlan(dropSystemToolSentences(item.soon), 200),
         next: adjust,
       }
     })
@@ -806,7 +816,7 @@ function adviceUsesBoundAccount(rows: unknown) {
   return (Array.isArray(rows) ? rows : []).some((row) => {
     const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
     const text = [item.module, item.finding, item.adjust, item.soon, item.next].join('\n')
-    return /我的资料|招募大厅|培训课程|商单日历|绑定账号|平台资料/.test(text)
+    return /我的资料|招募大厅|培训课程|商单日历/.test(text)
   })
 }
 
@@ -998,10 +1008,18 @@ export async function adviseTalent(
   const lines = score.situations
     .map((item) => `${item.name}${item.max ? ` ${item.points}/${item.max}` : ''}：${item.now}`)
     .join('\n')
-  const j = await askDoubaoJson(
-    ADVICE_SYSTEM,
-    `平台：${spec.name}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n这次评估解读出的现状：\n${lines}\n只根据这些现状写账号分析和提升，不要结合系统绑定的账号资料。\n只为这些短板各写一套方案：${defectBrief(score)}。`,
-  )
+  const notes = String(readEvalCache(row)?.publicNotes || '')
+  const publicBlock = notes && !/无公开账号记录/.test(notes)
+    ? `公网检索：\n${notes}\n检索里没有的指标按绑定资料和同类达人预估，写成确定判断。`
+    : '公网检索没有可用条目。按已绑定的粉丝、报价、等级、标签和同类达人做预估。'
+  const ask = `已绑定资料：\n${accountFacts(spec, row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n这次评估解读出的现状：\n${lines}\n用绑定资料和公网情况写账号分析和提升，不要套用系统功能。\n只为这些短板各写一套方案：${defectBrief(score)}。`
+  let j = await askDoubaoJson(ADVICE_SYSTEM, ask)
+  if (adviceUsesBoundAccount(j.sections)) {
+    j = await askDoubaoJson(
+      ADVICE_SYSTEM,
+      `${ask}\n上次写到了系统功能。整份重写，正文不能出现我的资料、招募大厅、培训课程、商单日历。`,
+    )
+  }
   const advice: LocalLifeAdvice = {
     lift: clampLift(j.lift),
     sections: mapSuggestions(j.sections),
