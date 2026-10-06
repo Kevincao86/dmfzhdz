@@ -7,6 +7,14 @@ const mpUi = require('../../utils/mpUiFlags.js')
 const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
 
 const PROFILE_KEY = 'meoo_merchant_profile_v1'
+const WEB_BIND_HINT = '请在网页端进行平台授权绑定，具体操作见网页版系统设置。'
+
+function consumeOpenPlatformBind() {
+  const app = getApp()
+  if (!app || !app.globalData || !app.globalData.openPlatformBind) return false
+  app.globalData.openPlatformBind = false
+  return true
+}
 
 const BASE_MENU = [
   {
@@ -134,6 +142,7 @@ Page({
   },
 
   onShow() {
+    this._openPlatformBind = consumeOpenPlatformBind()
     api.enterGuestBrowse()
     const real = api.isRealAuthed()
     const avatarUrl = readAvatar()
@@ -155,9 +164,14 @@ Page({
         planLabel: '',
         cloudPlatformRows: [],
         webPlatformRows: [],
-        bindingsHint: '登录后可同步平台绑定',
+        bindingsHint: this._openPlatformBind ? WEB_BIND_HINT : '登录后可同步平台绑定',
+        bindExpanded: this._openPlatformBind ? true : this.data.bindExpanded,
       })
+      this._openPlatformBind = false
       return
+    }
+    if (this._openPlatformBind) {
+      this.setData({ bindExpanded: true, bindingsHint: WEB_BIND_HINT })
     }
     try {
       const display =
@@ -218,10 +232,13 @@ Page({
 
   async refreshAccountData() {
     if (devAuth.isDevSkipLogin()) {
+      const fromBind = this._openPlatformBind
+      this._openPlatformBind = false
       this.setData({
         planLabel: '开发预览',
         planPillClass: 'dev',
-        bindingsHint: '开发预览模式不拉取云端绑定',
+        bindingsHint: fromBind ? WEB_BIND_HINT : '开发预览模式不拉取云端绑定',
+        bindExpanded: fromBind ? true : this.data.bindExpanded,
         cloudPlatformRows: [],
         webPlatformRows: [],
       })
@@ -238,9 +255,12 @@ Page({
     } catch (_) {}
 
     const bindingView = platformBindingsMp.loadPlatformBindingRows()
+    const fromBind = this._openPlatformBind
+    this._openPlatformBind = false
     this.setData({
       bindingsLoading: false,
-      bindingsHint: bindingView.syncHint,
+      bindingsHint: fromBind ? WEB_BIND_HINT : bindingView.syncHint,
+      bindExpanded: fromBind ? true : this.data.bindExpanded,
       cloudPlatformRows: bindingView.cloudRows,
       webPlatformRows: bindingView.webRows,
     })

@@ -1177,12 +1177,15 @@ Page({
     const bound = (this.data.platforms || []).some((item) => item.id === this.data.platformId && item.bound)
     if (!bound) {
       wx.showModal({
-        title: '请先绑定门店',
-        content: '分析评估前请先绑定门店账号。',
+        title: '请先绑定平台',
+        content: '请在网页端进行平台授权绑定，具体操作见网页版系统设置。',
         confirmText: '去绑定',
         cancelText: '取消',
         success(res) {
-          if (res.confirm) wx.navigateTo({ url: '/pages/store-list/store-list?mode=info' })
+          if (!res.confirm) return
+          const app = getApp()
+          if (app && app.globalData) app.globalData.openPlatformBind = true
+          wx.switchTab({ url: '/pages/mine/mine' })
         },
       })
       return
