@@ -3,6 +3,7 @@
  * 登录用户查看个人推广码、钱包与结算摘要；POST action=wxacode 生成太阳码
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import QRCode from 'qrcode'
 import { resolveAffiliateAuthIdentity } from '../src/lib/affiliatePortalAuth.js'
 import {
   buildAffiliatePortalFromSnapshot,
@@ -24,6 +25,20 @@ function sendJson(res: VercelResponse, status: number, body: Record<string, unkn
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
   res.status(status).send(JSON.stringify(body))
+}
+
+async function buildPromoLinkQrDataUrls(links: {
+  cs: string
+  drPr: string
+  drTalent: string
+}): Promise<{ cs: string; drPr: string; drTalent: string }> {
+  const opt = { width: 360, margin: 2, errorCorrectionLevel: 'M' as const }
+  const [cs, drPr, drTalent] = await Promise.all([
+    QRCode.toDataURL(links.cs, opt),
+    QRCode.toDataURL(links.drPr, opt),
+    QRCode.toDataURL(links.drTalent, opt),
+  ])
+  return { cs, drPr, drTalent }
 }
 
 function rawBody(req: VercelRequest): Record<string, unknown> {
@@ -155,6 +170,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ? buildDistributionPromoLinks(refCode)
         : null
 
+    const promoQrs = promoLinks
+      ? await buildPromoLinkQrDataUrls(promoLinks)
+      : null
+
     const affiliateId =
       portal.affiliate && typeof portal.affiliate.id === 'string' ? portal.affiliate.id.trim() : ''
     const attributionBundle =
@@ -169,6 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       stats: portal.stats,
       settlements: portal.settlements,
       promoLinks,
+      promoQrs,
       attributionStats: attributionBundle?.stats ?? null,
       attributions: attributionBundle?.attributions ?? [],
       withdrawGate: portal.withdrawGate,

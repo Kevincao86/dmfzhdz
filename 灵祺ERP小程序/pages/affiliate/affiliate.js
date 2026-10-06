@@ -56,6 +56,7 @@ Page({
     const portal = await affiliate.fetchPortal()
     const row = portal.affiliate || {}
     const links = portal.promoLinks || null
+    const qrs = portal.promoQrs || {}
     const wallet = portal.wallet
     this.setData({
       booting: false,
@@ -64,9 +65,10 @@ Page({
       commissionHint: portal.commissionHint || '',
       linkRows: links
         ? [
-            { key: 'cs', label: '商家注册', url: links.cs },
-            { key: 'drTalent', label: '星选达人注册', url: links.drTalent },
-            { key: 'drPr', label: '星选 PR 注册', url: links.drPr },
+            { key: 'cs', label: '商家 ERP', url: links.cs, qr: qrs.cs || '', copyLabel: '链接' },
+            { key: 'drPr', label: '星选 PR', url: links.drPr, qr: qrs.drPr || '', copyLabel: '链接' },
+            { key: 'drTalent', label: '星选达人', url: links.drTalent, qr: qrs.drTalent || '', copyLabel: '链接' },
+            { key: 'mp', label: '达人小程序', url: links.mpPath, qr: '', copyLabel: '路径' },
           ]
         : [],
       wallet: wallet
@@ -127,6 +129,19 @@ Page({
     const url = e.currentTarget.dataset.url
     if (!url) return
     wx.setClipboardData({ data: url })
+  },
+  onDownloadQr(e) {
+    const key = e.currentTarget.dataset.key
+    const row = (this.data.linkRows || []).find((item) => item.key === key)
+    const src = key === 'mp' ? this.data.wxacodePath : row && row.qr
+    if (!src) {
+      wx.showToast({ title: '二维码还在生成', icon: 'none' })
+      return
+    }
+    affiliate
+      .savePromoImage(src)
+      .then(() => wx.showToast({ title: '二维码已保存到相册', icon: 'none' }))
+      .catch(() => wx.showToast({ title: '保存失败，请长按二维码', icon: 'none' }))
   },
   onSaveQr() {
     if (!this.data.wxacodePath) return

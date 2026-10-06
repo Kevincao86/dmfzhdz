@@ -47,11 +47,13 @@ function mapPortalView(data) {
   const wallet = data.wallet
   const stats = data.stats
   const promoLinks = data.promoLinks
+  const qrs = data.promoQrs || {}
   const linkRows = promoLinks
     ? [
-        { key: 'cs', label: '商家 ERP 注册', url: promoLinks.cs },
-        { key: 'drPr', label: '星选 PR 注册', url: promoLinks.drPr },
-        { key: 'drTalent', label: '星选达人注册', url: promoLinks.drTalent },
+        { key: 'cs', label: '商家 ERP', url: promoLinks.cs, qr: qrs.cs || '', copyLabel: '链接' },
+        { key: 'drPr', label: '星选 PR', url: promoLinks.drPr, qr: qrs.drPr || '', copyLabel: '链接' },
+        { key: 'drTalent', label: '星选达人', url: promoLinks.drTalent, qr: qrs.drTalent || '', copyLabel: '链接' },
+        { key: 'mp', label: '达人小程序', url: promoLinks.mpPath, qr: '', copyLabel: '路径' },
       ]
     : []
   const settlements = (data.settlements || []).map((row) => ({
@@ -192,6 +194,33 @@ Page({
       data: code,
       success: () => wx.showToast({ title: '已复制推广码', icon: 'none' }),
     })
+  },
+  onDownloadQr(e) {
+    const key = e.currentTarget.dataset.key
+    const row = (this.data.linkRows || []).find((item) => item.key === key)
+    const src = key === 'mp' ? this.data.wxacodePath : row && row.qr
+    if (!src) {
+      wx.showToast({ title: '二维码还在生成', icon: 'none' })
+      return
+    }
+    affiliatePortal
+      .savePromoImage(src)
+      .then(() => wx.showToast({ title: '二维码已保存到相册', icon: 'none' }))
+      .catch((err) => {
+        const denied = err && /auth deny|authorize/i.test(String(err.errMsg || err.message || ''))
+        if (denied) {
+          wx.showModal({
+            title: '需要相册权限',
+            content: '请在设置中允许保存图片到相册',
+            confirmText: '去设置',
+            success: (res) => {
+              if (res.confirm) wx.openSetting({})
+            },
+          })
+          return
+        }
+        wx.showToast({ title: '保存失败，请长按二维码', icon: 'none' })
+      })
   },
   onCopyLink(e) {
     const url = e.currentTarget.dataset.url

@@ -77,6 +77,7 @@ async function fetchPortal() {
     stats: data.stats || null,
     settlements: data.settlements || [],
     promoLinks: data.promoLinks || null,
+    promoQrs: data.promoQrs || null,
     attributionStats: data.attributionStats || null,
     attributions: data.attributions || [],
     withdrawGate: data.withdrawGate || null,
@@ -125,6 +126,22 @@ async function fetchWxacodeImagePath() {
   }
 }
 
+function savePromoImage(src) {
+  const raw = String(src || '').trim()
+  if (!raw) return Promise.reject(new Error('二维码还在生成'))
+  const fileReady = raw.indexOf('data:image') === 0 ? dataUrlToTempFile(raw) : Promise.resolve(raw)
+  return fileReady.then(
+    (filePath) =>
+      new Promise((resolve, reject) => {
+        wx.saveImageToPhotosAlbum({
+          filePath,
+          success: resolve,
+          fail: (err) => reject(err || new Error('save_fail')),
+        })
+      }),
+  )
+}
+
 module.exports = {
   formatYuan,
   settlementStatusLabel,
@@ -133,4 +150,5 @@ module.exports = {
   fetchPortal,
   fetchWxacodeImagePath,
   submitWithdraw,
+  savePromoImage,
 }

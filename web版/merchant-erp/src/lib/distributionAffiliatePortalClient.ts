@@ -20,12 +20,19 @@ export type AffiliatePromoLinks = {
   mpPath: string
 }
 
+export type AffiliatePromoQrs = {
+  cs: string
+  drPr: string
+  drTalent: string
+}
+
 export type AffiliatePortalPayload = {
   affiliate: PublicAffiliateSummary | null
   wallet: AffiliatePortalWallet | null
   stats: AffiliatePortalStats | null
   settlements: AffiliatePortalSettlementRow[]
   promoLinks: AffiliatePromoLinks | null
+  promoQrs: AffiliatePromoQrs | null
   attributionStats: SalespersonPortalStats | null
   attributions: PartnerDistributionAttributionRow[]
   withdrawGate: AffiliateWithdrawGate | null
@@ -58,6 +65,7 @@ export async function fetchAffiliatePortal(): Promise<AffiliatePortalPayload> {
         stats: (json.stats as AffiliatePortalStats | null) ?? null,
         settlements: (json.settlements as AffiliatePortalSettlementRow[]) ?? [],
         promoLinks: (json.promoLinks as AffiliatePromoLinks | null) ?? null,
+        promoQrs: (json.promoQrs as AffiliatePromoQrs | null) ?? null,
         attributionStats: (json.attributionStats as SalespersonPortalStats | null) ?? null,
         attributions: (json.attributions as PartnerDistributionAttributionRow[]) ?? [],
         withdrawGate: (json.withdrawGate as AffiliateWithdrawGate | null) ?? null,

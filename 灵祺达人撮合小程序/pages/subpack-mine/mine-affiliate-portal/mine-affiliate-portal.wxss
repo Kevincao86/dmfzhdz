@@ -138,6 +138,30 @@
   margin-top: 0;
 }
 
+.link-qr {
+  width: 144rpx;
+  height: 144rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+}
+
+.link-qr__img {
+  width: 128rpx;
+  height: 128rpx;
+}
+
+.link-qr__wait {
+  font-size: 20rpx;
+  color: #94a3b8;
+  text-align: center;
+  padding: 8rpx;
+}
+
 .link-item {
   display: flex;
   align-items: flex-start;
@@ -170,6 +194,13 @@
   line-height: 1.5;
   color: #64748b;
   word-break: break-all;
+}
+
+.link-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
 }
 
 .link-item__copy {

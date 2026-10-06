@@ -77,6 +77,20 @@
   gap: 16rpx;
 }
 .row .btn { flex: 1; }
+.link-qr {
+  width: 220rpx;
+  height: 220rpx;
+  margin-top: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border-radius: 16rpx;
+}
+.link-qr-img {
+  width: 200rpx;
+  height: 200rpx;
+}
 .link {
   margin-top: 24rpx;
   padding-top: 20rpx;

@@ -1,4 +1,4 @@
-import { Copy, ExternalLink, Loader2, Share2, Users, Wallet } from 'lucide-react'
+import { Copy, Download, ExternalLink, Loader2, Share2, Users, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
@@ -27,6 +27,29 @@ function formatDate(iso?: string): string {
   const d = new Date(iso)
   if (!Number.isFinite(d.getTime())) return iso
   return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function downloadDataUrl(dataUrl: string, filename: string) {
+  const a = document.createElement('a')
+  if (dataUrl.startsWith('data:')) {
+    const comma = dataUrl.indexOf(',')
+    const meta = dataUrl.slice(0, comma)
+    const b64 = dataUrl.slice(comma + 1)
+    const mime = /data:(.*?);/.exec(meta)?.[1] || 'image/png'
+    const bin = atob(b64)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
+    const blob = new Blob([bytes], { type: mime })
+    const url = URL.createObjectURL(blob)
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+    return
+  }
+  a.href = dataUrl
+  a.download = filename
+  a.click()
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -68,6 +91,7 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
   const [wxacodeUrl, setWxacodeUrl] = useState('')
   const [wxacodeErr, setWxacodeErr] = useState('')
   const [wxacodeLoading, setWxacodeLoading] = useState(false)
+  const [linkQrs, setLinkQrs] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -112,6 +136,33 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
       cancelled = true
     }
   }, [data?.affiliate?.status, data?.affiliate?.refCode, data?.promoLinks])
+
+  useEffect(() => {
+    const links = data?.promoLinks
+    const fromApi = data?.promoQrs
+    if (!links) {
+      setLinkQrs({})
+      return
+    }
+    if (fromApi?.cs && fromApi.drPr && fromApi.drTalent) {
+      setLinkQrs({ cs: fromApi.cs, drPr: fromApi.drPr, drTalent: fromApi.drTalent })
+      return
+    }
+    let cancelled = false
+    void import('qrcode').then(async (mod) => {
+      const QRCode = mod.default
+      const opt = { width: 360, margin: 2, errorCorrectionLevel: 'M' as const }
+      const [cs, drPr, drTalent] = await Promise.all([
+        QRCode.toDataURL(links.cs, opt),
+        QRCode.toDataURL(links.drPr, opt),
+        QRCode.toDataURL(links.drTalent, opt),
+      ])
+      if (!cancelled) setLinkQrs({ cs, drPr, drTalent })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [data?.promoLinks, data?.promoQrs])
 
   useEffect(() => {
     void fetchPlatformDecorItem('cs.settings.affiliate').then((item) => {
@@ -286,56 +337,75 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
 
           {affiliate.status === 'active' && links ? (
             <section className="space-y-3">
-              <h4 className="text-sm font-medium text-gray-900">专属推广二维码</h4>
+              <h4 className="text-sm font-medium text-gray-900">推广链接与二维码</h4>
               {data?.commissionHint ? (
                 <p className="text-xs leading-relaxed text-slate-600">{data.commissionHint}</p>
-              ) : null}
-              <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
-                {wxacodeLoading ? <p className="text-sm text-slate-500">二维码生成中…</p> : null}
-                {wxacodeUrl ? (
-                  <img src={wxacodeUrl} alt="专属推广二维码" className="h-40 w-40 rounded-lg border border-slate-100 bg-white" />
-                ) : null}
-                {wxacodeErr ? <p className="text-sm text-amber-700">{wxacodeErr}</p> : null}
-                <p className="max-w-sm text-xs leading-relaxed text-slate-600">
-                  好友扫码进入小程序并完成注册、支付会员费后，佣金按运营后台设置的比例计入可提现余额。
+              ) : (
+                <p className="text-xs leading-relaxed text-slate-500">
+                  网站二维码用手机扫码打开注册页；小程序二维码请用微信扫一扫。
                 </p>
-              </div>
-              <h4 className="text-sm font-medium text-gray-900">推广链接</h4>
+              )}
               <div className="space-y-2">
-                {[
-                  { key: 'cs', label: '商家 ERP 注册', url: links.cs },
-                  { key: 'drPr', label: '星选 PR 注册', url: links.drPr },
-                  { key: 'drTalent', label: '星选达人注册', url: links.drTalent },
-                ].map((row) => (
+                {(
+                  [
+                    { key: 'cs', label: '商家 ERP', url: links.cs, qr: linkQrs.cs, copyLabel: '链接' },
+                    { key: 'drPr', label: '星选 PR', url: links.drPr, qr: linkQrs.drPr, copyLabel: '链接' },
+                    { key: 'drTalent', label: '星选达人', url: links.drTalent, qr: linkQrs.drTalent, copyLabel: '链接' },
+                    {
+                      key: 'mp',
+                      label: '达人小程序',
+                      url: links.mpPath,
+                      qr: wxacodeUrl,
+                      copyLabel: '路径',
+                    },
+                  ] as const
+                ).map((row) => (
                   <div
                     key={row.key}
-                    className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center"
                   >
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-slate-500">{row.label}</p>
-                      <p className="truncate font-mono text-xs text-slate-800">{row.url}</p>
+                    <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50">
+                      {row.qr ? (
+                        <img src={row.qr} alt={`${row.label}推广二维码`} className="h-24 w-24 object-contain" />
+                      ) : row.key === 'mp' && wxacodeLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                      ) : (
+                        <span className="px-2 text-center text-[11px] text-slate-400">
+                          {row.key === 'mp' ? wxacodeErr || '二维码生成中' : '二维码生成中'}
+                        </span>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void onCopy(row.url, row.label)}
-                      className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      复制
-                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900">{row.label}</p>
+                      <p className="mt-1 break-all font-mono text-xs text-slate-600">{row.url}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void onCopy(row.url, row.label)}
+                          className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          复制{row.copyLabel}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!row.qr}
+                          onClick={() => {
+                            if (!row.qr) return
+                            const code = affiliate.refCode || 'promo'
+                            downloadDataUrl(row.qr, `推广二维码-${row.label}-${code}.png`)
+                            setHint(`已开始下载${row.label}二维码`)
+                            setTimeout(() => setHint(null), 2200)
+                          }}
+                          className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          下载二维码
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                  小程序路径（供生成太阳码）：<span className="font-mono">{links.mpPath}</span>
-                  <button
-                    type="button"
-                    onClick={() => void onCopy(links.mpPath, '小程序路径')}
-                    className="ml-2 inline-flex items-center gap-1 text-indigo-600 hover:underline"
-                  >
-                    <Copy className="h-3 w-3" />
-                    复制
-                  </button>
-                </div>
               </div>
             </section>
           ) : null}

@@ -22,20 +22,24 @@
     <block wx:if="{{!booting && active}}">
       <text class="code">推广码 {{refCode}}</text>
       <text class="hint" wx:if="{{commissionHint}}">{{commissionHint}}</text>
-      <view class="qr-box">
-        <text wx:if="{{wxacodeLoading}}" class="hint">二维码生成中…</text>
-        <image wx:elif="{{wxacodePath}}" class="qr" src="{{wxacodePath}}" mode="aspectFit" show-menu-by-longpress />
-        <text wx:else class="hint">{{wxacodeErr || '二维码暂不可用'}}</text>
-      </view>
-      <text class="hint">长按保存二维码。好友扫码注册并支付会员费后，佣金进入可提现余额。</text>
-      <view class="row">
-        <button class="btn btn-ghost" bindtap="onCopyCode">复制推广码</button>
-        <button class="btn" bindtap="onSaveQr" disabled="{{!wxacodePath}}">保存二维码</button>
-      </view>
+      <text class="hint">网站二维码用手机扫码打开注册页；小程序二维码请用微信扫一扫。</text>
       <view class="link" wx:for="{{linkRows}}" wx:key="key">
+        <view class="link-qr">
+          <image
+            wx:if="{{item.key === 'mp' ? wxacodePath : item.qr}}"
+            class="link-qr-img"
+            src="{{item.key === 'mp' ? wxacodePath : item.qr}}"
+            mode="aspectFit"
+            show-menu-by-longpress
+          />
+          <text wx:else class="hint">生成中</text>
+        </view>
         <text class="link-label">{{item.label}}</text>
         <text class="link-url">{{item.url}}</text>
-        <button class="btn btn-ghost btn-sm" data-url="{{item.url}}" bindtap="onCopyLink">复制</button>
+        <view class="row">
+          <button class="btn btn-ghost btn-sm" data-url="{{item.url}}" bindtap="onCopyLink">复制{{item.copyLabel}}</button>
+          <button class="btn btn-sm" data-key="{{item.key}}" bindtap="onDownloadQr">下载二维码</button>
+        </view>
       </view>
       <view class="stats" wx:if="{{wallet}}">
         <text>可提现 ¥{{wallet.availableYuan}}</text>
