@@ -82,6 +82,7 @@
     <text class="advice-title">定位</text>
     <text class="report-text">{{positioning}}</text>
     <text class="report-summary" wx:if="{{summary}}">{{summary}}</text>
+    <text class="report-note" wx:if="{{disclaimer}}">{{disclaimer}}</text>
   </view>
 
   <view class="card advice advice--now" wx:if="{{scoreReady && indicators.length}}">
@@ -89,9 +90,9 @@
     <view class="metric" wx:for="{{indicators}}" wx:key="name">
       <view class="metric-head">
         <text class="metric-name">{{item.name}}</text>
-        <text class="metric-score">{{item.score}}</text>
+        <text class="metric-score">{{item.score}}/{{item.weight}}</text>
       </view>
-      <view class="metric-bar"><view class="metric-fill" style="width: {{item.score}}%;"></view></view>
+      <view class="metric-bar"><view class="metric-fill" style="width: {{item.pct}}%;"></view></view>
       <text class="metric-comment">{{item.comment}}</text>
     </view>
   </view>

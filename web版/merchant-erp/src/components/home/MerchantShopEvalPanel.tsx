@@ -868,6 +868,7 @@ export default function MerchantShopEvalPanel() {
             <p className="text-xs font-bold tracking-wide text-[#1E3A5F]">定位</p>
             <p className="mt-2 text-sm leading-7 text-slate-700">{score.positioning}</p>
             {score.summary ? <p className="mt-3 text-sm font-semibold leading-7 text-slate-900">{score.summary}</p> : null}
+            {score.disclaimer ? <p className="mt-3 text-xs leading-6 text-slate-500">{score.disclaimer}</p> : null}
           </div>
         ) : (
           <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">完成评估后，这里显示公开渠道上的定位和综合判断</div>
@@ -875,18 +876,21 @@ export default function MerchantShopEvalPanel() {
 
         {score?.indicators?.length ? (
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-            <div className="grid grid-cols-[148px_72px_1fr] bg-[#1E3A5F] px-4 py-2 text-xs font-semibold text-white">
+            <div className="grid grid-cols-[minmax(0,1.15fr)_88px_1.5fr] bg-[#1E3A5F] px-4 py-2 text-xs font-semibold text-white">
               <span>指标</span>
               <span>得分</span>
               <span>点评</span>
             </div>
             {score.indicators.map((row) => (
-              <div key={row.name} className="grid grid-cols-[148px_72px_1fr] items-start gap-2 border-t border-slate-100 px-4 py-3 text-left">
+              <div key={row.name} className="grid grid-cols-[minmax(0,1.15fr)_88px_1.5fr] items-start gap-2 border-t border-slate-100 px-4 py-3 text-left">
                 <p className="text-sm font-semibold text-slate-900">{row.name}</p>
                 <div>
-                  <p className="text-lg font-extrabold text-[#1E3A5F]">{row.score}</p>
+                  <p className="text-lg font-extrabold text-[#1E3A5F]">
+                    {row.score}
+                    {row.weight ? <span className="text-sm font-semibold text-slate-400">/{row.weight}</span> : null}
+                  </p>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-[#1E3A5F]" style={{ width: `${Math.max(0, Math.min(100, row.score))}%` }} />
+                    <div className="h-full rounded-full bg-[#1E3A5F]" style={{ width: `${Math.max(0, Math.min(100, row.pct || row.score))}%` }} />
                   </div>
                 </div>
                 <p className="text-sm leading-6 text-slate-600">{row.comment}</p>

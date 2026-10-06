@@ -96,18 +96,43 @@ const SHOP_EVAL_PLATFORMS = [
 ]
 
 const SHOP_EVAL_GRADES_SINGLE = [
-  { key: 'ready', range: '85~100', label: '经营稳健', note: '六项功能里，商品和已经接上的经营动作比较齐' },
-  { key: 'tune', range: '70~84', label: '转化偏弱', note: '店能被看见，运营、流量或财务还没接上' },
-  { key: 'fill', range: '55~69', label: '资料偏薄', note: '多项功能还是未完善，获客动作有限' },
-  { key: 'build', range: '＜55', label: '形象未立', note: '功能大多未完善，还没形成可经营的闭环' },
+  { key: 'ready', range: '80~100', label: '商圈头部', note: '套餐、内容和口碑在同商圈公开渠道上比较稳' },
+  { key: 'tune', range: '70~79', label: '优质门店', note: '有线上获客能力，套餐结构、自有内容或口碑还有短板' },
+  { key: 'fill', range: '55~69', label: '竞争力偏弱', note: '公网上能看见店，但下单规模、内容或口碑还没站住' },
+  { key: 'build', range: '＜55', label: '公域尚未成型', note: '套餐、内容、口碑里多项在公开渠道上还看不清' },
 ]
 
 const SHOP_EVAL_GRADES_CHAIN = [
-  { key: 'ready', range: '85~100', label: '品牌成型', note: '六项功能在各店比较统一，分店能被看见、能核销' },
-  { key: 'tune', range: '70~84', label: '协同不足', note: '品牌能见客，分店之间功能还没对齐' },
-  { key: 'fill', range: '55~69', label: '分店偏散', note: '多家店的商品、视觉或财务还没统一' },
-  { key: 'build', range: '＜55', label: '品牌未立', note: '连锁功能大多未完善，还没形成统一形象' },
+  { key: 'ready', range: '80~100', label: '品牌口碑稳', note: '各店公开口碑比较齐，内容和套餐没有明显打架' },
+  { key: 'tune', range: '70~79', label: '品牌能被看见', note: '品牌有内容或套餐，但舆情离散或标准化还没齐' },
+  { key: 'fill', range: '55~69', label: '分店口碑不齐', note: '有门店的公开差评或价格带在拖品牌' },
+  { key: 'build', range: '＜55', label: '品牌尚未成型', note: '公开渠道上还看不出统一的套餐、内容和口碑' },
 ]
+
+const PUBLIC_EVAL_SINGLE = [
+  { name: '套餐预估下单与竞争力', weight: 35 },
+  { name: '公域流量与内容转化', weight: 30 },
+  { name: '门店口碑与舆情风险', weight: 25 },
+  { name: '线上运营能力', weight: 10 },
+]
+
+const PUBLIC_EVAL_CHAIN = [
+  { name: '全品牌套餐规模与价格', weight: 25 },
+  { name: '品牌内容与流量矩阵', weight: 25 },
+  { name: '品牌口碑与舆情风险', weight: 30 },
+  { name: '品牌标准化与一致性', weight: 20 },
+]
+
+const SHOP_EVAL_DISCLAIMER = {
+  single:
+    '本结果只依据公网前台和检索到的公开说法，没有商家后台授权，不能核验真实核销、营收和利润。预估下单含退款、过期未核销等噪声，不是到店收入，只适合同商圈横向对比，不能用于财务结算或业绩考核。',
+  chain:
+    '本结果只依据公网前台和检索到的公开说法，没有商家后台授权，不能核验真实核销、营收和利润。品牌分看各店公开口碑是否一致、套餐价格是否一套、内容是否覆盖到店。一家店的公开差评会拉低品牌分。不能用于财务结算或业绩考核。',
+}
+
+function publicEvalIndicators(scope) {
+  return scope === 'chain' ? PUBLIC_EVAL_CHAIN : PUBLIC_EVAL_SINGLE
+}
 
 const SHOP_EVAL_GRADES = SHOP_EVAL_GRADES_SINGLE
 
@@ -216,10 +241,10 @@ function shopFacts(spec, row) {
     `分店示例：${filledOr(row.storeNames, spec.scope === 'chain' ? '未列出' : '无')}`,
     `城市：${filledOr(row.city, '未填写')}`,
     `地址：${filledOr(row.address, '未填写')}`,
-    `电话：${filledOr(row.phone, '商家档案未填。公开检索里有这一家的号码就写入平台基础搭建')}`,
-    `营业时间：${filledOr(row.businessHours, '商家档案未填。公开检索里有这一家的钟点就写入平台基础搭建。不要把店名里的24时当成营业时间')}`,
+    `电话：${filledOr(row.phone, '商家档案未填。公开检索里有这一家的号码就写入线上运营')}`,
+    `营业时间：${filledOr(row.businessHours, '商家档案未填。公开检索里有这一家的钟点就写入线上运营。不要把店名里的24时当成营业时间')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
-    `套餐价格：${filledOr(row.offerPrice, /\d+\s*元|套餐/.test(String(row.publicNote || '')) ? '公开检索里已经有抖音团购价格，写进短视频与团购，禁止写成未上架' : '未填写，不要编造')}`,
+    `套餐价格：${filledOr(row.offerPrice, /\d+\s*元|套餐/.test(String(row.publicNote || '')) ? '公开检索里已经有团购价格，写进套餐竞争力，禁止写成未上架' : '未填写，不要编造')}`,
     `经营分类：${filledOr(row.category, '未填写')}`,
     `评估范围：${row.evalFocus === 'brand' ? '用户指定按总品牌' : row.evalFocus === 'store' ? '用户指定只分析这一家绑定门店' : '未指定'}`,
     `高德定位：${filledOr(row.mapNote, '未返回')}`,
@@ -250,7 +275,7 @@ function functionCoverage(row) {
   const product = offer
     ? `商品信息：已有套餐 ${offer}。商品库和菜单图文本次未接入，不要写成图文已齐。`
     : publicOffer
-      ? '商品信息：公开检索里已经有抖音团购套餐和价格。短视频与团购必须写出套餐和价格，禁止写成未上架、暂未上架、没有套餐。'
+      ? '套餐竞争力：公开检索里已经有团购套餐和价格。必须写出套餐和价格，禁止写成未上架、暂未上架、没有套餐。'
       : '商品信息：未完善。没有套餐名称和价格。'
   return [
     product,
@@ -559,28 +584,52 @@ function blankSignals() {
   }
 }
 
-const PUBLIC_EVAL_INDICATORS = [
-  { name: '平台基础搭建', weight: 16 },
-  { name: '短视频与团购', weight: 20 },
-  { name: '品牌资产与口碑', weight: 16 },
-  { name: '私域与复购', weight: 16 },
-  { name: '门店标准化', weight: 16 },
-  { name: '数据复盘', weight: 16 },
-]
+function pointsOf(value, weight) {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n) || n <= 0) return 0
+  if (n > weight) return Math.round((Math.min(100, n) / 100) * weight)
+  return Math.min(weight, n)
+}
 
-function mapIndicators(rows) {
+function scopeFromCached(cached) {
+  const profile = cached && cached.profile
+  if (profile && typeof profile === 'object') {
+    if (profile.evalFocus === 'store') return 'single'
+    if (profile.evalFocus === 'brand' || profile.scope === 'chain' || Number(profile.storeCount) >= 2) return 'chain'
+  }
+  const names = {}
+  const rows = cached && Array.isArray(cached.indicators) ? cached.indicators : []
+  for (const row of rows) names[String((row && row.name) || '')] = true
+  if (PUBLIC_EVAL_CHAIN.some((block) => names[block.name])) return 'chain'
+  return 'single'
+}
+
+function mapIndicators(rows, blocks) {
   const byName = {}
   for (const row of Array.isArray(rows) ? rows : []) {
     const item = row && typeof row === 'object' ? row : {}
-    const name = clipText(item.name, 12)
+    const name = clipText(item.name, 40)
     if (!name) continue
+    const block = (blocks || []).find((candidate) => candidate.name === name)
     byName[name] = {
-      name,
-      score: clampScore(item.score != null ? item.score : item.points),
-      comment: clipText(item.comment || item.now, 180),
+      points: pointsOf(item.points != null ? item.points : item.score, block ? block.weight : 100),
+      comment: clipText(item.comment || item.now, 220),
     }
   }
-  return PUBLIC_EVAL_INDICATORS.map((block) => byName[block.name]).filter((row) => row && row.comment)
+  return (blocks || [])
+    .map((block) => {
+      const hit = byName[block.name]
+      if (!hit || !hit.comment) return null
+      const score = Math.min(block.weight, hit.points)
+      return {
+        name: block.name,
+        score,
+        weight: block.weight,
+        pct: Math.round((score / block.weight) * 100),
+        comment: hit.comment,
+      }
+    })
+    .filter(Boolean)
 }
 
 function textList(rows, limit, maxLen) {
@@ -598,42 +647,17 @@ function collapsedChainText(text, storeCount) {
 function brandScoreLow(raw) {
   const rows = Array.isArray(raw && raw.indicators) ? raw.indicators : []
   for (const row of rows) {
-    if (!row || String(row.name || '') !== '品牌资产与口碑') continue
-    const score = Math.round(Number(row.score != null ? row.score : row.points))
-    return !Number.isFinite(score) || score < 40
+    if (!row || String(row.name || '') !== '品牌口碑与舆情风险') continue
+    return pointsOf(row.points != null ? row.points : row.score, 30) < 12
   }
   return false
 }
 
-function applyEvidenceFloors(indicators, storeCount, note) {
-  if (storeCount < 2) return indicators
-  const floors = {
-    品牌资产与口碑: storeCount >= 5 ? 74 : 62,
-    门店标准化: storeCount >= 5 ? 68 : 58,
-    私域与复购: storeCount >= 5 ? 52 : 42,
-    数据复盘: storeCount >= 5 ? 40 : 32,
-    短视频与团购: storeCount >= 5 ? 50 : 42,
-    平台基础搭建: storeCount >= 5 ? 48 : 40,
-  }
-  if (/团购|抖音|探店|点评|榜/.test(note)) {
-    floors['短视频与团购'] = storeCount >= 5 ? 58 : 48
-    floors['平台基础搭建'] = storeCount >= 5 ? 54 : 46
-  }
-  return indicators.map((row) => {
-    const floor = floors[row.name] || 0
-    if (row.score >= floor) return row
-    const comment = /空白|未立|没有线上|零/.test(row.comment)
-      ? `${row.name}按高德同城 ${storeCount} 家同名门店来看，品牌已经被本地顾客叫得上名。这一家地址的后台和团购页这次没有逐条核对，短板写在货盘和数据，不把品牌写成没有形象。`
-      : row.comment
-    return Object.assign({}, row, { score: floor, comment })
-  })
-}
-
-function scoreFromPublic(raw, indicators) {
+function scoreFromPublic(raw, indicators, blocks, scope) {
   const byName = {}
   for (const row of indicators) byName[row.name] = row.score
   let sum = 0
-  for (const block of PUBLIC_EVAL_INDICATORS) sum += ((byName[block.name] || 0) / 100) * block.weight
+  for (const block of blocks) sum += byName[block.name] || 0
   const highlights = textList(raw.highlights, 3, 140)
   const gaps = textList(raw.gaps, 4, 160)
   return {
@@ -649,6 +673,7 @@ function scoreFromPublic(raw, indicators) {
     gaps,
     summary: clipText(raw.summary, 100),
     sources: textList(raw.sources, 8, 80),
+    disclaimer: SHOP_EVAL_DISCLAIMER[scope] || SHOP_EVAL_DISCLAIMER.single,
   }
 }
 
@@ -669,8 +694,10 @@ function profileFromRow(row) {
 }
 
 function savedFromCache(cached) {
-  const indicators = mapIndicators(cached && cached.indicators)
-  if (!cached || cached.sourcesSearch !== 'store-search-v5' || indicators.length !== PUBLIC_EVAL_INDICATORS.length) return null
+  if (!cached || cached.sourcesSearch !== 'store-search-v6') return null
+  const blocks = publicEvalIndicators(scopeFromCached(cached))
+  const indicators = mapIndicators(cached.indicators, blocks)
+  if (indicators.length !== blocks.length) return null
   const adviceRaw = cached.advice
   let advice = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray(adviceRaw.sections)) {
@@ -679,7 +706,7 @@ function savedFromCache(cached) {
   }
   const rawProfile = cached.profile && typeof cached.profile === 'object' ? cached.profile : null
   return {
-    score: scoreFromPublic(cached, indicators),
+    score: scoreFromPublic(cached, indicators, blocks, scopeFromCached(cached)),
     advice,
     profile: rawProfile ? profileFromRow(rawProfile) : null,
   }
@@ -689,7 +716,7 @@ function shopEvalGrade(score, scope) {
   const n = Math.round(Number(score))
   if (!Number.isFinite(n)) return null
   const grades = shopEvalGrades(scope)
-  if (n >= 85) return grades[0]
+  if (n >= 80) return grades[0]
   if (n >= 70) return grades[1]
   if (n >= 55) return grades[2]
   return grades[3]
@@ -1101,32 +1128,43 @@ async function searchPublicBrand(row) {
   return titles
 }
 
-function publicScoreSystem(focus) {
-  const names = PUBLIC_EVAL_INDICATORS.map((item) => item.name).join('、')
-  const chainRule =
-    focus === 'store'
-      ? '用户这次只评估绑定账号里的 1 家门店。按单门店写。即使高德或检索里还有同名分店，也不要改成连锁品牌。'
-      : focus === 'brand'
-        ? '用户这次按绑定账号的总品牌评估。按连锁品牌写，家数以档案里的连锁门店数为准。禁止写成单门店、形象未立、线上运营完全空白、线上经营基本空白。'
-        : '高德同名门店达到 2 家时，这是连锁品牌。禁止写成单门店、形象未立、线上运营完全空白、线上经营基本空白。'
+function publicScoreSystem(scope) {
+  const blocks = publicEvalIndicators(scope)
+  const names = blocks.map((item) => `${item.name}（满分 ${item.weight}）`).join('、')
+  const mode =
+    scope === 'chain'
+      ? [
+          '这次用连锁品牌公网模型。弱化单店预估销量，重点看品牌覆盖、各店口碑是否一致、内容矩阵、套餐是否一套价。',
+          '全品牌套餐规模与价格：各店套餐是否同一套、同名套餐是否同价。看见门店之间低价互踩，这项要扣。只看到一家有价，不能写成全品牌都在售。',
+          '品牌内容与流量矩阵：品牌账号、分店账号、达人探店是否都出现，内容有没有落到具体门店。',
+          '品牌口碑与舆情风险是最高权重。一家店出现卫生、服务类重大差评，或差评集中在某一家，这项要大幅扣分。',
+          '品牌标准化与一致性：店名规则、主页信息、套餐和内容素材是否像同一品牌。高德同城同名家数可以写。',
+          '禁止写成单门店、形象未立、线上完全空白。',
+        ]
+      : [
+          '这次用单门店公网模型。只评这一家，即使同城还有同名分店，也不要改成连锁品牌。',
+          '套餐预估下单与竞争力权重最高：看这一家的套餐价格带、引流款占比、套餐是否丰富、有没有上新。低价引流占比过高要扣分。检索原文里的已售、月售可以引用，并写明是公网前台数字、不是核销。',
+          '公域流量与内容转化：看指向这一家的探店、短视频、达人内容和直播挂载。这是内容供给，不是商家后台 ROI。',
+          '门店口碑与舆情风险：只用公开评价。卫生、服务类重大差评要大幅扣分。没有公开评价就不要写条数。',
+          '线上运营能力：主页信息、套餐迭代、差评有没有公开回复、商家自己的账号有没有更新。',
+        ]
   return [
-    '你在给商家写线上运营打分，用「你」来写，对象是这个品牌或这家店。',
-    '只根据下面的门店档案、高德同名门店和公开检索标题来写。检索标题里有的事实优先写进去。',
-    '不要编造具体销量、榜单名次、评价条数、核销率。检索里没出现的数字不要写。高德给出的同名门店数量可以写。',
-    chainRule,
-    '品牌资产与口碑、门店标准化按品牌在本地的公开认知和门店数量写。没绑定平台账号，只说明这一家地址的后台数据还没接进来，不能把品牌口碑打到 40 分以下。',
-    '短视频与团购：检索里出现套餐名、价格或抖音时，点评必须写出套餐和价格，并写明这是已经公开的抖音团购。禁止写暂未上架、未上架、没上架、未检索到、没查到、货盘未启动。',
-    '平台基础搭建：公开检索里出现这一家的营业时间或电话时，点评必须写出具体钟点和号码，禁止写成未完善、未填写、没有电话。没有检索到时，写这次联网没有检索到这一家的营业时间或电话，禁止写成抖音平台上没有、均未完善。其他分店的电话不要写到这一家。',
-    '数据复盘可以低，因为用户还没绑定门店账号，后台数还没进来。',
-    '周边同类店是别的餐厅，不能用来证明这家没有客流。不要编造距离和门店数量。',
-    '不要写「公开资料不足」「仅供参考」「无法判断」「弱预估」。',
-    '只输出一个 JSON 对象，不要 Markdown。',
-    'positioning：一句定位，40 到 90 字，写这个品牌在本地公开渠道上的位置和最明显的短板。',
-    `indicators 必须正好 6 项，name 只能是：${names}。每项含 score（0 到 100 的整数）和 comment（40 到 90 字，先写做到了什么，再写短板）。`,
-    'highlights 正好 3 条，每一条都是字符串，不要写成对象。每条 40 到 80 字，写公开渠道上已经跑通的优势。',
-    'gaps 正好 4 条，每一条都是字符串，不要写成对象。每条 40 到 90 字，写会拖后腿的短板。',
-    'summary：一句话总结，30 到 60 字。',
-  ].join('')
+    '你在用公网前台资料给商家打相对竞争力分，用「你」来写。没有商家后台授权。',
+    '分数是同商圈横向对比，不是真实核销、营收或利润。预估下单不能写成到店收入。',
+    '只根据下面的门店档案、高德同名门店和公开检索原文打分。原文里没有的份数、播放量、点击率、达人人数、差评条数、榜单名次，禁止编造。',
+    '没有已售或月售原文时，套餐项只按价格带、丰富度和上新打分，points 不得超过该项满分的 60%。',
+    '周边同类店不能用来证明这家没有客流。不要编造距离和门店数量。',
+  ]
+    .concat(mode)
+    .concat([
+      '只输出一个 JSON 对象，不要 Markdown。',
+      'positioning：一句定位，40 到 90 字，写公开渠道上的位置和最明显的短板。',
+      `indicators 必须正好 4 项，name 只能是：${names}。每项含 points（0 到该项满分的整数）和 comment（40 到 90 字，先写亮点，再写扣分）。`,
+      'highlights 正好 3 条，每一条都是字符串。每条 40 到 80 字。',
+      'gaps 正好 4 条，每一条都是字符串。每条 40 到 90 字。',
+      'summary：一句话总结，30 到 60 字。不要把预估下单写成盈利。',
+    ])
+    .join('')
 }
 
 function readShopEvalCloud(habits) {
@@ -1197,7 +1235,7 @@ function erpAdviceSystem(focus) {
     rangeRule,
     '前面的打分来自公开渠道。这里不要再复述网评，要落到系统功能。',
     '只能使用这些功能：商品与套餐、评价管理、店铺装修、活动中心、达人招募、店铺分析与投流、知识库与GEO投喂、财务对账、线索跟进。不要写系统里没有的会员储值、社群积分商城。',
-    '私域和复购写到线索跟进、评价管理、活动中心。核销和升单写到财务对账、店铺分析与投流、商品与套餐。多店不统一写到店铺装修、商品与套餐、评价管理。',
+    '套餐结构写到商品与套餐、活动中心。内容和达人写到达人招募、店铺装修。口碑写到评价管理。多店价格或视觉不统一写到商品与套餐、店铺装修。',
     '不要编造销量、核销额、GMV。',
     '不要写「公开资料不足」「仅供参考」「无法判断」。',
     '只输出一个 JSON 对象。',
@@ -1221,24 +1259,24 @@ async function evaluateShop(raw, opts) {
   const webNotes = await doubaoPublicNotes(opts.askText, row)
   const listed = sources.length ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n') : ''
   const material = [webNotes, listed].filter(Boolean).join('\n') || '无公开团购或探店记录'
-  const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请给出定位、六项得分和点评、三条优势、四条短板、一句话总结。`
-  let j = await askJson(opts.askText, publicScoreSystem(row.evalFocus), user)
-  const evidenceNote = `${row.mapNote}\n${row.publicNote}\n${material}`
-  if (row.evalFocus !== 'store' && (collapsedChainText(JSON.stringify(j), row.storeCount) || (row.storeCount >= 3 && brandScoreLow(j)))) {
+  const blocks = publicEvalIndicators(spec.scope)
+  const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请按${spec.scope === 'chain' ? '连锁品牌' : '单门店'}模型给出定位、四项 points 和点评、三条优势、四条短板、一句话总结。`
+  let j = await askJson(opts.askText, publicScoreSystem(spec.scope), user)
+  if (spec.scope === 'chain' && (collapsedChainText(JSON.stringify(j), row.storeCount) || (row.storeCount >= 3 && brandScoreLow(j)))) {
     j = await askJson(
       opts.askText,
-      publicScoreSystem(row.evalFocus),
-      `${user}\n纠正：高德已给出同城同名门店 ${row.storeCount} 家，这是连锁品牌。重写定位、优势和品牌资产、门店标准化，禁止出现单门店、形象未立、线上完全空白。短板只写这一家地址还没接进来的后台数据和这次没核对到的团购货盘。`,
+      publicScoreSystem('chain'),
+      `${user}\n纠正：高德已给出同城同名门店 ${row.storeCount} 家，这是连锁品牌。重写定位、品牌口碑和套餐价格是否统一。禁止出现单门店、形象未立、线上完全空白。一家店的公开差评要体现在品牌口碑里，不要为了家数把口碑打高。`,
     )
   }
-  if (row.storeCount >= 2 && collapsedChainText(`${j.positioning || ''}${j.summary || ''}`, row.storeCount)) {
-    j.positioning = `高德在同城检索到 ${row.storeCount} 家同名门店，品牌在本地已经被叫得上名。这一家地址的后台还没绑定，短板在货盘核对和数据复盘。`
-    j.summary = `同城已有 ${row.storeCount} 家同名门店，先把这一家的线上货盘和后台数据补上。`
+  if (spec.scope === 'chain' && row.storeCount >= 2 && collapsedChainText(`${j.positioning || ''}${j.summary || ''}`, row.storeCount)) {
+    j.positioning = `高德在同城检索到 ${row.storeCount} 家同名门店。品牌已经被叫得上名，短板看各店套餐是否同价、公开口碑是否被某一家拖累。`
+    j.summary = `同城已有 ${row.storeCount} 家同名门店，先核对套餐价格和各店公开口碑是否一致。`
   }
-  const indicators = applyEvidenceFloors(mapIndicators(j.indicators), row.storeCount, evidenceNote)
-  if (indicators.length !== PUBLIC_EVAL_INDICATORS.length) throw new Error('评估结果不完整，请再点一次')
-  const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators)
-  writeCache(opts.storage, loaded.key, Object.assign({}, score, { sourcesSearch: 'store-search-v5', profile: profileFromRow(row), savedAt: new Date().toISOString() }))
+  const indicators = mapIndicators(j.indicators, blocks)
+  if (indicators.length !== blocks.length) throw new Error('评估结果不完整，请再点一次')
+  const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators, blocks, spec.scope)
+  writeCache(opts.storage, loaded.key, Object.assign({}, score, { sourcesSearch: 'store-search-v6', profile: profileFromRow(row), savedAt: new Date().toISOString() }))
   void publishShopEval(opts.storage, loaded.key, slotId(row))
   return score
 }
@@ -1256,7 +1294,7 @@ async function adviseShop(raw, score, opts) {
       if (sections.length) return { lift: clampLift(adviceRaw.lift), sections }
     }
   }
-  const lines = score.indicators.map((item) => `${item.name} ${item.score}分：${item.comment}`).join('\n')
+  const lines = score.indicators.map((item) => `${item.name} ${item.score}/${item.weight}：${item.comment}`).join('\n')
   const gaps = (score.gaps || []).map((item, index) => `${index + 1}. ${item}`).join('\n')
   const j = await askJson(
     opts.askText,
