@@ -65,6 +65,25 @@ export type TalentLibraryFilterState = {
   tag: string
   provinces: string[]
   cities: string[]
+  createdFrom?: string
+  createdTo?: string
+}
+
+function matchCreatedRange(raw: string | undefined, from?: string, to?: string): boolean {
+  const start = String(from || '').trim()
+  const end = String(to || '').trim()
+  if (!start && !end) return true
+  const ms = Date.parse(String(raw || '').trim())
+  if (!Number.isFinite(ms)) return false
+  if (start) {
+    const fromMs = Date.parse(`${start}T00:00:00`)
+    if (Number.isFinite(fromMs) && ms < fromMs) return false
+  }
+  if (end) {
+    const toMs = Date.parse(`${end}T23:59:59.999`)
+    if (Number.isFinite(toMs) && ms > toMs) return false
+  }
+  return true
 }
 
 export function normalizeDouyinLevel(level: string): string {
@@ -175,5 +194,5 @@ export function matchTalentLibraryFilters(
     const tags = entry.accountTags || []
     if (!tags.includes(f.tag)) return false
   }
-  return true
+  return matchCreatedRange(entry.createdAt, f.createdFrom, f.createdTo)
 }

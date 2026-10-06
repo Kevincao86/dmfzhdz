@@ -98,6 +98,8 @@ export default function OpsTalentLibraryPage() {
   const [tagFilter, setTagFilter] = useState('全部')
   const [provinceFilters, setProvinceFilters] = useState<string[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>([])
+  const [createdFrom, setCreatedFrom] = useState('')
+  const [createdTo, setCreatedTo] = useState('')
   const [deletePending, setDeletePending] = useState<{
     title: string
     description: string
@@ -134,8 +136,10 @@ export default function OpsTalentLibraryPage() {
       tag: tagFilter,
       provinces: provinceFilters,
       cities: cityFilters,
+      createdFrom,
+      createdTo,
     }),
-    [genderFilter, followerFilters, levelFilters, tagFilter, provinceFilters, cityFilters],
+    [genderFilter, followerFilters, levelFilters, tagFilter, provinceFilters, cityFilters, createdFrom, createdTo],
   )
 
   const platformEntries = useMemo(
@@ -182,7 +186,8 @@ export default function OpsTalentLibraryPage() {
     levelFilters.length > 0 ||
     tagFilter !== '全部' ||
     provinceFilters.length > 0 ||
-    cityFilters.length > 0
+    cityFilters.length > 0 ||
+    Boolean(createdFrom || createdTo)
 
   async function onBatchDelete() {
     if (!canEdit || !batch.checkedIds.length || batch.deleting) return
@@ -418,6 +423,22 @@ export default function OpsTalentLibraryPage() {
               {tag}
             </button>
           ))}
+          <span className="ml-2 text-xs font-medium text-slate-500">创建时间</span>
+          <input
+            type="date"
+            value={createdFrom}
+            onChange={(e) => setCreatedFrom(e.target.value)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+            aria-label="创建开始日期"
+          />
+          <span className="text-xs text-slate-500">至</span>
+          <input
+            type="date"
+            value={createdTo}
+            onChange={(e) => setCreatedTo(e.target.value)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+            aria-label="创建结束日期"
+          />
           {hasActiveFilters ? (
             <button
               type="button"
@@ -428,6 +449,8 @@ export default function OpsTalentLibraryPage() {
                 setTagFilter('全部')
                 setProvinceFilters([])
                 setCityFilters([])
+                setCreatedFrom('')
+                setCreatedTo('')
               }}
               className="ml-2 text-xs text-slate-500 underline hover:text-slate-300"
             >
