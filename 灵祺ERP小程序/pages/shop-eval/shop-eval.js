@@ -4,6 +4,7 @@ const billing = require('../../utils/tenantBillingApiMp.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const evalApi = require('../../utils/merchantShopEval.js')
+const shopAnalysis = require('../../utils/shopAnalysisApiMp.js')
 const { readPlatformToken } = require('../../utils/platformTokensMp.js')
 
 const CATEGORIES = evalApi.SHOP_EVAL_CATEGORIES || {}
@@ -1070,7 +1071,19 @@ Page({
     let failed = null
     try {
       await billing.checkErpPointsAffordable({ kind: 'shop_eval_advice' })
-      const base = this._input || { platformId: this.data.platformId, storeName: this.data.storeName }
+      const base = Object.assign({}, this._input || { platformId: this.data.platformId, storeName: this.data.storeName })
+      const range = shopAnalysis.defaultRange()
+      const packed = await shopAnalysis.fetchShopAnalysisSummary({
+        platform: this.data.platformId,
+        startDate: range.startDate,
+        endDate: range.endDate,
+        poiId: base.evalFocus === 'store' ? base.storeId : '',
+      })
+      base.backendFacts = evalApi.describeShopBackend(
+        packed.summary,
+        packed.adviceFacts,
+        range.startDate + ' 至 ' + range.endDate,
+      )
       const advice = await evalApi.adviseShop(base, this._score, {
         force: true,
         storage,

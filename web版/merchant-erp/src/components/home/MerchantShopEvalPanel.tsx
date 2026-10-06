@@ -5,6 +5,7 @@ import { MEMBERSHIP_UPGRADE_HREF } from '../../lib/membershipPlan'
 import {
   adviseShop,
   boundEvalBrandTarget,
+  describeShopBackend,
   evaluateShop,
   formatVerifyYuan,
   hydrateShopEval,
@@ -30,6 +31,7 @@ import { postAiChat } from '../../services/ai/aiClient'
 import { checkErpPointsAffordable, spendErpPointsForUsage, type ErpPointsSpendKind } from '../../services/tenantBillingClient'
 import { MOCK_CATEGORY_TREE } from '../../data/douyinCategoryMock'
 import { fetchStoresForPlatform, storeTabToken, type StorePlatformTab } from '../../services/merchantStoresApi'
+import { fetchShopAnalysis } from '../../services/merchantOrdersApi'
 
 function readableLines(rows?: string[]) {
   return (rows || []).filter((line) => typeof line === 'string' && line.trim() && !line.includes('[object Object]'))
@@ -598,8 +600,27 @@ export default function MerchantShopEvalPanel() {
     setAdvising(true)
     setErr('')
     try {
+      const end = new Date()
+      const start = new Date(end.getTime() - 29 * 86400000)
+      const ymd = (d: Date) => {
+        const p = (n: number) => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+      }
+      const startDate = ymd(start)
+      const endDate = ymd(end)
+      const packed = await fetchShopAnalysis({
+        startDate,
+        endDate,
+        platform: platformId,
+        poiId: input.evalFocus === 'store' ? input.storeId : undefined,
+      })
+      const backendFacts = describeShopBackend(
+        packed.summary as unknown as Record<string, unknown>,
+        packed.adviceFacts,
+        `${startDate} 至 ${endDate}`,
+      )
       await checkErpPointsAffordable({ kind: adviceKind })
-      const advice = await adviseShop({ ...input, platformId }, score, { force: true, storage, askText })
+      const advice = await adviseShop({ ...input, platformId, backendFacts }, score, { force: true, storage, askText })
       await spendErpPointsForUsage({
         kind: adviceKind,
         idempotencyKey: `shop-eval-advice-${Date.now()}`,
@@ -876,13 +897,13 @@ export default function MerchantShopEvalPanel() {
 
         {score?.indicators?.length ? (
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-            <div className="grid grid-cols-[minmax(0,1.15fr)_88px_1.5fr] bg-[#1E3A5F] px-4 py-2 text-xs font-semibold text-white">
+            <div className="grid grid-cols-[minmax(0,1.45fr)_76px_1.2fr] bg-[#1E3A5F] px-4 py-2 text-xs font-semibold text-white">
               <span>指标</span>
               <span>得分</span>
               <span>点评</span>
             </div>
             {score.indicators.map((row) => (
-              <div key={row.name} className="grid grid-cols-[minmax(0,1.15fr)_88px_1.5fr] items-start gap-2 border-t border-slate-100 px-4 py-3 text-left">
+              <div key={row.name} className="grid grid-cols-[minmax(0,1.45fr)_76px_1.2fr] items-start gap-2 border-t border-slate-100 px-4 py-3 text-left">
                 <p className="text-sm font-semibold text-slate-900">{row.name}</p>
                 <div>
                   <p className="text-lg font-extrabold text-[#1E3A5F]">

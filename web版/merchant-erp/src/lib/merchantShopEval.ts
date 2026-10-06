@@ -21,6 +21,8 @@ export type ShopEvalInput = {
   evalFocus?: 'brand' | 'store' | ''
   storeId?: string
   signals?: ShopEvalSignals
+  /** 绑定商家后台后读到的订单、套餐、退款摘要，只用于提升方案 */
+  backendFacts?: string
 }
 
 export type ShopEvalBoundStore = {
@@ -59,20 +61,24 @@ export type ShopEvalSituation = { name: string; now: string }
 
 export type ShopEvalIndicator = { name: string; score: number; weight: number; pct: number; comment: string }
 
-/** 版本 A：单门店公网相对竞争力。预估下单不是核销。 */
+/** 单门店公网六维。预估下单、内容、口碑各 20，运营和基础做支撑。 */
 export const PUBLIC_EVAL_SINGLE = [
-  { name: '套餐预估下单与竞争力', weight: 35 },
-  { name: '公域流量与内容转化', weight: 30 },
-  { name: '门店口碑与舆情风险', weight: 25 },
-  { name: '线上运营能力', weight: 10 },
+  { name: '套餐预估下单规模', weight: 20 },
+  { name: '套餐结构与价格竞争力', weight: 15 },
+  { name: '公域流量与内容供给', weight: 20 },
+  { name: '线上运营执行力', weight: 15 },
+  { name: '门店口碑与舆情风险', weight: 20 },
+  { name: '门店基础与可信度', weight: 10 },
 ] as const
 
-/** 版本 B：连锁品牌公网相对竞争力。口碑离散度权重大于单店预估销量。 */
+/** 连锁公网六维。口碑 25 最高，单店销量降到品牌总量，并单列价格内卷。 */
 export const PUBLIC_EVAL_CHAIN = [
-  { name: '全品牌套餐规模与价格', weight: 25 },
-  { name: '品牌内容与流量矩阵', weight: 25 },
-  { name: '品牌口碑与舆情风险', weight: 30 },
-  { name: '品牌标准化与一致性', weight: 20 },
+  { name: '品牌全域套餐预估下单规模', weight: 15 },
+  { name: '价格体系与内卷控制', weight: 15 },
+  { name: '品牌内容与达人矩阵', weight: 20 },
+  { name: '标准化与运营一致性', weight: 15 },
+  { name: '品牌口碑与跨店舆情风险', weight: 25 },
+  { name: '品牌基础与规模可信度', weight: 10 },
 ] as const
 
 export const PUBLIC_EVAL_INDICATORS = PUBLIC_EVAL_SINGLE
@@ -83,9 +89,9 @@ export function publicEvalIndicators(scope?: ShopEvalScope) {
 
 export const SHOP_EVAL_DISCLAIMER = {
   single:
-    '本结果只依据公网前台和检索到的公开说法，没有商家后台授权，不能核验真实核销、营收和利润。预估下单含退款、过期未核销等噪声，不是到店收入，只适合同商圈横向对比，不能用于财务结算或业绩考核。',
+    '六维打分只依据公网前台，预估下单不是核销、营收或利润，只适合同商圈对比。绑定商家后台后的提升方案另读订单、套餐和退款，不能用于财务结算或业绩考核。',
   chain:
-    '本结果只依据公网前台和检索到的公开说法，没有商家后台授权，不能核验真实核销、营收和利润。品牌分看各店公开口碑是否一致、套餐价格是否一套、内容是否覆盖到店。一家店的公开差评会拉低品牌分。不能用于财务结算或业绩考核。',
+    '六维打分只依据公网前台。连锁看各店口碑是否被某一家拖累、价格是否内卷、内容是否覆盖到店。绑定商家后台后的提升方案另读订单、套餐和退款，不能用于财务结算或业绩考核。',
 } as const
 
 const ERP_SOLUTION_MODULES = [
@@ -350,12 +356,41 @@ function normalizeInput(raw: ShopEvalInput) {
       evalFocus: raw?.evalFocus === 'brand' || raw?.evalFocus === 'store' ? raw.evalFocus : '',
       storeId: String(raw?.storeId || '').trim(),
       signals: raw?.signals,
+      backendFacts: String(raw?.backendFacts || '').trim(),
     },
   }
 }
 
 function filledOr(value: string, empty: string) {
   return value || empty
+}
+
+export function describeShopBackend(summary: Record<string, unknown> | null | undefined, adviceFacts?: string, range?: string) {
+  const s = summary && typeof summary === 'object' ? summary : {}
+  const num = (key: string) => {
+    const n = Number(s[key])
+    return Number.isFinite(n) ? n : 0
+  }
+  const pct = (key: string) => {
+    const n = num(key)
+    return n > 0 && n <= 1 ? `${Math.round(n * 100)}%` : String(n)
+  }
+  const rowsOf = (key: string) => (Array.isArray(s[key]) ? (s[key] as Record<string, unknown>[]) : [])
+  const sales = rowsOf('topBySales')
+    .slice(0, 5)
+    .map((row) => `${String(row.name || '套餐')} ${Math.round(Number(row.salesYuan) || 0)}元/${Math.round(Number(row.couponCount) || 0)}份`)
+    .filter((line) => !line.startsWith('套餐 0元'))
+  const refunds = rowsOf('topByRefund')
+    .slice(0, 3)
+    .map((row) => `${String(row.name || '套餐')} 退款${Math.round(Number(row.refundYuan) || 0)}元`)
+  const lines = [
+    range ? `统计区间：${range}` : '',
+    `订单 ${num('orderCount')}，券 ${num('couponCount')}，成交 ${Math.round(num('salesAmountYuan'))} 元，退款 ${Math.round(num('refundAmountYuan'))} 元，退款率 ${pct('refundRate')}，购买人数 ${num('buyerCount')}，新客 ${num('newBuyerCount')}，老客 ${num('oldBuyerCount')}，复购率 ${pct('repurchaseRate')}。`,
+    sales.length ? `成交靠前套餐：${sales.join('；')}` : '成交靠前套餐：这段时间没有套餐成交排名。',
+    refunds.length ? `退款靠前套餐：${refunds.join('；')}` : '',
+    String(adviceFacts || '').trim().slice(0, 1600),
+  ]
+  return lines.filter(Boolean).join('\n')
 }
 
 function shopFacts(spec: PlatformSpec, row: ReturnType<typeof normalizeInput>['row']) {
@@ -501,7 +536,7 @@ function slotId(row: ReturnType<typeof normalizeInput>['row']) {
 }
 
 function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
-  return ['lq_merchant_shop_eval_v7', ownerId(), slotId(row)].join('|')
+  return ['lq_merchant_shop_eval_v8', ownerId(), slotId(row)].join('|')
 }
 
 function loadCache(storage: StorageLike, row: ReturnType<typeof normalizeInput>['row']) {
@@ -560,7 +595,7 @@ function savedFromCache(cached: Record<string, unknown> | null): {
   advice: ShopEvalAdvice | null
   profile: ShopEvalProfile | null
 } | null {
-  if (!cached || cached.sourcesSearch !== 'store-search-v7') return null
+  if (!cached || cached.sourcesSearch !== 'store-search-v8') return null
   const blocks = publicEvalIndicators(scopeFromCached(cached))
   const indicators = mapIndicators(cached.indicators, blocks)
   if (indicators.length !== blocks.length) return null
@@ -869,7 +904,7 @@ function brandScoreLow(raw: Record<string, unknown>) {
   const rows = Array.isArray(raw.indicators) ? raw.indicators : []
   for (const row of rows) {
     const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
-    if (String(item.name || '') !== '品牌口碑与舆情风险') continue
+    if (String(item.name || '') !== '品牌口碑与跨店舆情风险') continue
     return pointsOf(item.points ?? item.score, 30) < 12
   }
   return false
@@ -1103,19 +1138,23 @@ function publicScoreSystem(scope: ShopEvalScope) {
   const mode =
     scope === 'chain'
       ? [
-          '这次用连锁品牌公网模型。弱化单店预估销量，重点看品牌覆盖、各店口碑是否一致、内容矩阵、套餐是否一套价。',
-          '全品牌套餐规模与价格：各店套餐是否同一套、同名套餐是否同价。看见门店之间低价互踩，这项要扣。只看到一家有价，不能写成全品牌都在售。',
-          '品牌内容与流量矩阵：品牌账号、分店账号、达人探店是否都出现，内容有没有落到具体门店。',
-          '品牌口碑与舆情风险是最高权重。一家店出现卫生、服务类重大差评，或差评集中在某一家，这项要大幅扣分。',
-          '品牌标准化与一致性：店名规则、主页信息、套餐和内容素材是否像同一品牌。高德同城同名家数可以写。',
+          '这次用连锁品牌公网六维。口碑权重最高。不看单店多猛，看总量、单店均值和能不能复制。',
+          '品牌全域套餐预估下单规模：看全部店的预估下单总量和单店均值，一家独大不能代表全品牌。',
+          '价格体系与内卷控制：看各店套餐是否同价。门店之间低价互踩要重点扣分。',
+          '品牌内容与达人矩阵：看品牌号、门店号、达人是否都有，内容有没有落到具体门店。单个账号爆款不等于矩阵。',
+          '标准化与运营一致性：套餐能否跨店复用、主页信息是否统一、新店能不能按同一套上线。',
+          '品牌口碑与跨店舆情风险是最高权重。一家店的卫生、安全类重大差评要大幅扣分，并写成会连累全品牌。',
+          '品牌基础与规模可信度：高德同城同名家数、经营时长、资质和认证。这是抗风险底盘，不是销量。',
           '禁止写成单门店、形象未立、线上完全空白。',
         ]
       : [
-          '这次用单门店公网模型。只评这一家，即使同城还有同名分店，也不要改成连锁品牌。',
-          '套餐预估下单与竞争力权重最高：看这一家的套餐价格带、引流款占比、套餐是否丰富、有没有上新。低价引流占比过高要扣分。检索原文里的已售、月售可以引用，并写明是公网前台数字、不是核销。',
-          '公域流量与内容转化：看指向这一家的探店、短视频、达人内容和直播挂载。这是内容供给，不是商家后台 ROI。',
-          '门店口碑与舆情风险：有评价原文就按原文。没有原文时按同品类口碑档位估算，不写具体条数。卫生、服务类重大差评要大幅扣分。',
-          '线上运营能力：主页信息、套餐迭代、差评有没有公开回复、商家自己的账号有没有更新。',
+          '这次用单门店公网六维。只评这一家。预估下单、内容供给、口碑各 20 分，运营和基础做支撑。',
+          '套餐预估下单规模：按同商圈同品类给档位。主力套餐权重大于引流款。已售、月售按公网前台写，不是核销。',
+          '套餐结构与价格竞争力：看价格带、引流款占比、套餐是否丰富、有没有上新。低价引流占比过高要扣分。只有一两个套餐且长期不更新要扣分。',
+          '公域流量与内容供给：看探店达人、挂载短视频和直播。阶段性爆款不等于持续供给。',
+          '线上运营执行力：看主页信息、套餐上下架、商家账号更新、差评有没有公开回复。',
+          '门店口碑与舆情风险：卫生、安全类重大差评重扣。评价长期不动，按同品类口碑档位写，不写假条数。',
+          '门店基础与可信度：资质、开业时长、定位是否对得上这家店、有没有品牌背书。新店信息少就按档位写，不要写成没有这家店。',
         ]
   return [
     '你在用公网前台资料给商家打相对竞争力分，用「你」来写。没有商家后台授权。',
@@ -1223,16 +1262,17 @@ function erpAdviceSystem(focus?: string) {
   return [
     '你在给商家写灵祺 ERP 里能直接去做的改法，用「你」来写。',
     rangeRule,
-    '前面的打分来自公开渠道。这里不要再复述网评，要落到系统功能。',
+    '六维分数来自公网，只用来指出短板。提升方案必须解读用户消息里的商家后台数据。',
+    '后台里的订单、成交、退款、复购、套餐排名按原文引用。某项为 0 就写后台这段时间还没有这笔数，不要改成另一个数，也不要编造 GMV。',
+    '不要把后台核销写成公网预估下单，也不要把公网预估写成已经核销。',
     `只能使用这些功能：${modules}。不要写系统里没有的会员储值、社群积分商城。`,
-    '套餐结构写到商品与套餐、活动中心。内容和达人写到达人招募、店铺装修。口碑写到评价管理。多店价格或视觉不统一写到商品与套餐、店铺装修。',
-    '不要编造销量、核销额、GMV。',
+    '套餐结构和价格写到商品与套餐、活动中心。内容和达人写到达人招募、店铺装修。口碑和差评回复写到评价管理。成交、退款、复购写到店铺分析与投流、财务对账。多店价格不统一写到商品与套餐。',
     '不要写「公开资料不足」「仅供参考」「无法判断」。',
     '只输出一个 JSON 对象。',
-    'sections 正好 4 项，对应四条短板。每项含 name、module、finding、adjust、soon。',
-    'name 是短板标题，12 字以内。module 必须是上面列出的功能名。',
-    'finding 说明这条短板现在卡在哪，40 到 80 字。',
-    'adjust 写去哪个功能里改什么，改完应看到什么，60 到 140 字。',
+    'sections 正好覆盖用户点名的短板，一项一个维度。每项含 name、module、finding、adjust、soon。',
+    'name 必须与短板维度名称一致，不要另起标题。module 必须是上面列出的功能名。',
+    'finding 先写后台读到的数字，再写它和这项短板的关系，60 到 120 字。',
+    'adjust 写去哪个功能里改什么，改完应看到什么，80 到 160 字。',
     'soon 是近两周的 3 件事，用「1.」「2.」「3.」分开。',
   ].join('')
 }
@@ -1254,7 +1294,7 @@ export async function evaluateShop(
   const peerHint = `对照：城市 ${row.city || '未填'}，品类 ${row.category || '未填'}，同城同名 ${row.storeCount || 0} 家。材料里没有套餐价或评价时，按这些做档位估算。`
   const material = [webNotes, listed, peerHint].filter(Boolean).join('\n')
   const blocks = publicEvalIndicators(spec.scope)
-  const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请按${spec.scope === 'chain' ? '连锁品牌' : '单门店'}模型给出定位、四项 points 和点评、三条优势、四条短板、一句话总结。`
+  const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请按${spec.scope === 'chain' ? '连锁品牌' : '单门店'}六维模型给出定位、六项 points 和点评、三条优势、四条短板、一句话总结。`
   let j = await askJson(opts.askText, publicScoreSystem(spec.scope), user)
   if (spec.scope === 'chain' && (collapsedChainText(JSON.stringify(j), row.storeCount) || (row.storeCount >= 3 && brandScoreLow(j)))) {
     j = await askJson(
@@ -1283,7 +1323,7 @@ export async function evaluateShop(
   const score = scoreFromPublic({ ...j, sources }, indicators, blocks, spec.scope)
   writeCache(opts.storage, loaded.key, {
     ...score,
-    sourcesSearch: 'store-search-v7',
+    sourcesSearch: 'store-search-v8',
     profile: profileFromRow(row),
     savedAt: new Date().toISOString(),
   })
@@ -1308,17 +1348,25 @@ export async function adviseShop(
       if (sections.length) return { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections }
     }
   }
+  const backend = row.backendFacts
+  if (!backend) throw new Error('请先绑定门店并同步商家后台，再生成提升方案')
+  const ranked = [...(score.indicators || [])]
+    .map((item) => ({ ...item, ratio: item.weight ? item.score / item.weight : 1 }))
+    .sort((a, b) => a.ratio - b.ratio || a.score - b.score)
+    .slice(0, 4)
+    .map((item) => `${item.name} ${item.score}/${item.weight}`)
+    .join('、')
   const lines = (score.indicators || []).map((item) => `${item.name} ${item.score}/${item.weight}：${item.comment}`).join('\n')
-  const gaps = (score.gaps || []).map((item, index) => `${index + 1}. ${item}`).join('\n')
   const j = await askJson(
     opts.askText,
     erpAdviceSystem(row.evalFocus),
-    `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n分项：\n${lines}\n短板：\n${gaps}\n请按四条短板，给出灵祺 ERP 里对应功能的改法。`,
+    `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n公网六维：\n${lines}\n商家后台：\n${backend}\n只为这些短板各写一套方案：${ranked}。`,
   )
   const advice: ShopEvalAdvice = {
     lift: clampLift(j.lift),
     sections: mapSuggestions(j.sections),
   }
+  if (!advice.sections.length) throw new Error('提升方案不完整，请再点一次')
   writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
   void publishShopEval(opts.storage, key, slotId(row))
   return advice
