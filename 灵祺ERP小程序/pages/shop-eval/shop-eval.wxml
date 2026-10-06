@@ -86,16 +86,23 @@
     <text class="report-summary" wx:if="{{summary}}">{{summary}}</text>
     <text class="report-note" wx:if="{{disclaimer}}">{{disclaimer}}</text>
   </view>
+  <view class="card report" wx:else>
+    <text class="need">完成评估后，这里显示公开渠道上的定位和综合判断</text>
+  </view>
 
-  <view class="card advice advice--now" wx:if="{{scoreReady && indicators.length}}">
-    <text class="advice-title advice-title--now">线上运营打分</text>
-    <view class="metric" wx:for="{{indicators}}" wx:key="name">
-      <view class="metric-head">
-        <text class="metric-name">{{item.name}}</text>
-        <text class="metric-score">{{item.score}}/{{item.weight}}</text>
+  <view class="card score-table" wx:if="{{scoreReady && indicators.length}}">
+    <view class="score-head">
+      <text>指标</text>
+      <text>得分</text>
+      <text>点评</text>
+    </view>
+    <view class="score-row" wx:for="{{indicators}}" wx:key="name">
+      <text class="score-name">{{item.name}}</text>
+      <view class="score-num">
+        <text class="score-val">{{item.score}}<text class="score-max">/{{item.weight}}</text></text>
+        <view class="metric-bar"><view class="metric-fill" style="width: {{item.pct}}%;"></view></view>
       </view>
-      <view class="metric-bar"><view class="metric-fill" style="width: {{item.pct}}%;"></view></view>
-      <text class="metric-comment">{{item.comment}}</text>
+      <text class="score-comment">{{item.comment}}</text>
     </view>
   </view>
 
@@ -153,7 +160,8 @@
     <view class="plan" wx:for="{{sections}}" wx:key="name">
       <view class="plan-head">
         <text class="plan-no">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
-        <text class="plan-name">{{item.name}}{{item.module ? ' · ' + item.module : ''}}</text>
+        <text class="plan-name">{{item.name}}</text>
+        <text class="plan-mod" wx:if="{{item.module}}">{{item.module}}</text>
       </view>
       <view class="plan-block plan-block--find" wx:if="{{item.finding}}">
         <text class="plan-tag">短板</text>

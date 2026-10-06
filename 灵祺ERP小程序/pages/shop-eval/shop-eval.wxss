@@ -726,7 +726,7 @@
 }
 
 .plan-block--find {
-  background: #eef2f6;
+  background: #e8f1ff;
 }
 
 .plan-block--adjust {
@@ -734,7 +734,7 @@
 }
 
 .plan-block--soon {
-  background: #eef2f6;
+  background: #ffedd5;
 }
 
 .plan-tag {
@@ -747,18 +747,77 @@
 }
 
 .plan-block--find .plan-tag {
-  color: #3d5270;
-  background: #d5dde6;
+  color: #1d4ed8;
+  background: #dbeafe;
 }
 
 .plan-block--adjust .plan-tag {
-  color: #1e3a5f;
+  color: #6d28d9;
   background: #e9d5ff;
 }
 
 .plan-block--soon .plan-tag {
   color: #c2410c;
-  background: #d5dde6;
+  background: #fed7aa;
+}
+
+.plan-mod {
+  margin-left: auto;
+  padding: 2rpx 14rpx;
+  border-radius: 999rpx;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.score-table {
+  padding: 0;
+  overflow: hidden;
+}
+
+.score-head,
+.score-row {
+  display: grid;
+  grid-template-columns: 1.35fr 0.7fr 1.15fr;
+  gap: 12rpx;
+  align-items: start;
+  padding: 18rpx 20rpx;
+}
+
+.score-head {
+  background: #1e3a5f;
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.score-row {
+  border-top: 2rpx solid #f1f5f9;
+}
+
+.score-name,
+.score-comment {
+  font-size: 24rpx;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.score-name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.score-val {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #1e3a5f;
+}
+
+.score-max {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #94a3b8;
 }
 
 .plan-text {
