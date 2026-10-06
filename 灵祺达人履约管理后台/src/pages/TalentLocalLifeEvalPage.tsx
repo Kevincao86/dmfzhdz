@@ -474,6 +474,22 @@ export default function TalentLocalLifeEvalPage() {
       </div>
 
       <div className="space-y-4">
+          {evaluating || score?.situations?.length ? (
+            <div className="surface-card radar-card">
+              <p className="radar-title">
+                {(nickname || '达人') + ' 6维评估'}
+                {score ? `（${displayScore}/100）` : ''}
+              </p>
+              <p className="radar-sub">{basis || '按已填写资料和公开主页估算'}</p>
+              <RadarFigure
+                rows={radarRows(score?.situations)}
+                progress={score ? radarProgress : 0.08}
+                sweep={sweep}
+                showScore={!!score}
+              />
+            </div>
+          ) : null}
+
           <div className="surface-card rounded-xl border p-6">
             {score ? (
               <div className="grid gap-6 sm:grid-cols-2">
@@ -506,22 +522,6 @@ export default function TalentLocalLifeEvalPage() {
             ) : null}
             {err ? <p className="mt-3 text-center text-sm text-red-600">{err}</p> : null}
           </div>
-
-          {evaluating || score?.situations?.length ? (
-            <div className="surface-card radar-card">
-              <p className="radar-title">
-                {(nickname || '达人') + ' 6维评估'}
-                {score ? `（${displayScore}/100）` : ''}
-              </p>
-              <p className="radar-sub">{basis || '按已填写资料和公开主页估算'}</p>
-              <RadarFigure
-                rows={radarRows(score?.situations)}
-                progress={score ? radarProgress : 0.08}
-                sweep={sweep}
-                showScore={!!score}
-              />
-            </div>
-          ) : null}
 
           {score?.situations?.length ? (
             <div className="surface-card rounded-xl border p-5 text-left">
