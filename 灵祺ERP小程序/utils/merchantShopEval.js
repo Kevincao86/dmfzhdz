@@ -604,22 +604,52 @@ function scopeFromCached(cached) {
   return 'single'
 }
 
-function mapIndicators(rows, blocks) {
-  const byName = {}
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const item = row && typeof row === 'object' ? row : {}
-    const name = clipText(item.name, 40)
-    if (!name) continue
-    const block = (blocks || []).find((candidate) => candidate.name === name)
-    byName[name] = {
-      points: pointsOf(item.points != null ? item.points : item.score, block ? block.weight : 100),
-      comment: clipText(item.comment || item.now, 220),
-    }
+function normIndicatorName(value) {
+  return String(value || '').replace(/（\s*满分\s*\d+\s*）/g, '').replace(/[（）()\s&＆:：]/g, '')
+}
+
+function indicatorRows(rows) {
+  if (Array.isArray(rows)) return rows.filter((row) => row && typeof row === 'object')
+  if (rows && typeof rows === 'object') {
+    return Object.keys(rows).map((key) => {
+      const value = rows[key]
+      if (value && typeof value === 'object' && !Array.isArray(value)) return Object.assign({ name: key }, value)
+      return { name: key, points: value }
+    })
   }
-  return (blocks || [])
+  return []
+}
+
+function mapIndicators(rows, blocks) {
+  const parsed = indicatorRows(rows)
+  const list = blocks || []
+  const used = {}
+  const hits = {}
+  const takeBlock = (name) => {
+    const text = normIndicatorName(name)
+    const pool = list.filter((block) => !used[block.name])
+    const exact = pool.find((block) => normIndicatorName(block.name) === text)
+    if (exact) return exact
+    const ranked = pool
+      .map((block) => ({ block, key: normIndicatorName(block.name) }))
+      .filter((item) => item.key.length >= 4 && (text.indexOf(item.key) >= 0 || item.key.indexOf(text) >= 0))
+      .sort((a, b) => b.key.length - a.key.length)
+    return ranked[0] && ranked[0].block
+  }
+  parsed.forEach((item, index) => {
+    const rawName = clipText(item.name, 80)
+    const block = (rawName && takeBlock(rawName)) || (parsed.length === list.length ? list[index] : null)
+    if (!block || used[block.name]) return
+    used[block.name] = true
+    hits[block.name] = {
+      points: pointsOf(item.points != null ? item.points : item.score, block.weight),
+      comment: clipText(item.comment || item.now || item.reason || item.detail || item['点评'], 220) || '这项按公开检索打分。',
+    }
+  })
+  return list
     .map((block) => {
-      const hit = byName[block.name]
-      if (!hit || !hit.comment) return null
+      const hit = hits[block.name]
+      if (!hit) return null
       const score = Math.min(block.weight, hit.points)
       return {
         name: block.name,
@@ -1159,7 +1189,7 @@ function publicScoreSystem(scope) {
     .concat([
       '只输出一个 JSON 对象，不要 Markdown。',
       'positioning：一句定位，40 到 90 字，写公开渠道上的位置和最明显的短板。',
-      `indicators 必须正好 4 项，name 只能是：${names}。每项含 points（0 到该项满分的整数）和 comment（40 到 90 字，先写亮点，再写扣分）。`,
+      `indicators 必须是数组，正好 ${blocks.length} 项。name 只能逐字是：${blocks.map((item) => item.name).join('、')}。不要把「满分」写进 name。每项含 points（0 到该项满分的整数）和 comment（40 到 90 字，先写亮点，再写扣分）。参考满分：${names}。`,
       'highlights 正好 3 条，每一条都是字符串。每条 40 到 80 字。',
       'gaps 正好 4 条，每一条都是字符串。每条 40 到 90 字。',
       'summary：一句话总结，30 到 60 字。不要把预估下单写成盈利。',
@@ -1273,7 +1303,15 @@ async function evaluateShop(raw, opts) {
     j.positioning = `高德在同城检索到 ${row.storeCount} 家同名门店。品牌已经被叫得上名，短板看各店套餐是否同价、公开口碑是否被某一家拖累。`
     j.summary = `同城已有 ${row.storeCount} 家同名门店，先核对套餐价格和各店公开口碑是否一致。`
   }
-  const indicators = mapIndicators(j.indicators, blocks)
+  let indicators = mapIndicators(j.indicators, blocks)
+  if (indicators.length !== blocks.length) {
+    j = await askJson(
+      opts.askText,
+      publicScoreSystem(spec.scope),
+      `${user}\n上次指标名称不对。请重出 JSON。indicators 为数组，name 只能逐字是：${blocks.map((item) => item.name).join('、')}。不要把满分写进 name。每项都要有 points 和 comment。`,
+    )
+    indicators = mapIndicators(j.indicators, blocks)
+  }
   if (indicators.length !== blocks.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic(Object.assign({}, j, { sources }), indicators, blocks, spec.scope)
   writeCache(opts.storage, loaded.key, Object.assign({}, score, { sourcesSearch: 'store-search-v6', profile: profileFromRow(row), savedAt: new Date().toISOString() }))

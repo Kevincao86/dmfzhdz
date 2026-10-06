@@ -796,22 +796,51 @@ function scopeFromCached(cached: Record<string, unknown> | null): ShopEvalScope 
   return 'single'
 }
 
-function mapIndicators(rows: unknown, blocks: readonly { name: string; weight: number }[]): ShopEvalIndicator[] {
-  const byName = new Map<string, { points: number; comment: string }>()
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
-    const name = clipText(item.name, 40)
-    if (!name) continue
-    const block = blocks.find((candidate) => candidate.name === name)
-    byName.set(name, {
-      points: pointsOf(item.points ?? item.score, block?.weight || 100),
-      comment: clipText(item.comment || item.now, 220),
+function normIndicatorName(value: string) {
+  return value.replace(/（\s*满分\s*\d+\s*）/g, '').replace(/[（）()\s&＆:：]/g, '')
+}
+
+function indicatorRows(rows: unknown): Record<string, unknown>[] {
+  if (Array.isArray(rows)) {
+    return rows.filter((row) => row && typeof row === 'object').map((row) => row as Record<string, unknown>)
+  }
+  if (rows && typeof rows === 'object') {
+    return Object.entries(rows as Record<string, unknown>).map(([key, value]) => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) return { name: key, ...(value as Record<string, unknown>) }
+      return { name: key, points: value }
     })
   }
+  return []
+}
+
+function mapIndicators(rows: unknown, blocks: readonly { name: string; weight: number }[]): ShopEvalIndicator[] {
+  const parsed = indicatorRows(rows)
+  const used = new Set<string>()
+  const hits = new Map<string, { points: number; comment: string }>()
+  const takeBlock = (name: string) => {
+    const text = normIndicatorName(name)
+    const pool = blocks.filter((block) => !used.has(block.name))
+    const exact = pool.find((block) => normIndicatorName(block.name) === text)
+    if (exact) return exact
+    const ranked = pool
+      .map((block) => ({ block, key: normIndicatorName(block.name) }))
+      .filter((item) => item.key.length >= 4 && (text.includes(item.key) || item.key.includes(text)))
+      .sort((a, b) => b.key.length - a.key.length)
+    return ranked[0]?.block
+  }
+  parsed.forEach((item, index) => {
+    const rawName = clipText(item.name, 80)
+    const block = (rawName && takeBlock(rawName)) || (parsed.length === blocks.length ? blocks[index] : undefined)
+    if (!block || used.has(block.name)) return
+    used.add(block.name)
+    const comment =
+      clipText(item.comment || item.now || item.reason || item.detail || item['点评'], 220) || '这项按公开检索打分。'
+    hits.set(block.name, { points: pointsOf(item.points ?? item.score, block.weight), comment })
+  })
   return blocks
     .map((block) => {
-      const hit = byName.get(block.name)
-      if (!hit?.comment) return null
+      const hit = hits.get(block.name)
+      if (!hit) return null
       const score = Math.min(block.weight, hit.points)
       return {
         name: block.name,
@@ -1043,7 +1072,7 @@ function publicScoreSystem(scope: ShopEvalScope) {
     ...mode,
     '只输出一个 JSON 对象，不要 Markdown。',
     'positioning：一句定位，40 到 90 字，写公开渠道上的位置和最明显的短板。',
-    `indicators 必须正好 4 项，name 只能是：${names}。每项含 points（0 到该项满分的整数）和 comment（40 到 90 字，先写亮点，再写扣分）。`,
+    `indicators 必须是数组，正好 ${blocks.length} 项。name 只能逐字是：${blocks.map((item) => item.name).join('、')}。不要把「满分」写进 name。每项含 points（0 到该项满分的整数）和 comment（40 到 90 字，先写亮点，再写扣分）。参考满分：${names}。`,
     'highlights 正好 3 条，每一条都是字符串。每条 40 到 80 字。',
     'gaps 正好 4 条，每一条都是字符串。每条 40 到 90 字。',
     'summary：一句话总结，30 到 60 字。不要把预估下单写成盈利。',
@@ -1185,7 +1214,15 @@ export async function evaluateShop(
       summary: `同城已有 ${row.storeCount} 家同名门店，先核对套餐价格和各店公开口碑是否一致。`,
     }
   }
-  const indicators = mapIndicators(j.indicators, blocks)
+  let indicators = mapIndicators(j.indicators, blocks)
+  if (indicators.length !== blocks.length) {
+    j = await askJson(
+      opts.askText,
+      publicScoreSystem(spec.scope),
+      `${user}\n上次指标名称不对。请重出 JSON。indicators 为数组，name 只能逐字是：${blocks.map((item) => item.name).join('、')}。不要把满分写进 name。每项都要有 points 和 comment。`,
+    )
+    indicators = mapIndicators(j.indicators, blocks)
+  }
   if (indicators.length !== blocks.length) throw new Error('评估结果不完整，请再点一次')
   const score = scoreFromPublic({ ...j, sources }, indicators, blocks, spec.scope)
   writeCache(opts.storage, loaded.key, {
