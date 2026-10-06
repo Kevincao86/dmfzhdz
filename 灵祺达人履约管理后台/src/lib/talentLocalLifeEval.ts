@@ -786,29 +786,46 @@ function clipPlan(value: unknown, max: number) {
   return String(value || '').trim().slice(0, max)
 }
 
-function dropSystemToolSentences(value: unknown) {
+function planText(value: unknown) {
   return String(value ?? '')
-    .split(/(?<=[。！？\n])/)
-    .filter((part) => !/我的资料|招募大厅|培训课程|商单日历/.test(part))
-    .join('')
+    .replace(/我的资料|招募大厅|培训课程|商单日历/g, '')
     .replace(/用到/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/^[，。；、\s]+|[，。；、\s]+$/g, '')
     .trim()
 }
 
+function pickPlan(item: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const text = planText(item[key])
+    if (text) return text
+  }
+  return ''
+}
+
+function asSectionList(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object') return Object.values(value as Record<string, unknown>)
+  return []
+}
+
 function mapSuggestions(rows: unknown): LocalLifeSuggestion[] {
-  return (Array.isArray(rows) ? rows : [])
+  return asSectionList(rows)
     .map((row) => {
       const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
-      const adjust = clipPlan(dropSystemToolSentences(item.adjust), 200) || clipPlan(dropSystemToolSentences(item.next), 200)
+      const finding = clipPlan(pickPlan(item, ['finding', 'analysis', 'result', '分析结果']), 200)
+      const soon = clipPlan(pickPlan(item, ['soon', 'actions', '近期要做']), 240)
+      const adjust =
+        clipPlan(pickPlan(item, ['adjust', 'how', 'suggestion', 'plan', 'next', '怎么调整']), 240) || soon
       return {
-        name: clipPlan(item.name, 12),
-        finding: clipPlan(dropSystemToolSentences(item.finding), 160),
+        name: clipPlan(pickPlan(item, ['name', 'title', '维度']) || String(item.name || ''), 12),
+        finding: finding || clipPlan(adjust, 200),
         adjust,
-        soon: clipPlan(dropSystemToolSentences(item.soon), 200),
+        soon,
         next: adjust,
       }
     })
-    .filter((row) => row.name && row.finding && row.adjust)
+    .filter((row) => row.name && (row.finding || row.adjust))
     .slice(0, 4)
 }
 
@@ -1014,15 +1031,21 @@ export async function adviseTalent(
     : '公网检索没有可用条目。按已绑定的粉丝、报价、等级、标签和同类达人做预估。'
   const ask = `已绑定资料：\n${accountFacts(spec, row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n这次评估解读出的现状：\n${lines}\n用绑定资料和公网情况写账号分析和提升，不要套用系统功能。\n只为这些短板各写一套方案：${defectBrief(score)}。`
   let j = await askDoubaoJson(ADVICE_SYSTEM, ask)
-  if (adviceUsesBoundAccount(j.sections)) {
-    j = await askDoubaoJson(
-      ADVICE_SYSTEM,
-      `${ask}\n上次写到了系统功能。整份重写，正文不能出现我的资料、招募大厅、培训课程、商单日历。`,
-    )
+  if (adviceUsesBoundAccount(asSectionList(j.sections).length ? j.sections : j)) {
+    try {
+      const retry = await askDoubaoJson(
+        ADVICE_SYSTEM,
+        `${ask}\n上次写到了系统功能。整份重写，正文不能出现我的资料、招募大厅、培训课程、商单日历。`,
+      )
+      const retryRows = asSectionList(retry.sections || retry.suggestions)
+      if (retryRows.length) j = retry
+    } catch {
+      /* 重写失败时保留第一次结果，模块名在整理正文时去掉 */
+    }
   }
   const advice: LocalLifeAdvice = {
     lift: clampLift(j.lift),
-    sections: mapSuggestions(j.sections),
+    sections: mapSuggestions(j.sections || j.suggestions || j.plans),
   }
   if (!advice.sections.length) throw new Error('提升方案不完整，请再点一次')
   await spendTalentPoints('talent_advice', '达人账号分析提升')

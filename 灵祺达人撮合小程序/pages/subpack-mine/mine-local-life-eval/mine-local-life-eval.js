@@ -1,5 +1,4 @@
 const auth = require('../../../utils/auth.js')
-const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
 const talentMember = require('../../../utils/talentMember.js')
 const wxAccount = require('../../../utils/wxAccount.js')
 const evalApi = require('../../../utils/talentLocalLifeEval.js')
@@ -10,6 +9,106 @@ const { syncPageIdentity } = require('../../../utils/pageIdentityChrome.js')
 function letterOf(name) {
   const s = String(name || '').trim()
   return s ? s.slice(0, 1) : '达'
+}
+
+const RADAR_AXES = [
+  { name: '本地人群匹配', max: 20 },
+  { name: '口碑合规风险', max: 10 },
+  { name: '内容转化潜力', max: 15 },
+  { name: '团购带货能力', max: 25 },
+  { name: '内容质量人设', max: 15 },
+  { name: '内容产能稳定', max: 15 },
+]
+
+function radarRows(situations) {
+  const rows = Array.isArray(situations) ? situations : []
+  return RADAR_AXES.map((axis) => {
+    let hit = null
+    for (let i = 0; i < rows.length; i += 1) {
+      const name = String(rows[i].name || '')
+      if (name === axis.name || name.indexOf(axis.name.slice(0, 4)) >= 0) hit = rows[i]
+    }
+    return {
+      name: axis.name,
+      points: Number(hit && hit.points) || 0,
+      max: Number(hit && hit.max) || axis.max,
+    }
+  })
+}
+
+function paintRadar(ctx, w, h, rows, progress, sweep, showScore) {
+  ctx.clearRect(0, 0, w, h)
+  const cx = w / 2
+  const cy = h * 0.5
+  const radius = Math.min(w * 0.3, h * 0.28)
+  const count = rows.length
+  const point = (index, ratio) => {
+    const ang = -Math.PI / 2 + (index * 2 * Math.PI) / count
+    return { x: cx + Math.cos(ang) * radius * ratio, y: cy + Math.sin(ang) * radius * ratio, ang }
+  }
+  ctx.strokeStyle = '#d7e4f4'
+  ctx.lineWidth = 1
+  ;[0.25, 0.5, 0.75, 1].forEach((ring) => {
+    ctx.beginPath()
+    for (let i = 0; i < count; i += 1) {
+      const p = point(i, ring)
+      if (i === 0) ctx.moveTo(p.x, p.y)
+      else ctx.lineTo(p.x, p.y)
+    }
+    ctx.closePath()
+    ctx.stroke()
+  })
+  for (let i = 0; i < count; i += 1) {
+    const edge = point(i, 1)
+    ctx.beginPath()
+    ctx.moveTo(cx, cy)
+    ctx.lineTo(edge.x, edge.y)
+    ctx.stroke()
+  }
+  if (sweep >= 0) {
+    const start = -Math.PI / 2 + sweep * Math.PI * 2
+    ctx.beginPath()
+    ctx.moveTo(cx, cy)
+    ctx.arc(cx, cy, radius, start, start + Math.PI / 4.2)
+    ctx.closePath()
+    ctx.fillStyle = 'rgba(37,99,235,0.14)'
+    ctx.fill()
+  }
+  ctx.beginPath()
+  rows.forEach((row, index) => {
+    const ratio = Math.max(0.03, Math.min(1, row.max ? row.points / row.max : 0)) * progress
+    const p = point(index, ratio)
+    if (index === 0) ctx.moveTo(p.x, p.y)
+    else ctx.lineTo(p.x, p.y)
+  })
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(96,165,250,0.38)'
+  ctx.fill()
+  ctx.strokeStyle = '#2563eb'
+  ctx.lineWidth = 2
+  ctx.stroke()
+  rows.forEach((row, index) => {
+    const ratio = Math.max(0.03, Math.min(1, row.max ? row.points / row.max : 0)) * progress
+    const p = point(index, ratio)
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2)
+    ctx.fillStyle = '#1d4ed8'
+    ctx.fill()
+  })
+  ctx.textBaseline = 'middle'
+  rows.forEach((row, index) => {
+    const p = point(index, 1.38)
+    const cos = Math.cos(p.ang)
+    ctx.textAlign = cos > 0.34 ? 'left' : cos < -0.34 ? 'right' : 'center'
+    ctx.fillStyle = '#1e293b'
+    ctx.font = '600 12px sans-serif'
+    ctx.fillText(row.name, p.x, p.y - 8)
+    if (showScore) {
+      ctx.fillStyle = '#1d4ed8'
+      ctx.font = '700 12px sans-serif'
+      ctx.fillText(Math.round(row.points * progress) + '/' + row.max, p.x, p.y + 10)
+    }
+  })
 }
 
 function gainTargets(score, input) {
@@ -126,6 +225,83 @@ Page({
 
   onUnload() {
     this.stopTick()
+    this.stopRadar()
+  },
+
+  stopRadar() {
+    if (this._radarSweep) {
+      clearInterval(this._radarSweep)
+      this._radarSweep = null
+    }
+    if (this._radarTimer) {
+      clearInterval(this._radarTimer)
+      this._radarTimer = null
+    }
+  },
+
+  ensureRadar(done) {
+    const query = wx.createSelectorQuery().in(this)
+    query.select('#evalRadar').fields({ node: true, size: true }).exec((res) => {
+      const box = res && res[0]
+      if (!box || !box.node || !box.width) return
+      const canvas = box.node
+      const ctx = canvas.getContext('2d')
+      let dpr = 2
+      try {
+        dpr = (wx.getWindowInfo && wx.getWindowInfo().pixelRatio) || 2
+      } catch (e) {}
+      canvas.width = box.width * dpr
+      canvas.height = box.height * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      this._radarCtx = ctx
+      this._radarBox = { w: box.width, h: box.height }
+      done()
+    })
+  },
+
+  paintRadarNow(progress, sweep) {
+    if (!this._radarCtx || !this._radarBox) return
+    paintRadar(
+      this._radarCtx,
+      this._radarBox.w,
+      this._radarBox.h,
+      radarRows(this.data.situations),
+      progress,
+      sweep,
+      !!this.data.scoreReady,
+    )
+  },
+
+  startRadarSweep() {
+    this.stopRadar()
+    const start = Date.now()
+    const loop = () => {
+      this.paintRadarNow(this.data.scoreReady ? 1 : 0.08, ((Date.now() - start) / 1100) % 1)
+    }
+    this.ensureRadar(loop)
+    this._radarSweep = setInterval(loop, 32)
+  },
+
+  showRadar() {
+    this.stopRadar()
+    this.ensureRadar(() => this.paintRadarNow(1, -1))
+  },
+
+  playRadar() {
+    this.stopRadar()
+    const start = Date.now()
+    const dur = 1400
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - start) / dur)
+      const eased = 1 - Math.pow(1 - t, 3)
+      this.paintRadarNow(eased, -1)
+      if (t >= 1 && this._radarTimer) {
+        clearInterval(this._radarTimer)
+        this._radarTimer = null
+      }
+    }
+    this.ensureRadar(tick)
+    this._radarTimer = setInterval(tick, 32)
   },
 
   accountInput(platformId) {
@@ -173,6 +349,7 @@ Page({
     if (!saved) {
       this._score = null
       this.stopGains()
+      this.stopRadar()
       this.setData({
         scoreReady: false,
         adviceReady: false,
@@ -213,6 +390,7 @@ Page({
     })
     const gains = gainTargets(saved.score, input)
     if (gains) this.playGains(gains.exposure, gains.sales)
+    wx.nextTick(() => this.showRadar())
   },
 
   stopTick() {
@@ -312,7 +490,7 @@ Page({
     }
     if (!this.data.canEval || this.data.evaluating || this.data.advising) return
     this.stopTick()
-    this.setData({ evaluating: true, err: '', scorePop: false, displayScore: 0 })
+    this.setData({ evaluating: true, err: '', scorePop: false, displayScore: 0 }, () => this.startRadarSweep())
     this.startEvalSweep()
     let failed = null
     try {
@@ -321,6 +499,7 @@ Page({
       this._score = score
       const grade = input.platformId === 'douyin' ? evalApi.douyinScoreGrade(score.score) : null
       this.setData({
+        evaluating: false,
         scoreReady: true,
         videoLevel: score.videoLevel,
         liveLevel: score.liveLevel,
@@ -330,8 +509,10 @@ Page({
         gradeLabel: grade ? grade.label : '',
         gradeNote: grade ? grade.note : '',
         showGains: true,
+      }, () => {
+        this.playScore(score.score)
+        this.playRadar()
       })
-      this.playScore(score.score)
       const gains = gainTargets(score, input)
       if (gains) this.playGains(gains.exposure, gains.sales)
       void this.refreshQuota()
@@ -340,9 +521,11 @@ Page({
     }
     if (failed) {
       this.stopTick()
+      this.stopRadar()
       const prev = this._score ? Number(this._score.score) || 0 : 0
       this.setData({ displayScore: prev })
       this.failEval(failed, 'evaluating')
+      if (this._score) wx.nextTick(() => this.showRadar())
     }
   },
 
@@ -364,13 +547,10 @@ Page({
       wx.showToast({ title: '请先登录', icon: 'none' })
       return
     }
-    if (!prFeatureAccess.canUseAddonPerm(null, 'talentAdvice')) {
-      this.setData({ upgradeOpen: true })
-      return
-    }
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
-    this.setData({ advising: true, err: '' })
+    this.setData({ advising: true, err: '', adviceReady: false, sections: [] })
     wx.showLoading({ title: '分析中', mask: true })
+    wx.pageScrollTo({ selector: '#talent-advice-plan', duration: 240 })
     let failed = null
     try {
       const advice = await evalApi.adviseTalent(this._input || this.accountInput(), this._score, { force: true })
@@ -380,10 +560,15 @@ Page({
         sections: advice.sections,
         lift: Number(advice.lift) || 0,
       })
+      wx.nextTick(() => wx.pageScrollTo({ selector: '#talent-advice-plan', duration: 240 }))
     } catch (e) {
       failed = e
     }
     wx.hideLoading()
-    if (failed) this.failEval(failed, 'advising')
+    if (failed) {
+      const msg = String(failed && failed.message ? failed.message : failed || '')
+      if (/未开通|升级会员|开通会员/.test(msg)) this.setData({ upgradeOpen: true })
+      this.failEval(failed, 'advising')
+    }
   },
 })

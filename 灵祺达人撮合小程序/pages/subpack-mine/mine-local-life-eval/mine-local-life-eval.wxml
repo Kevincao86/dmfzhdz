@@ -85,6 +85,12 @@
     <text class="need" wx:elif="{{!canEval}}">请先到「我的信息」填写{{nickLabel}}或{{accountLabel}}</text>
     <text class="need" wx:elif="{{!scoreReady}}">请先完成达人信息评估</text>
 
+    <view class="xingxuan-card radar-card" wx:if="{{scoreReady || evaluating}}">
+      <text class="radar-title">{{nickname || '达人'}} 6维评估{{scoreReady ? '（' + displayScore + '/100）' : ''}}</text>
+      <text class="radar-sub">{{basis || '按已填写资料和公开主页估算'}}</text>
+      <canvas type="2d" id="evalRadar" class="radar-canvas"></canvas>
+    </view>
+
     <view class="xingxuan-card advice advice--now" wx:if="{{scoreReady && situations.length}}">
       <text class="advice-title advice-title--now">达人现状</text>
       <view class="plate-grid">
@@ -98,7 +104,12 @@
       </view>
     </view>
 
-    <view class="xingxuan-card advice advice--plan" wx:if="{{adviceReady}}">
+    <view class="xingxuan-card advice advice--plan" wx:if="{{advising}}" id="talent-advice-plan">
+      <text class="advice-title advice-title--plan">分析与提升方案</text>
+      <text class="plan-wait">正在按绑定资料和公网数据写提升方案…</text>
+    </view>
+
+    <view class="xingxuan-card advice advice--plan" wx:if="{{adviceReady && !advising}}" id="talent-advice-plan">
       <text class="advice-title advice-title--plan">分析与提升方案</text>
       <view class="plan-list">
         <view class="plan" wx:for="{{sections}}" wx:key="name">
