@@ -424,6 +424,45 @@
   text-align: center;
 }
 
+.hero-score {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4rpx;
+  min-height: 72rpx;
+}
+
+.hero-total {
+  margin-bottom: 8rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.radar-card {
+  text-align: center;
+}
+
+.radar-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1a1b1c;
+}
+
+.radar-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.radar-canvas {
+  width: 100%;
+  height: 640rpx;
+  margin-top: 8rpx;
+}
+
 .ring-stage {
   position: relative;
   width: 200rpx;

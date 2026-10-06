@@ -54,13 +54,9 @@
     </view>
     <view class="eval-right">
       <view class="card hero">
-        <view class="ring-stage">
-          <view class="ring-scan" wx:if="{{evaluating}}"></view>
-          <view class="ring {{scorePop ? 'ring--pop' : ''}} {{evaluating ? 'ring--wait' : ''}}" style="background: conic-gradient(from -90deg, #2f6fed 0%, #2f6fed {{displayScore}}%, #eef2f6 {{displayScore}}%);">
-            <view class="ring-hole">
-              <text class="score {{scorePop ? 'score--pop' : ''}} {{evaluating ? 'score--wait' : ''}}">{{displayScore}}</text>
-            </view>
-          </view>
+        <view class="hero-score">
+          <text class="score {{scorePop ? 'score--pop' : ''}} {{evaluating ? 'score--wait' : ''}}">{{displayScore}}</text>
+          <text class="hero-total">/100</text>
         </view>
         <text class="label">{{evalTitle}}</text>
         <view class="grade" wx:if="{{showGrade}}">
@@ -76,6 +72,12 @@
         </view>
       </view>
     </view>
+  </view>
+
+  <view class="card radar-card" wx:if="{{evaluating || indicators.length}}">
+    <text class="radar-title">{{formName || storeName || '门店'}} 6维评估（{{displayScore}}/100）</text>
+    <text class="radar-sub">{{scopeLabel}} · 公网六维</text>
+    <canvas type="2d" id="shopRadar" class="radar-canvas"></canvas>
   </view>
 
   <view class="card report" wx:if="{{positioning}}">

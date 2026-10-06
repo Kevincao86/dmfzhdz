@@ -1521,5 +1521,6 @@ module.exports = {
   evaluateShop,
   adviseShop,
   describeShopBackend,
+  publicEvalIndicators,
   shopEvalGainTargets,
 }

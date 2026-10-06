@@ -446,6 +446,7 @@ Page({
       })
     }
     this.setData(patch)
+    if (score) this.queueRadar(1)
   },
 
   async refreshQuota() {
@@ -617,6 +618,7 @@ Page({
       sections: advice ? advice.sections : [],
       err: '',
     })
+    if (score) this.queueRadar(1)
     if (score) {
       const gains = evalApi.shopEvalGainTargets(score, viewed)
       if (gains) this.playGains(gains.exposure, gains.verify)
@@ -669,12 +671,129 @@ Page({
     }
   },
 
+  radarRows() {
+    const rows = this.data.indicators || []
+    if (rows.length) return rows
+    const scope = evalApi.shopEvalScopeOf(this._input || {})
+    return evalApi.publicEvalIndicators(scope)
+  },
+
+  queueRadar(grow) {
+    this._radarGrow = grow
+    const paint = () => this.paintRadar()
+    if (this._radarCtx) {
+      paint()
+      return
+    }
+    wx.nextTick(() => this.ensureRadar(paint))
+  },
+
+  ensureRadar(done) {
+    wx.createSelectorQuery()
+      .in(this)
+      .select('#shopRadar')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        const box = res && res[0]
+        if (!box || !box.node || !box.width) return
+        const canvas = box.node
+        const ctx = canvas.getContext('2d')
+        const dpr = wx.getWindowInfo ? wx.getWindowInfo().pixelRatio || 2 : 2
+        canvas.width = box.width * dpr
+        canvas.height = box.height * dpr
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        this._radarCtx = ctx
+        this._radarSize = { w: box.width, h: box.height }
+        if (done) done()
+      })
+  },
+
+  paintRadar() {
+    const ctx = this._radarCtx
+    const size = this._radarSize
+    if (!ctx || !size) return
+    const rows = this.radarRows()
+    const n = rows.length
+    if (!n) return
+    const grow = this._radarGrow
+    const scanning = grow < 0
+    const scale = scanning ? 0.22 + ((Math.sin(Date.now() / 280) + 1) / 2) * 0.12 : Math.max(0, Math.min(1, grow))
+    const cx = size.w / 2
+    const cy = size.h * 0.48
+    const R = Math.min(size.w * 0.3, size.h * 0.28)
+    const pt = (i, r) => {
+      const a = -Math.PI / 2 + (Math.PI * 2 * i) / n
+      return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]
+    }
+    ctx.clearRect(0, 0, size.w, size.h)
+    ctx.strokeStyle = 'rgba(107,114,128,0.28)'
+    ctx.lineWidth = 1
+    ;[0.33, 0.66, 1].forEach((ring) => {
+      ctx.beginPath()
+      for (let i = 0; i < n; i += 1) {
+        const p = pt(i, R * ring)
+        if (i === 0) ctx.moveTo(p[0], p[1])
+        else ctx.lineTo(p[0], p[1])
+      }
+      ctx.closePath()
+      ctx.stroke()
+    })
+    for (let i = 0; i < n; i += 1) {
+      const outer = pt(i, R)
+      ctx.beginPath()
+      ctx.moveTo(cx, cy)
+      ctx.lineTo(outer[0], outer[1])
+      ctx.stroke()
+    }
+    ctx.beginPath()
+    rows.forEach((row, i) => {
+      const ratio = scanning ? 1 : row.weight ? Math.max(0, Math.min(1, (Number(row.score) || 0) / row.weight)) : 0
+      const p = pt(i, R * ratio * scale)
+      if (i === 0) ctx.moveTo(p[0], p[1])
+      else ctx.lineTo(p[0], p[1])
+    })
+    ctx.closePath()
+    ctx.fillStyle = 'rgba(139,200,234,0.38)'
+    ctx.fill()
+    ctx.strokeStyle = '#5BA3CF'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    ctx.fillStyle = '#5BA3CF'
+    rows.forEach((row, i) => {
+      const ratio = scanning ? 1 : row.weight ? Math.max(0, Math.min(1, (Number(row.score) || 0) / row.weight)) : 0
+      const p = pt(i, R * ratio * scale)
+      ctx.beginPath()
+      ctx.arc(p[0], p[1], 3.5, 0, Math.PI * 2)
+      ctx.fill()
+    })
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    rows.forEach((row, i) => {
+      const p = pt(i, R + 52)
+      const name = String(row.name || '')
+      const parts = name.split('与')
+      const shown = scanning || scale < 0.08 ? 0 : Math.round((Number(row.score) || 0) * scale)
+      ctx.fillStyle = '#1f2937'
+      ctx.font = '12px sans-serif'
+      if (parts.length > 1) {
+        ctx.fillText(parts[0] + '与', p[0], p[1] - 16)
+        ctx.fillText(parts.slice(1).join('与'), p[0], p[1] - 2)
+      } else {
+        ctx.fillText(name, p[0], p[1] - 8)
+      }
+      ctx.fillStyle = '#5BA3CF'
+      ctx.font = 'bold 12px sans-serif'
+      ctx.fillText(shown + '/' + row.weight, p[0], p[1] + (parts.length > 1 ? 14 : 8))
+    })
+  },
+
   startEvalSweep() {
     this.stopTick()
     const start = Date.now()
     this._timer = setInterval(() => {
       const wave = (Math.sin(((Date.now() - start) / 700) * Math.PI) + 1) / 2
       this.setData({ displayScore: Math.round(8 + wave * 78) })
+      this.queueRadar(-1)
     }, 32)
   },
 
@@ -691,9 +810,11 @@ Page({
       if (t >= 1) {
         this.stopTick()
         this.setData({ displayScore: goal, scorePop: true })
+        this.queueRadar(1)
         return
       }
       this.setData({ displayScore: cur })
+      this.queueRadar(eased)
     }, 32)
   },
 
@@ -873,6 +994,7 @@ Page({
       adviceReady: false,
       sections: [],
     })
+    this._radarCtx = null
     this.startEvalSweep()
     let failed = null
     try {

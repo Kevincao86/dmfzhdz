@@ -14,6 +14,7 @@ import {
   resolveShopEvalFromStores,
   SHOP_EVAL_PLATFORMS,
   shopEvalGainTargets,
+  publicEvalIndicators,
   shopEvalGrade,
   shopEvalGrades,
   shopEvalScopeOf,
@@ -118,6 +119,112 @@ function letterOf(name: string) {
   return s ? s.slice(0, 1) : '店'
 }
 
+function radarLines(name: string) {
+  const cut = name.indexOf('与')
+  if (cut > 1 && cut < name.length - 1) return [name.slice(0, cut + 1), name.slice(cut + 1)]
+  if (name.length <= 6) return [name]
+  const mid = Math.ceil(name.length / 2)
+  return [name.slice(0, mid), name.slice(mid)]
+}
+
+function ShopEvalRadar({
+  rows,
+  playKey,
+  scanning,
+}: {
+  rows: { name: string; score: number; weight: number }[]
+  playKey: number
+  scanning: boolean
+}) {
+  const [grow, setGrow] = useState(playKey > 0 ? 0 : 1)
+  const [spin, setSpin] = useState(0)
+  useEffect(() => {
+    if (playKey <= 0) {
+      setGrow(1)
+      return
+    }
+    setGrow(0)
+    const start = performance.now()
+    const dur = 1200
+    let frame = 0
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / dur)
+      setGrow(1 - (1 - p) ** 3)
+      if (p < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [playKey])
+  useEffect(() => {
+    if (!scanning) return
+    const start = performance.now()
+    let frame = 0
+    const tick = (now: number) => {
+      setSpin(((now - start) / 1000) % 1)
+      frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [scanning])
+  const n = rows.length
+  if (n < 3) return null
+  const cx = 260
+  const cy = 250
+  const R = 108
+  const ang = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n
+  const xy = (i: number, ratio: number) => {
+    const a = ang(i)
+    return [cx + Math.cos(a) * R * ratio, cy + Math.sin(a) * R * ratio] as const
+  }
+  const ringPoints = (ratio: number) => rows.map((_, i) => xy(i, ratio).map((v) => v.toFixed(1)).join(',')).join(' ')
+  const scale = scanning ? 0.22 + Math.sin(spin * Math.PI * 2) * 0.08 : grow
+  const area = rows
+    .map((row, i) => {
+      const ratio = scanning ? 1 : row.weight > 0 ? Math.max(0, Math.min(1, row.score / row.weight)) : 0
+      return xy(i, ratio * scale).map((v) => v.toFixed(1)).join(',')
+    })
+    .join(' ')
+  return (
+    <svg viewBox="0 0 520 500" className="mx-auto h-auto w-full max-w-[520px]" role="img" aria-label="六维评分">
+      {[0.25, 0.5, 0.75, 1].map((ring) => (
+        <polygon key={ring} points={ringPoints(ring)} fill={ring === 1 ? 'rgba(139,200,234,0.08)' : 'transparent'} stroke="rgba(107,114,128,0.28)" strokeWidth="1" />
+      ))}
+      {rows.map((row, i) => {
+        const [x, y] = xy(i, 1)
+        return <line key={row.name} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(107,114,128,0.28)" strokeWidth="1" />
+      })}
+      <polygon points={area} fill="rgba(139,200,234,0.38)" stroke="#5BA3CF" strokeWidth="2" />
+      {scanning
+        ? null
+        : rows.map((row, i) => {
+            const ratio = row.weight > 0 ? Math.max(0, Math.min(1, row.score / row.weight)) * grow : 0
+            const [x, y] = xy(i, ratio)
+            return <circle key={row.name} cx={x} cy={y} r="3.5" fill="#5BA3CF" />
+          })}
+      {rows.map((row, i) => {
+        const a = ang(i)
+        const lx = cx + Math.cos(a) * 162
+        const ly = cy + Math.sin(a) * 156
+        const anchor = lx < cx - 28 ? 'end' : lx > cx + 28 ? 'start' : 'middle'
+        const lines = radarLines(row.name)
+        const shown = scanning ? 0 : Math.round(row.score * grow)
+        return (
+          <text key={row.name} x={lx} y={ly} textAnchor={anchor} fill="#333" fontSize="12">
+            {lines.map((line, idx) => (
+              <tspan key={line} x={lx} dy={idx === 0 ? 0 : 15}>
+                {line}
+              </tspan>
+            ))}
+            <tspan x={lx} dy="16" fill="#5BA3CF" fontSize="12" fontWeight="700">
+              {shown}/{row.weight}
+            </tspan>
+          </text>
+        )
+      })}
+    </svg>
+  )
+}
+
 function useRiseCount(target: number, play: boolean) {
   const [value, setValue] = useState(0)
   useEffect(() => {
@@ -169,6 +276,7 @@ export default function MerchantShopEvalPanel() {
   const categoryLabel = cat1 && cat2 ? `${cat1} / ${cat2}` : ''
   const [displayScore, setDisplayScore] = useState(0)
   const [animateScore, setAnimateScore] = useState(false)
+  const [radarPlay, setRadarPlay] = useState(0)
   const [animateGains, setAnimateGains] = useState(false)
   const scope = shopEvalScopeOf(input)
   const meta = platformShopEvalMeta(platformId, scope)
@@ -517,6 +625,7 @@ export default function MerchantShopEvalPanel() {
       const next = await evaluateShop(nextInput, { force: true, storage, askText })
       setAnimateScore(true)
       setAnimateGains(true)
+      setRadarPlay((n) => n + 1)
       setDisplayScore(0)
       setScore(next)
       const used = await postLocate({ action: 'eval-quota', consume: true })
@@ -831,20 +940,11 @@ export default function MerchantShopEvalPanel() {
           </div>
         </div>
 
-        <div className="flex flex-col items-center rounded-2xl bg-[#f6f8fb] p-4">
-          <div className="relative h-44 w-44">
-            {evaluating ? <div className="shop-eval-scan" /> : null}
-            <div
-              className="flex h-full w-full items-center justify-center rounded-full"
-              style={{
-                background: `conic-gradient(from -90deg, #1E3A5F 0%, #5b8def ${displayScore}%, #e8eef6 ${displayScore}%)`,
-              }}
-            >
-              <div className="flex h-[9.5rem] w-[9.5rem] items-center justify-center rounded-full bg-white">
-                <span className="text-5xl font-extrabold tabular-nums text-[#1E3A5F]">{displayScore}</span>
-              </div>
-            </div>
-          </div>
+        <div className="flex flex-col items-center justify-center rounded-2xl bg-[#f6f8fb] p-4">
+          <p className="text-4xl font-extrabold tabular-nums text-[#1E3A5F]">
+            {displayScore}
+            <span className="text-base font-semibold text-slate-400">/100</span>
+          </p>
           <p className="mt-2 text-sm font-semibold text-slate-800">{meta.title}</p>
           {grade ? (
             <div className="mt-2 text-center">
@@ -882,6 +982,24 @@ export default function MerchantShopEvalPanel() {
           </button>
         </div>
       </div>
+
+      {evaluating || score?.indicators?.length ? (
+        <div className="px-5 pb-1 text-center">
+          <p className="text-[15px] font-semibold text-slate-900">
+            {displayName || '门店'} 6维评估（{displayScore}/100）
+          </p>
+          <p className="mt-1 text-xs text-slate-500">{scope === 'chain' ? '连锁品牌 · 公网六维' : '单门店 · 公网六维'}</p>
+          <ShopEvalRadar
+            rows={
+              score?.indicators?.length
+                ? score.indicators.map((row) => ({ name: row.name, score: row.score, weight: row.weight }))
+                : publicEvalIndicators(scope).map((row) => ({ name: row.name, score: 0, weight: row.weight }))
+            }
+            playKey={radarPlay}
+            scanning={evaluating}
+          />
+        </div>
+      ) : null}
 
       <div className="px-5 pb-5">
         {score?.positioning ? (
