@@ -79,7 +79,15 @@ export async function fetchAffiliatePortal(): Promise<AffiliatePortalPayload> {
   throw new Error(lastErr)
 }
 
-export async function submitAffiliateWithdraw(amountCents: number): Promise<void> {
+export function merchantWithdrawRequiresBoundAccount(): boolean {
+  if (typeof window === 'undefined') return false
+  return !window.location.hostname.toLowerCase().includes('dr.')
+}
+
+export async function submitAffiliateWithdraw(
+  amountCents: number,
+  options?: { useBoundAccount?: boolean },
+): Promise<void> {
   const { token, source } = await resolveMerchantApiBearer()
   if (!token) throw new Error('请先登录')
   if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('请输入有效提现金额')
@@ -94,7 +102,11 @@ export async function submitAffiliateWithdraw(amountCents: number): Promise<void
       const res = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ action: 'withdraw', amountCents: Math.floor(amountCents) }),
+        body: JSON.stringify({
+          action: 'withdraw',
+          amountCents: Math.floor(amountCents),
+          useBoundAccount: options?.useBoundAccount === true,
+        }),
       })
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
       if (!res.ok || json.ok === false) {

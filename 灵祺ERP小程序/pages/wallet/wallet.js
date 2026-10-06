@@ -80,6 +80,13 @@ Page({
     balanceCents: 0,
     pointsLedger: [],
     withdraws: [],
+    payoutBound: false,
+    payoutKind: 'person',
+    payoutName: '',
+    payoutBank: '',
+    payoutNo: '',
+    payoutBusy: false,
+    payoutMsg: '',
     loading: false,
     err: '',
     payOpen: false,
@@ -136,6 +143,7 @@ Page({
       const summary = await billing.fetchTenantBillingSummary()
       const ledgerRaw = await billing.fetchTenantPointsLedger()
       const withdraws = await loadAffiliateWithdraws()
+      const payout = await billing.fetchMerchantPayoutAccount().catch(() => null)
       const bc = typeof summary.walletBalanceCents === 'number' ? summary.walletBalanceCents : 0
       const totalPts = typeof summary.totalPoints === 'number' ? summary.totalPoints : 0
       const pkgPts = typeof summary.packagePoints === 'number' ? summary.packagePoints : 0
@@ -148,6 +156,11 @@ Page({
         rechargePointsText: walletUi.formatPoints(rechPts),
         pointsLedger: (ledgerRaw || []).slice(0, 20).map(formatPointsLedgerRow),
         withdraws,
+        payoutBound: !!(payout && payout.payeeName && payout.bankNo),
+        payoutKind: payout && payout.kind === 'entity' ? 'entity' : 'person',
+        payoutName: payout && payout.payeeName ? payout.payeeName : '',
+        payoutBank: payout && payout.bank ? payout.bank : '',
+        payoutNo: payout && payout.bankNo ? payout.bankNo : '',
         loading: false,
       })
     } catch (e) {
@@ -168,6 +181,48 @@ Page({
         err: payFlow.formatPayError(e),
         loading: false,
       })
+    }
+  },
+
+  onPayoutKind(e) {
+    const kind = e.currentTarget.dataset.kind
+    this.setData({ payoutKind: kind === 'entity' ? 'entity' : 'person', payoutMsg: '' })
+  },
+
+  onPayoutName(e) {
+    this.setData({ payoutName: (e.detail && e.detail.value) || '' })
+  },
+
+  onPayoutBank(e) {
+    this.setData({ payoutBank: (e.detail && e.detail.value) || '' })
+  },
+
+  onPayoutNo(e) {
+    this.setData({ payoutNo: (e.detail && e.detail.value) || '' })
+  },
+
+  async onSavePayout() {
+    if (this.data.payoutBusy) return
+    this.setData({ payoutBusy: true, payoutMsg: '' })
+    try {
+      const saved = await billing.saveMerchantPayoutAccount({
+        kind: this.data.payoutKind,
+        payeeName: this.data.payoutName,
+        bank: this.data.payoutBank,
+        bankNo: this.data.payoutNo,
+      })
+      this.setData({
+        payoutBound: !!(saved && saved.payeeName && saved.bankNo),
+        payoutKind: saved && saved.kind === 'entity' ? 'entity' : 'person',
+        payoutName: (saved && saved.payeeName) || this.data.payoutName,
+        payoutBank: (saved && saved.bank) || this.data.payoutBank,
+        payoutNo: (saved && saved.bankNo) || this.data.payoutNo,
+        payoutMsg: '收款账户已保存，之后的提现都会打到这个账户',
+      })
+    } catch (err) {
+      this.setData({ payoutMsg: (err && err.message) || '保存失败' })
+    } finally {
+      this.setData({ payoutBusy: false })
     }
   },
 

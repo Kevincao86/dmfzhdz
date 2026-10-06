@@ -242,6 +242,38 @@ export async function checkErpPointsAffordable(input: {
   })
 }
 
+export type MerchantPayoutAccountView = {
+  kind: 'person' | 'entity'
+  payeeName: string
+  bank: string
+  bankNo: string
+  updatedAt: string
+}
+
+export async function fetchMerchantPayoutAccount(): Promise<MerchantPayoutAccountView | null> {
+  const json = await billingFetch<{ account?: MerchantPayoutAccountView | null }>({
+    action: 'payout_account_get',
+  })
+  return json.account ?? null
+}
+
+export async function saveMerchantPayoutAccount(input: {
+  kind: 'person' | 'entity'
+  payeeName: string
+  bank: string
+  bankNo: string
+}): Promise<MerchantPayoutAccountView> {
+  const json = await billingFetch<{ account?: MerchantPayoutAccountView }>({
+    action: 'payout_account_save',
+    kind: input.kind,
+    payeeName: input.payeeName,
+    bank: input.bank,
+    bankNo: input.bankNo,
+  })
+  if (!json.account) throw new Error('保存收款账户失败')
+  return json.account
+}
+
 export async function spendErpPointsForUsage(input: {
   kind: ErpPointsSpendKind
   durationSec?: number

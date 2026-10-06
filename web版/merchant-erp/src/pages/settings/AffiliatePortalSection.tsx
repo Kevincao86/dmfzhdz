@@ -11,6 +11,7 @@ import {
   fetchAffiliatePortal,
   fetchAffiliateWxacode,
   formatCentsYuan,
+  merchantWithdrawRequiresBoundAccount,
   submitAffiliateWithdraw,
   withdrawRequestStatusLabel,
   type AffiliatePortalPayload,
@@ -196,7 +197,9 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
     setWithdrawing(true)
     setWithdrawHint(null)
     try {
-      await submitAffiliateWithdraw(Math.round(yuan * 100))
+      await submitAffiliateWithdraw(Math.round(yuan * 100), {
+        useBoundAccount: merchantWithdrawRequiresBoundAccount(),
+      })
       setWithdrawAmount('')
       setWithdrawHint('提现申请已提交，请等待运营审核')
       await load()
@@ -443,6 +446,15 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
               </div>
               <p className="text-xs text-slate-500">{withdrawGate.windowHint}</p>
               <p className="text-xs text-slate-600">{withdrawGate.payoutHint}</p>
+              {merchantWithdrawRequiresBoundAccount() ? (
+                <p className="text-xs text-slate-600">
+                  打款到
+                  <Link to="/wallet" className="mx-1 text-indigo-600 hover:underline">
+                    我的钱包
+                  </Link>
+                  里绑定的收款账户。请先填写户名、开户行和账号。
+                </p>
+              ) : null}
               <p className="text-xs text-slate-500">
                 单笔 ¥{formatCentsYuan(withdrawGate.minCents)}–¥{formatCentsYuan(withdrawGate.maxCents)} · 本月上限 ¥
                 {formatCentsYuan(withdrawGate.monthlyCapCents)}

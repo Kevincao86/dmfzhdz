@@ -27,6 +27,7 @@ import {
   settlementBatchAction,
   withdrawAction,
   yuanFromCents,
+  type MerchantPayoutAccountRow,
   type RegistryDistributionAffiliate,
   type RegistryDistributionPartnerChannel,
   type RegistryDistributionPolicy,
@@ -299,9 +300,29 @@ function CommissionOverrideModal({
   )
 }
 
+function withdrawPayee(row: {
+  ownerId: string
+  payoutAccount?: Record<string, string>
+}, affiliates: RegistryDistributionAffiliate[], accounts: Array<{ ownerKey: string; kind?: string; payeeName?: string; bank?: string; bankNo?: string }>) {
+  const snap = row.payoutAccount || {}
+  const affiliate = affiliates.find((item) => item.id === row.ownerId)
+  const live = accounts.find((item) => item.ownerKey && item.ownerKey === affiliate?.authUserId)
+  const payeeName = String(snap.payeeName || live?.payeeName || '').trim()
+  const bankNo = String(snap.bankNo || live?.bankNo || '').trim()
+  const bank = String(snap.bank || live?.bank || '').trim()
+  const kind = String(snap.kind || live?.kind || '')
+  return {
+    payeeName,
+    bankNo,
+    bank,
+    kindLabel: kind === 'entity' ? '企业' : kind === 'person' ? '个人' : '',
+  }
+}
+
 function exportWithdrawCsv(
   rows: Array<{
     id: string
+    ownerId: string
     ownerLabel: string
     ownerType: string
     amountCents: number
@@ -309,14 +330,22 @@ function exportWithdrawCsv(
     status: string
     createdAt: string
     paidAt?: string
+    payoutAccount?: Record<string, string>
   }>,
+  affiliates: RegistryDistributionAffiliate[],
+  accounts: Array<{ ownerKey: string; kind?: string; payeeName?: string; bank?: string; bankNo?: string }>,
 ) {
-  const header = ['申请人', '类型', '金额', '渠道', '状态', '申请时间', '打款时间', '提现编号']
+  const header = ['申请人', '类型', '收款户名', '收款账号', '开户行', '主体', '金额', '渠道', '状态', '申请时间', '打款时间', '提现编号']
   const lines = [header.join(',')]
   rows.forEach((row) => {
+    const payee = withdrawPayee(row, affiliates, accounts)
     const cells = [
       row.ownerLabel,
       row.ownerType === 'partner_tenant' ? '分销' : '推广员',
+      payee.payeeName,
+      payee.bankNo,
+      payee.bank,
+      payee.kindLabel,
       yuanFromCents(row.amountCents),
       row.channel,
       withdrawStatusLabel(row.status),
@@ -350,6 +379,7 @@ export default function OpsDistributionPage() {
   const [withdrawRequests, setWithdrawRequests] = useState<
     Awaited<ReturnType<typeof loadDistributionSnapshot>>['withdrawRequests']
   >([])
+  const [payoutAccounts, setPayoutAccounts] = useState<MerchantPayoutAccountRow[]>([])
   const [settlementBatches, setSettlementBatches] = useState<
     Awaited<ReturnType<typeof loadDistributionSnapshot>>['settlementBatches']
   >([])
@@ -378,6 +408,7 @@ export default function OpsDistributionPage() {
       setAffiliates(data.affiliates)
       setPartners(data.partners)
       setWithdrawRequests(data.withdrawRequests)
+      setPayoutAccounts(data.payoutAccounts)
       setSettlementBatches(data.settlementBatches)
       if (!activePartnerId && data.partners[0]) setActivePartnerId(data.partners[0].partnerTenantId)
     } catch (e) {
@@ -463,7 +494,7 @@ export default function OpsDistributionPage() {
               type="button"
               className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 disabled:opacity-50"
               disabled={!shownWithdraws.length}
-              onClick={() => exportWithdrawCsv(shownWithdraws)}
+              onClick={() => exportWithdrawCsv(shownWithdraws, affiliates, payoutAccounts)}
             >
               导出当前列表
             </button>
@@ -866,6 +897,9 @@ export default function OpsDistributionPage() {
             <thead className="bg-slate-900/80 text-xs text-slate-400">
               <tr>
                 <th className="p-2">申请人</th>
+                <th className="p-2">收款户名</th>
+                <th className="p-2">收款账号</th>
+                <th className="p-2">开户行</th>
                 <th className="p-2">提现编号</th>
                 <th className="p-2">金额</th>
                 <th className="p-2">渠道</th>
@@ -876,9 +910,17 @@ export default function OpsDistributionPage() {
               </tr>
             </thead>
             <tbody>
-              {shownWithdraws.map((w) => (
+              {shownWithdraws.map((w) => {
+                const payee = withdrawPayee(w, affiliates, payoutAccounts)
+                return (
                 <tr key={w.id} className="border-t border-slate-800">
-                  <td className="p-2 text-white">{w.ownerLabel}</td>
+                  <td className="p-2 text-white">
+                    {w.ownerLabel}
+                    {payee.kindLabel ? <div className="text-xs text-slate-500">{payee.kindLabel}</div> : null}
+                  </td>
+                  <td className="p-2 text-slate-200">{payee.payeeName || '—'}</td>
+                  <td className="p-2 font-mono text-xs text-slate-300">{payee.bankNo || '—'}</td>
+                  <td className="p-2 text-slate-400">{payee.bank || '—'}</td>
                   <td className="p-2 font-mono text-xs text-slate-300">{w.id}</td>
                   <td className="p-2">¥{yuanFromCents(w.amountCents)}</td>
                   <td className="p-2 text-slate-400">{w.channel === 'manual_bank' ? '银行转账' : w.channel === 'manual_alipay' ? '支付宝' : w.channel}</td>
@@ -908,7 +950,8 @@ export default function OpsDistributionPage() {
                     </td>
                   ) : null}
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
           {!shownWithdraws.length ? <p className="p-6 text-center text-slate-500">暂无提现申请。提交后网页端和小程序会显示同一状态。</p> : null}

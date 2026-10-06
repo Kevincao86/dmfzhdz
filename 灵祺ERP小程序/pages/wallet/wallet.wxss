@@ -438,3 +438,43 @@
 .wallet-close::after {
   border: none;
 }
+
+.wallet-payout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wallet-payout-flag {
+  font-size: 22rpx;
+  color: #b45309;
+  background: #fffbeb;
+  border-radius: 999rpx;
+  padding: 4rpx 14rpx;
+}
+
+.wallet-payout-flag.on {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.wallet-payout-kinds {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.wallet-payout-kind {
+  padding: 8rpx 22rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #475569;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+}
+
+.wallet-payout-kind.on {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}

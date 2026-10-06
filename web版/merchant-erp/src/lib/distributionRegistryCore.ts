@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { findMerchantPayoutAccount, payoutAccountSnapshot } from './merchantPayoutAccount.js'
 import type { RegistryFile } from './opsRegistryTypes.js'
 import type {
   DistributionCommissionOverride,
@@ -764,22 +765,34 @@ export function createWithdrawRequestFromSnapshot(
     }
   }
 
-  const channelRaw = String(body.channel || 'manual_bank').trim()
-  const channel: RegistryDistributionWithdrawRequest['channel'] =
-    channelRaw === 'manual_alipay' ||
-    channelRaw === 'wechat' ||
-    channelRaw === 'alipay'
-      ? channelRaw
-      : 'manual_bank'
-
+  const requireBoundAccount = body.useBoundAccount === true || affiliate.applySource === 'cs'
+  let channel: RegistryDistributionWithdrawRequest['channel'] = 'manual_bank'
   let payoutAccount: Record<string, string> | undefined
-  if (body.payoutAccount && typeof body.payoutAccount === 'object' && !Array.isArray(body.payoutAccount)) {
-    const parsed = Object.fromEntries(
-      Object.entries(body.payoutAccount as Record<string, unknown>)
-        .map(([k, v]) => [k, String(v || '').trim()])
-        .filter(([, v]) => v),
-    )
-    payoutAccount = Object.keys(parsed).length ? parsed : undefined
+  if (requireBoundAccount) {
+    const bound = findMerchantPayoutAccount(data, String(identity.authUserId || ''))
+    if (!bound) {
+      return {
+        ok: false,
+        error: 'account_required',
+        message: '请先在我的钱包绑定收款账户后再提现',
+        status: 400,
+      }
+    }
+    payoutAccount = payoutAccountSnapshot(bound)
+  } else {
+    const channelRaw = String(body.channel || 'manual_bank').trim()
+    channel =
+      channelRaw === 'manual_alipay' || channelRaw === 'wechat' || channelRaw === 'alipay'
+        ? channelRaw
+        : 'manual_bank'
+    if (body.payoutAccount && typeof body.payoutAccount === 'object' && !Array.isArray(body.payoutAccount)) {
+      const parsed = Object.fromEntries(
+        Object.entries(body.payoutAccount as Record<string, unknown>)
+          .map(([k, v]) => [k, String(v || '').trim()])
+          .filter(([, v]) => v),
+      )
+      payoutAccount = Object.keys(parsed).length ? parsed : undefined
+    }
   }
 
   const request: RegistryDistributionWithdrawRequest = {

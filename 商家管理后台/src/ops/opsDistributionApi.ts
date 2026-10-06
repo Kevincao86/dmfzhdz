@@ -42,14 +42,24 @@ async function postDistribution(body: Record<string, unknown>): Promise<{
   return { ok: false, error: String(last.error || 'request_failed') }
 }
 
+export type MerchantPayoutAccountRow = {
+  ownerKey: string
+  kind: 'person' | 'entity'
+  payeeName: string
+  bank: string
+  bankNo: string
+}
+
 export async function loadDistributionSnapshot(): Promise<{
   policy: RegistryDistributionPolicy
   affiliates: RegistryDistributionAffiliate[]
   partners: RegistryDistributionPartnerChannel[]
   withdrawRequests: RegistryDistributionWithdrawRequest[]
   settlementBatches: RegistryDistributionSettlementBatch[]
+  payoutAccounts: MerchantPayoutAccountRow[]
 }> {
   const reg: RegistryFile = await fetchRegistry()
+  const payoutRaw = (reg as { merchantPayoutAccounts?: MerchantPayoutAccountRow[] }).merchantPayoutAccounts
   return {
     policy: reg.distributionPolicy ?? {
       enabled: true,
@@ -65,6 +75,7 @@ export async function loadDistributionSnapshot(): Promise<{
     partners: reg.distributionPartnerChannels ?? [],
     withdrawRequests: reg.distributionWithdrawRequests ?? [],
     settlementBatches: reg.distributionSettlementBatches ?? [],
+    payoutAccounts: Array.isArray(payoutRaw) ? payoutRaw : [],
   }
 }
 

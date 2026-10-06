@@ -8,6 +8,7 @@ import {
   normalizeCatalogLogoUrl,
   normalizeVendorKeysFromDisk,
 } from '../src/lib/aiVendorCatalogShared.js'
+import { readMerchantPayoutAccounts } from '../src/lib/merchantPayoutAccount.js'
 import { registryFileForPersist } from '../src/lib/mpRecruitmentRegistryPersist.js'
 import type {
   AiVendorCatalogEntry,
@@ -189,6 +190,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const distributionWallets = Array.isArray(parsed?.distributionWallets)
     ? parsed!.distributionWallets
     : undefined
+  const merchantPayoutAccounts = readMerchantPayoutAccounts(parsed?.merchantPayoutAccounts)
   return {
     tenants,
     aiModels: ai,
@@ -233,6 +235,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     ...(distributionWithdrawRequests !== undefined ? { distributionWithdrawRequests } : {}),
     ...(distributionSettlementBatches !== undefined ? { distributionSettlementBatches } : {}),
     ...(distributionWallets !== undefined ? { distributionWallets } : {}),
+    ...(merchantPayoutAccounts.length ? { merchantPayoutAccounts } : {}),
   }
 }
 

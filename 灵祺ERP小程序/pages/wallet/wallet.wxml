@@ -45,6 +45,23 @@
       </view>
     </view>
 
+    <view class="wallet-account-card">
+      <view class="wallet-payout-head">
+        <text class="wallet-card-lab">收款账户</text>
+        <text class="wallet-payout-flag {{payoutBound ? 'on' : ''}}">{{payoutBound ? '已绑定' : '未绑定'}}</text>
+      </view>
+      <text class="wallet-card-hint">推广佣金等提现都打到这个账户。请填写户名、开户行和账号。</text>
+      <view class="wallet-payout-kinds">
+        <view class="wallet-payout-kind {{payoutKind === 'person' ? 'on' : ''}}" data-kind="person" bindtap="onPayoutKind">个人</view>
+        <view class="wallet-payout-kind {{payoutKind === 'entity' ? 'on' : ''}}" data-kind="entity" bindtap="onPayoutKind">企业</view>
+      </view>
+      <input class="wallet-custom-input" value="{{payoutName}}" bindinput="onPayoutName" placeholder="{{payoutKind === 'entity' ? '公司或经营者户名' : '收款户名'}}" maxlength="40" />
+      <input class="wallet-custom-input" value="{{payoutBank}}" bindinput="onPayoutBank" placeholder="开户行" maxlength="40" />
+      <input class="wallet-custom-input" value="{{payoutNo}}" bindinput="onPayoutNo" placeholder="收款账号" maxlength="40" />
+      <text wx:if="{{payoutMsg}}" class="wallet-card-hint">{{payoutMsg}}</text>
+      <button class="wallet-recharge-btn" loading="{{payoutBusy}}" disabled="{{payoutBusy}}" bindtap="onSavePayout">{{payoutBound ? '更新收款账户' : '绑定收款账户'}}</button>
+    </view>
+
     <view class="wallet-ledger">
       <text class="wallet-ledger-title">提现记录</text>
       <view wx:if="{{!withdraws.length}}" class="wallet-card-hint">暂无提现记录</view>

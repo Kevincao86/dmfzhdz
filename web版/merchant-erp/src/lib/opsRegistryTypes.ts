@@ -1059,6 +1059,8 @@ export type RegistryFile = {
   distributionSettlementBatches?: import('./distributionRegistryTypes.js').RegistryDistributionSettlementBatch[]
   distributionWallets?: import('./distributionRegistryTypes.js').RegistryDistributionWallet[]
   distributionAttributions?: import('./distributionRegistryTypes.js').RegistryDistributionAttribution[]
+  /** 商家钱包绑定的收款账户，提现时快照到申请单 */
+  merchantPayoutAccounts?: import('./merchantPayoutAccount.js').MerchantPayoutAccount[]
 }
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'

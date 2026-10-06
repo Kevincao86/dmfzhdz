@@ -29,6 +29,12 @@ import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAd
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 import { formatThrowableMessage, tenantPayErrorMessage } from '../src/lib/formatDisplayError.js'
 import { resolveErpWxOpenIdForPay } from '../vite-plugins/authWxLoginShared.js'
+import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
+import {
+  findMerchantPayoutAccount,
+  toPublicPayoutAccount,
+  upsertMerchantPayoutAccount,
+} from '../src/lib/merchantPayoutAccount.js'
 
 export const config = { maxDuration: 30 }
 
@@ -344,6 +350,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       sendJson(res, 200, { ok: true, status: result.status, orderId: result.orderId })
+      return
+    }
+
+    if (action === 'payout_account_get' || action === 'payout_account_save') {
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      if (action === 'payout_account_get') {
+        const account = findMerchantPayoutAccount(data, auth.userId)
+        sendJson(res, 200, { ok: true, account: account ? toPublicPayoutAccount(account) : null })
+        return
+      }
+      const saved = upsertMerchantPayoutAccount(data, auth.userId, body)
+      if (!saved.ok) {
+        sendJson(res, 400, { ok: false, error: saved.error, message: saved.message })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, { ok: true, account: toPublicPayoutAccount(saved.account) })
       return
     }
 

@@ -94,6 +94,20 @@ function fetchTenantMyOrders() {
   )
 }
 
+function fetchMerchantPayoutAccount() {
+  return billingFetch({ action: 'payout_account_get' }).then((r) => r.account || null)
+}
+
+function saveMerchantPayoutAccount(input) {
+  return billingFetch({
+    action: 'payout_account_save',
+    kind: input && input.kind === 'entity' ? 'entity' : 'person',
+    payeeName: input && input.payeeName,
+    bank: input && input.bank,
+    bankNo: input && input.bankNo,
+  }).then((r) => r.account || null)
+}
+
 function fetchTenantPointsLedger() {
   return billingFetch({ action: 'points_ledger' }).then((r) =>
     Array.isArray(r.ledger) ? r.ledger : [],
@@ -156,6 +170,8 @@ module.exports = {
   fetchTenantBillingSummary,
   fetchTenantMyOrders,
   fetchTenantPointsLedger,
+  fetchMerchantPayoutAccount,
+  saveMerchantPayoutAccount,
   tenantPayPrepay,
   tenantWalletPay,
   tenantPayPoll,

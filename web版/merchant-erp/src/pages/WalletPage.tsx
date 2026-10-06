@@ -25,9 +25,12 @@ import {
 } from '../lib/distributionAffiliatePortalClient'
 import { withdrawRequestStatusLabel } from '../lib/distributionRegistryCore'
 import {
+  fetchMerchantPayoutAccount,
   fetchTenantBillingSummary,
   fetchTenantMyOrders,
   fetchTenantPointsLedger,
+  saveMerchantPayoutAccount,
+  type MerchantPayoutAccountView,
   type TenantBillingSummary,
   type TenantPaymentOrder,
   type TenantPointsLedgerRow,
@@ -94,6 +97,13 @@ export default function WalletPage() {
   const [refundYuanInput, setRefundYuanInput] = useState('')
   const [refundBusy, setRefundBusy] = useState(false)
   const [refundErr, setRefundErr] = useState<string | null>(null)
+  const [payout, setPayout] = useState<MerchantPayoutAccountView | null>(null)
+  const [payoutKind, setPayoutKind] = useState<'person' | 'entity'>('person')
+  const [payoutName, setPayoutName] = useState('')
+  const [payoutBank, setPayoutBank] = useState('')
+  const [payoutNo, setPayoutNo] = useState('')
+  const [payoutBusy, setPayoutBusy] = useState(false)
+  const [payoutMsg, setPayoutMsg] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     if (!supabaseConfigured || !supabase) {
@@ -119,7 +129,17 @@ export default function WalletPage() {
       setWalletLedger(wallet.ledger as LedgerRow[])
       setOrders(orderRows)
       setPointsLedger(ptsRows)
-      const portal = await fetchAffiliatePortal().catch(() => null)
+      const [portal, bound] = await Promise.all([
+        fetchAffiliatePortal().catch(() => null),
+        fetchMerchantPayoutAccount().catch(() => null),
+      ])
+      setPayout(bound)
+      if (bound) {
+        setPayoutKind(bound.kind)
+        setPayoutName(bound.payeeName)
+        setPayoutBank(bound.bank)
+        setPayoutNo(bound.bankNo)
+      }
       setWithdraws(
         (portal?.withdrawRequests || [])
           .map((row) => ({
@@ -300,6 +320,94 @@ export default function WalletPage() {
           </section>
         </div>
       )}
+
+      {tab === 'overview' ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">收款账户</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                绑定后，推广佣金等提现都打到这个账户。修改后，新的提现申请使用新账户。
+              </p>
+            </div>
+            <span
+              className={cn(
+                'rounded-full px-2.5 py-1 text-xs font-medium',
+                payout ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
+              )}
+            >
+              {payout ? '已绑定' : '未绑定'}
+            </span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm text-slate-600">
+              账户类型
+              <select
+                value={payoutKind}
+                onChange={(e) => setPayoutKind(e.target.value === 'entity' ? 'entity' : 'person')}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+              >
+                <option value="person">个人</option>
+                <option value="entity">企业</option>
+              </select>
+            </label>
+            <label className="block text-sm text-slate-600">
+              收款户名
+              <input
+                value={payoutName}
+                onChange={(e) => setPayoutName(e.target.value)}
+                maxLength={40}
+                placeholder={payoutKind === 'entity' ? '公司或经营者户名' : '与银行卡一致的姓名'}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+              />
+            </label>
+            <label className="block text-sm text-slate-600">
+              开户行
+              <input
+                value={payoutBank}
+                onChange={(e) => setPayoutBank(e.target.value)}
+                maxLength={40}
+                placeholder="例如 招商银行杭州支行"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+              />
+            </label>
+            <label className="block text-sm text-slate-600">
+              收款账号
+              <input
+                value={payoutNo}
+                onChange={(e) => setPayoutNo(e.target.value)}
+                maxLength={40}
+                placeholder="银行卡号"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+              />
+            </label>
+          </div>
+          {payoutMsg ? <p className="mt-3 text-sm text-slate-600">{payoutMsg}</p> : null}
+          <button
+            type="button"
+            disabled={payoutBusy}
+            onClick={() => {
+              setPayoutBusy(true)
+              setPayoutMsg(null)
+              void saveMerchantPayoutAccount({
+                kind: payoutKind,
+                payeeName: payoutName,
+                bank: payoutBank,
+                bankNo: payoutNo,
+              })
+                .then((saved) => {
+                  setPayout(saved)
+                  setPayoutMsg('收款账户已保存，之后的提现都会打到这个账户')
+                })
+                .catch((e) => setPayoutMsg(formatSupabaseErr(e)))
+                .finally(() => setPayoutBusy(false))
+            }}
+            className="mt-4 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {payoutBusy ? '保存中…' : payout ? '更新收款账户' : '绑定收款账户'}
+          </button>
+        </section>
+      ) : null}
 
       {tab === 'orders' && (
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
