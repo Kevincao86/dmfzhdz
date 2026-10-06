@@ -29,6 +29,7 @@ import {
   fetchTenantBillingSummary,
   fetchTenantMyOrders,
   fetchTenantPointsLedger,
+  recognizeMerchantPayoutDoc,
   saveMerchantPayoutAccount,
   type MerchantPayoutAccountView,
   type TenantBillingSummary,
@@ -75,6 +76,34 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   cancelled: '已取消',
 }
 
+function compressPayoutImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const max = 1600
+      const scale = Math.min(1, max / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(img.width * scale))
+      canvas.height = Math.max(1, Math.round(img.height * scale))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        URL.revokeObjectURL(url)
+        reject(new Error('无法处理图片'))
+        return
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.72))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('无法读取图片'))
+    }
+    img.src = url
+  })
+}
+
 const CHANNEL_LABEL: Record<string, string> = {
   wechat: '微信',
   alipay: '支付宝',
@@ -102,6 +131,12 @@ export default function WalletPage() {
   const [payoutName, setPayoutName] = useState('')
   const [payoutBank, setPayoutBank] = useState('')
   const [payoutNo, setPayoutNo] = useState('')
+  const [payoutIdName, setPayoutIdName] = useState('')
+  const [payoutIdNo, setPayoutIdNo] = useState('')
+  const [payoutIdFront, setPayoutIdFront] = useState('')
+  const [payoutIdBack, setPayoutIdBack] = useState('')
+  const [payoutLicenseNo, setPayoutLicenseNo] = useState('')
+  const [payoutLicenseImage, setPayoutLicenseImage] = useState('')
   const [payoutBusy, setPayoutBusy] = useState(false)
   const [payoutMsg, setPayoutMsg] = useState<string | null>(null)
 
@@ -139,6 +174,12 @@ export default function WalletPage() {
         setPayoutName(bound.payeeName)
         setPayoutBank(bound.bank)
         setPayoutNo(bound.bankNo)
+        setPayoutIdName(bound.idName || '')
+        setPayoutIdNo(bound.idNo || '')
+        setPayoutIdFront(bound.idFront || '')
+        setPayoutIdBack(bound.idBack || '')
+        setPayoutLicenseNo(bound.licenseNo || '')
+        setPayoutLicenseImage(bound.licenseImage || '')
       }
       setWithdraws(
         (portal?.withdrawRequests || [])
@@ -168,6 +209,32 @@ export default function WalletPage() {
   }, [reload])
 
   const balanceCents = summary?.walletBalanceCents ?? 0
+
+  const onPayoutDoc = async (docKind: 'id_front' | 'id_back' | 'license', file: File) => {
+    setPayoutMsg(null)
+    try {
+      const imageDataUrl = await compressPayoutImage(file)
+      if (docKind === 'id_front') setPayoutIdFront(imageDataUrl)
+      else if (docKind === 'id_back') setPayoutIdBack(imageDataUrl)
+      else setPayoutLicenseImage(imageDataUrl)
+      const fields = await recognizeMerchantPayoutDoc(docKind, imageDataUrl)
+      if (docKind === 'id_front') {
+        if (fields.name) {
+          setPayoutIdName(fields.name)
+          if (payoutKind === 'person') setPayoutName(fields.name)
+        }
+        if (fields.idNo) setPayoutIdNo(fields.idNo)
+      } else if (docKind === 'license') {
+        if (fields.name) setPayoutName(fields.name)
+        if (fields.licenseNo) setPayoutLicenseNo(fields.licenseNo)
+      } else if (fields.idNo) {
+        setPayoutIdNo(fields.idNo)
+      }
+      setPayoutMsg('已填入识别结果，可以再改')
+    } catch (e) {
+      setPayoutMsg(formatSupabaseErr(e))
+    }
+  }
 
   const submitRefund = async (cents: number) => {
     if (!supabase) throw new Error('未配置 Supabase')
@@ -327,7 +394,7 @@ export default function WalletPage() {
             <div>
               <h2 className="text-base font-semibold text-slate-900">收款账户</h2>
               <p className="mt-1 text-xs text-slate-500">
-                绑定后，推广佣金等提现都打到这个账户。修改后，新的提现申请使用新账户。
+                拍照或从相册上传证件。上传人像面后自动填入姓名和身份证号，可以再改。提现打到这里绑定的账户。
               </p>
             </div>
             <span
@@ -348,9 +415,71 @@ export default function WalletPage() {
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
               >
                 <option value="person">个人</option>
-                <option value="entity">企业</option>
+                <option value="entity">个体户 / 企业</option>
               </select>
             </label>
+            <div className={cn('grid gap-3', payoutKind === 'entity' ? 'sm:col-span-2 sm:grid-cols-3' : 'sm:col-span-2 sm:grid-cols-2')}>
+              {(
+                [
+                  ['id_front', '身份证人像面', payoutIdFront],
+                  ['id_back', '身份证国徽面', payoutIdBack],
+                  ...(payoutKind === 'entity' ? [['license', '营业执照', payoutLicenseImage] as const] : []),
+                ] as const
+              ).map(([docKind, label, preview]) => (
+                <label
+                  key={docKind}
+                  className="relative flex h-28 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 text-center"
+                >
+                  {preview ? <img src={preview} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+                  <span className={cn('relative px-2 text-xs font-medium', preview ? 'rounded-full bg-slate-900/70 py-1 text-white' : 'text-slate-700')}>
+                    {preview ? '更换' : label}
+                  </span>
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      if (file) void onPayoutDoc(docKind, file)
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 sm:col-span-2">上传人像面后，自动填入姓名和身份证号，可以再改。手机可直接拍照。</p>
+            <label className="block text-sm text-slate-600">
+              姓名
+              <input
+                value={payoutIdName}
+                onChange={(e) => setPayoutIdName(e.target.value)}
+                maxLength={40}
+                placeholder="与身份证一致"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+              />
+            </label>
+            <label className="block text-sm text-slate-600">
+              身份证号
+              <input
+                value={payoutIdNo}
+                onChange={(e) => setPayoutIdNo(e.target.value.replace(/\s/g, ''))}
+                maxLength={18}
+                placeholder="18 位身份证号"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+              />
+            </label>
+            {payoutKind === 'entity' ? (
+              <label className="block text-sm text-slate-600 sm:col-span-2">
+                统一社会信用代码
+                <input
+                  value={payoutLicenseNo}
+                  onChange={(e) => setPayoutLicenseNo(e.target.value.trim())}
+                  maxLength={18}
+                  placeholder="18 位信用代码"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
+                />
+              </label>
+            ) : null}
             <label className="block text-sm text-slate-600">
               收款户名
               <input
@@ -394,6 +523,12 @@ export default function WalletPage() {
                 payeeName: payoutName,
                 bank: payoutBank,
                 bankNo: payoutNo,
+                idName: payoutIdName,
+                idNo: payoutIdNo,
+                idFront: payoutIdFront,
+                idBack: payoutIdBack,
+                licenseNo: payoutLicenseNo,
+                licenseImage: payoutLicenseImage,
               })
                 .then((saved) => {
                   setPayout(saved)

@@ -478,3 +478,43 @@
   background: #eff6ff;
   border-color: #bfdbfe;
 }
+
+.wallet-docs {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.wallet-doc {
+  position: relative;
+  flex: 1;
+  height: 160rpx;
+  border-radius: 20rpx;
+  border: 1rpx dashed #c4b5fd;
+  background: #f5f3ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.wallet-doc-img {
+  width: 100%;
+  height: 100%;
+}
+
+.wallet-doc-name {
+  font-size: 24rpx;
+  color: #334155;
+}
+
+.wallet-doc-badge {
+  position: absolute;
+  right: 8rpx;
+  bottom: 8rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 999rpx;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-size: 20rpx;
+}

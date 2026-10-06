@@ -85,6 +85,12 @@ Page({
     payoutName: '',
     payoutBank: '',
     payoutNo: '',
+    payoutIdName: '',
+    payoutIdNo: '',
+    payoutIdFront: '',
+    payoutIdBack: '',
+    payoutLicenseNo: '',
+    payoutLicenseImage: '',
     payoutBusy: false,
     payoutMsg: '',
     loading: false,
@@ -161,6 +167,12 @@ Page({
         payoutName: payout && payout.payeeName ? payout.payeeName : '',
         payoutBank: payout && payout.bank ? payout.bank : '',
         payoutNo: payout && payout.bankNo ? payout.bankNo : '',
+        payoutIdName: payout && payout.idName ? payout.idName : '',
+        payoutIdNo: payout && payout.idNo ? payout.idNo : '',
+        payoutIdFront: payout && payout.idFront ? payout.idFront : '',
+        payoutIdBack: payout && payout.idBack ? payout.idBack : '',
+        payoutLicenseNo: payout && payout.licenseNo ? payout.licenseNo : '',
+        payoutLicenseImage: payout && payout.licenseImage ? payout.licenseImage : '',
         loading: false,
       })
     } catch (e) {
@@ -201,6 +213,79 @@ Page({
     this.setData({ payoutNo: (e.detail && e.detail.value) || '' })
   },
 
+  onPayoutIdName(e) {
+    this.setData({ payoutIdName: (e.detail && e.detail.value) || '' })
+  },
+
+  onPayoutIdNo(e) {
+    this.setData({ payoutIdNo: String((e.detail && e.detail.value) || '').replace(/\s/g, '') })
+  },
+
+  onPayoutLicense(e) {
+    this.setData({ payoutLicenseNo: (e.detail && e.detail.value) || '' })
+  },
+
+  onPickPayoutDoc(e) {
+    const kind = e.currentTarget.dataset.kind
+    if (kind !== 'id_front' && kind !== 'id_back' && kind !== 'license') return
+    wx.chooseImage({
+      count: 1,
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const path = res.tempFilePaths && res.tempFilePaths[0]
+        if (!path) return
+        wx.showLoading({ title: '识别中' })
+        const read = (filePath) => wx.getFileSystemManager().readFile({
+          filePath,
+          encoding: 'base64',
+          success: async (file) => {
+            const imageDataUrl = `data:image/jpeg;base64,${file.data}`
+            const patch = kind === 'id_front'
+              ? { payoutIdFront: imageDataUrl }
+              : kind === 'id_back'
+                ? { payoutIdBack: imageDataUrl }
+                : { payoutLicenseImage: imageDataUrl }
+            try {
+              const fields = await billing.recognizePayoutDoc(kind, imageDataUrl)
+              if (kind === 'id_front') {
+                if (fields.name) {
+                  patch.payoutIdName = fields.name
+                  if (this.data.payoutKind === 'person') patch.payoutName = fields.name
+                }
+                if (fields.idNo) patch.payoutIdNo = fields.idNo
+              } else if (kind === 'license') {
+                if (fields.name) patch.payoutName = fields.name
+                if (fields.licenseNo) patch.payoutLicenseNo = fields.licenseNo
+              } else if (fields.idNo) {
+                patch.payoutIdNo = fields.idNo
+              }
+              this.setData({ ...patch, payoutMsg: '已填入识别结果，可以再改' })
+            } catch (err) {
+              this.setData({ ...patch, payoutMsg: String((err && err.message) || '识别失败').slice(0, 24) })
+            } finally {
+              wx.hideLoading()
+            }
+          },
+          fail: () => {
+            wx.hideLoading()
+            wx.showToast({ title: '读取照片失败', icon: 'none' })
+          },
+        })
+        if (wx.compressImage) {
+          wx.compressImage({
+            src: path,
+            quality: 60,
+            success: (c) => read(c.tempFilePath || path),
+            fail: () => read(path),
+          })
+        } else {
+          read(path)
+        }
+      },
+    })
+  },
+
   async onSavePayout() {
     if (this.data.payoutBusy) return
     this.setData({ payoutBusy: true, payoutMsg: '' })
@@ -210,6 +295,12 @@ Page({
         payeeName: this.data.payoutName,
         bank: this.data.payoutBank,
         bankNo: this.data.payoutNo,
+        idName: this.data.payoutIdName,
+        idNo: this.data.payoutIdNo,
+        idFront: this.data.payoutIdFront,
+        idBack: this.data.payoutIdBack,
+        licenseNo: this.data.payoutLicenseNo,
+        licenseImage: this.data.payoutLicenseImage,
       })
       this.setData({
         payoutBound: !!(saved && saved.payeeName && saved.bankNo),

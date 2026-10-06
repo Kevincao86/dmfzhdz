@@ -247,6 +247,12 @@ export type MerchantPayoutAccountView = {
   payeeName: string
   bank: string
   bankNo: string
+  idName: string
+  idNo: string
+  idFront: string
+  idBack: string
+  licenseNo: string
+  licenseImage: string
   updatedAt: string
 }
 
@@ -262,16 +268,41 @@ export async function saveMerchantPayoutAccount(input: {
   payeeName: string
   bank: string
   bankNo: string
+  idName: string
+  idNo: string
+  idFront: string
+  idBack: string
+  licenseNo: string
+  licenseImage: string
 }): Promise<MerchantPayoutAccountView> {
   const json = await billingFetch<{ account?: MerchantPayoutAccountView }>({
     action: 'payout_account_save',
-    kind: input.kind,
-    payeeName: input.payeeName,
-    bank: input.bank,
-    bankNo: input.bankNo,
+    ...input,
   })
   if (!json.account) throw new Error('保存收款账户失败')
   return json.account
+}
+
+export async function recognizeMerchantPayoutDoc(
+  kind: 'id_front' | 'id_back' | 'license',
+  imageDataUrl: string,
+): Promise<{ name?: string; idNo?: string; licenseNo?: string }> {
+  if (!supabase) throw new Error('未配置 Supabase')
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) throw new Error('请先登录')
+  const res = await fetch('/erp-api/meoo-mp-training', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action: 'ocrDoc', kind, imageDataUrl }),
+  })
+  const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; fields?: Record<string, string> }
+  if (!res.ok || json.ok === false) throw new Error(String(json.error || '识别失败'))
+  return json.fields || {}
 }
 
 export async function spendErpPointsForUsage(input: {

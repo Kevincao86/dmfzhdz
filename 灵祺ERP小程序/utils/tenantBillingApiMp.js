@@ -98,6 +98,37 @@ function fetchMerchantPayoutAccount() {
   return billingFetch({ action: 'payout_account_get' }).then((r) => r.account || null)
 }
 
+function recognizePayoutDoc(kind, imageDataUrl) {
+  const base = String(config.MERCHANT_API_BASE_URL || '').trim().replace(/\/$/, '')
+  const token = api.getBearerToken()
+  if (!base) return Promise.reject(new Error('尚未配置商家后台 API 地址'))
+  if (!token) return Promise.reject(new Error('请先登录'))
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: `${base}/erp-api/meoo-mp-training`,
+      method: 'POST',
+      timeout: 30000,
+      header: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      data: { action: 'ocrDoc', kind, imageDataUrl },
+      success(res) {
+        const json = res.data && typeof res.data === 'object' ? res.data : {}
+        if (res.statusCode >= 200 && res.statusCode < 300 && json.ok !== false) {
+          resolve(json.fields || {})
+          return
+        }
+        reject(new Error(String(json.error || json.message || '识别失败')))
+      },
+      fail(err) {
+        reject(new Error((err && err.errMsg) || '识别失败'))
+      },
+    })
+  })
+}
+
 function saveMerchantPayoutAccount(input) {
   return billingFetch({
     action: 'payout_account_save',
@@ -105,6 +136,12 @@ function saveMerchantPayoutAccount(input) {
     payeeName: input && input.payeeName,
     bank: input && input.bank,
     bankNo: input && input.bankNo,
+    idName: input && input.idName,
+    idNo: input && input.idNo,
+    idFront: input && input.idFront,
+    idBack: input && input.idBack,
+    licenseNo: input && input.licenseNo,
+    licenseImage: input && input.licenseImage,
   }).then((r) => r.account || null)
 }
 
@@ -172,6 +209,7 @@ module.exports = {
   fetchTenantPointsLedger,
   fetchMerchantPayoutAccount,
   saveMerchantPayoutAccount,
+  recognizePayoutDoc,
   tenantPayPrepay,
   tenantWalletPay,
   tenantPayPoll,
