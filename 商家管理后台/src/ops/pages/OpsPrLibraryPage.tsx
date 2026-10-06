@@ -16,7 +16,6 @@ import { matchStaffDataScope } from '../../meooRegistryShared/opsPermissionsV2'
 import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 import OpsPageHero from '../OpsPageHero'
 import OpsDeleteSmsConfirmModal from '../components/OpsDeleteSmsConfirmModal'
-import { resolveLibraryAccountCreatedAt } from '../opsLibraryCreatedAt'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
@@ -57,6 +56,8 @@ export default function OpsPrLibraryPage() {
   const [q, setQ] = useState('')
   const [provinceFilters, setProvinceFilters] = useState<string[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>([])
+  const [createdFrom, setCreatedFrom] = useState('')
+  const [createdTo, setCreatedTo] = useState('')
   const [deletePending, setDeletePending] = useState<{
     title: string
     description: string
@@ -83,8 +84,10 @@ export default function OpsPrLibraryPage() {
     () => ({
       provinces: provinceFilters,
       cities: cityFilters,
+      createdFrom,
+      createdTo,
     }),
-    [provinceFilters, cityFilters],
+    [provinceFilters, cityFilters, createdFrom, createdTo],
   )
 
   const provinceOpts = useMemo(() => buildProvinceOpts(rows), [rows])
@@ -120,7 +123,7 @@ export default function OpsPrLibraryPage() {
   const rowIds = useMemo(() => filtered.map((u) => u.id), [filtered])
   const batch = useOpsBatchSelection(rowIds)
 
-  const hasActiveFilters = provinceFilters.length > 0 || cityFilters.length > 0
+  const hasActiveFilters = provinceFilters.length > 0 || cityFilters.length > 0 || Boolean(createdFrom || createdTo)
 
   async function onBatchDelete() {
     if (!canEdit || !batch.checkedIds.length || batch.deleting) return
@@ -237,12 +240,33 @@ export default function OpsPrLibraryPage() {
           </div>
         ) : null}
 
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">创建时间</span>
+          <input
+            type="date"
+            value={createdFrom}
+            onChange={(e) => setCreatedFrom(e.target.value)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+            aria-label="创建开始日期"
+          />
+          <span className="text-xs text-slate-500">至</span>
+          <input
+            type="date"
+            value={createdTo}
+            onChange={(e) => setCreatedTo(e.target.value)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+            aria-label="创建结束日期"
+          />
+        </div>
+
         {hasActiveFilters ? (
           <button
             type="button"
             onClick={() => {
               setProvinceFilters([])
               setCityFilters([])
+              setCreatedFrom('')
+              setCreatedTo('')
             }}
             className="text-xs text-slate-500 underline hover:text-slate-300"
           >
@@ -340,7 +364,7 @@ export default function OpsPrLibraryPage() {
                   </Link>
                 </td>
                 <td className="whitespace-nowrap text-xs ops-muted">
-                  {resolveLibraryAccountCreatedAt(u)}
+                  {u.registeredAt || '—'}
                 </td>
                 <td className="whitespace-nowrap text-xs ops-muted">{u.updatedAt}</td>
               </tr>
