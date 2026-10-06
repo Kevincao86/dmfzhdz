@@ -305,7 +305,7 @@ function withdrawPayee(row: {
   payoutAccount?: Record<string, string>
 }, affiliates: RegistryDistributionAffiliate[], accounts: Array<{ ownerKey: string; kind?: string; payeeName?: string; bank?: string; bankNo?: string }>) {
   const snap = row.payoutAccount || {}
-  const affiliate = affiliates.find((item) => item.id === row.ownerId)
+  const affiliate = affiliates.find((item) => item.id === row.ownerId) as { authUserId?: string } | undefined
   const live = accounts.find((item) => item.ownerKey && item.ownerKey === affiliate?.authUserId)
   const payeeName = String(snap.payeeName || live?.payeeName || '').trim()
   const bankNo = String(snap.bankNo || live?.bankNo || '').trim()
