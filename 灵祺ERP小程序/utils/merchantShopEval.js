@@ -500,7 +500,7 @@ function mapSuggestions(rows) {
       const next = clipText(item.next, 80)
       const adjust = clipText(item.adjust, 180) || next
       return {
-        name: clipText(item.name, 12),
+        name: clipText(item.name, 24),
         finding: clipText(item.finding, 140),
         adjust,
         soon: clipText(item.soon, 180),
@@ -510,6 +510,27 @@ function mapSuggestions(rows) {
     })
     .filter((row) => row.name && (row.finding || row.adjust || row.soon))
     .slice(0, 6)
+}
+
+function alignAdviceSections(sections, names) {
+  const used = {}
+  const aligned = []
+  for (let n = 0; n < names.length; n += 1) {
+    const name = names[n]
+    let idx = -1
+    for (let i = 0; i < sections.length; i += 1) {
+      if (used[i]) continue
+      const got = sections[i].name
+      if (got === name || name.indexOf(got) === 0) {
+        idx = i
+        break
+      }
+    }
+    if (idx < 0) return []
+    used[idx] = true
+    aligned.push(Object.assign({}, sections[idx], { name }))
+  }
+  return aligned
 }
 
 function ownerId() {
@@ -779,8 +800,11 @@ function savedFromCache(cached) {
   const adviceRaw = cached.advice
   let advice = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray(adviceRaw.sections)) {
-    const sections = mapSuggestions(adviceRaw.sections)
-    if (sections.length) advice = { lift: clampLift(adviceRaw.lift), sections }
+    const sections = alignAdviceSections(
+      mapSuggestions(adviceRaw.sections),
+      indicators.map((item) => item.name),
+    )
+    if (sections.length === indicators.length) advice = { lift: clampLift(adviceRaw.lift), sections }
   }
   const rawProfile = cached.profile && typeof cached.profile === 'object' ? cached.profile : null
   return {
@@ -1386,8 +1410,8 @@ function erpAdviceSystem(focus) {
     '套餐结构和价格写到商品与套餐、活动中心。内容和达人写到达人招募、店铺装修。口碑和差评回复写到评价管理。成交、退款、复购写到店铺分析与投流、财务对账。多店价格不统一写到商品与套餐。',
     '不要写「公开资料不足」「仅供参考」「无法判断」。',
     '只输出一个 JSON 对象。',
-    'sections 正好覆盖用户点名的短板，一项一个维度。每项含 name、module、finding、adjust、soon。',
-    'name 必须与短板维度名称一致，不要另起标题。module 必须是上面列出的功能名。',
+    'sections 必须正好 6 项，顺序与用户给出的六维一致，一项一个维度，不能只写分数低的。每项含 name、module、finding、adjust、soon。',
+    'name 必须与六维名称逐字一致，不要另起标题。module 必须是上面列出的功能名。',
     'finding 先写后台读到的数字，再写它和这项短板的关系，60 到 120 字。',
     'adjust 写去哪个功能里改什么，改完应看到什么，80 到 160 字。',
     'soon 是近两周的 3 件事，用「1.」「2.」「3.」分开。',
@@ -1446,34 +1470,32 @@ async function adviseShop(raw, score, opts) {
     const cached = loaded.data
     const adviceRaw = cached && cached.advice
     if (adviceRaw && typeof adviceRaw === 'object') {
-      const sections = mapSuggestions(adviceRaw.sections)
-      if (sections.length) return { lift: clampLift(adviceRaw.lift), sections }
+      const names = score.indicators.map((item) => item.name)
+      const sections = alignAdviceSections(mapSuggestions(adviceRaw.sections), names)
+      if (sections.length === names.length) return { lift: clampLift(adviceRaw.lift), sections }
     }
   }
   const backend = row.backendFacts
   if (!backend) throw new Error('请先绑定门店并同步商家后台，再生成提升方案')
-  const ranked = score.indicators
-    .map((item) => ({
-      name: item.name,
-      score: item.score,
-      weight: item.weight,
-      ratio: item.weight ? item.score / item.weight : 1,
-    }))
-    .sort((a, b) => a.ratio - b.ratio || a.score - b.score)
-    .slice(0, 4)
-    .map((item) => item.name + ' ' + item.score + '/' + item.weight)
-    .join('、')
+  const names = score.indicators.map((item) => item.name)
+  const listed = score.indicators.map((item) => item.name + ' ' + item.score + '/' + item.weight).join('、')
   const lines = score.indicators.map((item) => `${item.name} ${item.score}/${item.weight}：${item.comment}`).join('\n')
-  const j = await askJson(
-    opts.askText,
-    erpAdviceSystem(row.evalFocus),
-    `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n公网六维：\n${lines}\n商家后台：\n${backend}\n只为这些短板各写一套方案：${ranked}。`,
-  )
+  const user = `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n公网六维：\n${lines}\n商家后台：\n${backend}\n六维都要各写一套方案，顺序不能变，一项都不能少：${listed}。`
+  let j = await askJson(opts.askText, erpAdviceSystem(row.evalFocus), user)
+  let sections = alignAdviceSections(mapSuggestions(j.sections), names)
+  if (sections.length !== names.length) {
+    j = await askJson(
+      opts.askText,
+      erpAdviceSystem(row.evalFocus),
+      `${user}\n上次没有覆盖全部六维。sections 必须正好 6 项，name 逐字是：${names.join('、')}。`,
+    )
+    sections = alignAdviceSections(mapSuggestions(j.sections), names)
+  }
   const advice = {
     lift: clampLift(j.lift),
-    sections: mapSuggestions(j.sections),
+    sections,
   }
-  if (!advice.sections.length) throw new Error('提升方案不完整，请再点一次')
+  if (advice.sections.length !== names.length) throw new Error('提升方案不完整，请再点一次')
   writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
   void publishShopEval(opts.storage, key, slotId(row))
   return advice
