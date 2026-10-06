@@ -501,7 +501,7 @@ function slotId(row: ReturnType<typeof normalizeInput>['row']) {
 }
 
 function cacheKey(row: ReturnType<typeof normalizeInput>['row']) {
-  return ['lq_merchant_shop_eval_v6', ownerId(), slotId(row)].join('|')
+  return ['lq_merchant_shop_eval_v7', ownerId(), slotId(row)].join('|')
 }
 
 function loadCache(storage: StorageLike, row: ReturnType<typeof normalizeInput>['row']) {
@@ -560,7 +560,7 @@ function savedFromCache(cached: Record<string, unknown> | null): {
   advice: ShopEvalAdvice | null
   profile: ShopEvalProfile | null
 } | null {
-  if (!cached || cached.sourcesSearch !== 'store-search-v6') return null
+  if (!cached || cached.sourcesSearch !== 'store-search-v7') return null
   const blocks = publicEvalIndicators(scopeFromCached(cached))
   const indicators = mapIndicators(cached.indicators, blocks)
   if (indicators.length !== blocks.length) return null
@@ -875,6 +875,20 @@ function brandScoreLow(raw: Record<string, unknown>) {
   return false
 }
 
+function speakEstimate(text: string) {
+  return text
+    .replace(/公开渠道未[^，。；]*/g, '按同城同品类估算')
+    .replace(/公网未[^，。；]*/g, '按同城同品类估算')
+    .replace(/没有检索到[^，。；]*/g, '按同城同品类估算')
+    .replace(/未检索到[^，。；]*/g, '按同城同品类估算')
+    .replace(/没有找到[^，。；]*/g, '按同城同品类估算')
+    .replace(/检索不到[^，。；]*/g, '按同城同品类估算')
+    .replace(/查不到[^，。；]*/g, '按同城同品类估算')
+    .replace(/没查到[^，。；]*/g, '按同城同品类估算')
+    .replace(/无公开团购或探店记录/g, '按同城同品类和门店规模估算')
+    .replace(/线上经营几乎空白|线上完全空白|线上空白/g, '线上内容仍有提升空间')
+}
+
 function scoreFromPublic(
   raw: Record<string, unknown>,
   indicators: ShopEvalIndicator[],
@@ -884,20 +898,21 @@ function scoreFromPublic(
   const byName = new Map(indicators.map((row) => [row.name, row.score]))
   let sum = 0
   for (const block of blocks) sum += byName.get(block.name) || 0
-  const highlights = textList(raw.highlights, 3, 140)
-  const gaps = textList(raw.gaps, 4, 160)
+  const highlights = textList(raw.highlights, 3, 140).map(speakEstimate)
+  const gaps = textList(raw.gaps, 4, 160).map(speakEstimate)
+  const shown = indicators.map((row) => ({ ...row, comment: speakEstimate(row.comment) }))
   return {
     score: clampScore(sum),
     searchLevel: '',
     verifyLevel: '',
-    situations: indicators.map((row) => ({ name: row.name, now: row.comment })),
+    situations: shown.map((row) => ({ name: row.name, now: row.comment })),
     exposureLift: 0,
     verifyLift: 0,
-    positioning: clipText(raw.positioning, 180),
-    indicators,
+    positioning: speakEstimate(clipText(raw.positioning, 180)),
+    indicators: shown,
     highlights,
     gaps,
-    summary: clipText(raw.summary, 100),
+    summary: speakEstimate(clipText(raw.summary, 100)),
     sources: textList(raw.sources, 8, 80),
     disclaimer: SHOP_EVAL_DISCLAIMER[scope],
   }
@@ -970,30 +985,51 @@ async function briefSearchTitles(query: string) {
   return [] as string[]
 }
 
+function keepNoteLine(line: string) {
+  if (line.length < 6) return false
+  if (/\d+\s*元|套餐|评价|探店|团购|人均|已售|月售|点评/.test(line)) return true
+  return !/暂未检索|未检索到|没有找到|无法查询|无公开/.test(line)
+}
+
 async function doubaoPublicNotes(
   askText: AskText,
-  row: { brandName: string; storeName: string; city: string; address: string; category: string },
+  row: { brandName: string; storeName: string; city: string; address: string; category: string; storeCount: number },
 ) {
   const name = row.brandName || row.storeName
-  try {
-    const text = await askText(
-      [
-        '你在用方舟联网检索这一家店。只写检索结果里明确属于这一家的店名、地址、营业时间、联系电话、套餐名和价格。',
-        '每条一行，最多 8 行。其他分店的电话和营业时间不要写。没出现的不要编造，不要根据店名里的「24时」推测全天营业。',
-        '禁止写其他品牌、行业参考价和大概区间。一条都没有时只输出：无公开团购或探店记录。',
+  const core = brandCoreName(name)
+  const rounds = [
+    {
+      system: [
+        '你在用方舟联网检索这个品牌。每条一行，最多 12 行。',
+        '要写套餐名、价格、已售或月售、评价说法、探店或短视频。数字按检索原文写。',
+        '店名里的「24时」不要当成全天营业。其他分店的电话不要安到被点名的这一家。',
       ].join(''),
-      `店名：${name}\n城市：${row.city || ''}\n地址：${row.address || ''}\n分类：${row.category || ''}\n请联网检索这一家的营业时间、联系电话、团购、探店和点评。`,
-      { webSearch: true },
-    )
-    const lines = String(text || '')
-      .split('\n')
-      .map((line) => line.replace(/^\d+[.、]\s*/, '').trim())
-      .filter((line) => line.length >= 6 && !/暂未检索|未检索到|没有找到|无法查询|公开渠道/.test(line))
-    if (/无公开团购或探店记录/.test(text) && !lines.length) return '无公开团购或探店记录'
-    return lines.slice(0, 8).map((line, index) => `${index + 1}. ${line}`).join('\n')
-  } catch {
-    return ''
+      user: `品牌：${name}\n城市：${row.city || ''}\n地址：${row.address || ''}\n分类：${row.category || ''}\n同城同名：${row.storeCount || 0}家\n请检索团购、美团、大众点评、抖音探店和评价。`,
+    },
+    {
+      system: [
+        '上一轮材料还不够。继续检索品牌简称、抖音团购、美团、大众点评，以及同城同品类的套餐价格和评价。',
+        '每条开头标明「本店」或「同城同品类」。最多 12 行。有价格和评价就写上。',
+      ].join(''),
+      user: `品牌简称：${core || name}\n城市：${row.city || ''}\n分类：${row.category || ''}\n请把能对上这个品牌的套餐、评价、探店，以及同城同品类可对照的价格带都写出来。`,
+    },
+  ]
+  const lines: string[] = []
+  for (const round of rounds) {
+    if (lines.length >= 8) break
+    try {
+      const text = await askText(round.system, round.user, { webSearch: true })
+      for (const line of String(text || '').split('\n')) {
+        const clean = line.replace(/^\d+[.、]\s*/, '').trim()
+        if (!keepNoteLine(clean) || lines.includes(clean)) continue
+        lines.push(clean)
+        if (lines.length >= 16) break
+      }
+    } catch {
+      /* 下一轮 */
+    }
   }
+  return lines.map((line, index) => `${index + 1}. ${line}`).join('\n')
 }
 
 function brandCoreName(name: string) {
@@ -1013,34 +1049,52 @@ function keepStoreTitle(title: string, core: string) {
   return true
 }
 
-async function searchPublicBrand(row: { brandName: string; storeName: string; city: string; publicNote?: string }) {
+async function searchPublicBrand(row: { brandName: string; storeName: string; city: string; category: string; publicNote?: string }) {
   const core = brandCoreName(row.brandName || row.storeName)
+  const name = row.brandName || row.storeName
+  const city = row.city || ''
+  const category = row.category || ''
   const preset = String(row.publicNote || '')
     .split('\n')
     .map((line) => line.replace(/^\d+\.\s*/, '').trim())
     .filter((line) => keepStoreTitle(line, core))
-  if (preset.length) return preset.slice(0, 8)
-  const name = row.brandName || row.storeName
-  const queries = [`${name} ${row.city} 团购`, `${name} 抖音 探店`, `${row.storeName} 点评`].map((q) => q.replace(/\s+/g, ' ').trim())
-  const titles: string[] = []
-  const push = (list: string[]) => {
+  const titles = preset.slice(0, 8)
+  const brandQueries = [
+    `${name} ${city} 团购`,
+    `${name} 抖音 探店`,
+    `${row.storeName} 点评`,
+    `${core} ${city} 美团 套餐`,
+    `${core} ${city} 评价`,
+    `${name} 抖音 已售`,
+  ]
+  const peerQueries = [`${category} ${city} 团购 套餐`, `${category} ${city} 点评 人均`]
+  const pull = async (query: string) => {
+    const q = query.replace(/\s+/g, ' ').trim()
+    if (q.length < 2) return [] as string[]
+    const [html, brief] = await Promise.all([
+      readPublicHtml(`https://www.sogou.com/web?query=${encodeURIComponent(q)}`),
+      briefSearchTitles(q),
+    ])
+    return [...parseSogouTitles(html), ...brief]
+  }
+  const pushBrand = (list: string[]) => {
     for (const title of list) {
       if (!title || !keepStoreTitle(title, core) || titles.includes(title)) continue
       titles.push(title)
-      if (titles.length >= 12) return
     }
   }
-  const batches = await Promise.all(
-    queries.slice(0, 3).map(async (query) => {
-      const [html, brief] = await Promise.all([
-        readPublicHtml(`https://www.sogou.com/web?query=${encodeURIComponent(query)}`),
-        briefSearchTitles(query),
-      ])
-      return [...parseSogouTitles(html), ...brief]
-    }),
-  )
-  for (const batch of batches) push(batch)
-  return titles
+  for (const batch of await Promise.all(brandQueries.map(pull))) pushBrand(batch)
+  if (titles.length < 4) {
+    for (const batch of await Promise.all(peerQueries.map(pull))) {
+      for (const title of batch) {
+        const line = `同城同品类：${title}`
+        if (!title || title.length < 8 || titles.includes(line)) continue
+        titles.push(line)
+        if (titles.length >= 16) break
+      }
+    }
+  }
+  return titles.slice(0, 16)
 }
 
 function publicScoreSystem(scope: ShopEvalScope) {
@@ -1060,15 +1114,16 @@ function publicScoreSystem(scope: ShopEvalScope) {
           '这次用单门店公网模型。只评这一家，即使同城还有同名分店，也不要改成连锁品牌。',
           '套餐预估下单与竞争力权重最高：看这一家的套餐价格带、引流款占比、套餐是否丰富、有没有上新。低价引流占比过高要扣分。检索原文里的已售、月售可以引用，并写明是公网前台数字、不是核销。',
           '公域流量与内容转化：看指向这一家的探店、短视频、达人内容和直播挂载。这是内容供给，不是商家后台 ROI。',
-          '门店口碑与舆情风险：只用公开评价。卫生、服务类重大差评要大幅扣分。没有公开评价就不要写条数。',
+          '门店口碑与舆情风险：有评价原文就按原文。没有原文时按同品类口碑档位估算，不写具体条数。卫生、服务类重大差评要大幅扣分。',
           '线上运营能力：主页信息、套餐迭代、差评有没有公开回复、商家自己的账号有没有更新。',
         ]
   return [
     '你在用公网前台资料给商家打相对竞争力分，用「你」来写。没有商家后台授权。',
     '分数是同商圈横向对比，不是真实核销、营收或利润。预估下单不能写成到店收入。',
-    '只根据下面的门店档案、高德同名门店和公开检索原文打分。原文里没有的份数、播放量、点击率、达人人数、差评条数、榜单名次，禁止编造。',
-    '没有已售或月售原文时，套餐项只按价格带、丰富度和上新打分，points 不得超过该项满分的 60%。',
-    '周边同类店不能用来证明这家没有客流。不要编造距离和门店数量。',
+    '检索原文里的套餐价、已售、月售、评价按原文写。原文没有这些数字时，用同城、同品类、连锁家数和同城同品类标题做档位估算，直接写出估算结论。',
+    '估算用上游、中上、中游、偏弱，不要编造精确到个位的核销量，也不要写假的评价条数。',
+    '点评、定位、优势、短板、总结里禁止出现：未检索到、没有检索到、公开渠道未、无公开、查不到、检索不到、线上空白、几乎空白。',
+    '周边同类店用来对照价格带和内容档位，不能写成这家没有客流。不要编造距离。',
     ...mode,
     '只输出一个 JSON 对象，不要 Markdown。',
     'positioning：一句定位，40 到 90 字，写公开渠道上的位置和最明显的短板。',
@@ -1196,7 +1251,8 @@ export async function evaluateShop(
   const sources = await searchPublicBrand(row)
   const webNotes = await doubaoPublicNotes(opts.askText, row)
   const listed = sources.length ? sources.map((title, index) => `${index + 1}. ${title}`).join('\n') : ''
-  const material = [webNotes, listed].filter(Boolean).join('\n') || '无公开团购或探店记录'
+  const peerHint = `对照：城市 ${row.city || '未填'}，品类 ${row.category || '未填'}，同城同名 ${row.storeCount || 0} 家。材料里没有套餐价或评价时，按这些做档位估算。`
+  const material = [webNotes, listed, peerHint].filter(Boolean).join('\n')
   const blocks = publicEvalIndicators(spec.scope)
   const user = `${shopFacts(spec, row)}\n公开检索标题：\n${material}\n请按${spec.scope === 'chain' ? '连锁品牌' : '单门店'}模型给出定位、四项 points 和点评、三条优势、四条短板、一句话总结。`
   let j = await askJson(opts.askText, publicScoreSystem(spec.scope), user)
@@ -1227,7 +1283,7 @@ export async function evaluateShop(
   const score = scoreFromPublic({ ...j, sources }, indicators, blocks, spec.scope)
   writeCache(opts.storage, loaded.key, {
     ...score,
-    sourcesSearch: 'store-search-v6',
+    sourcesSearch: 'store-search-v7',
     profile: profileFromRow(row),
     savedAt: new Date().toISOString(),
   })
