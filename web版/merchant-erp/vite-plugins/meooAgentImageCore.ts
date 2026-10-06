@@ -1,10 +1,5 @@
 import { wanxSizeToGptImage2Size } from '../src/lib/aiImageStudioGptSize.js'
-import {
-  tokenmixImagesCreate,
-  tokenmixImagesEdit,
-  tokenmixImagesGenerate,
-  tokenmixImagesPollOnce,
-} from './aiGateway/tokenmixImageGenerate.js'
+import { tokenmixImagesCreate, tokenmixImagesPollOnce } from './aiGateway/tokenmixImageGenerate.js'
 import { runAgentFreeformTextToImage, type AgentFreeformImageOpts } from './merchantAiUpstream.js'
 
 /**

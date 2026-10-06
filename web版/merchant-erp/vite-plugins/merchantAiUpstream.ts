@@ -192,7 +192,6 @@ function isVendorHopableError(e: unknown): boolean {
 }
 
 const DEFAULT_TEXT_FAILOVER = ['minimax', 'qwen', 'doubao'] as const
-const DEFAULT_IMAGE_FAILOVER = ['qwen', 'doubao', 'minimax'] as const
 type AssistVendorId = (typeof DEFAULT_TEXT_FAILOVER)[number]
 
 function parseDouyinAssistVendorOrder(
