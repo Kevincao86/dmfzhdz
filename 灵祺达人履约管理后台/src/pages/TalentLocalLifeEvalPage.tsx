@@ -554,13 +554,29 @@ export default function TalentLocalLifeEvalPage() {
               <p className="text-xs tracking-wide text-[var(--shell-muted)]">分析与提升方案</p>
               <div className="mt-3 grid gap-4">
                 {advice.sections.map((row, index) => (
-                  <div key={row.name} className="rounded-xl border border-slate-200 p-4">
+                  <div key={row.name} className="rounded-xl border border-slate-200 bg-white p-4">
                     <p className="text-sm font-semibold text-slate-900">
-                      {String(index + 1).padStart(2, '0')} {row.name}
+                      <span className="mr-2 text-violet-600">{String(index + 1).padStart(2, '0')}</span>
+                      {row.name}
                     </p>
-                    {row.finding ? <p className="mt-2 text-sm leading-6 text-slate-700">分析结果：{row.finding}</p> : null}
-                    {row.adjust ? <p className="mt-2 text-sm leading-6 text-slate-700">怎么调整：{row.adjust}</p> : null}
-                    {row.soon ? <p className="mt-2 text-sm leading-6 text-slate-700">近期要做：{row.soon}</p> : null}
+                    {row.finding ? (
+                      <div className="mt-3 rounded-lg bg-[#e8f1ff] p-3">
+                        <p className="text-xs font-bold text-[#1d4ed8]">分析结果</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-700">{row.finding}</p>
+                      </div>
+                    ) : null}
+                    {row.adjust ? (
+                      <div className="mt-2 rounded-lg bg-[#f3e8ff] p-3">
+                        <p className="text-xs font-bold text-[#6d28d9]">怎么调整</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-700">{row.adjust}</p>
+                      </div>
+                    ) : null}
+                    {row.soon ? (
+                      <div className="mt-2 rounded-lg bg-[#ffedd5] p-3">
+                        <p className="text-xs font-bold text-[#c2410c]">近期要做</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{row.soon}</p>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
