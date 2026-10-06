@@ -105,24 +105,21 @@ const PLATFORM_SPECS: Record<string, PlatformSpec> = {
   },
 }
 
-const PLAN_MODULES = ['我的资料', '招募大厅', '培训课程', '商单日历']
-
 const ADVICE_SYSTEM = [
-  '你是豆包。这是达人自己看的体检，只按短板写给达人本人的改法，用「你」来写。',
+  '你是豆包。根据已经解读出的达人现状，写给达人本人的账号分析和提升，用「你」来写。',
+  '只根据给出的六维现状和得分来写。不要结合系统里绑定的粉丝、报价、带货等级、标签或主页链接。',
+  '不要提「我的资料」「招募大厅」「培训课程」「商单日历」，不要让用户去系统里补资料或改绑定账号。',
   '不要用商家口吻，不要写合作、履约、核销、不建议合作。',
-  '不要编造用户没填、现状里也没出现的粉丝数和 GMV。已经进入评估的粉丝、报价、带货等级按原数引用。',
+  '不要编造现状里没有的粉丝数和 GMV。现状里已经写出的判断可以沿用。',
   '不要写未检索到、无公开、无法验证、待补充、公开资料不足、仅供参考、无法判断。',
   '只输出一个 JSON 对象，不要 Markdown。',
   '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
   '字段：sections 正好覆盖用户消息里点名的短板，一项对一个维度，不要另起维度。',
-  '每项含 name、finding、adjust、soon、module。',
+  '每项只含 name、finding、adjust、soon。不要输出 module。',
   'name 必须与短板维度名称一致。',
-  'finding 是分析结果：这个短板卡在哪、为什么拉低总分，60 到 100 字。引用已经进来的平台资料。',
-  'adjust 是怎么调整：必须落到 module 对应的功能里，写改什么、改完应看到什么，80 到 160 字。',
+  'finding 是分析结果：按这条现状说明卡在哪、为什么拉低总分，60 到 100 字。必须扣住现状原意。',
+  'adjust 是怎么调整：针对这个账号的现状改内容、话术或发布节奏，写改什么、改完应看到什么，80 到 160 字。',
   'soon 是近期要做：近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，每件写清动作和频率，80 到 160 字。',
-  `module 只能是：${PLAN_MODULES.join('、')}。`,
-  '对照：本地人群匹配用我的资料补属地和标签，再用招募大厅只接同城单。内容产能稳定用商单日历排更新。内容质量人设用培训课程补出镜、剪辑和团购话术。团购带货能力用招募大厅接同品类团购单，把真实成交写回我的资料。内容转化潜力用培训课程改开头和收藏点，再用招募大厅对照同类任务。口碑合规风险用我的资料核对账号，用培训课程改合规话术。',
-  '在「我的资料」启用平台后，粉丝、带货等级、报价、标签、主页链接会进入这次评估。缺的项写去「我的资料」补上后再重新评估。已经进来的数字直接用。',
   '不要写成已经读到官方后台。',
 ].join('')
 
@@ -346,7 +343,7 @@ export type LocalLifeSuggestion = {
   finding: string
   adjust: string
   soon: string
-  module: string
+  module?: string
 }
 
 export type LocalLifeAdvice = {
@@ -789,23 +786,28 @@ function clipPlan(value: unknown, max: number) {
 }
 
 function mapSuggestions(rows: unknown): LocalLifeSuggestion[] {
-  const allowed = new Set(PLAN_MODULES)
   return (Array.isArray(rows) ? rows : [])
     .map((row) => {
       const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
       const adjust = clipPlan(item.adjust, 200) || clipPlan(item.next, 200)
-      const moduleName = String(item.module || '').trim()
       return {
         name: clipPlan(item.name, 12),
         finding: clipPlan(item.finding, 160),
         adjust,
         soon: clipPlan(item.soon, 200),
-        module: moduleName,
         next: adjust,
       }
     })
-    .filter((row) => row.name && row.finding && row.adjust && allowed.has(row.module))
+    .filter((row) => row.name && row.finding && row.adjust)
     .slice(0, 4)
+}
+
+function adviceUsesBoundAccount(rows: unknown) {
+  return (Array.isArray(rows) ? rows : []).some((row) => {
+    const item = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
+    const text = [item.module, item.finding, item.adjust, item.soon, item.next].join('\n')
+    return /我的资料|招募大厅|培训课程|商单日历|绑定账号|平台资料/.test(text)
+  })
 }
 
 function defectBrief(score: LocalLifeScore) {
@@ -822,22 +824,6 @@ function defectBrief(score: LocalLifeScore) {
     .join('、')
 }
 
-function enteredProfile(row: ReturnType<typeof normalizeInput>['row']) {
-  const pairs: Array<[string, string]> = [
-    ['粉丝', row.followers],
-    ['报价', row.quotePrice],
-    ['标签', row.tags.join('、')],
-    ['主页链接', row.profileLink],
-  ]
-  if (row.platformId === 'douyin') pairs.push(['带货等级', row.salesLevel])
-  if (row.platformId === 'kuaishou') pairs.push(['达人等级', row.talentGrade])
-  const entered = pairs.filter(([, value]) => value).map(([label, value]) => `${label} ${value}`)
-  const missing = pairs.filter(([, value]) => !value).map(([label]) => label)
-  return [
-    entered.length ? `已进入评估的平台资料：${entered.join('，')}。` : '已进入评估的平台资料：还没有粉丝、报价、标签或主页链接。',
-    missing.length ? `还没进来的资料：${missing.join('、')}。这些要写去「我的资料」补上。` : '平台资料已经进来，方案直接用这些数字。',
-  ].join('')
-}
 
 function readCache(key: string): Record<string, unknown> | null {
   try {
@@ -915,7 +901,12 @@ function savedFromCache(cached: Record<string, unknown> | null): { score: LocalL
   if (!usesSixModel(situations)) return null
   const adviceRaw = cached.advice
   let advice: LocalLifeAdvice | null = null
-  if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray((adviceRaw as LocalLifeAdvice).sections)) {
+  if (
+    adviceRaw &&
+    typeof adviceRaw === 'object' &&
+    Array.isArray((adviceRaw as LocalLifeAdvice).sections) &&
+    !adviceUsesBoundAccount((adviceRaw as LocalLifeAdvice).sections)
+  ) {
     const sections = mapSuggestions((adviceRaw as LocalLifeAdvice).sections)
     if (sections.length) advice = { lift: clampLift((adviceRaw as LocalLifeAdvice).lift), sections }
   }
@@ -997,21 +988,19 @@ export async function adviseTalent(
     const cachedAdvice = readEvalCache(row)?.advice
     if (cachedAdvice && typeof cachedAdvice === 'object') {
       const advice = cachedAdvice as LocalLifeAdvice
-      if (Array.isArray(advice.sections) && advice.sections.length) {
+      if (Array.isArray(advice.sections) && advice.sections.length && !adviceUsesBoundAccount(advice.sections)) {
         const sections = mapSuggestions(advice.sections)
         if (sections.length) return { lift: clampLift(advice.lift), sections }
       }
     }
   }
   await assertTalentPoints('talent_advice')
-  const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
-  const notes = String(readEvalCache(row)?.publicNotes || '')
-  const publicBlock = notes && !/无公开账号记录/.test(notes)
-    ? `公开检索：\n${notes}`
-    : '公开检索没有可用条目。按现状里的预估来写改法，不要写未检索到或无数据。'
+  const lines = score.situations
+    .map((item) => `${item.name}${item.max ? ` ${item.points}/${item.max}` : ''}：${item.now}`)
+    .join('\n')
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,
-    `${accountFacts(spec, row)}\n${enteredProfile(row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n只为这些短板各写一套方案：${defectBrief(score)}。`,
+    `平台：${spec.name}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n这次评估解读出的现状：\n${lines}\n只根据这些现状写账号分析和提升，不要结合系统绑定的账号资料。\n只为这些短板各写一套方案：${defectBrief(score)}。`,
   )
   const advice: LocalLifeAdvice = {
     lift: clampLift(j.lift),

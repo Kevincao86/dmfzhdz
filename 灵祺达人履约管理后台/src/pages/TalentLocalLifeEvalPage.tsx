@@ -403,7 +403,6 @@ export default function TalentLocalLifeEvalPage() {
                   <div key={row.name} className="rounded-xl border border-slate-200 p-4">
                     <p className="text-sm font-semibold text-slate-900">
                       {String(index + 1).padStart(2, '0')} {row.name}
-                      <span className="ml-2 text-xs font-medium text-violet-700">用到 {row.module}</span>
                     </p>
                     {row.finding ? <p className="mt-2 text-sm leading-6 text-slate-700">分析结果：{row.finding}</p> : null}
                     {row.adjust ? <p className="mt-2 text-sm leading-6 text-slate-700">怎么调整：{row.adjust}</p> : null}
