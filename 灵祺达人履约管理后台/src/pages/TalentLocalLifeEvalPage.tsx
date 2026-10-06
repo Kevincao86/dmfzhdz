@@ -378,12 +378,15 @@ export default function TalentLocalLifeEvalPage() {
           {score?.situations?.length ? (
             <div className="surface-card rounded-xl border p-5 text-left">
               <p className="text-xs tracking-wide text-[var(--shell-muted)]">达人现状</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {score.situations.map((row, index) => (
                   <div key={row.name} className="eval-plate eval-plate--stack">
                     <span className="eval-plate-no">{String(index + 1).padStart(2, '0')}</span>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{row.name}</p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {row.name}
+                        {row.max ? ` ${row.points}/${row.max}` : ''}
+                      </p>
                       <p className="mt-1 text-sm leading-6 text-slate-600">{row.now}</p>
                     </div>
                   </div>

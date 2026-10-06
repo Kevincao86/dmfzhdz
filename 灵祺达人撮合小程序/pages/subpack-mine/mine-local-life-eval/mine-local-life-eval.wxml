@@ -91,7 +91,7 @@
         <view class="plate plate--now" wx:for="{{situations}}" wx:key="name">
           <text class="plate-no plate-no--now">{{index < 9 ? '0' + (index + 1) : index + 1}}</text>
           <view class="plate-body">
-            <text class="plate-name">{{item.name}}</text>
+            <text class="plate-name">{{item.name}}{{item.max ? ' ' + item.points + '/' + item.max : ''}}</text>
             <text class="plate-line">{{item.now}}</text>
           </view>
         </view>

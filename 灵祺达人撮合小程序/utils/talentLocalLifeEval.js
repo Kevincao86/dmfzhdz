@@ -4,6 +4,18 @@ const billing = require('./mpBillingRoleHint.js')
 const sessionStore = require('./mpSessionStore.js')
 const pointsSpend = require('./mpPointsSpendApi.js')
 
+const SCORE_BLOCKS = [
+  { name: '本地人群匹配', weight: 20 },
+  { name: '内容产能稳定', weight: 15 },
+  { name: '内容质量人设', weight: 15 },
+  { name: '团购带货能力', weight: 25 },
+  { name: '内容转化潜力', weight: 15 },
+  { name: '口碑合规风险', weight: 10 },
+]
+const LEVEL_A_BLOCKS = ['内容产能稳定', '内容质量人设', '内容转化潜力']
+const LEVEL_B_BLOCKS = ['团购带货能力', '本地人群匹配']
+const SITUATION_BAN = /公网未检索到|未检索到|无公开账号记录|公开资料不足|无法验证|待补充|没有数据|无数据|查不到|仅供参考|弱预估|无公开|没有检索到|检索为空|暂未检索|没有找到|无法查询/g
+
 const PLATFORM_SPECS = {
   douyin: {
     id: 'douyin',
@@ -14,17 +26,10 @@ const PLATFORM_SPECS = {
     levelTitle: '预估下月带货等级',
     levelA: '视频带货力',
     levelB: '直播带货力',
-    levelABlocks: ['内容种草', '探店转化'],
-    levelBBlocks: ['直播带货'],
-    scene: '按抖音本地生活达人（团购短视频和直播带货）场景打分。',
-    blocks: [
-      { name: '内容种草', weight: 25 },
-      { name: '探店转化', weight: 25 },
-      { name: '粉丝匹配', weight: 20 },
-      { name: '直播带货', weight: 30 },
-    ],
-    risk: 15,
-    riskNote: '搬运、硬广、挂车和内容无关',
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
+    scene: '按抖音本地生活达人打分。看短视频、直播和团购挂车，用同一套六维。',
+    blocks: SCORE_BLOCKS,
   },
   xiaohongshu: {
     id: 'xiaohongshu',
@@ -35,18 +40,10 @@ const PLATFORM_SPECS = {
     levelTitle: '预估等级',
     levelA: '笔记种草力',
     levelB: '到店转化力',
-    levelABlocks: ['笔记种草', '搜索匹配', '互动可信'],
-    levelBBlocks: ['到店转化'],
-    scene: '按小红书本地生活达人打分。成交靠笔记被搜到、被相信，再引导到店。直播不作为等级。',
-    blocks: [
-      { name: '笔记种草', weight: 30 },
-      { name: '搜索匹配', weight: 25 },
-      { name: '互动可信', weight: 20 },
-      { name: '到店转化', weight: 15 },
-      { name: '粉丝垂类', weight: 10 },
-    ],
-    risk: 20,
-    riskNote: '营销号感、虚假种草、明显限流',
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
+    scene: '按小红书本地生活达人打分。成交靠笔记被搜到、被相信，再引导到店。用同一套六维，直播不单列。',
+    blocks: SCORE_BLOCKS,
   },
   dianping: {
     id: 'dianping',
@@ -57,17 +54,10 @@ const PLATFORM_SPECS = {
     levelTitle: '预估等级',
     levelA: '笔记口碑力',
     levelB: '到店引导力',
-    levelABlocks: ['评价真实', '探店图文', '同城口碑'],
-    levelBBlocks: ['到店引导'],
-    scene: '按大众点评到店口碑达人打分。核心是真实评价和探店图文，不评直播带货。',
-    blocks: [
-      { name: '评价真实', weight: 35 },
-      { name: '探店图文', weight: 25 },
-      { name: '同城口碑', weight: 20 },
-      { name: '到店引导', weight: 20 },
-    ],
-    risk: 25,
-    riskNote: '刷评、水军、同文案批量铺店',
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
+    scene: '按大众点评到店口碑达人打分。核心是真实评价和探店图文。用同一套六维，不评直播。',
+    blocks: SCORE_BLOCKS,
   },
   kuaishou: {
     id: 'kuaishou',
@@ -78,17 +68,10 @@ const PLATFORM_SPECS = {
     levelTitle: '预估下月带货等级',
     levelA: '短视频带货力',
     levelB: '直播带货力',
-    levelABlocks: ['短视频挂载'],
-    levelBBlocks: ['直播带货'],
-    scene: '按快手本地生活达人打分。老铁信任和直播成交权重大于短视频。',
-    blocks: [
-      { name: '直播带货', weight: 35 },
-      { name: '短视频挂载', weight: 25 },
-      { name: '老铁信任', weight: 20 },
-      { name: '同城转化', weight: 20 },
-    ],
-    risk: 15,
-    riskNote: '搬运、标题党、挂车和内容无关',
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
+    scene: '按快手本地生活达人打分。老铁信任和直播成交看进团购带货能力。用同一套六维。',
+    blocks: SCORE_BLOCKS,
   },
   weixin_video: {
     id: 'weixin_video',
@@ -99,24 +82,17 @@ const PLATFORM_SPECS = {
     levelTitle: '预估等级',
     levelA: '社交传播力',
     levelB: '直播转化力',
-    levelABlocks: ['社交传播', '内容信任'],
-    levelBBlocks: ['直播转化'],
-    scene: '按微信视频号本地生活达人打分。成交靠朋友点赞转发，再进群、企微或小程序。',
-    blocks: [
-      { name: '社交传播', weight: 30 },
-      { name: '私域承接', weight: 25 },
-      { name: '内容信任', weight: 25 },
-      { name: '直播转化', weight: 20 },
-    ],
-    risk: 15,
-    riskNote: '诱导分享、营销感过重、和门店无关的泛内容',
+    levelABlocks: LEVEL_A_BLOCKS,
+    levelBBlocks: LEVEL_B_BLOCKS,
+    scene: '按微信视频号本地生活达人打分。成交靠朋友点赞转发，再进群、企微或小程序。用同一套六维。',
+    blocks: SCORE_BLOCKS,
   },
 }
 
 const ADVICE_SYSTEM = [
   '你是豆包。这是达人自己看的体检，按现状写给达人本人的改法，用「你」来写。',
   '不要用商家口吻，不要写合作、履约、核销、不建议合作。',
-  '不要编造粉丝数、GMV。未在用户填写或公开检索里出现的数字不要写进来。同名但账号对不上的人不要写。',
+  '不要编造用户没填、现状里也没出现的粉丝数和 GMV。现状里的预估可以沿用。不要写未检索到、无公开、无法验证、待补充。',
   '不要写「公开资料不足」「仅供参考」「无法判断」这类提示句。',
   '只输出一个 JSON 对象，不要 Markdown。',
   '字段：lift 为整改后综合分预计提升的百分比，整数，范围 5 到 35，不要写百分号。',
@@ -125,7 +101,7 @@ const ADVICE_SYSTEM = [
   'finding 是分析结果：写出这个板块现在卡在哪里、原因是什么，不要复述现状原句，60 到 100 字。',
   'adjust 是怎么调整：写出改哪一类内容、具体怎么改、改完应看到什么变化，至少两句，80 到 160 字。',
   'soon 是近期要做：写出近两周能直接执行的 3 件事，用「1.」「2.」「3.」分开，每件写清动作和频率，80 到 160 字。',
-  '不要一句口号带过，不要编造未提供的播放量、GMV 或粉丝数。',
+  '不要一句口号带过。不要编造现状里没有的播放量、GMV 或粉丝数。',
 ].join('')
 
 function specOf(platformId) {
@@ -166,7 +142,7 @@ function accountFacts(spec, row) {
     `平台：${spec.name}`,
     `${spec.nickLabel}：${filledOr(row.nickname, '未填写')}`,
     `${spec.accountLabel}：${filledOr(row.accountId, '未填写')}`,
-    `${spec.fansLabel}：${filledOr(row.followers, '未填写，不要编造')}`,
+    `${spec.fansLabel}：${filledOr(row.followers, '未填写，按内容和同类达人预估，不要改已填数字')}`,
     `主页链接：${filledOr(row.profileLink, '未填写')}`,
     `账号标签：${row.tags.length ? row.tags.join('、') : '未填写'}`,
     `默认报价：${filledOr(row.quotePrice, '未填写')}`,
@@ -181,28 +157,29 @@ function accountFacts(spec, row) {
 }
 
 function blockNames(spec) {
-  return spec.blocks.map((block) => block.name).concat(['账号风险'])
+  return spec.blocks.map((block) => block.name)
 }
 
 function scoreSystem(spec) {
-  const weights = spec.blocks.map((block) => `${block.name}占 ${block.weight} 分`).join('，')
+  const weights = spec.blocks.map((block) => `${block.name}满分 ${block.weight}`).join('，')
   return [
-    '你是豆包。',
+    '你是豆包。按 6 维本地生活达人模型打分，满分 100。',
     spec.scene,
+    `六维及满分：${weights}。团购带货能力权重最高。口碑合规风险是得分，不是另外扣分，越好越高。`,
+    '各维看这些信号：本地人群匹配看属地、同城粉丝、年龄性别、本地深耕、是否跨城。内容产能稳定看近 90 天更新、断更、持续时长、垂类是否漂移。内容质量人设看真人出镜、人设是否统一、画质剪辑话术、团购话术。团购带货能力看挂车或带货案例、价格带、预估单量或稿均单量、同品类经验。内容转化潜力看稿均播放点赞收藏评论、到店或商品点击、爆款占比、是否像投流刷量。口碑合规风险看违规限流、刷量、负面口碑、评论区、平台认证。',
     '这不是平台官方接口，不要声称读到了官方后台或官方等级。',
-    '根据用户填写的账号资料，以及附上的公开检索打分。用户填了的数字按原数使用，不要改成另一个数。',
-    '公开检索里明确属于这个账号的粉丝、作品标题、带货说法可以引用。检索里没有的粉丝数、播放量、GMV、官方带货等级不要编造。同名但账号对不上的人不要写进来。',
-    '公开检索为空或写着无公开账号记录时，按用户填写的资料打分，不要写成平台上没有这个人。',
+    '用户填了的粉丝、报价按原数使用，不要改成另一个数。同名但账号对不上的人不要写进来。',
+    '公开检索里对得上这个账号的说法可以引用。检索里没有的画像、完播、单量、认证，按账号资料和同类本地生活达人做预估，写成确定判断。',
+    '不要写「公网未检索到」「未检索到」「无公开」「公开资料不足」「无法验证」「待补充」「没有数据」「查不到」「仅供参考」「弱预估」「无公开账号记录」。',
+    '不要写成平台上没有这个人。',
     '用户自填的带货等级或达人等级只是用户自己填的，用来对照，不能当成官方读数。',
-    '不要写「公开资料不足」「仅供参考」「不是官方」「弱预估」这类提示句。',
     '只输出一个 JSON 对象，不要 Markdown，不要额外说明。键名必须用英文双引号，最后一项后面不要逗号。',
-    `blocks 为数组，每项含 name、points。points 为 0 到 100 的整数，表示该板块强弱。name 必须是：${spec.blocks.map((block) => block.name).join('、')}。`,
-    `risk 为 0 到 ${spec.risk} 的整数，表示账号风险扣分。扣分依据：${spec.riskNote}。`,
-    `同时输出 score，为 0 到 100 的整数，按这些权重合成后再扣 risk：${weights}。系统会按同样权重重算，重算成功时以系统结果为准。`,
-    `situations 为 3 到 5 项，每项含 name、now。now 不超过 40 字，只写该板块现状，不要写建议。现状要扣住用户填了的昵称、账号、粉丝、标签、报价或等级，以及公开检索里属于这个账号的句子；没填也没检索到的项不要写成具体数字。name 只能从这些板块里选：${blockNames(spec).join('、')}。`,
+    `blocks 为数组，顺序与六维一致，每项含 name、points。points 是该维得分，整数，0 到该维满分，不要写成 0 到 100 的强弱分。name 必须是：${blockNames(spec).join('、')}。`,
+    '不要输出 risk。score 为六维得分相加，0 到 100 的整数。系统会按满分重算，重算成功时以系统结果为准。',
+    'situations 必须正好 6 项，顺序与六维一致。每项含 name、now。now 不超过 72 字，只写这项现在怎么样，带上具体依据或预估，不要写建议。',
     'exposureLift 为按整改后预计多出来的曝光百分比，整数 8 到 60，不要写百分号。',
-    'salesLift 为按整改后预计每月多带来的带货金额，单位元的整数。按已填粉丝和报价估算增量，不要写成当前已经成交的金额。',
-    '同一份账号资料每次必须给出相同 blocks、risk 和现状。',
+    'salesLift 为按整改后预计每月多带来的带货金额，单位元的整数。按已填粉丝、报价和预估增量来写，不要写成当前已经成交的金额。',
+    '同一份账号资料每次必须给出相同 blocks 和现状。',
   ].join('')
 }
 
@@ -236,32 +213,46 @@ function pointsFor(byName, name) {
   return undefined
 }
 
-function scoreFromBlocks(spec, blocks, risk) {
+function dimensionPoints(raw, weight) {
+  const n = Math.round(Number(raw))
+  if (!Number.isFinite(n) || n < 0) return null
+  if (n <= weight) return n
+  if (n >= 30) return Math.max(0, Math.min(weight, Math.round((Math.min(n, 100) / 100) * weight)))
+  return weight
+}
+
+function scoreFromBlocks(spec, blocks) {
   const byName = {}
   for (let i = 0; i < blocks.length; i += 1) {
     const key = canonBlockName(blocks[i].name)
     if (key) byName[key] = blocks[i].points
   }
   let sum = 0
+  const norm = {}
+  const dimensions = []
   for (let i = 0; i < spec.blocks.length; i += 1) {
     const block = spec.blocks[i]
-    const points = pointsFor(byName, block.name)
-    if (!Number.isFinite(points)) return null
-    sum += (points / 100) * block.weight
+    const raw = pointsFor(byName, block.name)
+    if (!Number.isFinite(raw)) return null
+    const points = dimensionPoints(raw, block.weight)
+    if (points == null) return null
+    sum += points
+    norm[canonBlockName(block.name)] = (points / block.weight) * 100
+    dimensions.push({ name: block.name, points, max: block.weight })
   }
-  const deduct = Math.max(0, Math.min(spec.risk, Math.round(Number(risk) || 0)))
-  const levelAPoints = averagePoints(byName, spec.levelABlocks)
-  const levelBPoints = averagePoints(byName, spec.levelBBlocks)
+  const levelAPoints = averagePoints(norm, spec.levelABlocks)
+  const levelBPoints = averagePoints(norm, spec.levelBBlocks)
   return {
-    score: clampScore(sum - deduct),
+    score: clampScore(sum),
     videoLevel: levelAPoints == null ? '' : levelFromPoints(levelAPoints),
     liveLevel: levelBPoints == null ? '' : levelFromPoints(levelBPoints),
+    dimensions,
   }
 }
 
 const DOUYIN_SCORE_GRADES = [
   { key: 'excellent', range: '85~100', label: '优秀', note: '内容和带货都比较稳，按现在的节奏继续发' },
-  { key: 'good', range: '70~84', label: '良好', note: '整体能看，把报告里标出的短板补一补会更稳' },
+  { key: 'good', range: '70~84', label: '可用', note: 'A 级可用达人，内容和带货能看，短板补上会更稳' },
   { key: 'fix', range: '60~69', label: '待整改', note: '短板比较明显，先按报告把内容改到位' },
   { key: 'risk', range: '＜60', label: '高危', note: '现在接单容易吃力，先把内容和账号基础补上' },
 ]
@@ -457,10 +448,10 @@ function accountScope() {
 }
 
 function cacheKey(row) {
-  return ['lq_local_life_eval_v5', accountScope(), row.platformId].join('|')
+  return ['lq_local_life_eval_v6', accountScope(), row.platformId].join('|')
 }
 
-const EVAL_SYNC_KEY = 'lq_talent_eval_sync_v1'
+const EVAL_SYNC_KEY = 'lq_talent_eval_sync_v2'
 
 function readEvalSyncMap() {
   try {
@@ -504,7 +495,7 @@ async function doubaoPublicAccount(spec, row) {
       [
         '你在用方舟联网检索这一个达人账号。只写检索结果里明确属于这个昵称或这个账号 ID 的公开信息。',
         '可写公开主页上的粉丝数、近期作品标题、带货或团购的公开说法。每条一行，最多 8 行。',
-        '同名但账号对不上的人不要写。没出现的粉丝数、播放量、GMV、带货等级不要编造。',
+        '同名但账号对不上的人不要写。没出现的数字不要编进检索结果，留给打分时预估。',
         '一条都没有时只输出：无公开账号记录。',
       ].join(''),
       [
@@ -537,14 +528,58 @@ function mapBlockPoints(rows) {
     .filter((row) => row.name)
 }
 
+function cleanSituationNow(text, points, max) {
+  const now = String(text || '')
+    .replace(SITUATION_BAN, '')
+    .replace(/[✓⚠️]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[，。；、\s]+|[，。；、\s]+$/g, '')
+    .trim()
+  if (now.length >= 8) return now.slice(0, 72)
+  return '按账号现有内容预估，这项大约 ' + points + '/' + max + '。'
+}
+
 function mapSituations(rows) {
   return (Array.isArray(rows) ? rows : [])
-    .map((row) => ({
-      name: String(row && row.name ? row.name : '').trim().slice(0, 12),
-      now: String(row && row.now ? row.now : '').trim().slice(0, 40),
-    }))
+    .map((row) => {
+      const points = Number(row && row.points)
+      const max = Number(row && row.max)
+      const item = {
+        name: String(row && row.name ? row.name : '').trim().slice(0, 12),
+        now: String(row && row.now ? row.now : '').replace(SITUATION_BAN, '').trim().slice(0, 72),
+      }
+      if (Number.isFinite(points)) item.points = points
+      if (Number.isFinite(max)) item.max = max
+      return item
+    })
     .filter((row) => row.name && row.now)
-    .slice(0, 5)
+    .slice(0, 6)
+}
+
+function usesSixModel(rows) {
+  const text = (rows || []).map((row) => row.name).join(' ')
+  return text.indexOf('团购带货') >= 0 && text.indexOf('口碑合规') >= 0
+}
+
+function alignSituations(rows, dimensions) {
+  if (!dimensions || !dimensions.length) return mapSituations(rows)
+  return dimensions.map((dim) => {
+    let hit = null
+    for (let i = 0; i < rows.length; i += 1) {
+      const left = canonBlockName(rows[i].name)
+      const right = canonBlockName(dim.name)
+      if (left === right || left.indexOf(right) >= 0 || right.indexOf(left) >= 0) {
+        hit = rows[i]
+        break
+      }
+    }
+    return {
+      name: dim.name,
+      now: cleanSituationNow(hit && hit.now, dim.points, dim.max),
+      points: dim.points,
+      max: dim.max,
+    }
+  })
 }
 
 function clampLift(value) {
@@ -676,6 +711,8 @@ function savedFromCache(cached) {
   if (!cached || !cached.videoLevel || !cached.liveLevel || !Array.isArray(cached.situations) || !cached.situations.length) {
     return null
   }
+  const situations = mapSituations(cached.situations)
+  if (!usesSixModel(situations)) return null
   const adviceRaw = cached.advice
   let advice = null
   if (adviceRaw && Array.isArray(adviceRaw.sections)) {
@@ -688,7 +725,7 @@ function savedFromCache(cached) {
       score: clampScore(cached.score),
       videoLevel: levels.videoLevel,
       liveLevel: levels.liveLevel,
-      situations: mapSituations(cached.situations),
+      situations,
       exposureLift: clampExposure(cached.exposureLift),
       salesLift: clampSalesYuan(cached.salesLift),
     },
@@ -703,7 +740,7 @@ function readSavedTalentEval(raw) {
 }
 
 function buildScore(spec, j) {
-  const computed = scoreFromBlocks(spec, mapBlockPoints(j && j.blocks), j && j.risk)
+  const computed = scoreFromBlocks(spec, mapBlockPoints(j && j.blocks))
   const score = computed ? computed.score : clampScore(j && j.score)
   const levels = levelsFromScore(
     (computed && computed.videoLevel) || namedLevel(j && j.videoLevel),
@@ -714,7 +751,7 @@ function buildScore(spec, j) {
     score,
     videoLevel: levels.videoLevel,
     liveLevel: levels.liveLevel,
-    situations: mapSituations(j && j.situations),
+    situations: alignSituations(mapSituations(j && j.situations), computed && computed.dimensions),
     exposureLift: clampExposure(j && j.exposureLift),
     salesLift: clampSalesYuan(j && j.salesLift),
   }
@@ -768,10 +805,12 @@ async function evaluateTalent(raw, opts) {
   const gate = await readTalentEvalQuota()
   if (!gate.ok) throw new Error(gate.message || '本月评估次数已用完')
   const notes = await doubaoPublicAccount(spec, row)
-  const publicBlock = notes ? `公开检索：\n${notes}` : '公开检索：这次没有检索到。按用户填写的资料打分，不要编造粉丝、播放和带货数字。'
+  const publicBlock = notes && !/无公开账号记录/.test(notes)
+    ? `公开检索：\n${notes}\n检索里没有的指标用预估写进现状，不要写未检索到或无数据。`
+    : '公开检索没有可用条目。按用户填写和同类本地生活达人预估打分。正文不要写未检索到、无公开、无法验证、待补充。'
   const j = await askDoubaoJson(
     scoreSystem(spec),
-    `${accountFacts(spec, row)}\n${publicBlock}\n请按权重给各板块 points，并给出 risk 和各板块现状。现状用达人自己能看懂的话来写，不要写给商家的合作判断。`,
+    `${accountFacts(spec, row)}\n${publicBlock}\n请按六维满分给 points，并按同样顺序写 6 条现状。现状用达人自己能看懂的话，不要写给商家的合作判断。`,
   )
   const score = buildScore(spec, j)
   writeCache(key, Object.assign({}, score, { publicNotes: notes || '' }))
@@ -802,7 +841,9 @@ async function adviseTalent(raw, score, opts) {
   await pointsSpend.assertTalentEvalAffordable('talent_advice')
   const lines = score.situations.map((item) => `${item.name}：${item.now}`).join('\n')
   const notes = String((loaded.data && loaded.data.publicNotes) || '')
-  const publicBlock = notes ? `公开检索：\n${notes}` : '公开检索：这次没有检索到。'
+  const publicBlock = notes && !/无公开账号记录/.test(notes)
+    ? `公开检索：\n${notes}`
+    : '公开检索没有可用条目。按现状里的预估来写改法，不要写未检索到或无数据。'
   const j = await askDoubaoJson(
     ADVICE_SYSTEM,
     `${accountFacts(spec, row)}\n${publicBlock}\n评分：${score.score}/100，${spec.levelA} ${score.videoLevel}，${spec.levelB} ${score.liveLevel}。\n现状：\n${lines}\n请按每个板块写出分析结果、怎么调整、近两周要做的三件事。写具体动作，不要一句带过。`,
