@@ -34,8 +34,8 @@ import {
 import { parsePayoutCallbackIds, payoutCallbackSummary } from '../payoutCallbackCsv'
 
 const AFFILIATE_STATUS_LABEL: Record<string, string> = {
-  pending: '待审核',
-  active: '已通过',
+  pending: '待开通',
+  active: '已开通',
   rejected: '未通过',
   disabled: '已停用',
 }
@@ -160,9 +160,9 @@ function PolicyProductLineCard({
       </div>
 
       <div className="mt-4 rounded-lg border border-amber-900/35 bg-amber-950/15 p-3">
-        <p className="text-xs font-medium text-amber-100/90">个人推广员（dr/cs 申请 · IND- 推广码）</p>
+        <p className="text-xs font-medium text-amber-100/90">个人推广员（商家版 / 星选点击申请即开通 · IND- 推广码）</p>
         <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-          与服务商渠道独立：个人推广员直接按实付比例计提，不进入上方分润池。
+          与服务商渠道独立。用户点击申请即成为推广员并获得专属二维码；扫码完成注册并支付后，按下方比例计入可提现佣金，不进入上方分润池。
         </p>
         <div className="mt-3">
           {rateInput(
@@ -170,7 +170,7 @@ function PolicyProductLineCard({
             rates.individualPoolRate,
             (v) => onPatch({ individualPoolRate: v }),
             disabled,
-            `例：30 表示实付 ¥168 个人得 ¥50.40`,
+            `扫码注册并支付后按此比例入账。例：30 表示实付 ¥168 得 ¥50.40`,
           )}
         </div>
       </div>
@@ -689,7 +689,7 @@ export default function OpsDistributionPage() {
                 })}
               </tbody>
             </table>
-            {!affiliates.length ? <p className="p-6 text-center text-slate-500">暂无个人分销员；用户可在 cs/dr/小程序「申请成为推广员」提交。</p> : null}
+            {!affiliates.length ? <p className="p-6 text-center text-slate-500">暂无个人推广员。用户在商家版或星选点击「申请成为推广员」后会立即开通。</p> : null}
           </div>
         </div>
       ) : null}

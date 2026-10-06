@@ -59,7 +59,7 @@ function wxacodeErrorLabel(raw) {
     return '太阳码生成失败，请稍后重试'
   }
   if (msg === 'wx_not_configured') return '小程序码暂时生成不了，请联系客服'
-  if (msg === 'affiliate_not_active') return '推广员审核通过后才可生成太阳码'
+  if (msg === 'affiliate_not_active') return '成为推广员后才可生成太阳码'
   if (msg === 'unauthorized') return '请先登录后再查看推广中心'
   if (/invalid page|page not found|41030/i.test(msg)) return '小程序码暂时生成不了，请稍后再试'
   if (/access_token|40001|42001/i.test(msg)) return '微信授权失效，请稍后重试'
@@ -81,6 +81,7 @@ async function fetchPortal() {
     attributions: data.attributions || [],
     withdrawGate: data.withdrawGate || null,
     withdrawRequests: data.withdrawRequests || [],
+    commissionHint: data.commissionHint || '',
   }
 }
 

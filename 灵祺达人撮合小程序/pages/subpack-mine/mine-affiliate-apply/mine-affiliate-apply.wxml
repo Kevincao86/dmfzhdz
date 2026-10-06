@@ -1,7 +1,7 @@
 <view class="page page-shell-fixed">
   <view class="card">
     <text class="title">申请成为推广员</text>
-    <text class="sub">个人推广员可推广灵祺和星选会员，审核通过后会得到专属推广码和太阳码。和电脑上提交的申请、审核是同一套。</text>
+    <text class="sub">点击申请即成为推广员，并生成专属推广二维码。好友扫码完成注册并支付后，按后台设置的比例获得佣金。</text>
 
     <view wx:if="{{booting}}" class="boot">正在加载您的申请状态…</view>
 
@@ -9,7 +9,7 @@
       <text class="result-title">当前状态：{{result.status === 'pending' ? '待审核' : result.status === 'active' ? '已通过' : result.status === 'rejected' ? '未通过' : '已停用'}}</text>
       <text class="result-line" wx:if="{{result.refCode}}">推广码：{{result.refCode}}</text>
       <button class="btn-link" bindtap="onGoPortal">
-        {{result.status === 'active' ? '进入我的推广中心 →' : '查看我的推广 / 申请进度 →'}}
+        {{result.status === 'active' ? '进入我的推广中心 →' : '开通后查看推广二维码 →'}}
       </button>
     </view>
 
@@ -29,8 +29,8 @@
       <input class="input" value="{{note}}" bindinput="onNoteInput" placeholder="如：主要推广星选会员" maxlength="120" disabled="{{blockResubmit}}" />
     </view>
 
-    <button class="btn-primary" loading="{{submitting}}" disabled="{{booting || blockResubmit}}" bindtap="onSubmit">
-      {{blockResubmit ? '已提交申请' : '提交申请'}}
+    <button class="btn-primary" loading="{{submitting}}" disabled="{{booting || submitting || (result && result.status === 'disabled')}}" bindtap="onSubmit">
+      {{blockResubmit ? (result.status === 'active' ? '查看推广二维码' : '已停用') : '申请成为推广员'}}
     </button>
     <button class="btn-secondary" loading="{{checking}}" disabled="{{booting}}" bindtap="onCheckStatus">查询进度</button>
   </view>

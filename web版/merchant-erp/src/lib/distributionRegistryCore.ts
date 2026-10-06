@@ -10,7 +10,7 @@ import type {
   RegistryDistributionSettlementBatch,
   RegistryDistributionWithdrawRequest,
 } from './distributionRegistryTypes.js'
-import { mergeDistributionPolicy } from './distributionRegistryTypes.js'
+import { effectiveAffiliateRates, mergeDistributionPolicy } from './distributionRegistryTypes.js'
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -356,25 +356,15 @@ export function applyAffiliateFromSnapshot(
     if (cur.status === 'active') {
       return { ok: false, error: 'already_active', status: 409, affiliate: cur }
     }
-    if (cur.status === 'pending') {
-      const affiliate: RegistryDistributionAffiliate = {
-        ...cur,
-        realName,
-        phone,
-        ...(authUserId ? { authUserId } : {}),
-        ...(applySource ? { applySource } : {}),
-        ...(note ? { note } : {}),
-      }
-      list[idx] = affiliate
-      return { ok: true, affiliate, created: false }
+    if (cur.status === 'disabled') {
+      return { ok: false, error: 'affiliate_disabled', status: 403, affiliate: cur }
     }
     const affiliate: RegistryDistributionAffiliate = {
       ...cur,
       realName,
       phone,
-      status: 'pending',
-      appliedAt: nowIso(),
-      approvedAt: undefined,
+      status: 'active',
+      approvedAt: cur.approvedAt || nowIso(),
       ...(authUserId ? { authUserId } : {}),
       ...(applySource ? { applySource } : {}),
       ...(note ? { note } : {}),
@@ -388,8 +378,9 @@ export function applyAffiliateFromSnapshot(
     refCode: String(body.refCode || `IND-${randomBytes(3).toString('hex').toUpperCase()}`).trim(),
     realName,
     phone,
-    status: 'pending',
+    status: 'active',
     appliedAt: nowIso(),
+    approvedAt: nowIso(),
     ...(authUserId ? { authUserId } : {}),
     ...(applySource ? { applySource } : {}),
     ...(note ? { note } : {}),
@@ -571,6 +562,47 @@ function adjustWallet(
   w.updatedAt = nowIso()
 }
 
+/** 个人推广员：实付增量 × 后台「个人佣金占实收」。商家会员用 erp 比例，星选用 xingxuan 比例。 */
+export function creditIndividualAffiliateCommissionFromSnapshot(
+  data: RegistryFile,
+  row: { channelType?: string; affiliateId?: string; subjectType?: string },
+  paidDeltaCents: number,
+): number {
+  if (row.channelType !== 'individual') return 0
+  const affiliateId = String(row.affiliateId || '').trim()
+  const delta = Math.floor(Number(paidDeltaCents) || 0)
+  if (!affiliateId || delta <= 0) return 0
+  ensureDistribution(data)
+  const affiliate = (data.distributionAffiliates ?? []).find(
+    (a) => a.id === affiliateId && a.status === 'active',
+  )
+  if (!affiliate) return 0
+  const policy = mergeDistributionPolicy(data.distributionPolicy)
+  const rates = effectiveAffiliateRates(policy, affiliate.commissionOverride)
+  const line = row.subjectType === 'erp_merchant' ? rates.erp : rates.xingxuan
+  const rate = Number(line.individualPoolRate)
+  if (!Number.isFinite(rate) || rate <= 0) return 0
+  const commission = Math.floor(delta * Math.min(1, rate))
+  if (commission <= 0) return 0
+  adjustWallet(data, 'individual_affiliate', affiliate.id, commission, 0, 0)
+  return commission
+}
+
+export function affiliateCommissionHintFromSnapshot(
+  data: RegistryFile,
+  affiliate: RegistryDistributionAffiliate,
+): string | null {
+  if (affiliate.status !== 'active') return null
+  const policy = mergeDistributionPolicy(data.distributionPolicy)
+  const rates = effectiveAffiliateRates(policy, affiliate.commissionOverride)
+  const fmt = (n: number | undefined) => {
+    const v = Number(n)
+    if (!Number.isFinite(v) || v <= 0) return '0'
+    return String(Math.round(v * 1000) / 10)
+  }
+  return `好友扫码完成注册并支付后，商家会员按实付 ${fmt(rates.erp.individualPoolRate)}%、星选会员按实付 ${fmt(rates.xingxuan.individualPoolRate)}% 计入可提现佣金。比例在运营后台设置。`
+}
+
 function shanghaiCalendarParts(d: Date): { year: number; month: number; day: number; yearMonth: string } {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Shanghai',
@@ -665,7 +697,7 @@ export function createWithdrawRequestFromSnapshot(
     return { ok: false, error: 'affiliate_not_found', message: '未找到推广员身份', status: 404 }
   }
   if (affiliate.status !== 'active') {
-    return { ok: false, error: 'affiliate_not_active', message: '推广员审核通过后才可提现', status: 403 }
+    return { ok: false, error: 'affiliate_not_active', message: '成为推广员后才可提现', status: 403 }
   }
 
   const gate = buildWithdrawGateFromPolicy(policy)
@@ -1067,6 +1099,7 @@ export function buildAffiliatePortalFromSnapshot(
       settlements: AffiliatePortalSettlementRow[]
       withdrawGate: AffiliateWithdrawGate
       withdrawRequests: AffiliatePortalWithdrawRow[]
+      commissionHint: string | null
     }
   | { ok: false; error: string; status: number } {
   const withdrawGate = buildWithdrawGateFromPolicy(data.distributionPolicy)
@@ -1080,6 +1113,7 @@ export function buildAffiliatePortalFromSnapshot(
       settlements: [],
       withdrawGate,
       withdrawRequests: [],
+      commissionHint: null,
     }
   }
   const walletRow = (data.distributionWallets ?? []).find(
@@ -1141,5 +1175,6 @@ export function buildAffiliatePortalFromSnapshot(
     settlements,
     withdrawGate,
     withdrawRequests,
+    commissionHint: affiliateCommissionHintFromSnapshot(data, affiliate),
   }
 }

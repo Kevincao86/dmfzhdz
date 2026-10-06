@@ -66,6 +66,8 @@ export function affiliateApplyErrorLabel(error: string | undefined): string {
   switch (error) {
     case 'already_active':
       return '您已是推广员，请前往「我的推广」查看推广码与数据'
+    case 'affiliate_disabled':
+      return '推广员已停用，请联系运营'
     case 'phone_taken':
       return '该手机号已被其他账号用于推广员申请，请使用注册手机号或联系运营'
     case 'distribution_disabled':
@@ -157,9 +159,9 @@ export async function fetchAffiliateApplyStatus(
 export function affiliateStatusLabel(status: PublicAffiliateSummary['status']): string {
   switch (status) {
     case 'pending':
-      return '待审核'
+      return '待开通'
     case 'active':
-      return '已通过'
+      return '已开通'
     case 'rejected':
       return '未通过'
     case 'disabled':

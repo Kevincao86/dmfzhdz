@@ -107,6 +107,13 @@
       ]
     },
     {
+      "root": "pages/affiliate",
+      "name": "affiliate",
+      "pages": [
+        "affiliate"
+      ]
+    },
+    {
       "root": "pages/recruitment",
       "name": "recruitment",
       "pages": [

@@ -58,6 +58,14 @@ const BASE_MENU = [
     url: '/pages/wallet/wallet',
   },
   {
+    id: 'affiliate',
+    title: '申请推广员',
+    desc: '一点申请即开通，生成专属推广码',
+    iconKey: 'gift',
+    tone: 'cyan',
+    url: '/pages/affiliate/affiliate',
+  },
+  {
     id: 'switch',
     title: '切换账号',
     desc: '同一手机号或邮箱下最多 3 个账号',
@@ -93,7 +101,7 @@ const BASE_MENU = [
 
 function buildVisibleMenu(guestMode) {
   return BASE_MENU.filter((item) => {
-    if (guestMode && (item.id === 'wallet' || item.id === 'subscribe' || item.id === 'switch')) {
+    if (guestMode && (item.id === 'wallet' || item.id === 'subscribe' || item.id === 'switch' || item.id === 'affiliate')) {
       return false
     }
     if (item.id === 'wallet' && !mpUi.SHOW_WALLET) return false

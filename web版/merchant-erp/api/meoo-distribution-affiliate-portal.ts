@@ -96,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           sendJson(res, 403, {
             ok: false,
             error: 'affiliate_not_active',
-            message: '推广员审核通过后才可申请提现',
+            message: '成为推广员后才可申请提现',
           })
           return
         }
@@ -127,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       if (!portal.affiliate || portal.affiliate.status !== 'active' || !refCode) {
-        sendJson(res, 403, { ok: false, error: 'affiliate_not_active', message: '推广员审核通过后才可生成太阳码' })
+        sendJson(res, 403, { ok: false, error: 'affiliate_not_active', message: '成为推广员后才可生成太阳码' })
         return
       }
       try {
@@ -173,6 +173,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       attributions: attributionBundle?.attributions ?? [],
       withdrawGate: portal.withdrawGate,
       withdrawRequests: portal.withdrawRequests,
+      commissionHint: portal.commissionHint,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)

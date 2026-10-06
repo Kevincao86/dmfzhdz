@@ -52,7 +52,7 @@ const ZH = {
   wx_oa_ip_not_whitelisted: '微信通知暂时发不出去，请联系客服',
   wxacode_unavailable: '太阳码生成失败，请稍后重试',
   wx_not_configured: '小程序码暂时生成不了，请联系客服',
-  affiliate_not_active: '推广员审核通过后才可生成太阳码',
+  affiliate_not_active: '成为推广员后才可生成太阳码',
   already_active: '您已是推广员，请前往「我的推广」查看',
   distribution_disabled: '推广员申请暂未开放，请稍后再试',
   phone_taken: '该手机号已被其他账号用于推广员申请',

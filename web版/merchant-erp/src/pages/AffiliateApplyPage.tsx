@@ -67,10 +67,12 @@ export default function AffiliateApplyPage() {
         const mine = await fetchMyAffiliateApplyStatus()
         if (!cancelled && mine.ok && mine.affiliate) {
           setResult(mine.affiliate)
-          if (mine.affiliate.status === 'pending') {
-            setInfo('您已有待审核申请，审核通过后将在此与「我的推广」展示推广码。')
+          if (mine.affiliate.status === 'pending' || mine.affiliate.status === 'rejected') {
+            setInfo('点击下方即可成为推广员，并生成专属推广二维码。')
           } else if (mine.affiliate.status === 'active') {
-            setInfo('您已是推广员，请前往「我的推广」查看推广码与佣金数据。')
+            setInfo('您已是推广员，请前往「我的推广」查看推广二维码与佣金。')
+          } else if (mine.affiliate.status === 'disabled') {
+            setInfo('推广员已停用，请联系运营。')
           }
         }
       } finally {
@@ -104,8 +106,7 @@ export default function AffiliateApplyPage() {
   }
 
   const hasLoggedIn = Boolean(supabaseConfigured && supabase) || Boolean(readMpSessionToken())
-  const blockResubmit =
-    result?.status === 'pending' || result?.status === 'active'
+  const blockResubmit = result?.status === 'active' || result?.status === 'disabled'
 
   async function onCheckStatus() {
     const p = normalizePhone(phone)
@@ -131,11 +132,11 @@ export default function AffiliateApplyPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (blockResubmit) {
-      setInfo(
-        result?.status === 'active'
-          ? '您已是推广员，请前往「我的推广」。'
-          : '您已有待审核申请，无需重复提交。',
-      )
+      if (result?.status === 'active') {
+        navigate('/affiliate/portal')
+        return
+      }
+      setInfo('推广员已停用，请联系运营。')
       return
     }
     const p = normalizePhone(phone)
@@ -156,7 +157,7 @@ export default function AffiliateApplyPage() {
       if (!r.ok) {
         if (r.error === 'already_active' && r.affiliate) {
           setResult(r.affiliate)
-          setInfo('您已是通过审核的推广员。')
+          navigate('/affiliate/portal')
           return
         }
         if (r.error === 'phone_taken' && r.affiliate) {
@@ -167,11 +168,11 @@ export default function AffiliateApplyPage() {
         throw new Error(affiliateApplyErrorLabel(r.error))
       }
       setResult(r.affiliate ?? null)
-      setInfo(
-        r.created
-          ? '申请已提交，请等待运营审核。'
-          : '您已有待审核申请，无需重复提交；审核结果可在「我的推广」查看。',
-      )
+      if (r.affiliate?.status === 'active') {
+        navigate('/affiliate/portal')
+        return
+      }
+      setInfo('已提交，请前往「我的推广」查看推广二维码。')
     } catch (e) {
       setErr(e instanceof Error ? e.message : '提交失败')
     } finally {
@@ -203,7 +204,7 @@ export default function AffiliateApplyPage() {
             <h1 className="text-xl font-bold">申请成为推广员</h1>
           </div>
           <p className="text-sm leading-relaxed text-slate-600">
-            个人推广员可推广灵祺 ERP 商家会员与星选会员，审核通过后将获得专属推广码。实名认证可在首次提现前完成。
+            点击申请即成为推广员，并生成专属推广二维码。好友扫码完成注册并支付会员费后，按运营后台设置的比例获得佣金。
           </p>
 
           {booting ? (
@@ -224,7 +225,7 @@ export default function AffiliateApplyPage() {
                 to="/affiliate/portal"
                 className="mt-3 inline-flex text-sm font-semibold text-indigo-700 underline"
               >
-                {result.status === 'active' ? '进入我的推广中心 →' : '查看我的推广 / 申请进度 →'}
+                {result.status === 'active' ? '进入我的推广中心 →' : '开通后查看推广二维码 →'}
               </Link>
             </div>
           ) : null}
@@ -266,11 +267,15 @@ export default function AffiliateApplyPage() {
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="submit"
-                disabled={loading || blockResubmit}
+                disabled={loading || result?.status === 'disabled'}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {blockResubmit ? '已提交申请' : '提交申请'}
+                {result?.status === 'active'
+                  ? '查看推广二维码'
+                  : result?.status === 'disabled'
+                    ? '已停用'
+                    : '申请成为推广员'}
               </button>
               <button
                 type="button"
@@ -284,7 +289,7 @@ export default function AffiliateApplyPage() {
           </form>
 
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
-            提交即表示同意平台推广合作规则。每个登录账号仅对应一条推广员申请；审核通过后，请在
+            提交即表示同意平台推广合作规则。每个登录账号对应一名推广员；开通后请在
             <Link to="/affiliate/portal" className="mx-0.5 text-indigo-600 underline">
               我的推广
             </Link>

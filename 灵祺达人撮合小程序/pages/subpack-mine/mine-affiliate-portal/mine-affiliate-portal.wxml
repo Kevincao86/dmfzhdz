@@ -26,7 +26,7 @@
       <view class="mp-empty-v2">
         <text class="mp-empty-v2__icon">📣</text>
         <text class="mp-empty-v2__title">尚未成为推广员</text>
-        <text class="mp-empty-v2__sub">提交申请并通过审核后，即可获取推广码与太阳码。</text>
+        <text class="mp-empty-v2__sub">点击申请即成为推广员，并获得专属推广二维码。</text>
         <button class="portal-btn portal-btn--primary" bindtap="onGoApply">申请成为推广员</button>
       </view>
     </view>
@@ -37,7 +37,7 @@
         <text class="mp-sub-card__title">申请状态</text>
       </view>
       <text class="portal-status-line">当前状态：{{statusLabel}}</text>
-      <text class="portal-status-sub" wx:if="{{affiliate.status === 'pending'}}">审核通过后将展示推广太阳码与链接。</text>
+      <text class="portal-status-sub" wx:if="{{affiliate.status === 'pending' || affiliate.status === 'rejected'}}">回到申请页点击申请，即可开通并生成推广二维码。</text>
       <button class="portal-btn portal-btn--ghost" bindtap="onGoApply">查看申请 / 重新申请</button>
     </view>
 
@@ -132,7 +132,8 @@
           <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="loadWxacode">重新生成</button>
         </view>
       </view>
-      <text class="wxacode-tip">长按识别或保存图片，好友扫码进入小程序并自动绑定你的推广码。</text>
+      <text class="wxacode-tip" wx:if="{{commissionHint}}">{{commissionHint}}</text>
+      <text class="wxacode-tip">长按识别或保存图片。好友扫码完成注册并支付后，佣金按后台比例计入可提现余额。</text>
       <view class="wxacode-actions">
         <button class="portal-btn portal-btn--primary portal-btn--sm" bindtap="onCopyCode">复制推广码</button>
         <button class="portal-btn portal-btn--ghost portal-btn--sm" bindtap="onSaveWxacode" disabled="{{!wxacodePath}}">保存太阳码</button>

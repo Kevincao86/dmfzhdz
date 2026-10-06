@@ -9,6 +9,7 @@ import {
 } from '../../lib/distributionAttributionCore'
 import {
   fetchAffiliatePortal,
+  fetchAffiliateWxacode,
   formatCentsYuan,
   submitAffiliateWithdraw,
   withdrawRequestStatusLabel,
@@ -64,6 +65,9 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [withdrawing, setWithdrawing] = useState(false)
   const [decorBanner, setDecorBanner] = useState<RegistryPlatformDecorItem | null>(null)
+  const [wxacodeUrl, setWxacodeUrl] = useState('')
+  const [wxacodeErr, setWxacodeErr] = useState('')
+  const [wxacodeLoading, setWxacodeLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -82,6 +86,32 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    const active = data?.affiliate?.status === 'active' && Boolean(data.promoLinks)
+    if (!active) {
+      setWxacodeUrl('')
+      setWxacodeErr('')
+      setWxacodeLoading(false)
+      return
+    }
+    let cancelled = false
+    setWxacodeLoading(true)
+    setWxacodeErr('')
+    void fetchAffiliateWxacode()
+      .then((url) => {
+        if (!cancelled) setWxacodeUrl(url)
+      })
+      .catch((e) => {
+        if (!cancelled) setWxacodeErr(e instanceof Error ? e.message : '太阳码生成失败')
+      })
+      .finally(() => {
+        if (!cancelled) setWxacodeLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [data?.affiliate?.status, data?.affiliate?.refCode, data?.promoLinks])
 
   useEffect(() => {
     void fetchPlatformDecorItem('cs.settings.affiliate').then((item) => {
@@ -141,7 +171,7 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
           <h3 className="text-lg font-medium text-gray-900">我的推广</h3>
         </div>
         <p className="mt-1 text-sm text-gray-500">
-          查看专属推广码、推广链接与佣金结算。未申请者可先提交推广员申请。
+          点击申请即成为推广员，并生成专属推广二维码。扫码注册并支付后按后台比例获得佣金。
         </p>
       </div>
 
@@ -195,7 +225,7 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
 
       {!loading && !err && !affiliate ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-5 py-8 text-center">
-          <p className="text-sm text-slate-600">您尚未提交推广员申请。</p>
+          <p className="text-sm text-slate-600">点击申请即成为推广员，并获得专属推广二维码。</p>
           <Link
             to="/affiliate/apply"
             className="mt-4 inline-flex items-center gap-1 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
@@ -234,13 +264,13 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
               </div>
             ) : null}
             {hint ? <p className="mt-2 text-xs text-emerald-800">{hint}</p> : null}
-            {affiliate.status === 'pending' ? (
+            {affiliate.status === 'pending' || affiliate.status === 'rejected' ? (
               <p className="mt-2 text-xs">
-                审核通过后，推广码与链接将在此展示。您也可在
+                回到
                 <Link to="/affiliate/apply" className="mx-1 font-medium underline">
                   申请页
                 </Link>
-                查看进度。
+                点击申请，即可开通并生成推广二维码。
               </p>
             ) : null}
             {affiliate.status === 'rejected' || affiliate.status === 'disabled' ? (
@@ -256,6 +286,20 @@ export default function AffiliatePortalSection({ embedded = false }: Props) {
 
           {affiliate.status === 'active' && links ? (
             <section className="space-y-3">
+              <h4 className="text-sm font-medium text-gray-900">专属推广二维码</h4>
+              {data?.commissionHint ? (
+                <p className="text-xs leading-relaxed text-slate-600">{data.commissionHint}</p>
+              ) : null}
+              <div className="flex flex-col items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
+                {wxacodeLoading ? <p className="text-sm text-slate-500">二维码生成中…</p> : null}
+                {wxacodeUrl ? (
+                  <img src={wxacodeUrl} alt="专属推广二维码" className="h-40 w-40 rounded-lg border border-slate-100 bg-white" />
+                ) : null}
+                {wxacodeErr ? <p className="text-sm text-amber-700">{wxacodeErr}</p> : null}
+                <p className="max-w-sm text-xs leading-relaxed text-slate-600">
+                  好友扫码进入小程序并完成注册、支付会员费后，佣金按运营后台设置的比例计入可提现余额。
+                </p>
+              </div>
               <h4 className="text-sm font-medium text-gray-900">推广链接</h4>
               <div className="space-y-2">
                 {[

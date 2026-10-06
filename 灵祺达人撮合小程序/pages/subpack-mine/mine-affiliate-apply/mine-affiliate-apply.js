@@ -37,12 +37,14 @@ Page({
     try {
       const affiliate = await affiliateApply.fetchMyStatus()
       if (affiliate) {
-        const blockResubmit = affiliate.status === 'pending' || affiliate.status === 'active'
+        const blockResubmit = affiliate.status === 'active' || affiliate.status === 'disabled'
         let info = ''
-        if (affiliate.status === 'pending') {
-          info = '您已有待审核申请，审核通过后将在「我的推广」展示推广码。'
+        if (affiliate.status === 'pending' || affiliate.status === 'rejected') {
+          info = '点击下方即可成为推广员，并生成专属推广二维码。'
         } else if (affiliate.status === 'active') {
-          info = '您已是推广员，可前往「我的推广」查看推广码与佣金数据。'
+          info = '您已是推广员，可前往「我的推广」查看推广二维码与佣金。'
+        } else if (affiliate.status === 'disabled') {
+          info = '推广员已停用，请联系客服。'
         }
         this.setData({
           result: affiliate,
@@ -75,7 +77,7 @@ Page({
       const affiliate = await affiliateApply.fetchStatus(this.data.phone)
       const blockResubmit = !!(
         affiliate &&
-        (affiliate.status === 'pending' || affiliate.status === 'active')
+        (affiliate.status === 'active' || affiliate.status === 'disabled')
       )
       this.setData({
         result: affiliate,
@@ -90,13 +92,11 @@ Page({
   },
   async onSubmit() {
     if (this.data.blockResubmit) {
-      this.setData({
-        info:
-          this.data.result && this.data.result.status === 'active'
-            ? '您已是推广员，请前往「我的推广」。'
-            : '您已有待审核申请，无需重复提交。',
-        err: '',
-      })
+      if (this.data.result && this.data.result.status === 'active') {
+        wx.redirectTo({ url: PORTAL_URL })
+        return
+      }
+      this.setData({ info: '推广员已停用，请联系客服。', err: '' })
       return
     }
     if (!auth.isLoggedIn()) {
@@ -111,24 +111,26 @@ Page({
         note: this.data.note,
       })
       const affiliate = data.affiliate || null
+      if (affiliate && affiliate.status === 'active') {
+        wx.showToast({ title: '已成为推广员', icon: 'success' })
+        wx.redirectTo({ url: PORTAL_URL })
+        return
+      }
       this.setData({
         result: affiliate,
-        blockResubmit: !!(
-          affiliate &&
-          (affiliate.status === 'pending' || affiliate.status === 'active')
-        ),
-        info: data.created
-          ? '申请已提交，请等待审核。'
-          : '您已有待审核申请，请耐心等待；审核结果可在「我的推广」查看。',
+        blockResubmit: !!(affiliate && (affiliate.status === 'active' || affiliate.status === 'disabled')),
+        info: '已提交，请前往「我的推广」查看推广二维码。',
       })
     } catch (e) {
       if (e && e.affiliate) {
+        if (e.code === 'already_active' || e.affiliate.status === 'active') {
+          wx.redirectTo({ url: PORTAL_URL })
+          return
+        }
         this.setData({
           result: e.affiliate,
-          blockResubmit: e.affiliate.status === 'active' || e.affiliate.status === 'pending',
-          info: e.code === 'already_active' || e.affiliate.status === 'active'
-            ? '您已是通过审核的推广员。'
-            : (e && e.message) || '',
+          blockResubmit: e.affiliate.status === 'disabled',
+          info: (e && e.message) || '',
           err: e.code === 'phone_taken' ? e.message : '',
         })
       } else {

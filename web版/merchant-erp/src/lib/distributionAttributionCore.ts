@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { creditIndividualAffiliateCommissionFromSnapshot } from './distributionRegistryCore.js'
 import type { RegistryFile } from './opsRegistryTypes.js'
 import type {
   DistributionAttributionLandingSurface,
@@ -136,13 +137,20 @@ export function markDistributionAttributionPaidFromSnapshot(
   const row = findAttributionBySubjectFromSnapshot(data, params.subjectType, subjectRegistryId)
   if (!row) return { ok: true, attribution: null, updated: false }
 
+  const prevPaid = Math.max(0, Math.floor(Number(row.paidAmountCents) || 0))
   const paidAmountCents = Math.max(0, Math.floor(Number(params.paidAmountCents) || 0))
+  const nextPaid = Math.max(prevPaid, paidAmountCents)
+  const delta = nextPaid - prevPaid
   const ts = nowIso()
+  const changed = delta > 0 || row.status !== 'paid' || !row.firstPaidAt
   row.firstPaidAt = row.firstPaidAt || ts
-  row.paidAmountCents = Math.max(row.paidAmountCents ?? 0, paidAmountCents)
+  row.paidAmountCents = nextPaid
   row.status = 'paid'
   if (!row.activatedAt) row.activatedAt = ts
-  return { ok: true, attribution: row, updated: true }
+  if (delta > 0) {
+    creditIndividualAffiliateCommissionFromSnapshot(data, row, delta)
+  }
+  return { ok: true, attribution: row, updated: changed }
 }
 
 export type DistributionLineStats = {

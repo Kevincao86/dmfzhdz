@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "申请推广员",
+  "usingComponents": {
+    "site-icp-footer": "/components/site-icp-footer/index"
+  }
+}

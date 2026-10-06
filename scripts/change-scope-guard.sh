@@ -121,6 +121,7 @@ list_scopes() {
   mp_four_fixes        商家经营分析顾客数据；达人我的单据缓存；转单原表打开；达人客服 AI 回复
   talent_footer_lines 达人小程序页脚版权与备案收成两行
   talent_audit_browse  达人小程序审核：首页可先浏览，手机号/头像/昵称改为用户自行登录时再授权
+  affiliate_instant    推广员一点申请即开通、专属二维码、扫码付费按后台比例入账
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1774,6 +1775,28 @@ meoo-shop-analysis-summary.ts
 灵祺达人撮合小程序/app.json
 灵祺达人撮合小程序/utils/talentSupportAiMp.js
 灵祺达人撮合小程序/pages/subpack-mine/mine-support-chat
+change-scope-guard
+PAT
+      ;;
+    affiliate_instant)
+      cat <<'PAT'
+distributionRegistryCore
+distributionAttributionCore
+distributionAffiliateApplyClient
+distributionAffiliatePortalClient
+AffiliateApplyPage
+AffiliatePortalSection
+meoo-distribution-affiliate-portal
+OpsDistributionPage
+mine-affiliate-apply
+mine-affiliate-portal
+mpDistributionAffiliateApply
+mpDistributionAffiliatePortal
+mpApiErrors
+灵祺ERP小程序/pages/affiliate
+灵祺ERP小程序/utils/merchantAffiliateMp.js
+灵祺ERP小程序/pages/mine/mine.js
+灵祺ERP小程序/app.json
 change-scope-guard
 PAT
       ;;

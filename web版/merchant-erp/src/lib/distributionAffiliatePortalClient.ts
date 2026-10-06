@@ -30,6 +30,7 @@ export type AffiliatePortalPayload = {
   attributions: PartnerDistributionAttributionRow[]
   withdrawGate: AffiliateWithdrawGate | null
   withdrawRequests: AffiliatePortalWithdrawRow[]
+  commissionHint: string | null
 }
 
 export function formatCentsYuan(cents: number): string {
@@ -61,6 +62,7 @@ export async function fetchAffiliatePortal(): Promise<AffiliatePortalPayload> {
         attributions: (json.attributions as PartnerDistributionAttributionRow[]) ?? [],
         withdrawGate: (json.withdrawGate as AffiliateWithdrawGate | null) ?? null,
         withdrawRequests: (json.withdrawRequests as AffiliatePortalWithdrawRow[]) ?? [],
+        commissionHint: typeof json.commissionHint === 'string' ? json.commissionHint : null,
       }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
@@ -93,6 +95,37 @@ export async function submitAffiliateWithdraw(amountCents: number): Promise<void
         continue
       }
       return
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(lastErr)
+}
+
+export async function fetchAffiliateWxacode(): Promise<string> {
+  const { token, source } = await resolveMerchantApiBearer()
+  if (!token) throw new Error('请先登录')
+  const headers = {
+    ...merchantApiAuthHeaders(token, source),
+    'Content-Type': 'application/json',
+  }
+  let lastErr = '太阳码生成失败'
+  for (const url of merchantApiFetchUrls('/api/meoo-distribution-affiliate-portal')) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'wxacode' }),
+      })
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      if (!res.ok || json.ok === false) {
+        lastErr = String(json.message || json.error || res.statusText || '太阳码生成失败')
+        if (res.status !== 404) break
+        continue
+      }
+      const dataUrl = String(json.dataUrl || '').trim()
+      if (!dataUrl) throw new Error('太阳码生成失败')
+      return dataUrl
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
     }

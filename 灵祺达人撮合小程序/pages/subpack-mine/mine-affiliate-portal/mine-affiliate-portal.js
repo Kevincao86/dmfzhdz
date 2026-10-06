@@ -95,6 +95,7 @@ function mapPortalView(data) {
           monthlyCapYuan: affiliatePortal.formatYuan(data.withdrawGate.monthlyCapCents),
         }
       : null,
+    commissionHint: data.commissionHint || '',
     withdrawRequests: (data.withdrawRequests || []).map((row) => ({
       ...row,
       amountYuan: affiliatePortal.formatYuan(row.amountCents),
@@ -120,6 +121,7 @@ Page({
     settlements: [],
     attributionStats: null,
     attributions: [],
+    commissionHint: '',
     withdrawGate: null,
     withdrawAmount: '',
     withdrawing: false,

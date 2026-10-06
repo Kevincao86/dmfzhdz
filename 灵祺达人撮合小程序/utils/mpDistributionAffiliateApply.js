@@ -23,8 +23,8 @@ function phoneFromAccount(account) {
 
 function statusLabel(status) {
   const map = {
-    pending: '待审核',
-    active: '已通过',
+    pending: '待开通',
+    active: '已开通',
     rejected: '未通过',
     disabled: '已停用',
   }
@@ -35,6 +35,8 @@ function applyErrorLabel(error) {
   switch (String(error || '')) {
     case 'already_active':
       return '您已是推广员，请前往「我的推广」查看推广码与数据'
+    case 'affiliate_disabled':
+      return '推广员已停用，请联系客服'
     case 'phone_taken':
       return '这个手机号已经用来申请过推广员，请用注册手机号，或联系客服'
     case 'distribution_disabled':
