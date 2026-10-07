@@ -16,6 +16,7 @@ import { DEFAULT_PR_FEATURE_ACCESS } from './prFeatureAccess.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
+import { purgeClosedAccountIdentities } from './mpAccountCloseIdentity.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { ensureDouyinSalesLevelMonthlyReset } from './mpDouyinSalesLevelMonthlyReset.js'
 import {
@@ -1401,7 +1402,22 @@ export async function mpAuthSendCloseAccountSms(
   return { phoneMasked: maskMpPhone(phone) }
 }
 
-/** 短信验证通过后删除登录账号和会话。达人、PR、拍摄、剪辑共用这一条。 */
+async function accountIdsEq(
+  rest: SupabaseRest,
+  column: string,
+  value: string,
+): Promise<string[]> {
+  const v = String(value || '').trim()
+  if (!v) return []
+  const res = await rest.get(
+    `/mp_accounts?select=id&${column}=eq.${encodeURIComponent(v)}&limit=20`,
+  )
+  if (!res.ok) return []
+  const rows = (await res.json()) as { id?: string }[]
+  return rows.map((row) => String(row.id || '').trim()).filter(Boolean)
+}
+
+/** 短信验证通过后删除登录账号、会话，以及这个人的达人 / PR / 拍摄 / 剪辑身份。 */
 export async function mpAuthCloseAccount(
   supabaseUrl: string,
   serviceRole: string,
@@ -1416,8 +1432,27 @@ export async function mpAuthCloseAccount(
   const code = String(smsCode || '').trim()
   if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
   if (!(await verifyAuthSmsCode(phone, code))) throw new Error('sms_code_invalid')
-  await rest.delete(`/mp_auth_sessions?account_id=eq.${encodeURIComponent(account.id)}`)
-  await deleteAccountById(rest, account.id)
+
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  const purged = purgeClosedAccountIdentities(data, account)
+  if (purged.changed) await io.save(data)
+
+  const keys = purged.keys
+  const idGroups = await Promise.all([
+    accountIdsEq(rest, 'id', account.id),
+    accountIdsEq(rest, 'login_name', phone),
+    ...keys.openids.flatMap((oid) => [
+      accountIdsEq(rest, 'openid', oid),
+      accountIdsEq(rest, 'dy_openid', oid),
+    ]),
+  ])
+  const accountIds = [...new Set(idGroups.flat())]
+  if (!accountIds.includes(account.id)) accountIds.push(account.id)
+  for (const id of accountIds) {
+    await rest.delete(`/mp_auth_sessions?account_id=eq.${encodeURIComponent(id)}`)
+    await deleteAccountById(rest, id)
+  }
 }
 
 export type MpAuthPhoneRegisterInput = {
