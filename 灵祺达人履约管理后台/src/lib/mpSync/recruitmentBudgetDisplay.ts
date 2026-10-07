@@ -51,10 +51,11 @@ function compactLevelGroup(levels: unknown[]) {
 function formatTierPrice(price: unknown, priceMode?: unknown) {
   if (normalizeTierPriceMode(priceMode) === 'self_quote') return '自报价'
   const s = String(price ?? '').trim()
-  if (s === '') return '—'
-  if (/^¥/.test(s)) return s
-  const n = Number(String(s).replace(/,/g, ''))
-  if (Number.isFinite(n)) return n === 0 ? '置换' : `¥${n}`
+  if (s === '' || s === '—') return '—'
+  if (/自报价/.test(s)) return '自报价'
+  if (/置换/.test(s)) return '置换'
+  const n = Number(String(s).replace(/[¥,]/g, ''))
+  if (Number.isFinite(n)) return n > 0 ? `¥${n}` : '置换'
   return s
 }
 
@@ -93,11 +94,7 @@ function tiersFromBudgetText(body: string) {
     if (!segments.length) return null
     return {
       mode: '等级阶梯',
-      tiers: segments.map((seg) => {
-        const m = seg.match(/^(.+?)\s*¥\s*([\d,.]+)\s*$/)
-        if (m) return { label: m[1].trim(), price: formatTierPrice(m[2]) }
-        return { label: seg.trim(), price: '' }
-      }),
+      tiers: segments.map((seg) => parseTierSegment(seg)),
     }
   }
   if (/粉丝阶梯/.test(b)) {
@@ -106,25 +103,75 @@ function tiersFromBudgetText(body: string) {
     if (!segments.length) return null
     return {
       mode: '粉丝阶梯',
-      tiers: segments.map((seg) => {
-        const m = seg.match(/^(.+?)\s*¥\s*([\d,.]+)\s*$/)
-        if (m) return { label: m[1].trim(), price: formatTierPrice(m[2]) }
-        return { label: seg.trim(), price: '' }
-      }),
+      tiers: segments.map((seg) => parseTierSegment(seg)),
     }
   }
   return null
 }
 
-function tierSummary(tiers: Array<{ price: string }>) {
-  const prices = tiers
-    .map((t) => Number(String(t.price).replace(/[¥,]/g, '')))
-    .filter((n) => Number.isFinite(n))
-  if (!prices.length) return `${tiers.length}档`
-  const min = Math.min(...prices)
-  const max = Math.max(...prices)
-  if (min === max) return `${tiers.length}档 · ¥${min}`
-  return `${tiers.length}档 · ¥${min}~¥${max}`
+function parseTierSegment(seg: string) {
+  const s = String(seg || '').trim()
+  if (/自报价/.test(s)) {
+    const label = s.replace(/自报价/g, '').trim() || '自报价'
+    return { label, price: '自报价' }
+  }
+  if (/置换/.test(s)) {
+    const label = s.replace(/置换/g, '').trim() || '置换'
+    return { label, price: '置换' }
+  }
+  const m = s.match(/^(.+?)\s*¥\s*([\d,.]+)\s*$/)
+  if (m) return { label: m[1].trim(), price: formatTierPrice(m[2]) }
+  return { label: s, price: '' }
+}
+
+function positivePrice(price: string) {
+  const s = String(price ?? '').trim()
+  if (!s || /自报价|置换|面议|—/.test(s)) return null
+  const n = Number(s.replace(/[¥,]/g, ''))
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n
+}
+
+function priceWord(price: string) {
+  const s = String(price ?? '').trim()
+  if (/自报价/.test(s)) return '自报价'
+  if (/置换/.test(s)) return '置换'
+  if (/面议/.test(s)) return '面议'
+  return ''
+}
+
+function unpricedText(tier: { label?: string; price: string }) {
+  const word = priceWord(tier.price) || priceWord(tier.label || '')
+  const label = String(tier.label || '').trim()
+  if (word && label && label !== '—' && label !== word && !label.includes(word)) return `${label} ${word}`
+  if (label && /自报价|置换|面议/.test(label)) return label
+  if (word) return word
+  if (label && label !== '—') return label
+  return '自报价'
+}
+
+function tierSummary(tiers: Array<{ label?: string; price: string }>) {
+  const parts = tiers.map((t) => {
+    const n = positivePrice(t.price)
+    if (n != null) return { kind: 'money' as const, n }
+    return { kind: 'text' as const, text: unpricedText(t) }
+  })
+  const moneys = parts.filter((p) => p.kind === 'money')
+  if (moneys.length === parts.length && moneys.length) {
+    const nums = moneys.map((p) => p.n)
+    const min = Math.min(...nums)
+    const max = Math.max(...nums)
+    if (min === max) return `${tiers.length}档 · ¥${min}`
+    return `${tiers.length}档 · ¥${min}~¥${max}`
+  }
+  if (!moneys.length) {
+    const uniq: string[] = []
+    parts.forEach((p) => {
+      if (p.kind === 'text' && !uniq.includes(p.text)) uniq.push(p.text)
+    })
+    return uniq.join(' / ')
+  }
+  return parts.map((p) => (p.kind === 'money' ? `¥${p.n}` : p.text)).join(' / ')
 }
 
 export function buildBudgetDisplay(
@@ -174,8 +221,10 @@ export function formatHallBudgetAmount(row: {
   const line = bd.line || row.budgetText || ''
   const selfQuote = line.match(/自报价\s+(\d+)\s*-\s*([\d∞]+)/i)
   if (selfQuote) {
+    const min = Number(selfQuote[1])
+    if (!(min > 0)) return '自报价'
     const max = selfQuote[2] === '∞' ? '不限' : formatMoney(Number(selfQuote[2]))
-    return `¥ ${formatMoney(Number(selfQuote[1]))} - ${max}`
+    return `¥ ${formatMoney(min)} - ${max}`
   }
   const fixed = line.match(/一口价\s*¥?\s*([\d,]+)/)
   if (fixed) return `¥ ${formatMoney(Number(fixed[1].replace(/,/g, '')))}`
