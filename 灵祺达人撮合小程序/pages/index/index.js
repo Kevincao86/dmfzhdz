@@ -21,6 +21,7 @@ const memberStore = require('../../utils/talentMember.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const hallRegionLocate = require('../../utils/hallRegionLocate.js')
 const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
+const orderFavorites = require('../../utils/orderFavorites.js')
 const mpPrivacyPageMixin = require('../../utils/mpPrivacyPageMixin.js')
 const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
 
@@ -346,6 +347,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       if (this._hallRegion) this.applyFilters()
     }
     if (hasRows && !identityChanged) {
+      patch.displayRows = (this.data.displayRows || []).map((r) =>
+        r ? { ...r, favorited: orderFavorites.isFavorite(r.id) } : r,
+      )
       this.setData(patch)
       void loadHallList(this).then(afterHall)
       return
@@ -727,6 +731,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         const row = listFilters.attachHallCardHighlightTags({
           ...tagged,
           cardPriceLine: budgetDisplayUtil.formatCardPriceLine(tagged),
+          favorited: !tagged.isMock && orderFavorites.isFavorite(tagged.id),
         })
         return row
       })
@@ -876,6 +881,25 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       filterStatus: this.data.statusFilters[Number(e.detail.value)] || '全部',
     })
     this.applyFilters()
+  },
+  onToggleOrderFavorite(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === 'mock-preview') return
+    if ((this.data.workIdentity || userProfile.readIdentity()) === 'pr') return
+    if (!auth.isLoggedIn()) {
+      require('../../utils/mpGuestRoutes.js').redirectToLogin('/pages/index/index')
+      return
+    }
+    const favorited = orderFavorites.toggleFavorite(id)
+    const displayRows = (this.data.displayRows || []).map((r) =>
+      r && r.id === id ? { ...r, favorited } : r,
+    )
+    this.setData({ displayRows })
+    wx.showToast({
+      title: favorited ? '已收藏' : '已取消收藏',
+      icon: 'none',
+      duration: 1200,
+    })
   },
   goDetail(e) {
     const id = e.currentTarget.dataset.id

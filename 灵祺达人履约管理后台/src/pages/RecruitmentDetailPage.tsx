@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Star } from 'lucide-react'
 import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement, cancelMpRecruitmentApply } from '../lib/mpApi'
 import { resolveSignupDeadlineMsFromMp } from '../lib/mpRecruitment/listFilters'
 import { getAccount, getActiveRole } from '../lib/mpSession'
@@ -30,6 +31,7 @@ import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
 import { canTalentUploadRecruitmentVideo, canTalentSubmitVisitPublishLink, resolveApplicationDisplayStatus, canTalentCancelApplication } from '../lib/mpRecruitment/talentApplicationStatus'
 import { flushClientStateSync } from '../lib/mpAccountClientSync'
+import { isOrderFavorited, toggleOrderFavorite } from '../lib/mpSync/orderFavorites'
 import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import VisitScheduleTalentPanel from '../components/mp/VisitScheduleTalentPanel'
 import VisitPublishLinkPanel from '../components/mp/VisitPublishLinkPanel'
@@ -120,6 +122,7 @@ export default function RecruitmentDetailPage() {
   const [showTargetedInviteActions, setShowTargetedInviteActions] = useState(false)
   const [targetedInviteStatus, setTargetedInviteStatus] = useState('')
   const [targetedInviteStatusLabel, setTargetedInviteStatusLabel] = useState('')
+  const [orderFavorited, setOrderFavorited] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const detailViewBumpRef = useRef('')
   const appliedFromUrl = search.get('applied') === '1'
@@ -213,6 +216,20 @@ export default function RecruitmentDetailPage() {
         : null
     return String(relay?.sourceUrl || '').trim()
   })()
+
+  useEffect(() => {
+    setOrderFavorited(id ? isOrderFavorited(id) : false)
+  }, [id])
+
+  function onToggleOrderFavorite() {
+    if (!id) return
+    if (!getAccount()) {
+      window.alert('请先登录后再收藏商单')
+      nav('/login')
+      return
+    }
+    setOrderFavorited(toggleOrderFavorite(id))
+  }
 
   useEffect(() => {
     if (!id) {
@@ -597,6 +614,18 @@ export default function RecruitmentDetailPage() {
                   粉丝要求：{view.fansRequirement}
                 </p>
               </div>
+              {workIdentity !== 'pr' ? (
+                <button
+                  type="button"
+                  className="hall-order-card__fav shrink-0"
+                  aria-pressed={orderFavorited}
+                  aria-label={orderFavorited ? '取消收藏商单' : '收藏商单'}
+                  onClick={onToggleOrderFavorite}
+                >
+                  <Star size={18} strokeWidth={2} fill={orderFavorited ? 'currentColor' : 'none'} />
+                  <span>{orderFavorited ? '已收藏' : '收藏商单'}</span>
+                </button>
+              ) : null}
               {id ? <PrRecruitQrCard mpOrderId={id} /> : null}
             </div>
           </div>
@@ -798,11 +827,25 @@ export default function RecruitmentDetailPage() {
 
           <StickyActionBar
             left={
-              role === 'talent' ? (
-                <BtnOutline disabled={sharing} onClick={() => void onShare()}>
-                  {sharing ? '生成中…' : '分享招募'}
-                </BtnOutline>
-              ) : null
+              <>
+                {workIdentity !== 'pr' ? (
+                  <button
+                    type="button"
+                    className="hall-order-card__fav"
+                    aria-pressed={orderFavorited}
+                    aria-label={orderFavorited ? '取消收藏商单' : '收藏商单'}
+                    onClick={onToggleOrderFavorite}
+                  >
+                    <Star size={16} strokeWidth={2} fill={orderFavorited ? 'currentColor' : 'none'} />
+                    <span>{orderFavorited ? '已收藏' : '收藏商单'}</span>
+                  </button>
+                ) : null}
+                {role === 'talent' ? (
+                  <BtnOutline disabled={sharing} onClick={() => void onShare()}>
+                    {sharing ? '生成中…' : '分享招募'}
+                  </BtnOutline>
+                ) : null}
+              </>
             }
             right={
               <>

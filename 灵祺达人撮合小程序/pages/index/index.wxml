@@ -217,6 +217,16 @@
         <view class="job-card-v1__main">
           <view class="job-card-v1__head">
             <text class="job-card-v1__title">{{item.title}}</text>
+            <view
+              wx:if="{{workIdentity !== 'pr' && !item.isMock}}"
+              class="job-card-v1__fav {{item.favorited ? 'job-card-v1__fav--on' : ''}}"
+              catchtap="onToggleOrderFavorite"
+              data-id="{{item.id}}"
+              aria-role="button"
+              aria-label="{{item.favorited ? '取消收藏商单' : '收藏商单'}}"
+            >
+              <text class="job-card-v1__fav-glyph">★</text>
+            </view>
             <text
               wx:if="{{item.aiTag}}"
               class="job-card-v1__ai-tag"

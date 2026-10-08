@@ -404,6 +404,27 @@
   gap: 10rpx;
 }
 
+.job-card-v1__fav {
+  flex-shrink: 0;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.job-card-v1__fav-glyph {
+  font-size: 36rpx;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2rpx #9ca3af;
+}
+
+.job-card-v1__fav--on .job-card-v1__fav-glyph {
+  color: #f59e0b;
+  -webkit-text-stroke: 0;
+}
+
 .job-card-v1__title {
   flex: 1;
   min-width: 0;
