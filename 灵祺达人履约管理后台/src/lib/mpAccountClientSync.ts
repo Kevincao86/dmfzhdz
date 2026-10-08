@@ -48,6 +48,8 @@ export type MpClientStatePayload = {
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null
 let syncing = false
+let localEpoch = 0
+let needResync = false
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -208,7 +210,10 @@ function mergeApplicationsRemote(
     .slice(0, 80)
 }
 
-export function applyRemoteClientState(state: MpClientStatePayload | null | undefined) {
+export function applyRemoteClientState(
+  state: MpClientStatePayload | null | undefined,
+  epochAtStart?: number,
+) {
   if (!state || typeof state !== 'object') return
   const account = getAccount()
   const appKey = scopedStorageKey(APPLICATIONS_BASE, account)
@@ -253,7 +258,8 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
   if (Array.isArray(state.talentFavoriteIds)) {
     applyFavoriteIdsFromSync(state.talentFavoriteIds)
   }
-  if (Array.isArray(state.orderFavoriteIds)) {
+  const favoriteWriteStale = epochAtStart != null && epochAtStart !== localEpoch
+  if (!favoriteWriteStale && Array.isArray(state.orderFavoriteIds)) {
     applyOrderFavoriteIdsFromSync(state.orderFavoriteIds)
   }
   if (state.selectionHandled && typeof state.selectionHandled === 'object') {
@@ -271,22 +277,34 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
 }
 
 export async function syncClientStateWithServer() {
-  if (!getToken() || syncing) return null
+  if (!getToken()) return null
+  if (syncing) {
+    needResync = true
+    return null
+  }
   syncing = true
+  const epochAtStart = localEpoch
   try {
     const { state } = await apiSyncClientState(collectLocalClientState())
-    applyRemoteClientState(state as MpClientStatePayload)
+    applyRemoteClientState(state as MpClientStatePayload, epochAtStart)
     return state
   } catch (e) {
     console.warn('[fulfillment] client_state_sync', e instanceof Error ? e.message : String(e))
     return null
   } finally {
     syncing = false
+    if (needResync && getToken()) {
+      needResync = false
+      return syncClientStateWithServer()
+    }
+    needResync = false
   }
 }
 
 export function scheduleClientStatePush(delayMs = 1500) {
+  localEpoch += 1
   if (!getToken()) return
+  if (syncing) needResync = true
   if (pushTimer) clearTimeout(pushTimer)
   pushTimer = setTimeout(() => {
     pushTimer = null
