@@ -109,7 +109,7 @@ async function fetchMerchantProductList(/** @type {string} */ platform, opts) {
     return {
       ok: false,
       message:
-        '尚未绑定对应平台。请在商家后台「系统设置」完成授权，并将 accessToken 写入本机（键名与 Web 一致，如 meoo_douyin_merchant_token）。',
+        '尚未绑定该平台。请先在电脑端「设置 → 系统设置」完成授权，再回到本页下拉刷新。',
     }
   }
   const page = Math.max(1, (opts && opts.page) || 1)
