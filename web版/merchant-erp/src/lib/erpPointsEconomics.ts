@@ -66,11 +66,18 @@ export const ERP_RECHARGE_POINTS_PER_YUAN = Math.floor(
   ERP_POINT_AI_COST_SHARE / ERP_POINT_INTERNAL_COST_YUAN,
 )
 
-/** 月付价（元）→ 月赠积分（60% 毛利，未取整） */
+/**
+ * 月赠积分锚点：168 元 = 5000 积分。
+ * 其余档位按月费同比取整（约 70% 毛利；1 积分内部成本仍为 ¥0.01）。
+ */
+export const ERP_MONTHLY_GIFT_ANCHOR_YUAN = 168
+export const ERP_MONTHLY_GIFT_ANCHOR_POINTS = 5000
+
+/** 月付价（元）→ 月赠积分（按 168 元 = 5000 积分同比） */
 export function computeErpMonthlyGiftFromYuan(monthlyYuan: number): number {
   const y = Number(monthlyYuan)
   if (!Number.isFinite(y) || y <= 0) return 0
-  return Math.floor((y * ERP_POINT_AI_COST_SHARE) / ERP_POINT_INTERNAL_COST_YUAN)
+  return Math.round((y * ERP_MONTHLY_GIFT_ANCHOR_POINTS) / ERP_MONTHLY_GIFT_ANCHOR_YUAN)
 }
 
 /** 各会员档位月赠积分（套餐桶，自然月刷新） */

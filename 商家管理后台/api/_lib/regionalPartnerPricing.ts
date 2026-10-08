@@ -16,6 +16,7 @@ type Db = any
 
 export type SubscriptionTierKey =
   | 'member_monthly'
+  | 'member_store_monthly'
   | 'member_plus_monthly'
   | 'member_quarterly'
   | 'member_plus_quarterly'
@@ -26,7 +27,7 @@ export type ResolvedSubscriptionTier = {
   yuan: number
   cents: number
   floorCents: number
-  plan: 'member' | 'member_plus'
+  plan: 'member' | 'member_store' | 'member_plus'
   periodDays: 30 | 90
   regionalMarkup: boolean
 }
@@ -39,7 +40,7 @@ export const PLATFORM_SUBSCRIPTION_FLOOR: Record<
   SubscriptionTierKey,
   {
     label: string
-    plan: 'member' | 'member_plus'
+    plan: 'member' | 'member_store' | 'member_plus'
     periodDays: 30 | 90
     floorCents: number
   }
@@ -49,6 +50,12 @@ export const PLATFORM_SUBSCRIPTION_FLOOR: Record<
     plan: 'member',
     periodDays: 30,
     floorCents: 16800,
+  },
+  member_store_monthly: {
+    label: '进阶版 · 月度',
+    plan: 'member_store',
+    periodDays: 30,
+    floorCents: 36800,
   },
   member_plus_monthly: {
     label: '会员 Plus · 月度',
