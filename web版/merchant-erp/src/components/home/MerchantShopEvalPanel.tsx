@@ -745,6 +745,18 @@ export default function MerchantShopEvalPanel() {
 
   return (
     <section className="shop-eval overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="border-b border-indigo-100 bg-indigo-50/40 px-5 py-3 text-sm leading-6 text-slate-600">
+        <p>
+          <span className="font-medium text-indigo-700">数据来源</span>
+          <span className="mx-2 text-indigo-200">|</span>
+          商家填写的店名、地址、分类，以及已绑定的门店资料；评估时联网检索公开主页、套餐和评价。
+        </p>
+        <p className="mt-1">
+          <span className="font-medium text-indigo-700">分析方式</span>
+          <span className="mx-2 text-indigo-200">|</span>
+          按六个维度打分。公开页面里有的用检索结果，没有的按同城同品类门店预估。
+        </p>
+      </div>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
           <p className="text-xs font-semibold tracking-wide text-[#1E3A5F]">门店经营评估</p>

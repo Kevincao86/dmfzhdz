@@ -1,4 +1,14 @@
 <view class="shop-eval-page">
+  <view class="source-note">
+    <view class="source-line">
+      <text class="source-k">数据来源</text>
+      <text class="source-v">商家填写的店名、地址、分类，以及已绑定的门店资料；评估时联网检索公开主页、套餐和评价。</text>
+    </view>
+    <view class="source-line">
+      <text class="source-k">分析方式</text>
+      <text class="source-v">按六个维度打分。公开页面里有的用检索结果，没有的按同城同品类门店预估。</text>
+    </view>
+  </view>
   <view class="plats">
     <view
       wx:for="{{platforms}}"
