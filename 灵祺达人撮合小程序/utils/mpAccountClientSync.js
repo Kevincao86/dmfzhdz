@@ -262,7 +262,7 @@ function applyRemoteState(state, epochAtStart) {
   if (Array.isArray(state.talentFavoriteIds)) {
     talentFavorites.applyFavoriteIdsFromSync(state.talentFavoriteIds)
   }
-  if (Array.isArray(state.orderFavoriteIds)) {
+  if (!readFieldsStale && Array.isArray(state.orderFavoriteIds)) {
     orderFavorites.applyFavoriteIdsFromSync(state.orderFavoriteIds)
   }
   if (state.groupQrCache && typeof state.groupQrCache === 'object') {

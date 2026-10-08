@@ -1156,7 +1156,8 @@ export async function mpAuthPasswordLogin(
   const name = normalizeMpLoginName(loginName)
   if (!name || !password) throw new Error('invalid_credentials')
   let account = await findAccountByLoginName(rest, name)
-  if (!account?.password_hash || !account.password_salt) throw new Error('account_no_password')
+  if (!account) throw new Error('invalid_credentials')
+  if (!account.password_hash || !account.password_salt) throw new Error('account_no_password')
   if (!verifyPassword(password, account.password_hash, account.password_salt)) {
     throw new Error('invalid_credentials')
   }
