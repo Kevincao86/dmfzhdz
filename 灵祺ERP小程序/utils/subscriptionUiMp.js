@@ -7,7 +7,7 @@ const TIERS = [
   { id: 'member_plus', label: '会员 Plus', plan: 'member_plus', price: '¥598/月起' },
 ]
 
-/** 月赠积分：168 元 = 5000，其余档位按月费同比。与 erpPointsEconomics.ERP_MONTHLY_GIFT_POINTS 一致 */
+/** 月赠积分：168 元 = 5000，其余档位按月费同比后取整到整千。与 erpPointsEconomics 一致 */
 const FEATURE_ROWS = [
   {
     key: 'core',
@@ -60,8 +60,8 @@ const FEATURE_ROWS = [
     icon: '✦',
     free: '注册赠 100 积分',
     member: '每月 5,000 积分',
-    member_store: '每月 10,952 积分',
-    member_plus: '每月 17,798 积分',
+    member_store: '每月 11,000 积分',
+    member_plus: '每月 18,000 积分',
   },
 ]
 
