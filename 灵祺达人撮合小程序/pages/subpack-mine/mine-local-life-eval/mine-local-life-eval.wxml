@@ -1,4 +1,14 @@
 <view class="xingxuan-page page-shell {{lqThemeClass}}">
+  <view class="source-note">
+    <view class="source-line">
+      <text class="source-k">数据来源</text>
+      <text class="source-v">达人填写的昵称、账号、粉丝、标签、报价；有主页时联网检索公开主页。</text>
+    </view>
+    <view class="source-line">
+      <text class="source-k">分析方式</text>
+      <text class="source-v">按六个维度打分。公开主页里有的用检索结果，没有的按同类本地生活达人预估。</text>
+    </view>
+  </view>
   <view class="plats">
     <view
       wx:for="{{platforms}}"

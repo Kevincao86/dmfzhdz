@@ -1,5 +1,38 @@
 @import '../../../styles/xingxuan-subpage.wxss';
 
+.source-note {
+  margin: 0 0 16rpx;
+  padding: 20rpx 22rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border-left: 6rpx solid #7c4dff;
+}
+
+.source-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.source-line + .source-line {
+  margin-top: 10rpx;
+}
+
+.source-k {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #6d28d9;
+  line-height: 1.5;
+}
+
+.source-v {
+  flex: 1;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.5;
+}
+
 .plats {
   display: flex;
   flex-wrap: wrap;

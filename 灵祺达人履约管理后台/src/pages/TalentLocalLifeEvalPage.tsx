@@ -341,6 +341,19 @@ export default function TalentLocalLifeEvalPage() {
         <h1 className="text-xl font-bold">达人账号分析</h1>
       </header>
 
+      <div className="rounded-xl border border-violet-100 bg-white px-4 py-3 text-sm leading-6 text-[var(--shell-muted)]">
+        <p>
+          <span className="font-medium text-violet-700">数据来源</span>
+          <span className="mx-2 text-violet-200">|</span>
+          达人填写的昵称、账号、粉丝、标签、报价；有主页时联网检索公开主页。
+        </p>
+        <p className="mt-1">
+          <span className="font-medium text-violet-700">分析方式</span>
+          <span className="mx-2 text-violet-200">|</span>
+          按六个维度打分。公开主页里有的用检索结果，没有的按同类本地生活达人预估。
+        </p>
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {PLATFORMS.map((item) => (
           <button

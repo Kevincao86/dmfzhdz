@@ -359,6 +359,18 @@ export default function StoreAnalysisPage() {
       title="店铺分析"
       subtitle="先看成交与客群图表；点击「店铺分析」由 GPT 结合评价生成完整图文报告"
     >
+      <div className="mb-4 rounded-xl border border-indigo-100 bg-white px-4 py-3 text-sm leading-6 text-slate-600">
+        <p>
+          <span className="font-medium text-indigo-700">数据来源</span>
+          <span className="mx-2 text-indigo-200">|</span>
+          抖音来客已同步的订单；评价来自来客餐饮评价。
+        </p>
+        <p className="mt-1">
+          <span className="font-medium text-indigo-700">分析方式</span>
+          <span className="mx-2 text-indigo-200">|</span>
+          图表按所选日期汇总成交、退款和客群。点「店铺分析」后，用 AI 结合订单和评价写经营建议。
+        </p>
+      </div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <label className="text-sm text-slate-600">
           开始
