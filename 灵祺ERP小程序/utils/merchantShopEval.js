@@ -103,10 +103,10 @@ const SHOP_EVAL_GRADES_SINGLE = [
 ]
 
 const SHOP_EVAL_GRADES_CHAIN = [
-  { key: 'ready', range: '80~100', label: '品牌口碑稳', note: '各店公开口碑比较齐，内容和套餐没有明显打架' },
-  { key: 'tune', range: '70~79', label: '品牌能被看见', note: '品牌有内容或套餐，但舆情离散或标准化还没齐' },
-  { key: 'fill', range: '55~69', label: '分店口碑不齐', note: '有门店的公开差评或价格带在拖品牌' },
-  { key: 'build', range: '＜55', label: '品牌尚未成型', note: '公开渠道上还看不出统一的套餐、内容和口碑' },
+  { key: 'ready', range: '80~100', label: '口碑稳定', note: '各店评价都不错，套餐和介绍也对得上' },
+  { key: 'tune', range: '70~79', label: '品牌能搜到', note: '网上能看到品牌和套餐，各店评价和内容还没统一' },
+  { key: 'fill', range: '55~69', label: '门店不齐', note: '有的店差评多，或各店套餐价格差得比较大' },
+  { key: 'build', range: '＜55', label: '品牌还没立住', note: '网上还看不出统一的套餐、内容和评价' },
 ]
 
 const PUBLIC_EVAL_SINGLE = [
