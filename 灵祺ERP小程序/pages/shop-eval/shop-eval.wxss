@@ -186,7 +186,7 @@
 }
 
 .source-note {
-  margin: 0 0 16rpx;
+  margin: 16rpx 0 0;
   padding: 20rpx 22rpx;
   background: #fff;
   border-radius: 20rpx;
