@@ -36,3 +36,4 @@
   <button class="meoo-btn-primary btn" bindtap="onSubmit">保存草稿</button>
   <view class="edit-tail-space"></view>
 </scroll-view>
+<site-icp-footer />

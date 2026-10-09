@@ -97,3 +97,4 @@
     <view class="leads-bottom-space"></view>
   </scroll-view>
 </view>
+<site-icp-footer />

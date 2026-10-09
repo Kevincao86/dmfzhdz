@@ -111,3 +111,4 @@
 
   <view class="nv-bottom-space" />
 </scroll-view>
+<site-icp-footer />

@@ -5,3 +5,4 @@
   </view>
 <view class="kpi-hero"><text class="kpi-big">工作台</text><text>已合并至首页 Tab</text></view>
 <navigator url="/pages/dashboard/dashboard" class="btn-v2 primary" open-type="switchTab">进入首页</navigator></scroll-view>
+<site-icp-footer />

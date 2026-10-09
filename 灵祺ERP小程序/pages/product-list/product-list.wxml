@@ -97,3 +97,4 @@
   </block>
   <view class="plist-bottom-space"></view>
 </scroll-view>
+<site-icp-footer />

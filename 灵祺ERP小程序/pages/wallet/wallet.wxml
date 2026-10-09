@@ -171,3 +171,4 @@
     <button class="wallet-btn-link" bindtap="onRefundAll">全部退款</button>
   </view>
 </view>
+<site-icp-footer />

@@ -5,3 +5,4 @@
   </view>
 <view class="pick-v2" bindtap="goNovice"><text class="pick-strong">新手发单</text><text class="pick-p">极简填单 · 达人档位</text></view>
 <view class="pick-v2 on" bindtap="goPro"><text class="pick-strong">专业发单</text><text class="pick-p">完整 Brief · 达人条件</text></view></scroll-view>
+<site-icp-footer />

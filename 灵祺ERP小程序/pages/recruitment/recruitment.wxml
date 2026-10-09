@@ -16,3 +16,4 @@
     <text class="tag">{{item.statusLabel}}</text>
   </view>
 </block></scroll-view>
+<site-icp-footer />

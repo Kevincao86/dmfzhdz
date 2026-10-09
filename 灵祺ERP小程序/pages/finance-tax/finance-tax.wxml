@@ -38,3 +38,4 @@
     <text wx:for="{{history}}" wx:key="id" class="lq-hero-sub">{{item.periodLabel}} · {{item.status}} · 核销 {{item.totalVerifyYuan}}</text>
   </view>
 </scroll-view>
+<site-icp-footer />

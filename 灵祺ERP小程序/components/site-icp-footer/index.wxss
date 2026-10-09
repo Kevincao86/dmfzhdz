@@ -1,3 +1,15 @@
+:host {
+  display: block;
+  width: 100%;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.site-icp-spacer {
+  width: 100%;
+  flex-shrink: 0;
+}
+
 .site-icp-footer {
   display: flex;
   flex-direction: column;
@@ -5,6 +17,20 @@
   gap: 8rpx;
   padding: 28rpx 24rpx 16rpx;
   box-sizing: border-box;
+  width: 100%;
+}
+
+.site-icp-footer--dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: #f5f6f8;
+  pointer-events: none;
+}
+
+.site-icp-footer--safe {
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
 }
 
 .site-icp-footer__row {

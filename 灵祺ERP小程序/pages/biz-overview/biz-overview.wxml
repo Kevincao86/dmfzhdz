@@ -83,5 +83,5 @@
   </view>
 
   <view wx:if="{{loading}}" class="dash-loading">加载中…</view>
-  <site-icp-footer />
 </scroll-view>
+<site-icp-footer />

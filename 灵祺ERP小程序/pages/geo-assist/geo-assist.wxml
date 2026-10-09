@@ -115,3 +115,4 @@
     <button class="geo-primary" bindtap="onCloseReport">关闭</button>
   </view>
 </view>
+<site-icp-footer />

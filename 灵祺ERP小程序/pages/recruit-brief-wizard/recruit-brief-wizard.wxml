@@ -84,3 +84,4 @@
 
   <view class="bw-space" />
 </scroll-view>
+<site-icp-footer />

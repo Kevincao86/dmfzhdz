@@ -179,3 +179,4 @@
     <button class="op-btn-ghost" bindtap="copyResult">复制链接</button>
   </view>
 </scroll-view>
+<site-icp-footer />

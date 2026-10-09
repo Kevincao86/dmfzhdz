@@ -29,3 +29,4 @@
 
   <text wx:if="{{recording}}" class="voice-pulse">录音中…</text>
 </view>
+<site-icp-footer />

@@ -12,3 +12,4 @@
   </view>
   <button class="btn-v2 primary" bindtap="goPick">进入 · 选择发布方式</button>
 </scroll-view>
+<site-icp-footer />

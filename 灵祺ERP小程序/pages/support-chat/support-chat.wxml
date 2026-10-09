@@ -22,6 +22,7 @@
     <text wx:else class="support-human-off">人工客服服务时间为 9:00–22:00</text>
     <text wx:if="{{queueHint}}" class="support-human-off">{{queueHint}}</text>
   </view>
+  <site-icp-footer />
   <view class="composer-v2 support-composer">
     <input class="composer-input" placeholder="输入消息…" value="{{input}}" bindinput="onInput" confirm-type="send" bindconfirm="onSend" />
     <view class="send-v2" bindtap="onSend"><text class="send-glyph">➤</text></view>

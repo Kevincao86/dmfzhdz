@@ -51,8 +51,8 @@
   </view>
   <button wx:if="{{!guestMode}}" class="same-switch-btn" bindtap="onSameAccountSwitch">切换同号账号</button>
   <button wx:if="{{!guestMode}}" class="logout-v2 danger" bindtap="onLogout">退出登录</button>
-  <site-icp-footer />
 </scroll-view>
+<site-icp-footer />
 <view wx:if="{{showLogoutConfirm}}" class="logout-mask" catchtouchmove="true">
   <view class="sec-card-v2 logout-dialog" catchtap="true">
     <text class="sec-strong">退出当前账号</text>

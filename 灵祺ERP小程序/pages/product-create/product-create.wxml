@@ -229,3 +229,4 @@ module.exports.includes = includes
 <view wx:if="{{phase === 'pick'}}" class="wizard-footer-fixed">
   <button class="wizard-btn-next wizard-btn-block" bindtap="onNextPick">{{nextPickLabel}}</button>
 </view>
+<site-icp-footer />

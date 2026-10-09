@@ -5,3 +5,4 @@
     <text class="step" wx:for="{{item.steps}}" wx:for-item="step" wx:key="*this">{{index + 1}}. {{step}}</text>
   </view>
 </scroll-view>
+<site-icp-footer />

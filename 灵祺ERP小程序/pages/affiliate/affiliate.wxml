@@ -47,5 +47,5 @@
       </view>
     </block>
   </view>
-  <site-icp-footer />
 </scroll-view>
+<site-icp-footer />

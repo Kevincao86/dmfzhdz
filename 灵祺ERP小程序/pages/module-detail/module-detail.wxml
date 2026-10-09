@@ -8,3 +8,4 @@
     <text class="body">{{body}}</text>
   </view>
 </scroll-view>
+<site-icp-footer />

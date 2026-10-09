@@ -4,3 +4,4 @@
     <text class="lq-hero-sub">历史 Brief 复用与回溯</text>
   </view>
 <view wx:for="{{records}}" wx:key="id" class="lq-nav-card list-card-v2"><view><text class="list-strong">{{item.title}}</text><text class="list-span">{{item.date}}</text></view></view></scroll-view>
+<site-icp-footer />

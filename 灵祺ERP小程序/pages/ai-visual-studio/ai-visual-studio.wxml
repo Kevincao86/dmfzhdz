@@ -182,3 +182,4 @@
   </view>
   <canvas type="2d" id="vs-aspect-canvas" class="vs-aspect-canvas" />
 </scroll-view>
+<site-icp-footer />

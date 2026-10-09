@@ -152,4 +152,5 @@
     <button wx:if="{{resultUrl}}" class="op-btn-ghost" bindtap="onSaveVideo">保存到相册</button>
     <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
   </view>
+  <site-icp-footer />
 </scroll-view>
