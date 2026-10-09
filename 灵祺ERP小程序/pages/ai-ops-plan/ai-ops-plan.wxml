@@ -119,5 +119,5 @@
       <view wx:for="{{plan.risks}}" wx:key="*this" class="op-li">· {{item}}</view>
     </view>
   </block>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

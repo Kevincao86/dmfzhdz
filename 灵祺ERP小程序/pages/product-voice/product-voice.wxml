@@ -97,6 +97,6 @@
         <button class="meoo-btn-ghost skip" disabled="{{busy}}" bindtap="onBackRecord">重新录音</button>
       </view>
     </view>
+    <site-icp-footer />
   </scroll-view>
 </view>
-<site-icp-footer />

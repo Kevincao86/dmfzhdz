@@ -1,5 +1,4 @@
-<view wx:if="{{docked}}" class="site-icp-spacer" style="height: {{spacerH}};"></view>
-<view class="site-icp-footer {{docked ? 'site-icp-footer--dock' : ''}} {{safePad ? 'site-icp-footer--safe' : ''}}" style="{{dockStyle}}">
+<view class="site-icp-footer">
   <text class="site-icp-footer__copy">{{copyright}}</text>
   <view class="site-icp-footer__row">
     <text class="site-icp-footer__text">{{filing}}</text>

@@ -95,6 +95,6 @@
       </view>
     </block>
     <view class="leads-bottom-space"></view>
+    <site-icp-footer />
   </scroll-view>
 </view>
-<site-icp-footer />

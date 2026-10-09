@@ -171,6 +171,6 @@
       </view>
     </block>
     <view class="rev-bottom-space"></view>
+    <site-icp-footer />
   </scroll-view>
 </view>
-<site-icp-footer />

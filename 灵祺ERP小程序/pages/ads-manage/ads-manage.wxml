@@ -130,6 +130,7 @@
     </view>
   </block>
   <view class="ads-bottom-space"></view>
+  <site-icp-footer />
 </scroll-view>
 
 <view wx:if="{{createOpen}}" class="ads-mask" catchtouchmove="noop">
@@ -156,4 +157,3 @@
     </view>
   </view>
 </view>
-<site-icp-footer />

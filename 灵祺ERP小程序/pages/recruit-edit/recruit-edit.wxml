@@ -35,5 +35,5 @@
 
   <button class="meoo-btn-primary btn" bindtap="onSubmit">提交招募需求</button>
   <view class="edit-tail-space"></view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

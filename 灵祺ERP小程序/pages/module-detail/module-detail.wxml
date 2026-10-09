@@ -7,5 +7,5 @@
     <text class="sec-strong">详情</text>
     <text class="body">{{body}}</text>
   </view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

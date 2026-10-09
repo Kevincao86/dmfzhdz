@@ -475,5 +475,5 @@
 
   <text class="sv-footer">生成内容由系统提供，请合规使用并自行备份成片。</text>
   <view class="sv-bottom-sp" />
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

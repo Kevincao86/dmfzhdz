@@ -15,5 +15,5 @@
     </view>
     <text class="tag">{{item.statusLabel}}</text>
   </view>
-</block></scroll-view>
-<site-icp-footer />
+</block><site-icp-footer />
+</scroll-view>

@@ -20,5 +20,5 @@
     </view>
   </block>
   <view class="notify-bottom-space"></view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

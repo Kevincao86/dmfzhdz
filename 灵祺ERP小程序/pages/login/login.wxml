@@ -125,9 +125,8 @@
       <image class="welcome-glass__icon" src="{{item.icon}}" mode="aspectFit" />
     </view>
   </view>
+<site-icp-footer />
 </scroll-view>
-  <site-icp-footer />
-
 <view wx:if="{{showBindPhone}}" class="login-legal-mask" catchtouchmove="true">
   <view class="login-legal-modal" catchtap="true">
     <text class="login-legal-modal-title">{{bindMergeToken ? '加入已有手机号' : '绑定手机号'}}</text>

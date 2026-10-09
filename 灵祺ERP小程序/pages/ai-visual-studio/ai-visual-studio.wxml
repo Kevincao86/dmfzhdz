@@ -181,5 +181,5 @@
     <button class="vs-btn ghost" bindtap="onPrevStep">上一步</button>
   </view>
   <canvas type="2d" id="vs-aspect-canvas" class="vs-aspect-canvas" />
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

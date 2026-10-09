@@ -84,6 +84,7 @@
   <view wx:if="{{mode === 'info'}}" class="store-foot-hint">
     <text>所有平台信息均通过官方授权，安全可靠</text>
   </view>
+  <site-icp-footer />
 </scroll-view>
 
 <view wx:if="{{editOpen}}" class="store-mask" catchtouchmove="noop">
@@ -99,4 +100,3 @@
     </view>
   </view>
 </view>
-<site-icp-footer />

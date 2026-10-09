@@ -90,5 +90,5 @@
     <text class="fin-security-chev">›</text>
   </view>
   <view class="fin-bottom-space"></view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

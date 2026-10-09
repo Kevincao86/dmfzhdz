@@ -93,5 +93,5 @@
       <text wx:if="{{item.rationale}}" class="cp-row-note">{{item.rationale}}</text>
     </view>
   </view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

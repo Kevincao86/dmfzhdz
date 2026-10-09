@@ -104,5 +104,5 @@
     </view>
   </block>
   <view class="ai-bottom-sp"></view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

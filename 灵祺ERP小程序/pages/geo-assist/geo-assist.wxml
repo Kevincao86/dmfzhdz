@@ -104,6 +104,7 @@
       <text>咨询优化方案</text>
     </button>
   </view>
+  <site-icp-footer />
 </view>
 
 <view wx:if="{{showReport}}" class="geo-mask" catchtouchmove="noop">
@@ -115,4 +116,3 @@
     <button class="geo-primary" bindtap="onCloseReport">关闭</button>
   </view>
 </view>
-<site-icp-footer />

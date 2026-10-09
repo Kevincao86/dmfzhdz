@@ -106,6 +106,7 @@
     </view>
   </block>
   <view class="wallet-bottom-space"></view>
+  <site-icp-footer />
 </scroll-view>
 
 <view wx:if="{{payOpen}}" class="wallet-mask" catchtouchmove="true">
@@ -171,4 +172,3 @@
     <button class="wallet-btn-link" bindtap="onRefundAll">全部退款</button>
   </view>
 </view>
-<site-icp-footer />

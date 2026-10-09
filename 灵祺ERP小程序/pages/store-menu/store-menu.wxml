@@ -41,6 +41,7 @@
       <text class="sm-del" data-idx="{{index}}" bindtap="onDelete">删除</text>
     </view>
   </view>
+  <site-icp-footer />
 </scroll-view>
 
 <view wx:if="{{editing}}" class="sm-mask" catchtouchmove="noop">
@@ -55,4 +56,3 @@
     </view>
   </view>
 </view>
-<site-icp-footer />

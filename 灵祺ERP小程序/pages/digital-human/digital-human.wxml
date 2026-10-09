@@ -141,5 +141,5 @@
     <video src="{{resultUrl}}" controls object-fit="contain" style="width:100%;height:520rpx;background:#1e3a5f" />
     <button class="dh-btn" bindtap="saveAlbum">保存到相册</button>
   </view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

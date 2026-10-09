@@ -178,5 +178,5 @@
     <button class="op-btn" bindtap="saveAlbum">保存到相册</button>
     <button class="op-btn-ghost" bindtap="copyResult">复制链接</button>
   </view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

@@ -213,9 +213,8 @@
         <text class="bubble-text muted">{{thinkingText}}</text>
       </view>
     </view>
+    <site-icp-footer />
   </scroll-view>
-
-  <site-icp-footer />
   <view class="wx-composer">
     <scroll-view wx:if="{{attachments.length}}" class="attach-row" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="attach-chip" wx:for="{{attachments}}" wx:key="id">

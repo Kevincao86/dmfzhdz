@@ -132,6 +132,7 @@
           </view>
         </block>
       </view>
+      <site-icp-footer />
     </scroll-view>
   </block>
 
@@ -183,6 +184,7 @@
         <text class="msg-empty-title">{{groupEmptyTitle}}</text>
         <text class="msg-empty-hint" wx:if="{{groupEmptyHint}}">{{groupEmptyHint}}</text>
       </view>
+      <site-icp-footer />
     </scroll-view>
   </block>
 
@@ -257,7 +259,7 @@
         <button class="msg-test-btn" bindtap="openTestDialog">打开测试对话（开发）</button>
         <text class="msg-test-hint">PR 建会话后切达人身份可双向回复</text>
       </view>
+      <site-icp-footer />
     </scroll-view>
   </block>
-  <site-icp-footer />
 </view>

@@ -96,5 +96,5 @@
     <view class="plist-end">— 没有更多了 —</view>
   </block>
   <view class="plist-bottom-space"></view>
-</scroll-view>
 <site-icp-footer />
+</scroll-view>

@@ -62,6 +62,7 @@
   <view wx:if="{{loading}}" class="sub-state">加载中…</view>
   <view wx:if="{{payErr && !paySheetOpen}}" class="sub-state sub-err">{{payErr}}</view>
   <view class="sub-bottom-space"></view>
+  <site-icp-footer />
 </scroll-view>
 
 <view wx:if="{{paySheetOpen}}" class="sub-mask" catchtouchmove="true">
@@ -111,4 +112,3 @@
     </view>
   </view>
 </view>
-<site-icp-footer />
