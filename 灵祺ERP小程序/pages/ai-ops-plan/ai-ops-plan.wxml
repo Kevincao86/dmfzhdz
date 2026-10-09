@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="op-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="op-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="op-hero">
     <text class="op-title">AI 运营方案</text>
     <text class="op-sub">与电脑端同源：先选简易/标准版，点目标模板，再生成（{{opsPoints}} 积分/次）。</text>

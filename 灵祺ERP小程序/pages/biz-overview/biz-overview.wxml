@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="dash-page-v2" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="dash-page-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="dash-head">
     <view class="dash-head-icon">
       <image class="dash-hero-ic" src="{{heroIconSrc}}" mode="aspectFit" />

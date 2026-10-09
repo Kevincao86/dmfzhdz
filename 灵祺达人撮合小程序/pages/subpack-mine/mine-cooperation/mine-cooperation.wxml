@@ -1,4 +1,4 @@
-<view class="xingxuan-page {{lqThemeClass}}">
+<view class="xingxuan-page {{lqThemeClass}} foot-col">
   <view class="xingxuan-card">
     <text class="xingxuan-title">合作达人池</text>
     <text class="xingxuan-hint">从已完成商单自动沉淀可复用达人，便于下次优先邀约</text>

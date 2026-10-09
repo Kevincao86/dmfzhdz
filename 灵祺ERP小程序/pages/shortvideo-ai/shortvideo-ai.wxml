@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="sv-root" enhanced="{{true}}" show-scrollbar="{{false}}">
+<scroll-view scroll-y class="sv-root foot-col" enhanced="{{true}}" show-scrollbar="{{false}}" enable-flex>
   <view class="sv-header">
     <view class="sv-header-bar" />
     <view class="sv-header-row">

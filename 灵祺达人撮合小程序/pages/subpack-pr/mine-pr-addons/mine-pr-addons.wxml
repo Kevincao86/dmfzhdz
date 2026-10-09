@@ -1,4 +1,4 @@
-<view class="addon-page {{lqThemeClass}}">
+<view class="addon-page {{lqThemeClass}} foot-col">
   <view class="addon-hero">
     <view class="addon-hero__badge">
       <text class="addon-hero__spark">✦</text>

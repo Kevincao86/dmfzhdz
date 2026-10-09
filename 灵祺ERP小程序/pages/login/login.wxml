@@ -1,6 +1,6 @@
 <view>
 <launch-splash bind:done="onLaunchSplashDone" />
-<scroll-view scroll-y class="login-welcome" enhanced show-scrollbar="{{false}}" style="{{navBandStyle}}">
+<scroll-view scroll-y class="login-welcome foot-col" enhanced show-scrollbar="{{false}}" style="{{navBandStyle}}" enable-flex>
   <view class="welcome-head">
     <button class="login-back-btn" bindtap="onLeaveLogin">返回</button>
     <image class="welcome-head__logo" src="{{logoSrc}}" mode="aspectFit" />

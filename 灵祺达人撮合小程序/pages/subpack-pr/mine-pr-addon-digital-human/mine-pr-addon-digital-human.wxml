@@ -1,4 +1,4 @@
-<scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
+<scroll-view class="addon-page addon-scroll {{lqThemeClass}} foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="addon-mini-hero addon-mini-hero--rose">
     <text class="addon-mini-hero__title">数字人口播</text>
     <text class="addon-mini-hero__sub">选形象 · 配音试听 · 口播成片一键生成</text>

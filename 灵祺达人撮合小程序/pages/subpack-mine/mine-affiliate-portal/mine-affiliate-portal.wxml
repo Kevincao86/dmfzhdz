@@ -1,4 +1,4 @@
-<view class="portal-page">
+<view class="portal-page foot-col">
   <scroll-view scroll-y class="portal-scroll" enhanced show-scrollbar="{{false}}">
     <view class="mp-sub-hero">
       <view class="mp-sub-hero__glow"></view>

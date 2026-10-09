@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="page-pad-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="lq-hero">
     <text class="lq-hero-title">活动中心</text>
     <text class="lq-hero-sub">多平台活动同步 · 状态筛选与网页同源</text>

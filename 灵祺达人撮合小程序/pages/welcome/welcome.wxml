@@ -1,4 +1,4 @@
-<view class="welcome-page" style="{{navBandStyle}}">
+<view class="welcome-page foot-col" style="{{navBandStyle}}">
   <launch-splash />
   <view class="welcome-head">
     <image class="welcome-head__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />

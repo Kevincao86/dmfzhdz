@@ -1,4 +1,4 @@
-<view class="pr-page page-shell {{lqThemeClass}}">
+<view class="pr-page page-shell {{lqThemeClass}} foot-col">
   <view class="pr-sticky-top">
   <scroll-view class="pr-platform-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="pr-platform-bar">

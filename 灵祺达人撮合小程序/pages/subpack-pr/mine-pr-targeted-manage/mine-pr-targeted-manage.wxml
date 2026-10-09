@@ -1,4 +1,4 @@
-<view class="tgt-man-page {{lqThemeClass}}">
+<view class="tgt-man-page {{lqThemeClass}} foot-col">
   <view class="addon-card" style="margin-top:20rpx;">
     <text class="addon-card__title">{{orderTitle}}</text>
     <text class="addon-card__sub">邀约响应截止：{{inviteDeadline || '—'}}</text>

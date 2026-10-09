@@ -1,4 +1,4 @@
-<scroll-view class="page" scroll-y>
+<scroll-view class="page foot-col" scroll-y enable-flex>
   <text class="lead">商家小程序：下面是当前功能，以及对应的操作方式。</text>
   <view class="card" wx:for="{{sections}}" wx:key="title">
     <text class="card-title">{{item.title}}</text>

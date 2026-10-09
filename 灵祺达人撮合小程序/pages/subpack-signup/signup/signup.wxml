@@ -109,7 +109,7 @@
     </view>
     <text class="reg-back" bindtap="onBackLogin">已有账号，去登录</text>
   </view>
-  <view class="reg-copy">
+  <view class="reg-copy foot-col">
     <site-icp-footer />
   </view>
 </view>

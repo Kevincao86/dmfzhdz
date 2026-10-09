@@ -6,10 +6,10 @@
 
   <scroll-view
     scroll-y
-    class="chat-scroll"
+    class="chat-scroll foot-col"
     scroll-into-view="{{scrollTo}}"
     scroll-with-animation
-  >
+   enable-flex>
     <view
       wx:for="{{messages}}"
       wx:key="id"

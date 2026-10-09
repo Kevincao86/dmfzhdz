@@ -1,4 +1,4 @@
-<view class="addon-page {{lqThemeClass}}">
+<view class="addon-page {{lqThemeClass}} foot-col">
   <view class="addon-card">
     <text class="addon-card__title">平台文稿审核规则</text>
     <text class="addon-card__sub">按平台查看小红书、大众点评官方公开规则。点击后打开原网页；若小程序无法内嵌，将复制链接便于在浏览器打开。</text>

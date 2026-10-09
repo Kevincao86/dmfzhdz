@@ -1,4 +1,4 @@
-<view class="xingxuan-page {{lqThemeClass}}">
+<view class="xingxuan-page {{lqThemeClass}} foot-col">
   <view class="xingxuan-tabs">
     <text class="xingxuan-tab {{activeTab === 'blacklist' ? 'xingxuan-tab--on' : ''}}" data-tab="blacklist" bindtap="onSwitchTab">黑名单</text>
     <text class="xingxuan-tab {{activeTab === 'graylist' ? 'xingxuan-tab--on' : ''}}" data-tab="graylist" bindtap="onSwitchTab">灰名单</text>

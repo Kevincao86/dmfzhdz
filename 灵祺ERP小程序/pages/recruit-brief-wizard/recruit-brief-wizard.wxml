@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="bw-scroll" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="bw-scroll foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <text class="bw-back" bindtap="goHub">‹ 返回达人招募中心</text>
 
   <view class="bw-hero meoo-card">

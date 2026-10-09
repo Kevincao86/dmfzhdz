@@ -1,4 +1,4 @@
-<view class="app-list-page page-shell {{lqThemeClass}}">
+<view class="app-list-page page-shell {{lqThemeClass}} foot-col">
   <scroll-view wx:if="{{rows.length > 0 || !loading}}" class="app-platform-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="app-platform-bar">
       <view

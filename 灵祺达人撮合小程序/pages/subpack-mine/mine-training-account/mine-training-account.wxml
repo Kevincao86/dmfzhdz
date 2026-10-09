@@ -1,4 +1,4 @@
-<view class="la">
+<view class="la foot-col">
   <view class="la-hero">
     <text class="la-hero__kicker">{{mode === 'apply' ? '本地生活讲师' : '我的钱包'}}</text>
     <text class="la-hero__title">{{mode === 'apply' ? '申请讲师' : '收款账户绑定'}}</text>

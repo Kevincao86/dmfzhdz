@@ -1,4 +1,4 @@
-<view class="sch-ok-page page-shell {{lqThemeClass}}">
+<view class="sch-ok-page page-shell {{lqThemeClass}} foot-col">
   <view class="card sch-ok-card">
     <text class="sch-ok-icon" aria-hidden="true">✓</text>
     <text class="sch-ok-title">探店排期已确认并通知达人</text>

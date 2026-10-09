@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="ai-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="ai-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="ai-head-block">
     <text class="ai-h1">爆款 Brief 生成</text>
     <text class="ai-intro">与电脑端同源：选平台与风格，填写门店需求，一次生成达人可执行 Brief / 图文文稿（{{briefPoints}} 积分/篇）。</text>

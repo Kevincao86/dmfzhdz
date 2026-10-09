@@ -1,4 +1,4 @@
-<view class="tgt-pick-page {{lqThemeClass}}">
+<view class="tgt-pick-page {{lqThemeClass}} foot-col">
   <input class="tgt-pick-search" placeholder="搜索达人昵称" value="{{keyword}}" bindinput="onKeyword" />
   <view class="tgt-pick-filters card">
     <view class="tgt-pick-filters__head">

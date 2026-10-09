@@ -1,4 +1,4 @@
-<view class="addon-page addon-page--review {{lqThemeClass}}">
+<view class="addon-page addon-page--review {{lqThemeClass}} foot-col">
   <view class="addon-hero-brief addon-hero-brief--review">
     <view class="addon-hero-brief__glow"></view>
     <view class="addon-hero-brief__inner">

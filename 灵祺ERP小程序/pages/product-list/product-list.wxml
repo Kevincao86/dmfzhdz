@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="plist-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="plist-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <scroll-view scroll-x class="plist-tab-scroll" enhanced show-scrollbar="{{false}}">
     <view class="plist-tab-row">
       <view

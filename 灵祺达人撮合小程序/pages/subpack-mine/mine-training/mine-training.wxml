@@ -1,4 +1,4 @@
-<view class="tr-page">
+<view class="tr-page foot-col">
   <text class="tr-note">这里是即将开始的课程。讲师也可以报名别人发布的课，不能报名自己发布的课。线下课可以按城市查看。</text>
   <view class="tr-seg">
     <view class="tr-seg__item {{filter === 'all' ? 'tr-seg__item--on' : ''}}" data-id="all" bindtap="onFilter">全部</view>

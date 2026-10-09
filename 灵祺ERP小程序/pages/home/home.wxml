@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="page-pad-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="lq-hero">
     <text class="lq-hero-title">首页</text>
     <text class="lq-hero-sub">商家经营快捷入口</text>

@@ -1,4 +1,4 @@
-<view class="detail-page detail-page--v3 page-shell page-with-bar {{lqThemeClass}}">
+<view class="detail-page detail-page--v3 page-shell page-with-bar {{lqThemeClass}} foot-col">
   <include src="../../../partials/subpage-nav.wxml" />
   <view class="detail-page__scroll">
   <view wx:if="{{loading}}" class="card state-loading">

@@ -1,4 +1,4 @@
-<view class="pts-page {{lqThemeClass}}">
+<view class="pts-page {{lqThemeClass}} foot-col">
   <view class="pts-hero">
     <view class="pts-hero-bg"></view>
     <view class="pts-hero-body">

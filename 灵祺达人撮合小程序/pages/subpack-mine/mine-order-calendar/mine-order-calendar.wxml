@@ -1,4 +1,4 @@
-<view class="cal-page {{lqThemeClass}}">
+<view class="cal-page {{lqThemeClass}} foot-col">
   <view class="cal-hero">
     <text class="cal-title">商单日历</text>
     <text class="cal-sub">{{pageSub}}</text>

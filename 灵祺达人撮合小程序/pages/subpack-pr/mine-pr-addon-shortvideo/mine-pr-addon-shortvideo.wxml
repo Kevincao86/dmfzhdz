@@ -1,4 +1,4 @@
-<scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
+<scroll-view class="addon-page addon-scroll {{lqThemeClass}} foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="addon-mini-hero addon-mini-hero--violet">
     <text class="addon-mini-hero__title">短视频 AI 处理</text>
     <text class="addon-mini-hero__sub">短视频生成 · AI 混剪</text>

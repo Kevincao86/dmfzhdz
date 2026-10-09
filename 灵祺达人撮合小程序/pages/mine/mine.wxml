@@ -91,14 +91,14 @@
   </view>
 
   <scroll-view
-    class="mine-scroll page-scroll-body"
+    class="mine-scroll page-scroll-body foot-col"
     scroll-y
     enhanced
     show-scrollbar="{{false}}"
     refresher-enabled
     refresher-triggered="{{statRefreshing}}"
     bindrefresherrefresh="onStatRefresh"
-  >
+   enable-flex>
     <view class="wb-section" wx:if="{{quickMenus.length}}">
       <view class="wb-section-head">
         <text class="wb-section-title">常用功能</text>

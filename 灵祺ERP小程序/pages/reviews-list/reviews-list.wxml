@@ -108,7 +108,7 @@
     </picker>
   </view>
 
-  <scroll-view scroll-y class="rev-list" enhanced show-scrollbar="{{false}}">
+  <scroll-view scroll-y class="rev-list foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
     <text wx:if="{{syncedAtText}}" class="rev-sync-hint">{{syncedAtText}}</text>
     <view wx:if="{{loading}}" class="rev-state">加载中…</view>
     <view wx:elif="{{errMsg}}" class="rev-state rev-err">{{errMsg}}</view>

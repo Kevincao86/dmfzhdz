@@ -1,5 +1,5 @@
 <view class="voice-root">
-  <scroll-view scroll-y class="voice-scroll" enhanced show-scrollbar="{{false}}">
+  <scroll-view scroll-y class="voice-scroll foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
     <view class="voice-inner">
       <view class="voice-hero">
         <text class="voice-hero-title">语音上品</text>

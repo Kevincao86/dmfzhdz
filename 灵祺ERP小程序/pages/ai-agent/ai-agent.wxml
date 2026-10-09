@@ -16,9 +16,10 @@
   <scroll-view
     wx:if="{{!hasChat}}"
     scroll-y
-    class="agent-empty"
+    class="agent-empty foot-col"
     enhanced
     show-scrollbar="{{false}}"
+    enable-flex
   >
     <text class="empty-title">今天要处理哪件事？</text>
     <text class="empty-sub">点快捷任务或直接输入，规则与商家后台助手一致</text>
@@ -37,12 +38,14 @@
         <text class="shortcut-t">{{item.label}}</text>
       </view>
     </view>
+    <site-icp-footer />
   </scroll-view>
 
   <scroll-view
     wx:else
     scroll-y
-    class="agent-chat"
+    class="agent-chat foot-col"
+    enable-flex
     scroll-into-view="{{scrollTo}}"
     enhanced
     show-scrollbar="{{false}}"

@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="op-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="op-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="op-hero">
     <text class="op-title">AI 短剧</text>
     <text class="op-sub">和商家端同一套四步：先选场景，再写故事和角色，最后出片。</text>

@@ -1,4 +1,4 @@
-<view class="page-shell page-with-bar paper-page">
+<view class="page-shell page-with-bar paper-page foot-col">
   <view class="page-hero page-hero--compact">
     <text class="page-hero-title">{{isSupplier ? (workIdentity === 'edit' ? '剪辑团队信息' : '拍摄团队信息') : '我的信息'}}</text>
     <text class="page-hero-sub">{{isSupplier ? '填写团队服务能力与作品集，报名时可一键填入' : '按平台填写达人资料，报名时可一键填入'}}</text>

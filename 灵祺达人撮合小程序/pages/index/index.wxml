@@ -41,7 +41,7 @@
     </view>
   </view>
 
-  <scroll-view class="home-list-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
+  <scroll-view class="home-list-scroll page-scroll-body foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
     <view class="home-kpi">
       <view class="home-kpi__pill">
         <image class="home-kpi__icon" src="{{kpiRecruitIcon}}" mode="aspectFit" />

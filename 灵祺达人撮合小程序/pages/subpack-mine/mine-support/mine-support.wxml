@@ -1,4 +1,4 @@
-<view class="page-shell">
+<view class="page-shell foot-col">
   <view class="card">
     <text class="title-lg">我的客服 · 小灵同学</text>
     <text class="hint">常见问题</text>

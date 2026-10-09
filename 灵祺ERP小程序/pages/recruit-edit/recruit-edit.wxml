@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="edit-scroll">
+<scroll-view scroll-y class="edit-scroll foot-col" enable-flex>
   <view class="edit-head meoo-card">
     <text class="edit-head-title">达人招募草稿</text>
     <text class="edit-head-desc">填写岗位与预算后提交招募单。</text>

@@ -1,4 +1,4 @@
-<view class="page-shell page-with-bar paper-page">
+<view class="page-shell page-with-bar paper-page foot-col">
   <view class="page-hero page-hero--compact">
     <text class="page-hero-title">提交报名</text>
     <text class="page-hero-sub">{{isSupplierApply ? (supplierWorkId === 'shoot' ? '拍摄团队' : '剪辑团队') : ('平台 ' + platform)}} · 订单 {{merchantOrderNo}}</text>

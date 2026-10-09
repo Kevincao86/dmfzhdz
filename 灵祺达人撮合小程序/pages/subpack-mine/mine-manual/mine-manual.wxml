@@ -1,4 +1,4 @@
-<scroll-view class="manual-page" scroll-y enhanced show-scrollbar="{{false}}">
+<scroll-view class="manual-page foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="card manual-hero">
     <text class="title-lg">{{productName}}</text>
     <text class="hint">当前功能与操作方式</text>

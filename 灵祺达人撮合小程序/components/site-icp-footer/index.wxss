@@ -1,3 +1,10 @@
+:host {
+  display: block;
+  width: 100%;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
 .site-icp-footer {
   display: flex;
   flex-direction: column;

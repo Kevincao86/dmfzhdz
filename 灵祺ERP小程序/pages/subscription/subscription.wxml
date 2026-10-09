@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="sub-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="sub-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="sub-hero">
     <text class="sub-hero-deco">👑</text>
   </view>

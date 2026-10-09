@@ -9,7 +9,7 @@ var includes = function (arr, id) {
 module.exports.includes = includes
 </wxs>
 
-<scroll-view scroll-y class="wizard-scroll" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="wizard-scroll foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <!-- 经营类型 → 选平台 → 确认（对齐 Web：团购组 / 外卖组）-->
   <view wx:if="{{phase === 'channel' || phase === 'pick' || phase === 'confirm'}}" class="wizard-steps-v2">
     <view class="wstep {{phase === 'pick' || phase === 'confirm' ? 'done' : phase === 'channel' ? 'on' : ''}}">

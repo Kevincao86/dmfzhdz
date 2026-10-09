@@ -302,7 +302,7 @@
     </view>
   </view>
 
-  <scroll-view class="rec-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
+  <scroll-view class="rec-scroll page-scroll-body foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
     <view wx:if="{{loading}}" class="rec-state card state-loading">
       <view class="loading-dot-wrap">
         <view class="loading-dot" />

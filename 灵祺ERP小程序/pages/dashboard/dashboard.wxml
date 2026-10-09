@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="home-page" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
+<scroll-view scroll-y class="home-page foot-col" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)" enable-flex>
   <swiper
     class="home-poster"
     indicator-dots

@@ -1,4 +1,4 @@
-<view class="xingxuan-page {{lqThemeClass}}">
+<view class="xingxuan-page {{lqThemeClass}} foot-col">
   <view class="xingxuan-card">
     <text class="xingxuan-title">招募漏斗概览</text>
     <text class="xingxuan-hint">统计您发单的曝光→报名→审核→成片全链路转化</text>

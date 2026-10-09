@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="ads-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="ads-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="ads-head">
     <view class="ads-head-main">
       <text class="ads-title">投流管理</text>

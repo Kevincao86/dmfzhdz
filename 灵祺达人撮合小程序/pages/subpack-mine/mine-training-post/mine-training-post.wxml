@@ -1,4 +1,4 @@
-<view class="tp">
+<view class="tp foot-col">
   <view class="tp-hero">
     <text class="tp-hero__kicker">本地生活培训</text>
     <text class="tp-hero__title">{{view === 'form' ? (editingId ? '编辑培训' : '新增培训') : '我的课程'}}</text>

@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="fin-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="fin-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="fin-hero">
     <view class="fin-hero-main">
       <text class="fin-title">财务对账</text>

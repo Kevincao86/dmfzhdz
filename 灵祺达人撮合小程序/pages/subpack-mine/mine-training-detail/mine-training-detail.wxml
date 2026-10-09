@@ -1,4 +1,4 @@
-<view class="td" wx:if="{{course}}">
+<view class="td foot-col" wx:if="{{course}}">
   <image wx:if="{{cover}}" class="td-cover" src="{{cover}}" mode="aspectFill" />
   <view class="td-body">
     <text class="td-title">{{course.title}}</text>

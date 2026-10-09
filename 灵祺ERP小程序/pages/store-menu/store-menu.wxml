@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="sm-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="sm-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="sm-hero">
     <text class="sm-title">菜单价目表</text>
     <text class="sm-sub">与电脑端同源。拍照识别或上传 Excel，保存后门店经营分析可引用。</text>

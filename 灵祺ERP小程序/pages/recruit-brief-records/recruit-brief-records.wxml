@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="page-pad-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="lq-hero">
     <text class="lq-hero-title">Brief 生成记录</text>
     <text class="lq-hero-sub">历史 Brief 复用与回溯</text>

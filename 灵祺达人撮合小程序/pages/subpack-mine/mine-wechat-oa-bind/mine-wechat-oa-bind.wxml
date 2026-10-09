@@ -1,4 +1,4 @@
-<view class="oa-bind-page {{lqThemeClass}}">
+<view class="oa-bind-page {{lqThemeClass}} foot-col">
   <view class="oa-bind-hero">
     <view class="oa-bind-hero__badge">微信服务号</view>
     <text class="oa-bind-hero__title">服务号订阅通知</text>

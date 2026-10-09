@@ -1,4 +1,4 @@
-<view class="vr-page page-shell {{lqThemeClass}}">
+<view class="vr-page page-shell {{lqThemeClass}} foot-col">
   <view class="card vr-head">
     <text class="title-lg">{{reviewLabel}}</text>
     <text class="hint vr-sub">达人探店文稿审核，支持 doc/txt 文件与腾讯文档、飞书文档链接。通过或驳回后将自动通知达人。</text>

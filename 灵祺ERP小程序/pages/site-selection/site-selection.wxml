@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="erp-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="erp-hero">
     <text class="erp-hero-title">选址参考</text>
     <text class="erp-hero-sub">人流热度、周边地图与综合打分。与电脑端「选址参考」同源 API。</text>

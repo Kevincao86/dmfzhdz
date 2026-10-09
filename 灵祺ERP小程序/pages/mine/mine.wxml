@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="page-mine-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
+<scroll-view scroll-y class="page-mine-v2 foot-col" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)" enable-flex>
   <view class="profile-v2" bindtap="onEditProfile" hover-class="profile-v2-hover">
     <view class="store-logo-line">
       <image class="store-logo-img" src="{{avatarUrl || storeLogoSrc}}" mode="aspectFit" />

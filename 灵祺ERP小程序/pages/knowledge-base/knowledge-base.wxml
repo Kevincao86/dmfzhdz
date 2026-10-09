@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="erp-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="erp-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="erp-hero">
     <text class="erp-hero-title">我的知识库</text>
     <text class="erp-hero-sub">投喂门店资料、FAQ 与话术，供经营分析引用。与电脑端同源。</text>

@@ -53,7 +53,7 @@
   </view>
 </template>
 
-<view class="pub-page pub-page--{{step}} {{lqThemeClass}}">
+<view class="pub-page pub-page--{{step}} {{lqThemeClass}} foot-col">
   <!-- 第一步：选择普通招募 / 定向邀约 -->
   <block wx:if="{{step === 'channel'}}">
     <view class="pub-screen pub-screen--mode">

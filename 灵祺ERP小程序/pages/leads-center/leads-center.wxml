@@ -48,7 +48,7 @@
     </view>
   </scroll-view>
 
-  <scroll-view scroll-y class="leads-list" enhanced show-scrollbar="{{false}}">
+  <scroll-view scroll-y class="leads-list foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
     <view wx:if="{{loading}}" class="leads-state">加载中…</view>
     <view wx:elif="{{err}}" class="leads-state leads-err">{{err}}</view>
     <view wx:elif="{{!displayItems.length}}" class="leads-state">暂无线索</view>

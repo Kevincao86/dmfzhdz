@@ -1,4 +1,4 @@
-<view class="xingxuan-page page-shell {{lqThemeClass}}">
+<view class="xingxuan-page page-shell {{lqThemeClass}} foot-col">
   <view wx:if="{{loading}}" class="xingxuan-card state-loading">
     <text class="hint">加载履约信用…</text>
   </view>

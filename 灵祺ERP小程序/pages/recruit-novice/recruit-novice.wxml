@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="nv-scroll">
+<scroll-view scroll-y class="nv-scroll foot-col" enable-flex>
   <view class="nv-head">
     <text class="nv-back" bindtap="backPick">返回版本选择</text>
     <view class="nv-title-row">

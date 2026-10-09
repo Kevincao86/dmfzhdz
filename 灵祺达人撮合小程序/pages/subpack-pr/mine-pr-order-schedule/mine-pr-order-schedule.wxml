@@ -1,4 +1,4 @@
-<view class="sch-page page-shell {{lqThemeClass}}">
+<view class="sch-page page-shell {{lqThemeClass}} foot-col">
   <view class="sch-hero card" wx:if="{{!loading}}">
     <text class="title-lg">{{pageTitle}}</text>
     <text class="hint">{{title}}</text>

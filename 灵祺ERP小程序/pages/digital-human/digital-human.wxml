@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="dh-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="dh-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="dh-hero">
     <text class="dh-title">数字人口播</text>
     <text class="dh-sub">选形象、写口播、配动作与背景，一键出竖屏口播。照片走口型驱动。成片 {{rateLabel}}。</text>

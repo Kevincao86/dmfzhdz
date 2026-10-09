@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="notify-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="notify-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view wx:if="{{!items.length}}" class="notify-empty">暂无消息</view>
   <block wx:else>
     <view

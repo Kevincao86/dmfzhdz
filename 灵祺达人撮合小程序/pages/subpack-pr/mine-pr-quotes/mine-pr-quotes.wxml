@@ -1,4 +1,4 @@
-<view class="page-shell {{lqThemeClass}}">
+<view class="page-shell {{lqThemeClass}} foot-col">
   <view wx:if="{{mineGuestMode}}" class="card state-empty">
     <text class="state-empty-icon">🔒</text>
     <text class="empty-title">请登录后管理专属报价</text>

@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="store-page-v2" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="store-page-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view wx:if="{{mode === 'info' && showNotice}}" class="store-notice">
     <text class="store-notice-text">完善多平台店铺信息，提升曝光与转化</text>
     <text class="store-notice-close" bindtap="onCloseNotice">×</text>

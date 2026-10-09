@@ -30,14 +30,14 @@
 
   <block wx:if="{{msgTab === 'system'}}">
     <scroll-view
-      class="msg-ntf-scroll page-scroll-body"
+      class="msg-ntf-scroll page-scroll-body foot-col"
       scroll-y
       enhanced
       show-scrollbar="{{false}}"
       refresher-enabled="{{true}}"
       refresher-triggered="{{refreshing}}"
       bindrefresherrefresh="onPullRefresh"
-    >
+     enable-flex>
       <view wx:if="{{ntfLoading}}" class="msg-fixed-tip card state-loading">
         <view class="loading-dot-wrap">
           <view class="loading-dot" />
@@ -148,14 +148,14 @@
 
     <scroll-view
       wx:else
-      class="msg-list page-scroll-body"
+      class="msg-list page-scroll-body foot-col"
       scroll-y
       enhanced
       show-scrollbar="{{false}}"
       refresher-enabled="{{true}}"
       refresher-triggered="{{refreshing}}"
       bindrefresherrefresh="onPullRefresh"
-    >
+     enable-flex>
       <view
         wx:for="{{groupSessions}}"
         wx:key="id"
@@ -209,14 +209,14 @@
 
     <scroll-view
       wx:else
-      class="msg-list page-scroll-body"
+      class="msg-list page-scroll-body foot-col"
       scroll-y
       enhanced
       show-scrollbar="{{false}}"
       refresher-enabled="{{chatConfigured}}"
       refresher-triggered="{{refreshing}}"
       bindrefresherrefresh="onPullRefresh"
-    >
+     enable-flex>
       <view
         wx:for="{{sessions}}"
         wx:key="id"

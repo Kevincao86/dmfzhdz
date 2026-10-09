@@ -3,6 +3,41 @@
 @import './styles/subpage-shell.wxss';
 @import './styles/mp-legacy.wxss';
 
+/* 页脚在文档流里沉到本页底部：内容少时贴页面下沿，内容多时跟着滚动，不固定在 Tab 上 */
+.foot-col.foot-col {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+page > .foot-col {
+  min-height: 100vh;
+}
+
+.agent-chat.foot-col,
+.support-chat.foot-col,
+.agent-empty.foot-col {
+  min-height: 0;
+}
+
+.foot-col.foot-col > view,
+.foot-col.foot-col > button,
+.foot-col.foot-col > text,
+.foot-col.foot-col > image,
+.foot-col.foot-col > navigator,
+.foot-col.foot-col > input,
+.foot-col.foot-col > textarea,
+.foot-col.foot-col > video,
+.foot-col.foot-col > form,
+.foot-col.foot-col > label,
+.foot-col.foot-col > picker,
+.foot-col.foot-col > swiper,
+.foot-col.foot-col > icon,
+.foot-col.foot-col > scroll-view,
+.foot-col.foot-col > cover-view {
+  flex-shrink: 0;
+}
+
 page {
   background: #f5f6f8;
   color: #1e3a5f;

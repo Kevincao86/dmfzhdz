@@ -1,4 +1,4 @@
-<view class="wl">
+<view class="wl foot-col">
   <text class="wl-sub">积分、培训保证金和课时费。退保证金后讲师变为未认证，不能发布课程。</text>
   <text wx:if="{{err}}" class="wl-err">{{err}}</text>
 

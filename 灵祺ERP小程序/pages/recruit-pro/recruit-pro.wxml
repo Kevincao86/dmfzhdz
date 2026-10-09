@@ -9,7 +9,7 @@ var includes = function (arr, x) {
 module.exports.includes = includes
 </wxs>
 
-<scroll-view scroll-y class="pro-scroll">
+<scroll-view scroll-y class="pro-scroll foot-col" enable-flex>
   <text class="pro-back" bindtap="backManage">‹ 返回发布方式</text>
   <text class="pro-h1">发布招募需求</text>
 

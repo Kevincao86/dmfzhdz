@@ -1,4 +1,4 @@
-<scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
+<scroll-view class="addon-page addon-scroll {{lqThemeClass}} foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="vs-hero">
     <text class="vs-hero__badge">灵祺视觉工坊</text>
     <text class="vs-hero__title">多端营销海报</text>

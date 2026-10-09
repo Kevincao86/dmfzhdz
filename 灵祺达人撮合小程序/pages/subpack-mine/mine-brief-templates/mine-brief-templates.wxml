@@ -1,4 +1,4 @@
-<view class="xingxuan-page {{lqThemeClass}}">
+<view class="xingxuan-page {{lqThemeClass}} foot-col">
   <view class="xingxuan-card">
     <text class="xingxuan-title">Brief 结构化模版</text>
     <text class="xingxuan-hint">发单时可一键套用，减少重复填写</text>

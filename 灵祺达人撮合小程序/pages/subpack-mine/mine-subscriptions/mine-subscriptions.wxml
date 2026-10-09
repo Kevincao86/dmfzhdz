@@ -1,4 +1,4 @@
-<view class="xingxuan-page {{lqThemeClass}}">
+<view class="xingxuan-page {{lqThemeClass}} foot-col">
   <view class="xingxuan-card" wx:if="{{showOa}}">
     <view class="row between">
       <text class="xingxuan-title">服务号通知</text>

@@ -1,4 +1,4 @@
-<view class="pe-page">
+<view class="pe-page foot-col">
   <view class="pe-card">
     <text class="pe-title">个人中心</text>
     <text class="pe-desc">与电脑端同步：可改头像、昵称，换绑手机/邮箱，并用验证码修改登录密码。</text>
@@ -137,5 +137,5 @@
       </block>
     </view>
   </block>
+  <site-icp-footer />
 </view>
-<site-icp-footer />

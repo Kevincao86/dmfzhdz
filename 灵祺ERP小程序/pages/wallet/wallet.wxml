@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="wallet-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="wallet-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="wallet-nav">
     <view class="wallet-nav-spacer"></view>
     <view class="wallet-nav-detail" bindtap="onShowLedger">

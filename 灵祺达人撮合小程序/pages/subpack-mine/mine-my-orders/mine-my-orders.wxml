@@ -1,4 +1,4 @@
-<view class="orders-page {{lqThemeClass}}">
+<view class="orders-page {{lqThemeClass}} foot-col">
   <view class="orders-tabs">
     <view
       class="orders-tab {{tab === 'spend' ? 'is-active' : ''}}"

@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="op-page" enhanced show-scrollbar="{{false}}">
+<scroll-view scroll-y class="op-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
   <view class="op-hero">
     <text class="op-title">AI 短剧</text>
     <text class="op-sub">和电脑端同一套：场景、故事、角色（可保存、可按参考图二选一）、再出片。分四步，每步只做一件事。</text>

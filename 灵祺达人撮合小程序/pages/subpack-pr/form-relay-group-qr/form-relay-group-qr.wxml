@@ -1,4 +1,4 @@
-<view class="frg-page page-shell {{lqThemeClass}}">
+<view class="frg-page page-shell {{lqThemeClass}} foot-col">
   <view class="frg-card card">
     <text class="frg-title">{{title || '扫码进群'}}</text>
     <text class="frg-hint">长按下方二维码图片，识别后即可加入微信群</text>

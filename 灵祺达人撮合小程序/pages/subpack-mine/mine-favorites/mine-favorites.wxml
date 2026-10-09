@@ -1,4 +1,4 @@
-<view class="fav-page page-shell {{lqThemeClass}}">
+<view class="fav-page page-shell {{lqThemeClass}} foot-col">
   <view wx:if="{{mineGuestMode}}" class="card state-empty fav-empty">
     <text class="fav-empty-icon">🔒</text>
     <text class="empty-title">没有数据，请登录后查看</text>

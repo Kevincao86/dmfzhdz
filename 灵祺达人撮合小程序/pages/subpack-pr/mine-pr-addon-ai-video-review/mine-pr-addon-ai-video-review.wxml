@@ -1,4 +1,4 @@
-<view class="acr-page page-shell {{lqThemeClass}}">
+<view class="acr-page page-shell {{lqThemeClass}} foot-col">
   <view class="card acr-head">
     <text class="title-lg">{{pageTitle}}</text>
     <text class="hint acr-sub">{{pageSubtitle}}</text>

@@ -1,4 +1,4 @@
-<view class="xx-page {{lqThemeClass}}">
+<view class="xx-page {{lqThemeClass}} foot-col">
   <view class="xx-hero">
     <view class="xx-hero-bg"></view>
     <view class="xx-hero-body">

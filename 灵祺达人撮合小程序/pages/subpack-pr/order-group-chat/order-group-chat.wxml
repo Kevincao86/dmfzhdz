@@ -11,7 +11,7 @@
 
   <view class="ogc-closed-banner" wx:if="{{groupClosed}}">商单已完成超过 7 天，群聊已关闭（仅可查看历史消息）</view>
 
-  <scroll-view class="chat-scroll" scroll-y scroll-into-view="{{scrollTo}}" scroll-with-animation>
+  <scroll-view class="chat-scroll foot-col" scroll-y scroll-into-view="{{scrollTo}}" scroll-with-animation enable-flex>
     <view
       wx:for="{{messages}}"
       wx:key="id"

@@ -1,4 +1,4 @@
-<scroll-view scroll-y class="edit-scroll">
+<scroll-view scroll-y class="edit-scroll foot-col" enable-flex>
   <view class="edit-head meoo-card">
     <text class="edit-head-title">短视频优化草稿</text>
     <text class="edit-head-desc">结构与 Web「短视频优化」对齐；请按投放平台规则微调。</text>
