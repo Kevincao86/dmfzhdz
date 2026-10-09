@@ -86,9 +86,14 @@ Page({
     try {
       await agent.syncAgentStateFromCloud()
     } catch (_) {}
-    const messages = (agent.loadThread() || []).map((m) =>
+    let messages = (agent.loadThread() || []).map((m) =>
       previewMp && previewMp.ensureRecruitWizard ? previewMp.ensureRecruitWizard(m) : m,
     )
+    if (agent.rehydrateThreadImages) {
+      try {
+        messages = await agent.rehydrateThreadImages(messages)
+      } catch (_) {}
+    }
     this.setData({
       messages,
       hasChat: messages.some((m) => m.role === 'user'),

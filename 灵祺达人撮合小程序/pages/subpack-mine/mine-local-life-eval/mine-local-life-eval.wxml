@@ -1,4 +1,5 @@
-<view class="xingxuan-page page-shell {{lqThemeClass}} foot-col">
+<view class="xingxuan-page eval-page page-shell {{lqThemeClass}}">
+  <scroll-view class="eval-scroll" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="plats">
     <view
       wx:for="{{platforms}}"
@@ -157,6 +158,8 @@
       </view>
     </view>
   </view>
+    <site-icp-footer />
+  </scroll-view>
 
   <view class="eval-tab-bar {{lqThemeClass}}">
     <view
@@ -206,6 +209,4 @@
       </view>
     </view>
   </view>
-
-  <site-icp-footer />
 </view>

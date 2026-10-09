@@ -61,6 +61,7 @@ function membershipAllowsAiTask(plan, task) {
 }
 
 const STORAGE_KEY_BASE = 'meoo_agent_thread_v2'
+const IMAGE_SIDE_KEY = 'meoo_agent_image_side_v1'
 const THREAD_UID_KEY = '_meoo_agent_thread_uid'
 const MAX_ATTACH = 8
 
@@ -255,17 +256,71 @@ function agentNativeImageRouteFromPickerKey(key) {
   return { route: 'builtin' }
 }
 
-function compactThreadForStorage(messages) {
-  return (messages || []).map((m) => {
-    const urls = Array.isArray(m.imageUrls) ? m.imageUrls : []
-    const kept = urls.filter((u) => {
-      const s = String(u || '')
-      if (/^https?:\/\//i.test(s)) return true
+function durableImageUrls(urls) {
+  return (Array.isArray(urls) ? urls : [])
+    .map((u) => String(u || '').trim())
+    .filter((s) => {
+      if (!s || s.startsWith('data:')) return false
+      if (/^https?:\/\//i.test(s) && s.length < 4000) return true
       if (/^(wxfile|http):\/\//i.test(s) && s.length < 800) return true
-      if (/agent-gen-\d+\.(jpg|jpeg|png|webp)$/i.test(s)) return true
-      if (s.startsWith('data:') && s.length < 60000) return true
+      if (/agent-gen-\d+\.(jpe?g|png|webp)$/i.test(s)) return true
       return false
     })
+}
+
+function imageSideKey() {
+  return `${IMAGE_SIDE_KEY}@${threadStorageKey()}`
+}
+
+function readImageSide() {
+  try {
+    const raw = wx.getStorageSync(imageSideKey())
+    if (!raw) return {}
+    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return obj && typeof obj === 'object' ? obj : {}
+  } catch {
+    return {}
+  }
+}
+
+function rememberMessageImages(messages) {
+  const prev = readImageSide()
+  let changed = false
+  for (const m of messages || []) {
+    if (!m || !m.id) continue
+    const urls = durableImageUrls(m.imageUrls)
+    if (!urls.length) continue
+    prev[m.id] = urls
+    changed = true
+  }
+  const ids = Object.keys(prev)
+  if (ids.length > 80) {
+    ids.slice(0, ids.length - 80).forEach((id) => {
+      delete prev[id]
+    })
+    changed = true
+  }
+  if (!changed) return prev
+  try {
+    wx.setStorageSync(imageSideKey(), JSON.stringify(prev))
+  } catch (_) {}
+  return prev
+}
+
+function applyRememberedImages(messages) {
+  const side = readImageSide()
+  return (messages || []).map((m) => {
+    if (!m || !m.id) return m
+    if (Array.isArray(m.imageUrls) && durableImageUrls(m.imageUrls).length) return m
+    const urls = side[m.id]
+    if (!urls || !urls.length) return m
+    return Object.assign({}, m, { imageUrls: urls })
+  })
+}
+
+function compactThreadForStorage(messages) {
+  return (messages || []).map((m) => {
+    const kept = durableImageUrls(m && m.imageUrls)
     const next = Object.assign({}, m)
     if (kept.length) next.imageUrls = kept
     else delete next.imageUrls
@@ -276,15 +331,16 @@ function compactThreadForStorage(messages) {
 function loadThread() {
   try {
     const raw = wx.getStorageSync(threadStorageKey())
-    if (!raw) return []
+    if (!raw) return applyRememberedImages([])
     const arr = JSON.parse(raw)
-    return Array.isArray(arr) ? arr : []
+    return applyRememberedImages(Array.isArray(arr) ? arr : [])
   } catch {
-    return []
+    return applyRememberedImages([])
   }
 }
 
 function saveThread(messages) {
+  rememberMessageImages(messages)
   const slice = compactThreadForStorage(messages).slice(-40)
   try {
     wx.setStorageSync(threadStorageKey(), JSON.stringify(slice))
@@ -292,10 +348,9 @@ function saveThread(messages) {
     try {
       const slim = slice.map((m) => {
         const n = Object.assign({}, m)
-        if (n.imageUrls) {
-          n.imageUrls = n.imageUrls.filter((u) => /^https?:\/\//i.test(String(u || '')))
-          if (!n.imageUrls.length) delete n.imageUrls
-        }
+        const urls = durableImageUrls(n.imageUrls)
+        if (urls.length) n.imageUrls = urls
+        else delete n.imageUrls
         return n
       })
       wx.setStorageSync(threadStorageKey(), JSON.stringify(slim))
@@ -311,6 +366,7 @@ function saveThread(messages) {
 function clearThread() {
   try {
     wx.removeStorageSync(threadStorageKey())
+    wx.removeStorageSync(imageSideKey())
   } catch (_) {}
   const uid = getCurrentUserId()
   if (uid) {
@@ -329,10 +385,59 @@ async function syncAgentStateFromCloud() {
   if (data.habits) habitsMp.applyCloudHabits(uid, data.habits)
   if (Array.isArray(data.thread) && data.thread.length) {
     try {
-      wx.setStorageSync(threadStorageKey(), JSON.stringify(data.thread.slice(-40)))
+      const local = loadThread()
+      const cloud = data.thread.slice(-40)
+      const last = local[local.length - 1]
+      const cloudHasLatest = !last || !last.id || cloud.some((m) => m && m.id === last.id)
+      const base = cloudHasLatest ? cloud : local
+      const byId = {}
+      for (const m of local) {
+        const urls = durableImageUrls(m && m.imageUrls)
+        if (m && m.id && urls.length) byId[m.id] = urls
+      }
+      const merged = applyRememberedImages(
+        base.map((m) => {
+          if (!m || !m.id || (Array.isArray(m.imageUrls) && durableImageUrls(m.imageUrls).length)) return m
+          if (!byId[m.id]) return m
+          return Object.assign({}, m, { imageUrls: byId[m.id] })
+        }),
+      )
+      rememberMessageImages(merged)
+      wx.setStorageSync(threadStorageKey(), JSON.stringify(compactThreadForStorage(merged)))
     } catch (_) {}
   }
   return data
+}
+
+async function rehydrateThreadImages(messages) {
+  const list = Array.isArray(messages) ? messages : []
+  let changed = false
+  const out = []
+  for (const m of list) {
+    const urls = Array.isArray(m && m.imageUrls) ? m.imageUrls : []
+    if (!urls.length) {
+      out.push(m)
+      continue
+    }
+    const nextUrls = []
+    for (const raw of urls) {
+      const src = String(raw || '').trim()
+      if (!src) continue
+      if (/^data:image\//i.test(src)) {
+        const file = await persistGeneratedImageUrl(src)
+        if (file && !/^data:/i.test(file)) {
+          nextUrls.push(file)
+          changed = true
+          continue
+        }
+      }
+      nextUrls.push(src)
+    }
+    if (nextUrls.length && nextUrls.join('|') !== urls.join('|')) changed = true
+    out.push(nextUrls.length ? Object.assign({}, m, { imageUrls: nextUrls }) : m)
+  }
+  if (changed) saveThread(out)
+  return out
 }
 
 function devMockReply(userText) {
@@ -939,6 +1044,7 @@ module.exports = {
   setCurrentUserId,
   getCurrentUserId,
   syncAgentStateFromCloud,
+  rehydrateThreadImages,
   loadThread,
   saveThread,
   clearThread,

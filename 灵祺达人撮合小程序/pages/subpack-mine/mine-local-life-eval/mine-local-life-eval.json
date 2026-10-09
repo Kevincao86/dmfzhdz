@@ -1,4 +1,5 @@
 {
   "navigationBarTitleText": "达人账号分析",
+  "disableScroll": true,
   "usingComponents": {}
 }

@@ -60,7 +60,7 @@
           wx:key="*this"
           class="bubble-img"
           src="{{img}}"
-          mode="widthFix"
+          mode="aspectFit"
           bindtap="onPreviewBubbleImage"
           data-url="{{img}}"
         />

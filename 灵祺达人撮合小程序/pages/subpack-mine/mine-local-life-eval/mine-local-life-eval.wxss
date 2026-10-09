@@ -320,6 +320,7 @@
 .radar-card {
   text-align: center;
   padding: 28rpx 8rpx 8rpx;
+  overflow: hidden;
 }
 
 .radar-title {
@@ -337,6 +338,8 @@
 }
 
 .radar-canvas {
+  position: relative;
+  z-index: 0;
   width: 100%;
   height: 640rpx;
 }
@@ -754,6 +757,22 @@
   box-sizing: border-box;
 }
 
+.xingxuan-page.eval-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-height: 100vh;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.eval-scroll {
+  flex: 1;
+  height: 0;
+  width: 100%;
+}
+
 .xingxuan-page--dock {
   padding-bottom: calc(420rpx + env(safe-area-inset-bottom));
 }
@@ -798,19 +817,19 @@
 
 /* 分析页在分包里，不能依赖主包 tab 样式，图标尺寸写在本页 */
 .eval-tab-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 999;
+  position: relative;
+  flex-shrink: 0;
+  z-index: 20;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-around;
   height: calc(96rpx + env(safe-area-inset-bottom));
+  margin-left: -24rpx;
+  margin-right: -24rpx;
   padding: 6rpx 8rpx calc(6rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  background: rgba(255, 255, 255, 0.96);
+  background: #fff;
   border-top: 1rpx solid #e6e4f0;
 }
 
