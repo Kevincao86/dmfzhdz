@@ -24,12 +24,17 @@ function randomGuestFp() {
 function getOrCreateSessionId() {
   try {
     const existing = String(wx.getStorageSync(SESSION_KEY) || '').trim()
-    if (/^lq-mp[-:]/i.test(existing) && existing.length >= 12) return existing
-    const sid = `lq-mp-${randomSid()}`
+    if (/^lq-erp[-:]/i.test(existing) && existing.length >= 12) return existing
+    if (/^lq-mp[-:]/i.test(existing) && existing.length >= 12) {
+      const sid = existing.replace(/^lq-mp/i, 'lq-erp')
+      wx.setStorageSync(SESSION_KEY, sid)
+      return sid
+    }
+    const sid = `lq-erp-${randomSid()}`
     wx.setStorageSync(SESSION_KEY, sid)
     return sid
   } catch (_) {
-    return `lq-mp-${randomSid()}`
+    return `lq-erp-${randomSid()}`
   }
 }
 

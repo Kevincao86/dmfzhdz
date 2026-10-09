@@ -4,6 +4,10 @@
  */
 
 import { pushSupportFeishuAppCard } from './supportFeishuAppBridge.js'
+import {
+  readSupportRelaySupabaseAdminEnv,
+  supportRelayAdminFetch,
+} from '../../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
 
 export type SupportFeishuNotifyResult = {
   ok: boolean
@@ -95,6 +99,62 @@ async function sendWebhook(payload: {
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e), via: 'webhook' }
   }
+}
+
+type FeishuClaim = 'claimed' | 'already' | 'unavailable'
+
+/** 原子 claim：仅首次把 feishu_notified_at 置上的调用方负责发飞书 */
+async function claimSupportFeishuNotify(row: {
+  sessionId: string
+  clientMsgId: string
+}): Promise<FeishuClaim> {
+  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
+  if (missingParts.length > 0 || !row.clientMsgId) return 'unavailable'
+  const q = new URLSearchParams({
+    session_id: `eq.${row.sessionId}`,
+    client_msg_id: `eq.${row.clientMsgId}`,
+    from_role: 'eq.user',
+    feishu_notified_at: 'is.null',
+  })
+  try {
+    const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
+      method: 'PATCH',
+      headers: {
+        apikey: serviceRole,
+        Authorization: `Bearer ${serviceRole}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ feishu_notified_at: new Date().toISOString() }),
+    })
+    if (!r.ok) return 'unavailable'
+    const updated = (await r.json()) as unknown[]
+    return Array.isArray(updated) && updated.length > 0 ? 'claimed' : 'already'
+  } catch {
+    return 'unavailable'
+  }
+}
+
+/** 写入后或轮询发现新消息时调用。claim 成功才发，避免运营台和入库各发一次。 */
+export async function notifySupportUserMessageOnce(row: {
+  sessionId: string
+  enterpriseName?: string
+  customerId?: string
+  text: string
+  ts?: number
+  clientMsgId: string
+}): Promise<void> {
+  const text = row.text.trim()
+  if (!text || !row.sessionId || row.sessionId.startsWith('__')) return
+  const claim = await claimSupportFeishuNotify({ sessionId: row.sessionId, clientMsgId: row.clientMsgId })
+  if (claim === 'already') return
+  await sendSupportMerchantMessageFeishu({
+    sessionId: row.sessionId,
+    enterpriseName: row.enterpriseName,
+    customerId: row.customerId,
+    text,
+    ts: row.ts,
+  })
 }
 
 export async function sendSupportMerchantMessageFeishu(payload: {

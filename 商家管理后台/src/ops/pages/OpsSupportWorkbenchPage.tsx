@@ -20,7 +20,19 @@ import {
   type SupportRelaySessionMetaMessage,
 } from '../../lib/supportRelay'
 import { supportOpsSendUrl, postSupportOpsSend, supportPollUrl } from '../../lib/supportOpsHttpApi'
+import { readOpsSession } from '../opsStaffAuth'
 import { useOpsModuleEdit } from '../useOpsModuleEdit'
+
+function supportPollBearer(): string {
+  const staff = readOpsSession()?.sessionToken?.trim() ?? ''
+  if (staff) return staff
+  const baked =
+    typeof import.meta.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN === 'string'
+      ? import.meta.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN.trim()
+      : ''
+  if (!baked || baked === 'build-placeholder') return ''
+  return baked
+}
 
 type SessionRow = { lastText: string; lastTs: number; unread: number }
 
@@ -157,10 +169,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
     typeof import.meta.env.VITE_SUPPORT_RELAY_WS === 'string' &&
     import.meta.env.VITE_SUPPORT_RELAY_WS.trim().length > 0
 
-  const httpPollToken =
-    typeof import.meta.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN === 'string'
-      ? import.meta.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN.trim()
-      : ''
+  const httpPollToken = supportPollBearer()
   /** 有 HTTP token 时始终轮询 ECS/Supabase（小程序会话必须走 DB；dev 可与 WS 并存） */
   const useHttpPoll = Boolean(httpPollToken)
   const maxPollTsRef = useRef(0)
@@ -225,9 +234,11 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
     if (!useHttpPoll || !httpPollToken) return
 
     let cancelled = false
+    let inflight = false
 
     const tick = async () => {
-      if (cancelled) return
+      if (cancelled || inflight) return
+      inflight = true
       try {
         const since = maxPollTsRef.current
         const res = await fetch(supportPollUrl(since), {
@@ -268,6 +279,8 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
             ? `${e.message}（请确认 ECS auth-api 与 https://mofangdianai.com/erp-api/support-poll 可访问）`
             : '轮询网络异常',
         )
+      } finally {
+        inflight = false
       }
     }
 
@@ -702,7 +715,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
             <WifiOff className="h-4 w-4 shrink-0" />
           )}
           {httpPollError
-            ? `云端会话轮询异常：${httpPollError}。若含 fetch failed，请在 Vercel 增加 VITE_MEEO_SUPPORT_OPS_API_BASE=https://mofangdianai.com/erp-api 并确认 ECS auth-api 已挂载 support-poll。`
+            ? `云端会话轮询异常：${httpPollError}。若是 unauthorized，请退出运营台后重新登录。`
             : httpPollReady
               ? '云端会话同步已启用（HTTP 轮询 Supabase，约每 2 秒刷新）'
               : '正在连接云端会话接口… 请确认 Vercel 已配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。'}

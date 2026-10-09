@@ -337,7 +337,7 @@ export function extractPlainTextFromFeishuMessage(contentRaw: string, messageTyp
 /** 从回复正文中兜底解析 session（卡片说明里的会话 id） */
 export function extractSessionIdFromReplyText(text: string): string | null {
   const m =
-    text.match(/`?(lq-mp[-:][A-Za-z0-9._:-]+|mp[-_][A-Za-z0-9._:-]+|sess_[A-Za-z0-9._:-]+|[0-9a-f]{8}-[0-9a-f-]{20,})`?/i) ||
+    text.match(/`?(lq-erp[-:][A-Za-z0-9._:-]+|lq-mp[-:][A-Za-z0-9._:-]+|mp[-_][A-Za-z0-9._:-]+|sess_[A-Za-z0-9._:-]+|[0-9a-f]{8}-[0-9a-f-]{20,})`?/i) ||
     text.match(/会话[：:\s]*`?([A-Za-z0-9._:-]{8,})`?/)
   const sid = m?.[1]?.trim()
   return sid || null

@@ -3,6 +3,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { insertSupportOpsReply } from '../supportOpsSendCore.js'
+import { supportOpsHttpAuthorized } from '../supportOpsHttpAuth.js'
 
 export const config = { maxDuration: 30 }
 
@@ -26,20 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const expected = process.env.MEOO_SUPPORT_OPS_HTTP_TOKEN?.trim()
-  if (!expected) {
-    sendJson(res, 503, {
-      ok: false,
-      error: 'support_send_not_configured',
-      hint: '配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。',
-    })
-    return
-  }
-
-  const auth = String(req.headers.authorization ?? '')
-    .replace(/^Bearer\s+/i, '')
-    .trim()
-  if (auth !== expected) {
+  if (!supportOpsHttpAuthorized(req.headers.authorization)) {
     sendJson(res, 401, { ok: false, error: 'unauthorized' })
     return
   }

@@ -1,10 +1,11 @@
+import { notifySupportUserMessageOnce } from '../../../../商家管理后台/api/_lib/supportFeishuNotify.js'
 import {
   readSupportRelaySupabaseAdminEnv,
   supportRelayAdminFetch,
   supportRelaySupabaseEnvConfigureHint,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
 
-const MP_SESSION_RE = /^lq-mp[-:]/i
+const MP_SESSION_RE = /^(lq-mp|lq-erp)[-:]/i
 const MP_GUEST_FP_RE = /^lq-mp:/i
 const ALLOWED_FROM = new Set(['user', 'bot', 'agent', 'system'])
 
@@ -183,17 +184,28 @@ export async function handleMpSupportRelayBody(
       if (!text || !clientMsgId) {
         return { status: 400, data: { ok: false, error: 'missing_text_or_id' } }
       }
+      const ts = Number(body.ts) || Date.now()
       await adminInsertMessage(supabaseUrl, serviceRole, {
         session_id: sessionId,
         customer_id: String(body.customerId || '').trim() || null,
         enterprise_name: String(body.enterpriseName || '').trim() || null,
         from_role: fromRole,
         text,
-        ts: Number(body.ts) || Date.now(),
+        ts,
         client_msg_id: clientMsgId,
         guest_fingerprint: guestFingerprint,
         author_user_id: null,
       })
+      if (fromRole === 'user') {
+        void notifySupportUserMessageOnce({
+          sessionId,
+          customerId: String(body.customerId || '').trim() || undefined,
+          enterpriseName: String(body.enterpriseName || '').trim() || undefined,
+          text,
+          ts,
+          clientMsgId,
+        }).catch(() => {})
+      }
       return { status: 200, data: { ok: true } }
     }
 

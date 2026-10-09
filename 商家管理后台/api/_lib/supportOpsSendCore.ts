@@ -67,8 +67,8 @@ export async function insertSupportOpsReply(input: SupportOpsSendInput): Promise
   } catch {
     /* ignore */
   }
-  if (!guestFingerprint && /^lq-mp[-:]/i.test(sessionId)) {
-    guestFingerprint = `lq-mp:${sessionId.replace(/^lq-mp[-:]/i, '').slice(0, 48)}`
+  if (!guestFingerprint && /^(lq-mp|lq-erp)[-:]/i.test(sessionId)) {
+    guestFingerprint = `lq-mp:${sessionId.replace(/^(lq-mp|lq-erp)[-:]/i, '').slice(0, 48)}`
   }
 
   const row = {

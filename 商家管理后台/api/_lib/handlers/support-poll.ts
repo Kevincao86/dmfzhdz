@@ -3,7 +3,8 @@
  * 增量轮询到新商户消息时推送飞书群通知（去重字段 feishu_notified_at）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sendSupportMerchantMessageFeishu } from '../supportFeishuNotify.js'
+import { notifySupportUserMessageOnce } from '../supportFeishuNotify.js'
+import { supportOpsHttpAuthorized } from '../supportOpsHttpAuth.js'
 import {
   readSupportRelaySupabaseAdminEnv,
   supportRelayAdminFetch,
@@ -34,59 +35,17 @@ function serviceHeaders(serviceRole: string) {
   } as const
 }
 
-/** 原子 claim：仅首次将 feishu_notified_at 置位者返回 claimed */
-async function claimSupportFeishuNotify(
-  supabaseUrl: string,
-  serviceRole: string,
-  row: DbRow,
-): Promise<'claimed' | 'already' | 'unavailable'> {
-  const q = new URLSearchParams({
-    session_id: `eq.${row.session_id}`,
-    client_msg_id: `eq.${row.client_msg_id}`,
-    from_role: 'eq.user',
-    feishu_notified_at: 'is.null',
-  })
-  try {
-    const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
-      method: 'PATCH',
-      headers: {
-        ...serviceHeaders(serviceRole),
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation',
-      },
-      body: JSON.stringify({ feishu_notified_at: new Date().toISOString() }),
+/** 只推最近窗口内的商户消息，避免首屏 400 条历史把飞书堵住 */
+function freshUserRows(rows: DbRow[], sinceTs: number, incremental: boolean): DbRow[] {
+  const cutoff = incremental && sinceTs > 0 ? sinceTs : Date.now() - 90_000
+  return rows
+    .filter((row) => {
+      if (row.from_role !== 'user') return false
+      if (!row.text.trim()) return false
+      if (row.session_id.startsWith('__')) return false
+      return row.ts > cutoff
     })
-    if (!r.ok) {
-      const detail = await r.text()
-      if (/feishu_notified_at|42703|column|PGRST204/i.test(detail)) return 'unavailable'
-      return 'unavailable'
-    }
-    const updated = (await r.json()) as unknown[]
-    return Array.isArray(updated) && updated.length > 0 ? 'claimed' : 'already'
-  } catch {
-    return 'unavailable'
-  }
-}
-
-async function notifyNewMerchantSupportMessages(
-  supabaseUrl: string,
-  serviceRole: string,
-  rows: DbRow[],
-): Promise<void> {
-  for (const row of rows) {
-    if (row.from_role !== 'user') continue
-    const text = row.text.trim()
-    if (!text) continue
-    const claim = await claimSupportFeishuNotify(supabaseUrl, serviceRole, row)
-    if (claim === 'already') continue
-    await sendSupportMerchantMessageFeishu({
-      sessionId: row.session_id,
-      enterpriseName: row.enterprise_name ?? undefined,
-      customerId: row.customer_id ?? undefined,
-      text,
-      ts: row.ts,
-    })
-  }
+    .slice(-20)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -95,20 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const expected = process.env.MEOO_SUPPORT_OPS_HTTP_TOKEN?.trim()
-  if (!expected) {
-    sendJson(res, 503, {
-      ok: false,
-      error: 'support_poll_not_configured',
-      hint: '配置 Vercel 环境变量 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY（及 MEOO_SUPABASE_ADMIN_URL=https://mofangdianai.com）。',
-    })
-    return
-  }
-
-  const auth = String(req.headers.authorization ?? '')
-    .replace(/^Bearer\s+/i, '')
-    .trim()
-  if (auth !== expected) {
+  if (!supportOpsHttpAuthorized(req.headers.authorization)) {
     sendJson(res, 401, { ok: false, error: 'unauthorized' })
     return
   }
@@ -172,12 +118,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       rows = (await r.json()) as DbRow[]
     }
 
-    // 全量/增量都尝试推送：claim(feishu_notified_at) 保证只发一次。
-    // 仅增量时，首屏 sinceTs=0 拉到的新消息会永远跳过飞书通知。
-    if (rows.length > 0) {
-      await notifyNewMerchantSupportMessages(supabaseUrl, serviceRole, rows)
-    }
-
     const messages = rows.map((row) => ({
       type: 'chat' as const,
       sessionId: row.session_id,
@@ -190,6 +130,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }))
 
     sendJson(res, 200, { ok: true, messages, supabaseHost })
+    const fresh = freshUserRows(rows, sinceTs, incremental)
+    if (fresh.length > 0) {
+      void Promise.all(
+        fresh.map((row) =>
+          notifySupportUserMessageOnce({
+            sessionId: row.session_id,
+            enterpriseName: row.enterprise_name ?? undefined,
+            customerId: row.customer_id ?? undefined,
+            text: row.text,
+            ts: row.ts,
+            clientMsgId: row.client_msg_id,
+          }),
+        ),
+      ).catch(() => {})
+    }
   } catch (e) {
     sendJson(res, 502, {
       ok: false,
