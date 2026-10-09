@@ -8,6 +8,9 @@
     <text class="welcome-head__sub">管门店　|　对商品　|　看财务</text>
   </view>
 
+  <button class="btn-v2 guest-browse" bindtap="onLeaveLogin">先逛逛，暂不登录</button>
+  <text class="guest-browse-hint">可先浏览首页、门店评估和功能。登录后再使用自己的门店数据。</text>
+
   <view class="welcome-grid">
     <view
       wx:for="{{landingWays}}"
@@ -110,9 +113,6 @@
     <text class="login-legal-txt">和</text>
     <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
   </view>
-
-  <button class="btn-v2 guest-browse" bindtap="onLeaveLogin">先逛逛，暂不登录</button>
-  <text class="guest-browse-hint">浏览功能无需授权；使用业务能力时再登录</text>
 
   <view class="welcome-cluster {{pickedId ? 'welcome-cluster--compact' : ''}}">
     <view class="welcome-cluster__glow welcome-cluster__glow--a" />

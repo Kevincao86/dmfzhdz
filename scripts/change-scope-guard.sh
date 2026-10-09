@@ -125,6 +125,7 @@ list_scopes() {
   merchant_payout_bind 商家钱包绑定收款账户，提现打到该账户，运营台提现名单带出户名账号开户行
   merchant_payout_photo 商家收款账户绑定支持拍证件照，识别后填入姓名和证件号
   erp_ops_finance       运营台客户与财务：商家 ERP 开通与充值统计
+  merchant_mp_review    商家小程序审核：先浏览再登录；分析提升先付费再提醒绑定门店
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1614,6 +1615,16 @@ HomeDashboard.tsx
 灵祺ERP小程序/custom-tab-bar/
 灵祺ERP小程序/pages/ai-agent/ai-agent.js
 灵祺ERP小程序/pages/mine/mine.js
+change-scope-guard
+PAT
+      ;;
+    merchant_mp_review)
+      cat <<'PAT'
+灵祺ERP小程序/app.js
+灵祺ERP小程序/pages/login/
+灵祺ERP小程序/pages/shop-eval/
+灵祺ERP小程序/utils/merchantSessionSyncMp.js
+灵祺ERP小程序/utils/supabaseRest.js
 change-scope-guard
 PAT
       ;;

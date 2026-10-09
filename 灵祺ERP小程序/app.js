@@ -27,6 +27,9 @@ App({
       // 已登录进入工作台改由登录页开屏海报结束后再跳转
     } else {
       this.globalData.accessToken = null
+      try {
+        require('./utils/api.js').enterGuestBrowse()
+      } catch (_) {}
     }
   },
   globalData: {

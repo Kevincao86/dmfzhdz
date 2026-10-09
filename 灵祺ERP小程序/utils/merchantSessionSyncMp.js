@@ -439,7 +439,7 @@ function clearMerchantSessionLocal() {
 async function syncFromCloud(opts) {
   if (devAuth.isDevSkipLogin()) return
   const api = require('./api.js')
-  if (!api.getAccessToken()) return
+  if (!api.isRealAuthed()) return
 
   const force = Boolean(opts && opts.force)
   const now = Date.now()

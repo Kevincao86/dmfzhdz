@@ -93,7 +93,7 @@ function request(method, pathAndQuery, token, body) {
 }
 
 async function fetchAuthUserId() {
-  const token = api.getAccessToken()
+  const token = api.getBearerToken ? api.getBearerToken() : api.getAccessToken()
   if (!token) return null
   let sub = decodeJwtSub(token)
   if (sub) return sub

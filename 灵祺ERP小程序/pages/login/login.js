@@ -458,18 +458,6 @@ Page({
         { access_token: r.access_token, refresh_token: r.refresh_token || '' },
         r.loginName || '',
       )
-      if (r.needsPhoneBind || r.isNew) {
-        this.setData({
-          showBindPhone: true,
-          bindAccessToken: r.access_token,
-          bindPhone: '',
-          bindSmsCode: '',
-          bindMergeToken: '',
-          bindMergeMsg: '',
-          bindNeedCode: false,
-        })
-        return
-      }
       this._goHome()
     } catch (e) {
       const msg = e && e.message ? e.message : '快捷登录失败'

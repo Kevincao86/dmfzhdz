@@ -265,10 +265,6 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 2 })
     }
-    if (!api.canAccessPage || !api.canAccessPage()) {
-      if (api.goLogin) api.goLogin()
-      return
-    }
     this._left = false
     void this.refreshQuota()
     void this.bootstrapEval()
@@ -1174,10 +1170,11 @@ Page({
   },
 
   async onAdvise() {
+    if (!(await this.requirePaid())) return
     const bound = (this.data.platforms || []).some((item) => item.id === this.data.platformId && item.bound)
     if (!bound) {
       wx.showModal({
-        title: '请先绑定平台',
+        title: '请先绑定门店',
         content: '请在网页端进行平台授权绑定，具体操作见网页版系统设置。',
         confirmText: '去绑定',
         cancelText: '取消',
@@ -1190,7 +1187,6 @@ Page({
       })
       return
     }
-    if (!(await this.requirePaid())) return
     if (!this.data.scoreReady || this.data.evaluating || this.data.advising) return
     this.setData({ advising: true, err: '' })
     let failed = null
