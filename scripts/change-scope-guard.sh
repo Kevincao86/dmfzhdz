@@ -124,6 +124,7 @@ list_scopes() {
   affiliate_instant    推广员一点申请即开通、专属二维码、扫码付费按后台比例入账
   merchant_payout_bind 商家钱包绑定收款账户，提现打到该账户，运营台提现名单带出户名账号开户行
   merchant_payout_photo 商家收款账户绑定支持拍证件照，识别后填入姓名和证件号
+  erp_ops_finance       运营台客户与财务：商家 ERP 开通与充值统计
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1787,6 +1788,18 @@ tenantBillingClient
 WalletPage
 tenantBillingApiMp
 灵祺ERP小程序/pages/wallet
+change-scope-guard
+PAT
+      ;;
+    erp_ops_finance)
+      cat <<'PAT'
+opsErpFinanceApi
+OpsErpFinancePage
+opsNavConfig
+opsStaffAuth
+opsPageHeroConfig
+opsStaffAccountsBackend
+商家管理后台/src/App.tsx
 change-scope-guard
 PAT
       ;;

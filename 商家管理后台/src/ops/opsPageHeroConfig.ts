@@ -1,6 +1,7 @@
 export type OpsPageHeroKey =
   | 'customers'
   | 'mp-membership-finance'
+  | 'erp-finance'
   | 'talent-library'
   | 'shoot-team-library'
   | 'edit-team-library'
@@ -31,6 +32,13 @@ export const OPS_PAGE_HERO: Record<OpsPageHeroKey, OpsPageHeroMeta> = {
     description:
       '汇总达人 / PR / 拍摄 / 剪辑各档会员的微信支付开通记录，按角色与套餐统计已确认收入，支持 CSV / Excel 导出。',
     accent: '#0ea5e9',
+  },
+  'erp-finance': {
+    image: '/ops-hero/mp-membership-finance.png',
+    title: '商家ERP财务',
+    description:
+      '汇总商家 ERP 订阅开通与钱包充值的到账记录，按类型和档位统计收入，支持 CSV / Excel 导出。',
+    accent: '#4f46e5',
   },
   'talent-library': {
     image: '/ops-hero/talent-library.png',

@@ -25,6 +25,7 @@ export const OPS_PERMISSION_MODULE_KEYS = [
   'announcements',
   'payment_orders',
   'mp_membership_finance',
+  'erp_finance',
   'distribution',
   'recruitment_orders',
   'mp_recruitment_orders',
