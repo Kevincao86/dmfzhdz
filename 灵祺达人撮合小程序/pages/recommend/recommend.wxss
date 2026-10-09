@@ -1332,12 +1332,20 @@
 /* —— 商单卡（推荐大厅设计稿） —— */
 .job-card-rec {
   position: relative;
+  flex: 0 0 auto;
+  height: auto;
   margin-bottom: 8rpx;
   background: #fff;
   border-radius: 20rpx;
   border: 1rpx solid var(--lq-chip-on-border);
   box-shadow: 0 8rpx 24rpx rgba(91, 33, 182, 0.08);
-  overflow: hidden;
+  overflow: visible;
+}
+
+.rec-scroll.page-scroll-body > .job-card-rec {
+  flex: 0 0 auto;
+  height: auto;
+  overflow: visible;
 }
 
 .rec-ai-panel__dots {
@@ -1557,15 +1565,12 @@
 .job-card-rec__title {
   flex: 1;
   min-width: 0;
-  font-size: 24rpx;
+  font-size: 28rpx;
   font-weight: 700;
   color: var(--lq-text);
-  line-height: 1.3;
-  max-height: 34rpx;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.4;
+  display: block;
+  white-space: normal;
   word-break: break-all;
 }
 
@@ -1612,14 +1617,12 @@
 }
 
 .job-card-rec__advantage-text {
-  font-size: 20rpx;
-  line-height: 1.35;
+  font-size: 22rpx;
+  line-height: 1.4;
   color: #475569;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
+  display: block;
+  white-space: normal;
+  word-break: break-all;
 }
 
 .job-card-rec__meta-row {
