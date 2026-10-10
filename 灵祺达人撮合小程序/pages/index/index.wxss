@@ -271,17 +271,22 @@
   margin: 12rpx 24rpx 0;
 }
 
-/* 轻量筛选 */
+/* 轻量筛选。横向 scroll-view 在真机正式版不写高度会收成 0，开发者工具仍会撑开。 */
 .home-filter-v1 {
   width: 100%;
+  height: 88rpx;
   margin-top: 8rpx;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .home-filter-v1__row {
   display: inline-flex;
+  align-items: center;
+  height: 88rpx;
   gap: 12rpx;
-  padding: 6rpx 24rpx 8rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
 }
 
 .home-filter-v1__chip {
