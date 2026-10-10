@@ -919,6 +919,7 @@ export default function OrderCalendarPage() {
                                 </button>
                               ) : null}
                               {evt.kind !== 'manual' ? (
+                              <>
                               <button
                                 type="button"
                                 onClick={() => openLabelDialog(evt)}
@@ -943,6 +944,7 @@ export default function OrderCalendarPage() {
                                 <Bell className="h-3.5 w-3.5" />
                                 {remindSet ? '已设提醒' : '设提醒'}
                               </button>
+                              </>
                               ) : null}
                             </div>
                           </div>
