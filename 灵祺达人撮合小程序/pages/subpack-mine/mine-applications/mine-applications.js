@@ -208,6 +208,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   onTabChange(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
     if (!id || id === this.data.filterTab) return
+    this.data.filterTab = id
+    this.data.progressFilter = 'all'
     this.setData({
       filterTab: id,
       progressFilter: 'all',
@@ -279,6 +281,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     const progressFilter = opt && opt.id ? opt.id : 'all'
     const progressFilterLabel =
       progressFilter === 'all' ? '状态' : opt && opt.label ? opt.label : '状态'
+    this.data.progressFilter = progressFilter
     this.setData({
       progressFilter,
       progressFilterLabel,
@@ -288,6 +291,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   onOrderTypeFilterChange(e) {
     const idx = Number(e.detail.value) || 0
     const opt = this.data.orderTypeOptions[idx] || this.data.orderTypeOptions[0]
+    this.data.orderTypeFilter = opt.id
     this.setData({
       orderTypeFilter: opt.id,
       orderTypeFilterLabel: opt.id === 'all' ? '类型' : opt.label,
@@ -297,6 +301,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   onTimeFilterChange(e) {
     const idx = Number(e.detail.value) || 0
     const opt = this.data.timeOptions[idx] || this.data.timeOptions[0]
+    this.data.timeFilter = opt.id
     this.setData({
       timeFilter: opt.id,
       timeFilterLabel: opt.id === 'all' ? '时间' : opt.label,
@@ -306,6 +311,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   onCategoryChange(e) {
     const idx = Number(e.detail.value) || 0
     const val = this.data.categoryOptions[idx] || '全部'
+    this.data.category = val
     this.setData({
       category: val,
       categoryLabel: val === '全部' ? '类目' : val,
@@ -315,6 +321,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   onCityChange(e) {
     const idx = Number(e.detail.value) || 0
     const val = this.data.cityOptions[idx] || '全部'
+    this.data.city = val
+    this.data.province = '全部'
     this.setData({
       city: val,
       province: '全部',
@@ -324,6 +332,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   },
   onKeywordInput(e) {
     const keyword = String((e.detail && e.detail.value) || '')
+    this.data.keyword = keyword
     this.setData({
       keyword,
       filteredRows: this.applyFilters(this.data.rows),

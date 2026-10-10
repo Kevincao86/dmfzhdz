@@ -418,25 +418,29 @@ function hallRecruitmentSortTier(row) {
   return 2
 }
 
-/** 招募大厅：爆火优先；未满临期；再按用户所选排序 */
+function compareHallSortKey(a, b, sortBy) {
+  if (sortBy === '当日热度') {
+    const heat = resolveHallExposureScore(b) - resolveHallExposureScore(a)
+    if (heat !== 0) return heat
+  } else if (sortBy === '截止时间') {
+    const deadline = (a.deadlineMs || 9e15) - (b.deadlineMs || 9e15)
+    if (deadline !== 0) return deadline
+  } else if (sortBy === '价格从高到低') {
+    const price = (b.priceAmount || 0) - (a.priceAmount || 0)
+    if (price !== 0) return price
+  }
+  return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+}
+
+/** 招募大厅：爆火优先；未满在前；同一档内按用户所选排序 */
 function sortHallRecruitmentRows(rows, sortBy) {
   const list = rows.slice()
+  const key = sortBy || '发布时间'
   list.sort((a, b) => {
     const ta = hallRecruitmentSortTier(a)
     const tb = hallRecruitmentSortTier(b)
     if (ta !== tb) return ta - tb
-    const sa = resolveHallExposureScore(a)
-    const sb = resolveHallExposureScore(b)
-    if (sb !== sa) return sb - sa
-    const da = a.deadlineMs || 9e15
-    const db = b.deadlineMs || 9e15
-    if (sortBy === '截止时间') {
-      return da - db
-    }
-    if (sortBy === '价格从高到低') {
-      return (b.priceAmount || 0) - (a.priceAmount || 0)
-    }
-    return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+    return compareHallSortKey(a, b, key)
   })
   return list
 }

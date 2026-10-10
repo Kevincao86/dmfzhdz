@@ -704,7 +704,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       if (!matchHomeCategoryChip(r, this.data.activeCategoryChip)) return false
       return true
     })
-    rows = listFilters.sortHallRecruitmentRows(rows, this.data.sortBy)
+    const sortBy = this.data.sortBy || '发布时间'
+    rows = listFilters.sortHallRecruitmentRows(rows, sortBy)
     const countForTab = (list) =>
       (list || []).filter((r) => {
         if (!showDemoOrders() && r && r.isMock) return false
@@ -755,6 +756,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
           if (mocks.length) final = [...final.filter((r) => !r.isMock), ...mocks]
         } catch (_) {}
       }
+      if (this._aiTagToken !== token) return
+      final = listFilters.sortHallRecruitmentRows(final, sortBy)
       this.setData({ displayRows: final })
     })
   },
@@ -873,7 +876,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     this.applyFilters()
   },
   onSortFilter(e) {
-    this.setData({ sortBy: this.data.sortOptions[Number(e.detail.value)] || '发布时间' })
+    const sortBy = this.data.sortOptions[Number(e.detail.value)] || '发布时间'
+    this.data.sortBy = sortBy
+    this.setData({ sortBy })
     this.applyFilters()
   },
   onStatusFilter(e) {
