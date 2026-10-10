@@ -4,7 +4,7 @@ type Channel = 'qq' | 'wechat'
 
 const QR: Record<Channel, { src: string; title: string }> = {
   qq: { src: '/bind-contact/qq-qr.png', title: 'QQ 联系' },
-  wechat: { src: '/bind-contact/wechat-qr.png', title: '微信联系' },
+  wechat: { src: '/bind-contact/wechat-qr-full.png', title: '微信联系' },
 }
 
 function QqMark() {
@@ -65,13 +65,13 @@ export default function BindContactHelp() {
           role="presentation"
         >
           <div
-            className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-xl"
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-label={current.title}
           >
             <p className="text-center text-sm font-medium text-slate-800">{current.title}</p>
-            <img src={current.src} alt={current.title} className="mx-auto mt-3 block w-56 max-w-full bg-white" />
+            <img src={current.src} alt={current.title} className="mx-auto mt-3 block w-full bg-white" />
             <button
               type="button"
               className="mt-4 w-full rounded-lg border border-slate-200 py-2 text-sm text-slate-600 hover:bg-slate-50"
