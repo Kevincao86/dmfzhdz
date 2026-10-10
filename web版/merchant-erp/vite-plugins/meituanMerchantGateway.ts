@@ -664,22 +664,6 @@ export async function fetchMeituanMarketingActivities(
 
 // —— 财务对账 ——
 
-function addCalendarDaysShanghai(ymd: string, delta: number): string {
-  const ms = new Date(`${ymd}T12:00:00+08:00`).getTime() + delta * 86_400_000
-  return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
-}
-
-function enumerateYmdInclusive(startYmd: string, endYmd: string): string[] {
-  const out: string[] = []
-  let cur = startYmd
-  while (cur <= endYmd) {
-    out.push(cur)
-    cur = addCalendarDaysShanghai(cur, 1)
-    if (out.length > 120) break
-  }
-  return out
-}
-
 export async function fetchMeituanFinanceReconcileRows(
   bearerToken: string,
   startYmd: string,
