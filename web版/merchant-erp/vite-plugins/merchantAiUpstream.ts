@@ -2925,6 +2925,12 @@ export async function handleDouyinGoodsAiAssist(
 ): Promise<void> {
   const env = envIn
   const action = String(body.action ?? '')
+  const demoEnv = (billing?.env || (process.env as Record<string, string>)) as Record<string, string>
+  const { demoShowcaseGoodsAssistPayload, isDemoShowcaseAuth } = await import('./demoShowcaseAccount.js')
+  if (await isDemoShowcaseAuth(billing?.authHeader, demoEnv)) {
+    json(res, 200, demoShowcaseGoodsAssistPayload(action, body))
+    return
+  }
   const requestedVendor = normalizeAiModelPreserveCustom(body.model)
   const isImageAction = action === 'image_generate' || action === 'image_enhance'
   const listingTitle =

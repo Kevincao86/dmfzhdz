@@ -622,6 +622,8 @@ export async function recordAiTokenUsageAfterSuccess(opts: {
   env: Record<string, string>
   mpOrderId?: string
 }): Promise<void> {
+  const { isDemoShowcaseTenantId } = await import('./demoShowcaseAccount.js')
+  if (opts.usageCtx && isDemoShowcaseTenantId(opts.usageCtx.tenantId)) return
   const scope = await resolveAiUsageScopeForRecord({
     env: opts.env,
     userId: opts.userId,

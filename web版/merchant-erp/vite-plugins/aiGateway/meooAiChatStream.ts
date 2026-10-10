@@ -14,6 +14,7 @@ import {
   describeDirectLlmKeyDebug,
   formatDirectLlmKeyDebugHint,
 } from './directLlmKeyDebug.js'
+import { DEMO_SHOWCASE_CHAT, isDemoShowcaseAuth } from '../demoShowcaseAccount.js'
 
 export type MeooAiChatSsePayload =
   | { event: 'thinking'; text: string }
@@ -29,6 +30,16 @@ export async function runMeooAiChatStream(
   signal?: AbortSignal,
   mpSession?: string,
 ): Promise<void> {
+  if (await isDemoShowcaseAuth(authHeader, env, mpSession)) {
+    write({ event: 'content', text: DEMO_SHOWCASE_CHAT })
+    write({
+      event: 'done',
+      content: DEMO_SHOWCASE_CHAT,
+      provider: 'demo',
+      model: 'showcase',
+    })
+    return
+  }
   const prep = await prepareMeooAiChat(bodyRaw, authHeader, env, mpSession)
   if (!prep.ok) {
     write({

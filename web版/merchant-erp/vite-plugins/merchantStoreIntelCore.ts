@@ -867,6 +867,10 @@ export async function runAiProductPlanCore(
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const session = await verifyBearerJwt(authHeader, env)
   if (!session) return { status: 401, body: { ok: false, error: 'unauthorized' } }
+  const { demoShowcaseProductPlanBody, isDemoShowcaseEmail } = await import('./demoShowcaseAccount.js')
+  if (isDemoShowcaseEmail(session.email)) {
+    return { status: 200, body: demoShowcaseProductPlanBody() }
+  }
   const aiEnv = await mergeStoreIntelAiEnv(env)
 
   let body: {

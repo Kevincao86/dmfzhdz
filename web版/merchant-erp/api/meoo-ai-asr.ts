@@ -81,6 +81,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMerchantJson(res, 401, { ok: false, error: 'unauthorized', message: '请先登录后再使用语音输入' })
     return
   }
+  const { isDemoShowcaseEmail } = await import('../vite-plugins/demoShowcaseAccount.js')
+  if (isDemoShowcaseEmail(user.email)) {
+    sendMerchantJson(res, 200, {
+      ok: true,
+      text: '欢迎来到灵祺演示门店，今天推荐招牌双人套餐。',
+      demoShowcase: true,
+    })
+    return
+  }
 
   let body: { audioBase64?: unknown; mime?: unknown }
   try {

@@ -6,6 +6,8 @@ import { voicePresetById } from './digitalHumanBroadcast.js'
 import { isArkQuotaHopableError } from './arkModelCatalog.js'
 import { synthesizeWithQwenSpeechPool } from './qwenCosyVoiceTts.js'
 import { cosyVoiceForCloudVoiceId } from './qwenSpeechCatalog.js'
+import { DEMO_SHOWCASE_TTS_MP3_B64 } from '../../vite-plugins/demoShowcaseTtsAudio.js'
+import { isDemoShowcaseAuth } from '../../vite-plugins/demoShowcaseAccount.js'
 
 export type DigitalHumanTtsInput = {
   text: string
@@ -261,6 +263,16 @@ export async function runDigitalHumanTtsCore(
   const text = String(input.text ?? '').trim()
   if (text.length < 2) {
     return { ok: false, message: '口播文案过短，无法合成' }
+  }
+  if (!input.trustedServer && (await isDemoShowcaseAuth(authHeader, env, mpSession))) {
+    return {
+      ok: true,
+      audioBase64: DEMO_SHOWCASE_TTS_MP3_B64,
+      mimeType: 'audio/mpeg',
+      provider: 'qwen',
+      voiceId: 'showcase',
+      model: 'showcase',
+    }
   }
 
   try {

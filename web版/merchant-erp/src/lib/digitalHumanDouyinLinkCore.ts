@@ -1,6 +1,10 @@
 /** 抖音链接解析 → 提取口播文案 + 动作指令（服务端 / dev 中间件共用） */
 
 import { runMeooAiChatCore } from '../../vite-plugins/aiGateway/meooAiChatCore.js'
+import {
+  demoShowcaseDouyinLinkBody,
+  isDemoShowcaseAuth,
+} from '../../vite-plugins/demoShowcaseAccount.js'
 
 export type DouyinLinkParseInput = {
   url: string
@@ -1400,6 +1404,9 @@ export async function runDouyinLinkParseCore(
   env: Record<string, string>,
   authHeader?: string,
 ): Promise<DouyinLinkParseResult> {
+  if (await isDemoShowcaseAuth(authHeader, env)) {
+    return demoShowcaseDouyinLinkBody() as DouyinLinkParseResult
+  }
   const share = extractDouyinShareFromText(input.url)
   const extracted =
     share.url ?? (share.videoId ? `https://www.douyin.com/video/${share.videoId}` : null)

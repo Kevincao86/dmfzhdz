@@ -40,6 +40,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+  const { demoShowcaseDouyinLinkBody, isDemoShowcaseAuth } = await import(
+    '../vite-plugins/demoShowcaseAccount.js'
+  )
+  if (await isDemoShowcaseAuth(auth, process.env as Record<string, string>)) {
+    sendJson(res, 200, demoShowcaseDouyinLinkBody())
+    return
+  }
   const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
     '../vite-plugins/merchantRegistryVendorEnv.js'
   )

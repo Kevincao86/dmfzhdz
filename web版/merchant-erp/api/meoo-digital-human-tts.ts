@@ -49,6 +49,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
   const mpSession =
     typeof req.headers['x-mp-session'] === 'string' ? req.headers['x-mp-session'] : undefined
+  const { demoShowcaseTtsBody, isDemoShowcaseAuth } = await import(
+    '../vite-plugins/demoShowcaseAccount.js'
+  )
+  if (await isDemoShowcaseAuth(auth, process.env as Record<string, string>, mpSession)) {
+    sendJson(res, 200, demoShowcaseTtsBody())
+    return
+  }
   const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
     '../vite-plugins/merchantRegistryVendorEnv.js'
   )

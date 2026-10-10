@@ -14,6 +14,7 @@ import {
   ERP_AGENT_USAGE_KIND,
   type ErpAgentUsageKind,
 } from './erpPointsEconomics.js'
+import { isDemoShowcaseTenantId } from '../../vite-plugins/demoShowcaseAccount.js'
 import {
   MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE,
   MP_POINTS_USAGE_KIND_LABELS,
@@ -187,6 +188,17 @@ export async function spendErpAiPoints(
     note?: string
   },
 ): Promise<ErpAiPointsSpendResult> {
+  if (isDemoShowcaseTenantId(tenantId)) {
+    return {
+      ok: true,
+      pointsCharged: 0,
+      fromPackage: 0,
+      fromRecharge: 0,
+      packageBalance: 999999,
+      rechargeBalance: 0,
+      balance: 999999,
+    }
+  }
   const kind = opts.kind
   const idempotencyKey = String(opts.idempotencyKey || '').trim()
   if (idempotencyKey) {

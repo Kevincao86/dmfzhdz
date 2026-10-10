@@ -10,6 +10,7 @@ import {
 import { ERP_AGENT_USAGE_KIND } from '../src/lib/erpPointsEconomics.js'
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { isDemoShowcaseTenantId } from './demoShowcaseAccount.js'
 
 export type TenantAiContext = {
   tenantId: string
@@ -315,6 +316,7 @@ export function recordDirectAiUsageAfterSuccess(
   opts?: { idempotencyKey?: string; pointsOverride?: number },
 ): void {
   if (!ctx) return
+  if (isDemoShowcaseTenantId(ctx.tenantId)) return
   if (ctx.plan === 'free') {
     const month = currentUsageMonth()
     let used = ctx.directAiCallsUsed

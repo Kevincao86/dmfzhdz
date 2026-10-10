@@ -19,6 +19,10 @@ import {
 import { mergeMerchantAiEnvWithRegistrySnapshot } from '../vite-plugins/merchantRegistryVendorEnv.js'
 import type { MerchantAiEnv } from '../vite-plugins/merchantAiUpstream.js'
 import { runErpAiWithPointsBilling } from './_lib/erpAiApiPointsGate.js'
+import {
+  DEMO_SHOWCASE_SHOP_REPORT,
+  isDemoShowcaseEmail,
+} from '../vite-plugins/demoShowcaseAccount.js'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -96,6 +100,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     if (!user?.id) {
       sendJson(res, 401, { ok: false, error: 'unauthorized', detail: 'invalid_token' })
+      return
+    }
+    if (isDemoShowcaseEmail(user.email)) {
+      const startDate = String(body.startDate || '').trim()
+      const endDate = String(body.endDate || '').trim()
+      sendJson(res, 200, {
+        ok: true,
+        demoShowcase: true,
+        startDate,
+        endDate,
+        summary: {
+          orderCount: 18,
+          couponCount: 18,
+          salesAmountYuan: 2304,
+          refundAmountYuan: 0,
+          refundCount: 0,
+          refundRate: 0,
+          buyerCount: 16,
+          openIdCoverage: 1,
+          newBuyerCount: 10,
+          oldBuyerCount: 6,
+          newBuyerSalesYuan: 1280,
+          oldBuyerSalesYuan: 1024,
+          newBuyerShare: 0.56,
+          newBuyerPeopleShare: 0.63,
+          oneTimeBuyerCount: 12,
+          repeatBuyerCount: 4,
+          repurchaseRate: 0.25,
+          estimatedGrossYuan: 900,
+          hasPreWindowHistory: false,
+          guestBasis: 'repurchase',
+          stores: [],
+          topBySales: [
+            {
+              name: '双人火锅套餐',
+              productId: 'demo-hotpot',
+              salesYuan: 2304,
+              couponCount: 18,
+              share: 1,
+            },
+          ],
+          topByRefund: [],
+        },
+        adviceFacts: '演示门店预设经营摘要，不调用模型。',
+        reviewDigest: {
+          ok: true,
+          total: 6,
+          avgStars: 4.8,
+          goodCount: 6,
+          neutralCount: 0,
+          badCount: 0,
+          unrepliedCount: 0,
+          goodShare: 1,
+          badShare: 0,
+          badSamples: [],
+        },
+        aiReport: DEMO_SHOWCASE_SHOP_REPORT,
+        aiSections: parseShopAiReportSections(DEMO_SHOWCASE_SHOP_REPORT),
+        modelUsed: 'showcase',
+        pointsCharged: 0,
+        warnings: [],
+      })
       return
     }
     const ctx = await loadTenantAiContextForUser(

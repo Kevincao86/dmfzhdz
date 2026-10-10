@@ -1075,10 +1075,16 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
 
         const pathForAi = (industryPathParam || row.industryPath).trim()
         const aiEnv = env as MerchantAiEnv
-        const aiPack = await generateGrossMarginSuggestionByAi(aiEnv, {
-          industryPath: pathForAi,
-          industryName: row.industryName,
-        })
+        const marginAuth =
+          typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+        const { isDemoShowcaseAuth: isDemoMargin } = await import('./demoShowcaseAccount.js')
+        const demoMargin = await isDemoMargin(marginAuth, env as Record<string, string>)
+        const aiPack = demoMargin
+          ? null
+          : await generateGrossMarginSuggestionByAi(aiEnv, {
+              industryPath: pathForAi,
+              industryName: row.industryName,
+            })
 
         if (aiPack) {
           json(res, 200, {
@@ -1507,6 +1513,17 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env as MerchantAiEnv)
         const authHeader =
           typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+        const { isDemoShowcaseAuth } = await import('./demoShowcaseAccount.js')
+        if (await isDemoShowcaseAuth(authHeader, env as Record<string, string>)) {
+          json(res, 200, {
+            ok: true,
+            suggestion: '感谢光临灵祺演示门店。双人火锅套餐 128 元，欢迎再来。此回复为预设展示，不消耗 Token。',
+            modelUsed: 'showcase',
+            pointsCharged: 0,
+            demoShowcase: true,
+          })
+          return true
+        }
         const { runErpAiWithPointsBilling } = await import('../api/_lib/erpAiApiPointsGate.js')
         const billed = await runErpAiWithPointsBilling(
           authHeader,

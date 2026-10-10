@@ -28,6 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     const auth = authHeaderFromRequest(req)
     const env = process.env as Record<string, string>
+    const { demoShowcaseOpsPlanBody, isDemoShowcaseAuth } = await import(
+      '../vite-plugins/demoShowcaseAccount.js'
+    )
+    if (await isDemoShowcaseAuth(auth, env)) {
+      sendMerchantJson(res, 200, demoShowcaseOpsPlanBody())
+      return
+    }
     const gate = await requireErpAiPointsAffordable(auth, 'ops_plan', env)
     if (!gate.ok) {
       sendErpAiPointsGateError(res, sendMerchantJson, gate)

@@ -39,6 +39,19 @@ export async function generateAdvertisingAiTextBilled(
         | { ok: false; message: string }
     }
 > {
+  const billEnv = (billing?.env || (process.env as Record<string, string>)) as Record<string, string>
+  const { isDemoShowcaseAuth } = await import('./demoShowcaseAccount.js')
+  if (await isDemoShowcaseAuth(billing?.authHeader, billEnv)) {
+    return {
+      blocked: false,
+      result: {
+        ok: true,
+        text: '演示账号预设投流文案：双人火锅套餐 128 元，午市和晚市到店可用。不消耗 Token。',
+        modelUsed: 'showcase',
+        pointsCharged: 0,
+      },
+    }
+  }
   const { runErpAiWithPointsBilling } = await import('../api/_lib/erpAiApiPointsGate.js')
   const billed = await runErpAiWithPointsBilling(
     billing?.authHeader,

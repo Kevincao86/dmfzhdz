@@ -14,6 +14,7 @@ import {
   formatDirectLlmKeyDebugHint,
 } from './directLlmKeyDebug.js'
 import { extractToolCallsFromChatRaw } from '../../src/lib/aiAgentTools/extractToolCalls.js'
+import { demoShowcaseChatBody, isDemoShowcaseAuth } from '../demoShowcaseAccount.js'
 
 export async function runMeooAiChatCore(
   bodyRaw: string,
@@ -21,6 +22,9 @@ export async function runMeooAiChatCore(
   env: Record<string, string>,
   mpSession?: string,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
+  if (await isDemoShowcaseAuth(authHeader, env, mpSession)) {
+    return { status: 200, body: demoShowcaseChatBody() }
+  }
   let wantsStream = false
   try {
     const peek = JSON.parse(bodyRaw || '{}') as { stream?: boolean }
