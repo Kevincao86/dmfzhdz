@@ -33,20 +33,36 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-function withMark(raw) {
+function isUnset(raw) {
   const s = String(raw || '').trim()
-  if (!s || s === '—' || s === '不限') return s && s !== '—' ? s : '不限'
-  if (/^[≥≧>]/.test(s)) return s.replace(/^>/, '≥')
-  return `≥${s.replace(/^>=/, '')}`
+  return !s || s === '—' || s === '-' || s === '不限' || s === '未填写' || s === '无' || s === '面议'
+}
+
+function formatLevel(raw) {
+  const s = String(raw || '').trim()
+  if (isUnset(s)) return ''
+  if (/不限/.test(s) && !/\d|万/.test(s)) return ''
+  return s
+}
+
+function formatFans(raw) {
+  const s = String(raw || '').trim().replace(/^粉丝要求[:：]\s*/, '').replace(/^粉丝/, '')
+  if (isUnset(s)) return ''
+  if (/不限/.test(s) && !/\d|万/.test(s)) return ''
+  const marked = s.match(/[≥≧>]?\s*[\d.]+\s*万?/)
+  if (!marked && !/万/.test(s)) return ''
+  let v = (marked ? marked[0] : s).replace(/\s/g, '')
+  if (!/^[≥≧>]/.test(v)) v = `≥${v.replace(/^>=/, '')}`
+  return v.replace(/^>/, '≥')
 }
 
 function compactPrice(raw) {
   const s = String(raw || '').trim()
-  if (!s || s === '—' || s === '面议') return '面议'
+  if (isUnset(s)) return ''
   if (/置换/.test(s) && !/\d/.test(s)) return '置换'
   if (/自报价/.test(s) && !/\d/.test(s)) return '自报价'
   const nums = s.match(/[\d]+(?:\.[\d]+)?/g)
-  if (!nums || !nums.length) return s.slice(0, 6)
+  if (!nums || !nums.length) return ''
   const a = nums[0]
   const b = nums[nums.length - 1]
   if (a === b) return `¥${a}`
@@ -54,9 +70,44 @@ function compactPrice(raw) {
 }
 
 function compactCity(raw) {
-  const s = String(raw || '').trim().replace(/市$/, '')
+  const s = String(raw || '').trim()
   if (!s || s === '—' || s === '不限') return '全国'
   return s
+}
+
+function wrapCityLines(ctx, text, maxWidth) {
+  const parts = String(text || '')
+    .split(/[、,，/;；]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const tokens = parts.length ? parts : [String(text || '').trim()].filter(Boolean)
+  const lines = []
+  let line = ''
+  tokens.forEach((token) => {
+    const next = line ? `${line}、${token}` : token
+    if (ctx.measureText(next).width <= maxWidth) {
+      line = next
+      return
+    }
+    if (line) lines.push(line)
+    if (ctx.measureText(token).width <= maxWidth) {
+      line = token
+      return
+    }
+    let buf = ''
+    for (let i = 0; i < token.length; i += 1) {
+      const ch = token[i]
+      if (buf && ctx.measureText(buf + ch).width > maxWidth) {
+        lines.push(buf)
+        buf = ch
+      } else {
+        buf += ch
+      }
+    }
+    line = buf
+  })
+  if (line) lines.push(line)
+  return lines
 }
 
 function readCardFields(order) {
@@ -66,8 +117,8 @@ function readCardFields(order) {
     platform,
     logo: hallFilters.platformIcon(platform),
     slogan: SLOGAN,
-    level: withMark(fields.levelText),
-    fans: withMark(fields.fansText),
+    level: formatLevel(fields.levelText),
+    fans: formatFans(fields.fansText),
     price: compactPrice(fields.feeTypeText),
     city: compactCity(fields.cityText),
   }
@@ -161,9 +212,11 @@ function drawCard(ctx, view, bg, logo) {
     ctx.fillStyle = '#9A9086'
     ctx.font = '13px sans-serif'
     ctx.fillText(col.label, cx, panel[1] + 36)
-    ctx.fillStyle = col.color
-    ctx.font = 'bold 26px sans-serif'
-    ctx.fillText(fitText(ctx, col.value, colW - 16), cx, panel[1] + 84)
+    if (col.value) {
+      ctx.fillStyle = col.color
+      ctx.font = 'bold 26px sans-serif'
+      ctx.fillText(fitText(ctx, col.value, colW - 16), cx, panel[1] + 84)
+    }
     if (i) {
       ctx.strokeStyle = '#E8DCCE'
       ctx.lineWidth = 1
@@ -181,29 +234,35 @@ function drawCard(ctx, view, bg, logo) {
   const by1 = by2 - bh
   const mid = (card[0] + card[2]) / 2
 
+  const cityMaxW = card[2] - card[0] - 56
+  const cityTop = panel[3] + 8
+  const cityBottom = by1 - 10
+  let citySize = 16
+  let cityLines = []
+  let cityLineH = 22
+  while (citySize >= 12) {
+    ctx.font = `bold ${citySize}px sans-serif`
+    cityLines = wrapCityLines(ctx, view.city, cityMaxW)
+    cityLineH = citySize + 6
+    const blockH = 16 + cityLines.length * cityLineH
+    if (blockH <= cityBottom - cityTop || citySize === 12) break
+    citySize -= 1
+  }
+  const cityBlockH = 16 + Math.max(cityLines.length, 1) * cityLineH
+  let cityLabelY = cityBottom - cityBlockH
+  if (cityLabelY < cityTop) cityLabelY = cityTop
   ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
   ctx.fillStyle = '#9A9086'
   ctx.font = '12px sans-serif'
-  ctx.fillText('城市', mid, by1 - 52)
-  ctx.font = 'bold 20px sans-serif'
+  ctx.fillText('城市', mid, cityLabelY)
   ctx.fillStyle = '#221C18'
-  const city = view.city
-  const cityW = ctx.measureText(city).width
-  const pinX = mid - (cityW + 18) / 2
-  const cityY = by1 - 28
-  ctx.fillStyle = '#E23A2E'
-  ctx.beginPath()
-  ctx.arc(pinX + 5, cityY - 2, 4, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.moveTo(pinX + 5, cityY + 1)
-  ctx.lineTo(pinX + 1, cityY + 8)
-  ctx.lineTo(pinX + 9, cityY + 8)
-  ctx.closePath()
-  ctx.fill()
-  ctx.fillStyle = '#221C18'
-  ctx.textAlign = 'left'
-  ctx.fillText(city, pinX + 16, cityY)
+  ctx.font = `bold ${citySize}px sans-serif`
+  cityLines.forEach((line, index) => {
+    const y = cityLabelY + 16 + index * cityLineH
+    if (y > cityBottom) return
+    ctx.fillText(line, mid, y)
+  })
 
   const grad = ctx.createLinearGradient(bx1, 0, bx2, 0)
   grad.addColorStop(0, '#FF6038')
