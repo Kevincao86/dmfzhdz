@@ -4,10 +4,12 @@
  */
 const posterCore = require('./recruitmentSharePosterCore.js')
 const hallFilters = require('./recruitmentHallFilters.js')
+const ossBase = require('./recruitCoverOssBase.js')
 
 const CARD_W = 750
 const CARD_H = 600
-const BG_SRC = '/images/share/recruit-card-bg.jpg'
+const BG_OSS = `${String(ossBase || '').replace(/\/$/, '')}/share/recruit-card-bg.jpg?v=20261010c`
+const BG_LOCAL = '/images/share/recruit-card-bg.jpg'
 const SLOGAN = '同城探店 · 速来报名'
 
 const cache = Object.create(null)
@@ -125,7 +127,31 @@ function readCardFields(order) {
 }
 
 function cacheKey(order, view) {
-  return ['local-bg', String((order && order.id) || ''), view.platform, view.level, view.fans, view.price, view.city].join('|')
+  return ['oss-bg-20261010c', String((order && order.id) || ''), view.platform, view.level, view.fans, view.price, view.city].join('|')
+}
+
+function downloadFile(url) {
+  return new Promise((resolve, reject) => {
+    if (typeof wx === 'undefined' || typeof wx.downloadFile !== 'function') {
+      reject(new Error('no_download'))
+      return
+    }
+    wx.downloadFile({
+      url,
+      success(res) {
+        if (res.statusCode === 200 && res.tempFilePath) resolve(res.tempFilePath)
+        else reject(new Error('bg_download_failed'))
+      },
+      fail: reject,
+    })
+  })
+}
+
+function loadBackground(canvas) {
+  return downloadFile(BG_OSS)
+    .then((local) => loadImage(canvas, local))
+    .then((img) => (img ? img : loadImage(canvas, BG_LOCAL)))
+    .catch(() => loadImage(canvas, BG_LOCAL))
 }
 
 function loadImage(canvas, src) {
@@ -330,7 +356,7 @@ function buildShareCardPath(order) {
     return Promise.reject(err)
   }
   const ctx = canvas.getContext('2d')
-  const job = Promise.all([loadImage(canvas, BG_SRC), loadImage(canvas, view.logo)])
+  const job = Promise.all([loadBackground(canvas), loadImage(canvas, view.logo)])
     .then(([bg, logo]) => {
       drawCard(ctx, view, bg, logo)
       return exportCanvas(canvas)
