@@ -580,16 +580,30 @@ Page({
       /* ignore */
     }
   },
-  onShareAppMessage() {
+  onShareAppMessage(res) {
     const mpShare = require('../../../utils/mpShare.js')
     const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
     const recruitShareCover = require('../../../utils/recruitShareCover.js')
+    const recruitShareCard = require('../../../utils/recruitShareCard.js')
     mpShare.enableShareMenu()
     const v = this.data.view
     const mp = this.data.mpOrder
     const share = {
       title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
       path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(this.data.id)}`,
+    }
+    if (mp && recruitShareCard.readShareCoverKind(res) === 'recruit') {
+      return {
+        title: share.title,
+        path: share.path,
+        promise: recruitShareCard.buildShareCardPath(mp).then((imageUrl) => {
+          if (imageUrl) return Object.assign({}, share, { imageUrl })
+          const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+          const wrapped = recruitShareCover.attachShareCoverPromise(share, coverUrl)
+          if (wrapped && typeof wrapped.promise === 'object' && wrapped.promise) return wrapped.promise
+          return wrapped || share
+        }),
+      }
     }
     if (mp) {
       const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)

@@ -450,7 +450,8 @@
     <view class="detail-bottom-v2__share-wrap">
       <view class="detail-share-menu-mask" wx:if="{{showShareMenu}}" bindtap="onShareMenuClose"></view>
       <view wx:if="{{showShareMenu}}" class="detail-share-menu detail-share-menu--bottom" catchtap="noopShareSheetTap">
-        <button class="detail-share-menu__item detail-share-menu__item--primary" open-type="share" bindtap="onShareMenuClose">分享小程序卡片</button>
+        <button class="detail-share-menu__item detail-share-menu__item--primary" open-type="share" data-cover="recruit" bindtap="onShareMenuClose">招募封面</button>
+        <button class="detail-share-menu__item" open-type="share" data-cover="poster" bindtap="onShareMenuClose">海报封面</button>
         <view class="detail-share-menu__item" bindtap="onSharePickPoster">分享海报</view>
       </view>
       <view class="detail-bottom-v2__share" bindtap="onShareTap">
@@ -543,7 +544,8 @@
         style="color: {{sharePosterAccentColor}}"
         bindtap="onSaveSharePoster"
       >保存海报到相册</view>
-      <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share">分享小程序卡片</button>
+      <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share" data-cover="recruit">招募封面</button>
+      <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share" data-cover="poster">海报封面</button>
     </view>
     <view class="detail-share-sheet-cancel" bindtap="onCloseSharePosterSheet">取消</view>
   </view>
