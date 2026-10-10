@@ -4,6 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { hydrateDouyinBindingsFromCloud } from './merchantDouyinCloudBinding'
 import { hydrateKuaishouBindingsFromCloud } from './merchantKuaishouCloudBinding'
+import { hydrateMeituanBindingsFromCloud } from './merchantMeituanCloudBinding'
 
 export async function hydratePlatformBindingsFromCloud(
   supabase: SupabaseClient,
@@ -12,6 +13,7 @@ export async function hydratePlatformBindingsFromCloud(
     await Promise.all([
       hydrateDouyinBindingsFromCloud(supabase),
       hydrateKuaishouBindingsFromCloud(supabase),
+      hydrateMeituanBindingsFromCloud(supabase),
     ])
   } catch {
     /* 云端恢复失败时保留本机凭证，设置页会重试 */

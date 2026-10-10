@@ -1,7 +1,7 @@
 /**
  * 平台绑定展示（读取 merchantSessionSyncMp 同步后的本地凭证）。
- * 云端可同步：抖音来客 / 快手团购 / 巨量本地推 / 小红书聚光。
- * 仅 Web 浏览器会话：美团团购、小红书商家开放平台等。
+ * 云端可同步：抖音来客 / 快手团购 / 美团团购 / 巨量本地推 / 小红书聚光。
+ * 仅 Web 浏览器会话：小红书商家开放平台等。
  */
 const sessionSync = require('./merchantSessionSyncMp.js')
 
@@ -10,13 +10,13 @@ const { platformIconUri } = require('./platformIconAssetsMp.js')
 const CLOUD_PLATFORMS = [
   { id: 'douyin', label: '抖音来客', key: 'douyin' },
   { id: 'kuaishou', label: '快手团购', key: 'kuaishou' },
+  { id: 'meituan', label: '美团团购', key: 'meituan' },
   { id: 'local_promotion', label: '巨量本地推', key: 'localPromotion' },
   { id: 'qianchuan', label: '巨量千川', key: 'qianchuan' },
   { id: 'xhs_commercial', label: '小红书聚光', key: 'xhsCommercial' },
 ]
 
 const WEB_ONLY_PLATFORMS = [
-  { id: 'meituan', label: '美团团购', key: 'meituan' },
   { id: 'xiaohongshu', label: '小红书商家', key: 'xiaohongshu' },
 ]
 
@@ -67,6 +67,7 @@ function formatAgentBindingContext() {
   const all = [
     { key: 'douyin', label: '抖音来客' },
     { key: 'kuaishou', label: '快手团购' },
+    { key: 'meituan', label: '美团团购' },
     { key: 'localPromotion', label: '巨量本地推' },
     { key: 'qianchuan', label: '巨量千川' },
     { key: 'xhsCommercial', label: '小红书聚光' },

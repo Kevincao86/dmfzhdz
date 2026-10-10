@@ -5,6 +5,7 @@
  * token，界面误判「掉绑定」；除用户点击「断开连接」外不应丢失绑定态。
  * 已登录 Supabase 商户账号时，设置页会将绑定同步到 `tenant_merchant_bindings`，换设备可从云端恢复。
  *
+ * 美团团购 `meoo_meituan_*`（不含美团外卖）同样使用 localStorage，并与云端绑定同步。
  * 其它商家键仍走 sessionStorage（保持原行为）。
  */
 
@@ -25,6 +26,15 @@ const KUAISHOU_LOCAL_KEYS = [
   'meoo_kuaishou_account_name',
 ] as const
 
+const MEITUAN_GROUPBUY_LOCAL_KEYS = [
+  'meoo_meituan_merchant_token',
+  'meoo_meituan_auto_refresh',
+  'meoo_meituan_app_id',
+  'meoo_meituan_merchant_id',
+  'meoo_meituan_account_name',
+  'meoo_meituan_bind_demo',
+] as const
+
 function isDouyinBindingKey(key: string): boolean {
   return key.startsWith('meoo_douyin_')
 }
@@ -33,8 +43,14 @@ function isKuaishouBindingKey(key: string): boolean {
   return key.startsWith('meoo_kuaishou_')
 }
 
+/** 美团团购。美团外卖键以 meoo_meituan_waimai_ 开头，不能算进团购。 */
+function isMeituanGroupbuyBindingKey(key: string): boolean {
+  if (key.startsWith('meoo_meituan_waimai_')) return false
+  return (MEITUAN_GROUPBUY_LOCAL_KEYS as readonly string[]).includes(key)
+}
+
 function isPersistentMerchantBindingKey(key: string): boolean {
-  return isDouyinBindingKey(key) || isKuaishouBindingKey(key)
+  return isDouyinBindingKey(key) || isKuaishouBindingKey(key) || isMeituanGroupbuyBindingKey(key)
 }
 
 export function readMerchantSession(key: string): string | null {
@@ -89,6 +105,12 @@ export function clearDouyinMerchantBindingLocal(): void {
 
 export function clearKuaishouMerchantBindingLocal(): void {
   for (const k of KUAISHOU_LOCAL_KEYS) {
+    writeMerchantSession(k, null)
+  }
+}
+
+export function clearMeituanMerchantBindingLocal(): void {
+  for (const k of MEITUAN_GROUPBUY_LOCAL_KEYS) {
     writeMerchantSession(k, null)
   }
 }

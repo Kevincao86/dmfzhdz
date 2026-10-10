@@ -78,20 +78,23 @@ export function decodeMeituanSessionToken(bearer: string): MeituanMerchantSessio
   }
 }
 
-/** 美团开放平台常见 MD5 签名：secret + key1val1key2val2... + secret */
-export function meituanMd5Sign(
-  appSecret: string,
-  params: Record<string, string | number | boolean | undefined | null>,
-): string {
+/**
+ * 美团技术服务合作中心签名：SignKey + 按参数名升序的 key+value，SHA1 小写。
+ * @see https://developer.meituan.com/docs/biz/comm-dev-isv-api-rule
+ */
+export function meituanSha1Sign(signKey: string, params: Record<string, string>): string {
   const keys = Object.keys(params)
-    .filter((k) => k !== 'sign' && params[k] != null && params[k] !== '')
+    .filter((k) => k !== 'sign' && params[k] !== '')
     .sort()
-  let s = appSecret
-  for (const k of keys) {
-    s += k + String(params[k])
-  }
-  s += appSecret
-  return createHash('md5').update(s, 'utf8').digest('hex').toUpperCase()
+  let s = signKey
+  for (const k of keys) s += k + params[k]
+  return createHash('sha1').update(s, 'utf8').digest('hex')
+}
+
+/** 团购业务 ID。文档示例：团购 1，外卖 2。可用 MEITUAN_BUSINESS_ID 覆盖。 */
+export function meituanGroupbuyBusinessId(): string {
+  const raw = process.env.MEITUAN_BUSINESS_ID?.trim()
+  return raw || '1'
 }
 
 export async function meituanServerFetch(
@@ -113,89 +116,35 @@ export type MeituanSignedCallResult =
   | { ok: true; status: number; json: Record<string, unknown>; raw: string }
   | { ok: false; message: string; status?: number; raw?: string }
 
-/**
- * 向已配置的美团 OpenAPI 基址发起请求（GET 查询或 POST JSON）。
- * 具体 path 由业务模块从环境变量读取；签名参数与 body 合并后发送。
- */
-export async function meituanSignedRequest(
+function meituanBizPayload(
   session: MeituanMerchantSession,
-  apiPath: string,
   opts: {
-    method?: 'GET' | 'POST'
     query?: Record<string, string | number | undefined>
     body?: Record<string, unknown>
-    extraSignParams?: Record<string, string | number | undefined>
   },
-): Promise<MeituanSignedCallResult> {
-  const base = meituanOpenApiBaseUrl()
-  if (!base) {
-    return { ok: false, message: '未配置 MEITUAN_OPENAPI_BASE_URL' }
-  }
-
-  const method = opts.method ?? 'POST'
-  const timestamp = String(Math.floor(Date.now() / 1000))
-  const signParams: Record<string, string | number | boolean | undefined | null> = {
-    app_id: session.appKey,
-    timestamp,
-    ...(opts.extraSignParams ?? {}),
-  }
-  if (session.accessToken) {
-    signParams.session = session.accessToken
-    signParams.access_token = session.accessToken
-  }
+): Record<string, string> {
+  const biz: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(opts.query ?? {})) {
-    if (v != null && v !== '') signParams[k] = v
+    if (v != null && v !== '') biz[k] = v
   }
-  const sign = meituanMd5Sign(session.appSecret, signParams)
-
-  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
-  const url = new URL(`${base}${path}`)
-
-  if (method === 'GET') {
-    for (const [k, v] of Object.entries(signParams)) {
-      if (v != null && v !== '') url.searchParams.set(k, String(v))
-    }
-    url.searchParams.set('sign', sign)
-    const dr = await meituanServerFetch(url.toString(), {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-    })
-    const raw = await dr.text()
-    let json: Record<string, unknown> = {}
-    try {
-      json = JSON.parse(raw || '{}') as Record<string, unknown>
-    } catch {
-      return {
-        ok: false,
-        message: `美团接口返回非 JSON（HTTP ${dr.status}）`,
-        status: dr.status,
-        raw: raw.slice(0, 1500),
-      }
-    }
-    if (!dr.ok) {
-      return {
-        ok: false,
-        message: extractMeituanErrorMessage(json) || `HTTP ${dr.status}`,
-        status: dr.status,
-        raw,
-      }
-    }
-    return { ok: true, status: dr.status, json, raw }
+  for (const [k, v] of Object.entries(opts.body ?? {})) {
+    if (v != null && v !== '') biz[k] = v
   }
-
-  const payload: Record<string, unknown> = {
-    ...signParams,
-    sign,
-    ...(opts.body ?? {}),
+  const timestamp = String(Math.floor(Date.now() / 1000))
+  const params: Record<string, string> = {
+    developerId: session.appKey,
+    charset: 'utf-8',
+    timestamp,
+    version: '2',
+    businessId: meituanGroupbuyBusinessId(),
+    biz: JSON.stringify(biz),
   }
-  const dr = await meituanServerFetch(url.toString(), {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
+  if (session.accessToken) params.appAuthToken = session.accessToken
+  params.sign = meituanSha1Sign(session.appSecret, params)
+  return params
+}
+
+async function readMeituanHttpResult(dr: Response): Promise<MeituanSignedCallResult> {
   const raw = await dr.text()
   let json: Record<string, unknown> = {}
   try {
@@ -217,10 +166,60 @@ export async function meituanSignedRequest(
     }
   }
   const bizErr = meituanBizError(json)
-  if (bizErr) {
-    return { ok: false, message: bizErr, status: dr.status, raw }
-  }
+  if (bizErr) return { ok: false, message: bizErr, status: dr.status, raw }
   return { ok: true, status: dr.status, json, raw }
+}
+
+/**
+ * 按美团技术服务合作中心公共参数调用（developerId / businessId / biz / appAuthToken）。
+ * 具体 path 由业务模块从环境变量读取。
+ */
+export async function meituanSignedRequest(
+  session: MeituanMerchantSession,
+  apiPath: string,
+  opts: {
+    method?: 'GET' | 'POST'
+    query?: Record<string, string | number | undefined>
+    body?: Record<string, unknown>
+    extraSignParams?: Record<string, string | number | undefined>
+  },
+): Promise<MeituanSignedCallResult> {
+  const base = meituanOpenApiBaseUrl()
+  if (!base) {
+    return { ok: false, message: '未配置 MEITUAN_OPENAPI_BASE_URL' }
+  }
+
+  const method = opts.method ?? 'POST'
+  const params = meituanBizPayload(session, opts)
+  if (opts.extraSignParams) {
+    for (const [k, v] of Object.entries(opts.extraSignParams)) {
+      if (v != null && v !== '' && k !== 'sign') params[k] = String(v)
+    }
+    delete params.sign
+    params.sign = meituanSha1Sign(session.appSecret, params)
+  }
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const url = new URL(`${base}${path}`)
+
+  if (method === 'GET') {
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+    const dr = await meituanServerFetch(url.toString(), {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    })
+    return readMeituanHttpResult(dr)
+  }
+
+  const body = new URLSearchParams(params)
+  const dr = await meituanServerFetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+    },
+    body: body.toString(),
+  })
+  return readMeituanHttpResult(dr)
 }
 
 export function extractMeituanErrorMessage(j: Record<string, unknown>): string | undefined {

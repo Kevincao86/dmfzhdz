@@ -1,6 +1,7 @@
 import { readMerchantSession } from '../lib/merchantSession'
 import { hydrateDouyinBindingsFromCloud } from '../lib/merchantDouyinCloudBinding'
 import { hydrateKuaishouBindingsFromCloud } from '../lib/merchantKuaishouCloudBinding'
+import { hydrateMeituanBindingsFromCloud } from '../lib/merchantMeituanCloudBinding'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { getDouyinStores } from './douyinMerchantApi'
 import { getKuaishouStores } from './kuaishouMerchantApi'
@@ -33,6 +34,7 @@ async function hydrateBindingsFromCloudWithBudget(client: SupabaseClient) {
       Promise.all([
         hydrateDouyinBindingsFromCloud(client),
         hydrateKuaishouBindingsFromCloud(client),
+        hydrateMeituanBindingsFromCloud(client),
       ]),
       HYDRATE_MAX_WAIT_MS,
     )

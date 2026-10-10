@@ -9,7 +9,7 @@ const { writePlatformToken } = require('./platformTokensMp.js')
 const MEOO_ACTIVE_TENANT_ID = 'meoo_active_tenant_id'
 const MEOO_MERCHANT_DISPLAY_NAME = 'meoo_erp_merchant_display_name'
 
-const PROVIDERS = ['douyin', 'kuaishou', 'local_promotion', 'qianchuan', 'xhs_commercial']
+const PROVIDERS = ['douyin', 'kuaishou', 'local_promotion', 'qianchuan', 'xhs_commercial', 'meituan']
 
 const ACTIVE_ID_KEY = {
   douyin: 'meoo_active_douyin_binding_id',
@@ -17,6 +17,7 @@ const ACTIVE_ID_KEY = {
   local_promotion: 'meoo_active_local_promotion_binding_id',
   qianchuan: 'meoo_active_qianchuan_binding_id',
   xhs_commercial: 'meoo_active_xhs_commercial_binding_id',
+  meituan: 'meoo_active_meituan_binding_id',
 }
 
 const DOUYIN_KEYS = [
@@ -32,6 +33,14 @@ const KUAISHOU_KEYS = [
   'meoo_kuaishou_app_id',
   'meoo_kuaishou_merchant_id',
   'meoo_kuaishou_account_name',
+]
+
+const MEITUAN_KEYS = [
+  'meoo_meituan_merchant_token',
+  'meoo_meituan_app_id',
+  'meoo_meituan_merchant_id',
+  'meoo_meituan_account_name',
+  'meoo_meituan_bind_demo',
 ]
 
 const LEGACY_BIND_KEY = {
@@ -102,7 +111,9 @@ function parseBindingRow(raw) {
           ? 'kuaishou'
           : raw.provider === 'douyin'
             ? 'douyin'
-            : null
+            : raw.provider === 'meituan'
+              ? 'meituan'
+              : null
   const sealed =
     typeof raw.sealed_credentials === 'string' ? raw.sealed_credentials.trim() : ''
   const merchantAccountId =
@@ -215,6 +226,47 @@ function applyKuaishou(row, tenantId) {
   writeActiveBindingId('kuaishou', tenantId, row.id)
 }
 
+function localMeituanTokenIsDemo() {
+  const tok = storageGet('meoo_meituan_merchant_token')
+  if (!tok.startsWith('meoo_mt1.')) return false
+  try {
+    let b64 = tok.slice('meoo_mt1.'.length).replace(/-/g, '+').replace(/_/g, '/')
+    const mod = b64.length % 4
+    if (mod) b64 += '='.repeat(4 - mod)
+    const buf = wx.base64ToArrayBuffer(b64)
+    const text = String.fromCharCode.apply(null, Array.from(new Uint8Array(buf)))
+    const json = JSON.parse(text)
+    return Boolean(json && json.demo)
+  } catch (_) {
+    return false
+  }
+}
+
+function clearMeituanLocal() {
+  for (const k of MEITUAN_KEYS) {
+    try {
+      wx.removeStorageSync(k)
+    } catch (_) {}
+  }
+  writePlatformToken('meituan', '')
+}
+
+function applyMeituan(row, tenantId) {
+  if (!row || row.demoMode) {
+    clearMeituanLocal()
+    writeActiveBindingId('meituan', tenantId, null)
+    return
+  }
+  storageSet('meoo_meituan_merchant_token', row.sealedCredentials)
+  writePlatformToken('meituan', row.sealedCredentials)
+  if (row.clientKey) storageSet('meoo_meituan_app_id', row.clientKey)
+  storageSet('meoo_meituan_merchant_id', row.merchantAccountId)
+  const name = row.bindingLabel || row.accountDisplayName || row.merchantAccountId
+  if (name) storageSet('meoo_meituan_account_name', name)
+  storageSet('meoo_meituan_bind_demo', '0')
+  writeActiveBindingId('meituan', tenantId, row.id)
+}
+
 function applyLocalPromotion(row, tenantId) {
   const legacyKey = LEGACY_BIND_KEY.local_promotion
   if (!row) {
@@ -311,6 +363,7 @@ function applyXhsCommercial(row, tenantId) {
 function clearPlatformSessionForAccountSwitch() {
   clearDouyinLocal()
   clearKuaishouLocal()
+  clearMeituanLocal()
   for (const p of ['local_promotion', 'qianchuan', 'xhs_commercial']) {
     const k = LEGACY_BIND_KEY[p]
     try {
@@ -322,7 +375,7 @@ function clearPlatformSessionForAccountSwitch() {
       wx.removeStorageSync(ACTIVE_ID_KEY[p])
     } catch (_) {}
   }
-  for (const plat of ['meituan', 'xiaohongshu', 'jd']) {
+  for (const plat of ['xiaohongshu', 'jd']) {
     writePlatformToken(plat, '')
   }
 }
@@ -384,7 +437,11 @@ function readBindingSnapshotFromStorage() {
     localPromotion: lp,
     qianchuan: qc,
     xhsCommercial: xhs,
-    meituan: readName('meoo_meituan_merchant_token', '', ''),
+    meituan: readName(
+      'meoo_meituan_merchant_token',
+      'meoo_meituan_account_name',
+      'meoo_meituan_merchant_id',
+    ),
     xiaohongshu: readName('meoo_xhs_merchant_token', '', ''),
   }
 }
@@ -480,12 +537,16 @@ async function syncFromCloud(opts) {
         }
         const rows = (Array.isArray(rawRows) ? rawRows : [])
           .map((r) => parseBindingRow(r))
-          .filter(Boolean)
-        if (!rows.length) continue
+          .filter((r) => r && !r.demoMode)
+        if (!rows.length) {
+          if (provider === 'meituan' && localMeituanTokenIsDemo()) clearMeituanLocal()
+          continue
+        }
         const active = pickActive(rows, provider, tenantId)
         if (!active) continue
         if (provider === 'douyin') applyDouyin(active, tenantId)
         else if (provider === 'kuaishou') applyKuaishou(active, tenantId)
+        else if (provider === 'meituan') applyMeituan(active, tenantId)
         else if (provider === 'local_promotion') applyLocalPromotion(active, tenantId)
         else if (provider === 'qianchuan') applyQianchuan(active, tenantId)
         else if (provider === 'xhs_commercial') applyXhsCommercial(active, tenantId)

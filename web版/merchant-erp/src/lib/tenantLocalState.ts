@@ -5,6 +5,7 @@
 import {
   clearDouyinMerchantBindingLocal,
   clearKuaishouMerchantBindingLocal,
+  clearMeituanMerchantBindingLocal,
 } from './merchantSession'
 import {
   MEOO_MERCHANT_DISPLAY_NAME_KEY,
@@ -94,6 +95,14 @@ const PLATFORM_BINDING_KEY_MARKERS = [
   'meoo_active_kuaishou_binding_id',
   'meoo_douyin_cloud_backup_attempted',
   'meoo_kuaishou_cloud_backup_attempted',
+  'meoo_meituan_merchant_token',
+  'meoo_meituan_auto_refresh',
+  'meoo_meituan_app_id',
+  'meoo_meituan_merchant_id',
+  'meoo_meituan_account_name',
+  'meoo_meituan_bind_demo',
+  'meoo_active_meituan_binding_id',
+  'meoo_meituan_cloud_backup_attempted',
 ] as const
 
 /** 平台商家后台绑定凭据：登录/刷新会话时不得删除 */
@@ -104,6 +113,7 @@ export function isPlatformBindingStorageKey(key: string): boolean {
 export function clearPlatformBindingLocalState(): void {
   clearDouyinMerchantBindingLocal()
   clearKuaishouMerchantBindingLocal()
+  clearMeituanMerchantBindingLocal()
 }
 
 function purgeMeooStorageExceptBindings(storage: Storage): void {

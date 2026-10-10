@@ -1,10 +1,9 @@
 /**
  * 美团 OpenAPI 网关：门店、装修、商品、评价、营销活动、财务对账。
- * 参照 douyinMerchantGateway 与现有 ERP 前端约定；未配置 MEITUAN_OPENAPI_BASE_URL 时返回演示数据便于联调 UI。
+ * 参照 douyinMerchantGateway 与现有 ERP 前端约定。未配置 MEITUAN_OPENAPI_BASE_URL 时返回空数据，不签发演示门店。
  * @see https://developer.meituan.com/docs/api
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { randomUUID } from 'node:crypto'
 import {
   decodeMeituanSessionToken,
   encodeMeituanSessionToken,
@@ -45,81 +44,11 @@ function isDemoSession(session: MeituanMerchantSession): boolean {
   return session.demo === true || !meituanConfiguredForLiveApi()
 }
 
-// —— 演示数据（未接正式 OpenAPI 基址时）——
+const GROUPBUY_UNAVAILABLE =
+  '美团团购未接通开放平台，无法拉取真实门店、商品与评价。'
 
-const DEMO_STORES: unknown[] = [
-  {
-    poi: {
-      poi_id: 'mt-demo-001',
-      poi_name: '灵祺演示门店·南山店',
-      address: '广东省深圳市南山区科技园南路 88 号',
-      city_name: '深圳市',
-      district_name: '南山区',
-      contact_phone: '0755-88880001',
-      open_time_desc: '周一至周日 10:00-22:00',
-    },
-  },
-  {
-    poi: {
-      poi_id: 'mt-demo-002',
-      poi_name: '灵祺演示门店·福田店',
-      address: '广东省深圳市福田区福华路 168 号',
-      city_name: '深圳市',
-      district_name: '福田区',
-      contact_phone: '0755-88880002',
-      open_time_desc: '周一至周日 09:30-21:30',
-    },
-  },
-]
-
-const DEMO_PRODUCTS = [
-  {
-    id: 'mt-deal-1001',
-    name: '双人招牌套餐',
-    price: 128,
-    store: '灵祺演示门店·南山店',
-    status: '已上架',
-    auditStatus: '审核通过',
-    saleStatus: '售卖中',
-    platform: 'meituan',
-  },
-  {
-    id: 'mt-deal-1002',
-    name: '100 元代金券',
-    price: 88,
-    store: '灵祺演示门店·福田店',
-    status: '已上架',
-    auditStatus: '审核通过',
-    saleStatus: '售卖中',
-    platform: 'meituan',
-  },
-]
-
-function demoReviews(): MerchantReviewRowMeituan[] {
-  const now = Date.now()
-  return [
-    {
-      id: 'mt-demo-review-1',
-      platform: 'meituan',
-      sentiment: 'good',
-      userName: '美团用户A',
-      ratingStars: 5,
-      content: '味道不错，服务热情，会再来。',
-      createdAt: new Date(now - 2 * 86400000).toISOString(),
-      replied: false,
-    },
-    {
-      id: 'mt-demo-review-2',
-      platform: 'meituan',
-      sentiment: 'neutral',
-      userName: '美团用户B',
-      ratingStars: 3,
-      content: '上菜稍慢，整体还可以。',
-      createdAt: new Date(now - 5 * 86400000).toISOString(),
-      replied: true,
-      replyText: '感谢您的反馈，我们会加强出餐效率。',
-    },
-  ]
+function groupbuyLive(session: MeituanMerchantSession): boolean {
+  return !isDemoSession(session)
 }
 
 function poiSearchHay(row: unknown): string {
@@ -225,63 +154,17 @@ export async function handleMeituanBindPost(
   const live = meituanConfiguredForLiveApi()
 
   if (!live) {
-    const session: MeituanMerchantSession = {
-      v: 1,
-      appKey: appId,
-      appSecret,
-      accessToken: appAuthToken || `mt-at-${randomUUID().replace(/-/g, '')}`,
-      merchantId,
-      demo: true,
-    }
-    json(res, 200, {
-      accessToken: encodeMeituanSessionToken(session),
+    json(res, 400, {
       message:
-        '已绑定（演示模式 · 商家自研）：配置 MEITUAN_OPENAPI_BASE_URL 与各业务 PATH 后将直连美团 OpenAPI。',
-      demo: true,
-      mode: 'merchant_self',
+        '美团团购开放平台未配置（MEITUAN_OPENAPI_BASE_URL）。未接通前不签发演示令牌，也不会返回演示门店。',
     })
     return
   }
 
-  let accessToken = appAuthToken
-  if (!accessToken) {
-    const tokenPath = meituanPathFromEnv('MEITUAN_OAUTH_TOKEN_PATH', '/oauth/token')
-    const r = await meituanSignedRequest(
-      {
-        v: 1,
-        appKey: appId,
-        appSecret,
-        accessToken: '',
-        merchantId,
-      },
-      tokenPath,
-      {
-        method: 'POST',
-        body: {
-          grant_type: 'client_credentials',
-          developer_id: extraId || undefined,
-        },
-        extraSignParams: { grant_type: 'client_credentials' },
-      },
-    )
-    if (r.ok) {
-      const data = r.json.data
-      accessToken =
-        (typeof r.json.access_token === 'string' && r.json.access_token) ||
-        (data &&
-        typeof data === 'object' &&
-        typeof (data as Record<string, unknown>).access_token === 'string'
-          ? String((data as Record<string, unknown>).access_token)
-          : '') ||
-        (typeof r.json.session === 'string' && r.json.session) ||
-        ''
-    }
-  }
-
+  const accessToken = appAuthToken
   if (!accessToken) {
     json(res, 400, {
-      message:
-        '未能获取访问令牌。请填写门店授权后的 appAuthToken，或确认商家自研应用 OAuth（client_credentials）可用。',
+      message: '请填写门店授权后的 appAuthToken。美团团购按商家自研授权令牌接通。',
     })
     return
   }
@@ -321,11 +204,40 @@ export async function handleMeituanSyncPost(
 ): Promise<void> {
   const session = requireSession(res, parseBearer(req))
   if (!session) return
+  if (!groupbuyLive(session)) {
+    json(res, 400, { message: GROUPBUY_UNAVAILABLE })
+    return
+  }
+  const notes: string[] = []
+  let storeCount = 0
+  let goodsCount = 0
+  try {
+    storeCount = (await fetchMeituanStoreRows(session)).length
+  } catch (e) {
+    notes.push(`门店：${e instanceof Error ? e.message : String(e)}`)
+  }
+  try {
+    const path = meituanPathFromEnv('MEITUAN_GOODS_LIST_PATH', '/deal/query')
+    const r = await meituanSignedRequest(session, path, {
+      method: 'POST',
+      body: { page: 1, page_size: 20, merchant_id: session.merchantId },
+    })
+    if (!r.ok) notes.push(`商品：${r.message}`)
+    else {
+      goodsCount = pickArrayFromMeituanPayload(r.json, ['deals', 'products', 'list', 'items']).length
+    }
+  } catch (e) {
+    notes.push(`商品：${e instanceof Error ? e.message : String(e)}`)
+  }
+  if (storeCount === 0 && goodsCount === 0 && notes.length) {
+    json(res, 502, { message: notes.join('；') })
+    return
+  }
   json(res, 200, {
     syncedAt: new Date().toLocaleString('zh-CN'),
-    message: isDemoSession(session)
-      ? '演示模式：已刷新本地缓存时间戳。'
-      : '已向美团同步账户数据（门店/商品/评价等按各模块调用时拉取）。',
+    storeCount,
+    goodsCount,
+    message: notes.length ? notes.join('；') : '已从美团拉取团购门店与商品。',
   })
 }
 
@@ -335,12 +247,11 @@ export async function handleMeituanConnectionCheckGet(
 ): Promise<void> {
   const session = requireSession(res, parseBearer(req))
   if (!session) return
+  const live = groupbuyLive(session)
   json(res, 200, {
-    ok: true,
-    message: isDemoSession(session)
-      ? '网关可达（演示数据）；生产请配置 MEITUAN_OPENAPI_BASE_URL。'
-      : '网关可达，美团会话有效。',
-    demo: isDemoSession(session),
+    ok: live,
+    message: live ? '美团团购会话有效。' : GROUPBUY_UNAVAILABLE,
+    demo: !live,
     liveApi: meituanConfiguredForLiveApi(),
   })
 }
@@ -348,7 +259,7 @@ export async function handleMeituanConnectionCheckGet(
 // —— 门店 ——
 
 async function fetchMeituanStoreRows(session: MeituanMerchantSession): Promise<unknown[]> {
-  if (isDemoSession(session)) return [...DEMO_STORES]
+  if (!groupbuyLive(session)) throw new Error(GROUPBUY_UNAVAILABLE)
 
   const path = meituanPathFromEnv('MEITUAN_STORE_LIST_PATH', '/poi/list')
   const r = await meituanSignedRequest(session, path, {
@@ -386,11 +297,8 @@ export async function handleMeituanStoresGet(
     json(res, 200, {
       items: slice,
       total,
-      accountName: isDemoSession(session) ? '灵祺演示商户' : session.merchantId,
+      accountName: session.merchantId,
       tabCounts: { claimed: total, claiming: 0 },
-      emptyHint: isDemoSession(session)
-        ? '当前为演示门店；在美团技术服务合作中心申请门店查询能力并配置 MEITUAN_OPENAPI_BASE_URL、MEITUAN_STORE_LIST_PATH 后返回真实数据。'
-        : undefined,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -412,13 +320,8 @@ export async function handleMeituanStoreDetailGet(
   }
 
   try {
-    if (isDemoSession(session)) {
-      const hit = DEMO_STORES.find((row) => {
-        const o = row as Record<string, unknown>
-        const poi = o.poi as Record<string, unknown>
-        return String(poi?.poi_id) === poiId
-      })
-      json(res, 200, { ok: true, poi: hit ?? { poi: { poi_id: poiId, poi_name: '演示门店' } } })
+    if (!groupbuyLive(session)) {
+      json(res, 400, { message: GROUPBUY_UNAVAILABLE })
       return
     }
     const path = meituanPathFromEnv('MEITUAN_STORE_DETAIL_PATH', '/poi/detail')
@@ -451,7 +354,7 @@ export async function handleMeituanStoreDecorationGet(
 
   try {
     let rows = await fetchMeituanStoreRows(session)
-    if (!isDemoSession(session)) {
+    {
       const decorPath = process.env.MEITUAN_STORE_DECORATION_PATH?.trim()
       if (decorPath) {
         const r = await meituanSignedRequest(session, decorPath, {
@@ -470,9 +373,7 @@ export async function handleMeituanStoreDecorationGet(
     json(res, 200, {
       items: slice.map(rowToDecorationItem),
       total,
-      message: isDemoSession(session)
-        ? '演示模式：装修字段由门店基础信息映射；配置 MEITUAN_STORE_DECORATION_PATH 可拉取独立装修接口。'
-        : '由门店/装修 OpenAPI 聚合；未返回的列显示为「—」。',
+      message: '由门店/装修 OpenAPI 聚合；未返回的列显示为「—」。',
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -520,16 +421,11 @@ export async function handleMeituanGoodsProductsListGet(
   )
 
   try {
-    if (isDemoSession(session)) {
+    if (!groupbuyLive(session)) {
       json(res, 200, {
-        ok: true,
-        data: {
-          items: DEMO_PRODUCTS,
-          total: DEMO_PRODUCTS.length,
-          page,
-          page_size: pageSize,
-        },
-        message: '演示商品；配置 MEITUAN_OPENAPI_BASE_URL 与 MEITUAN_GOODS_LIST_PATH 后返回线上团购/套餐。',
+        ok: false,
+        data: { items: [], total: 0, page, page_size: pageSize },
+        message: GROUPBUY_UNAVAILABLE,
       })
       return
     }
@@ -578,12 +474,8 @@ export async function handleMeituanGoodsProductSavePost(
     return
   }
 
-  if (isDemoSession(session)) {
-    json(res, 200, {
-      ok: true,
-      productId: `mt-draft-${randomUUID().slice(0, 8)}`,
-      message: '演示模式：商品已记为草稿；配置 OpenAPI 后写入美团团购/套餐创建接口。',
-    })
+  if (!groupbuyLive(session)) {
+    json(res, 400, { ok: false, message: GROUPBUY_UNAVAILABLE })
     return
   }
 
@@ -614,8 +506,8 @@ export async function fetchMeituanReviews(
     return { ok: false, message: '美团会话无效，请先在商家版后台完成绑定。' }
   }
 
-  if (isDemoSession(session)) {
-    return { ok: true, items: demoReviews() }
+  if (!groupbuyLive(session)) {
+    return { ok: false, message: GROUPBUY_UNAVAILABLE }
   }
 
   const path = meituanPathFromEnv('MEITUAN_REVIEW_LIST_PATH', '/ugc/comment/query')
@@ -700,8 +592,8 @@ export async function postMeituanCommentReply(
   const parsed = parseMeituanReviewId(reviewId)
   if (!parsed) return { ok: false, message: '评价 ID 无效' }
 
-  if (isDemoSession(session) || parsed.commentId.startsWith('mt-demo-')) {
-    return { ok: true }
+  if (!groupbuyLive(session) || parsed.commentId.startsWith('mt-demo-')) {
+    return { ok: false, message: GROUPBUY_UNAVAILABLE }
   }
 
   const path = meituanPathFromEnv('MEITUAN_REVIEW_REPLY_PATH', '/ugc/comment/reply')
@@ -727,25 +619,15 @@ export async function fetchMeituanMarketingActivities(
   const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
   const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get('page_size')) || 20))
 
-  if (isDemoSession(session)) {
+  if (!groupbuyLive(session)) {
     return {
       status: 200,
       body: {
-        ok: true,
+        ok: false,
         platform: 'meituan',
-        items: [
-          {
-            id: 'mt-act-demo-1',
-            title: '春季招商活动（演示）',
-            status: '报名中',
-            startTime: new Date().toISOString(),
-            endTime: new Date(Date.now() + 14 * 86400000).toISOString(),
-          },
-        ],
-        total: 1,
-        syncedAt: new Date().toISOString(),
-        upstreamNote:
-          '演示数据。正式环境请配置 MEITUAN_OPENAPI_BASE_URL 与 MEITUAN_MARKETING_ACTIVITY_QUERY_PATH。',
+        items: [],
+        total: 0,
+        message: GROUPBUY_UNAVAILABLE,
       },
     }
   }
@@ -810,22 +692,9 @@ export async function fetchMeituanFinanceReconcileRows(
     return { rows: [], warnings }
   }
 
-  if (isDemoSession(session)) {
-    const rows: FinanceReconcileRowPayload[] = []
-    for (const date of enumerateYmdInclusive(startYmd, endYmd)) {
-      const seed = date.split('-').reduce((a, b) => a + Number(b), 0)
-      rows.push({
-        date,
-        platform: 'meituan',
-        platformLabel: '美团点评',
-        orderCount: 8 + (seed % 12),
-        verifyOrderCount: 6 + (seed % 10),
-        salesAmountYuan: 1200 + (seed % 500),
-        verifyAmountYuan: 980 + (seed % 400),
-      })
-    }
-    warnings.push('美团对账为演示数据；配置 MEITUAN_FINANCE_PATH 后返回真实账单汇总。')
-    return { rows, warnings }
+  if (!groupbuyLive(session)) {
+    warnings.push(GROUPBUY_UNAVAILABLE)
+    return { rows: [], warnings }
   }
 
   const path = meituanPathFromEnv('MEITUAN_FINANCE_PATH', '/bill/daily/summary')

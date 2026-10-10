@@ -13,6 +13,7 @@ export type MerchantBindingProvider =
   | 'local_promotion'
   | 'qianchuan'
   | 'xhs_commercial'
+  | 'meituan'
 
 export type MerchantPlatformBindingRow = {
   id: string
@@ -32,6 +33,7 @@ const ACTIVE_ID_KEY: Record<MerchantBindingProvider, string> = {
   local_promotion: 'meoo_active_local_promotion_binding_id',
   qianchuan: 'meoo_active_qianchuan_binding_id',
   xhs_commercial: 'meoo_active_xhs_commercial_binding_id',
+  meituan: 'meoo_active_meituan_binding_id',
 }
 
 function parseRow(raw: Record<string, unknown>): MerchantPlatformBindingRow | null {
@@ -47,7 +49,9 @@ function parseRow(raw: Record<string, unknown>): MerchantPlatformBindingRow | nu
           ? 'kuaishou'
         : raw.provider === 'douyin'
           ? 'douyin'
-          : null
+          : raw.provider === 'meituan'
+            ? 'meituan'
+            : null
   const sealed =
     typeof raw.sealed_credentials === 'string' ? raw.sealed_credentials.trim() : ''
   const merchantAccountId =
