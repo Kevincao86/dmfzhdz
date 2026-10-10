@@ -71,7 +71,7 @@ export default function BindContactHelp() {
             aria-label={current.title}
           >
             <p className="text-center text-sm font-medium text-slate-800">{current.title}</p>
-            <img src={current.src} alt={current.title} className="mx-auto mt-3 w-56 rounded-lg bg-white" />
+            <img src={current.src} alt={current.title} className="mx-auto mt-3 block w-56 max-w-full bg-white" />
             <button
               type="button"
               className="mt-4 w-full rounded-lg border border-slate-200 py-2 text-sm text-slate-600 hover:bg-slate-50"
