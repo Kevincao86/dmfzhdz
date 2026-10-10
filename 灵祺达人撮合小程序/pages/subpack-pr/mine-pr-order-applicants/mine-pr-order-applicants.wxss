@@ -687,11 +687,13 @@
 .fit-entry {
   align-self: flex-end;
   margin-bottom: 12rpx;
-  padding: 8rpx 16rpx;
-  border: 1px solid #c4b5fd;
+  padding: 8rpx 18rpx;
+  border: 1px solid #fff;
   border-radius: 999rpx;
-  color: #6d28d9;
+  color: #c2410c;
+  background: #fff;
   font-size: 22rpx;
+  font-weight: 600;
 }
 .applicant-fit {
   width: 100%;
