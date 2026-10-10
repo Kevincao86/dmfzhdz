@@ -21,6 +21,10 @@ import {
   runMeooAgentImageRequest,
   type MeooAgentImageResult,
 } from '../vite-plugins/meooAgentImageCore.js'
+import {
+  DEMO_SHOWCASE_IMAGE_URL,
+  isDemoShowcaseEmail,
+} from '../vite-plugins/demoShowcaseAccount.js'
 
 export const config = { maxDuration: 300 }
 
@@ -179,6 +183,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
   if (!user) {
     sendMerchantJson(res, 401, { ok: false, error: 'unauthorized' })
+    return
+  }
+  if (isDemoShowcaseEmail(user.email)) {
+    sendMerchantJson(res, 200, {
+      ok: true,
+      imageUrl: DEMO_SHOWCASE_IMAGE_URL,
+      channel: 'builtin',
+      demoShowcase: true,
+    })
     return
   }
 

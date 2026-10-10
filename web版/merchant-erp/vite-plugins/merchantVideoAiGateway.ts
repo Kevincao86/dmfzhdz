@@ -139,6 +139,8 @@ import {
   ensureScriptRowsForTargetDuration,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
+import { readRequestBearer, verifyBearerJwt } from './aiGateway/authSupabase.js'
+import { demoShowcaseVideoPayload, isDemoShowcaseEmail } from './demoShowcaseAccount.js'
 
 function tenantIdFromParsed(parsed: Record<string, unknown>): string | undefined {
   const t = parsed.tenantId ?? parsed.tenant_id
@@ -2217,6 +2219,31 @@ export type ArkPollState = {
   raw?: Record<string, unknown>
 }
 
+async function replyDemoShowcaseVideo(
+  input: {
+    method: string
+    pathname: string
+    res: ServerResponse
+    req?: import('node:http').IncomingMessage
+  },
+  env: MerchantAiEnv,
+): Promise<boolean> {
+  const payload = demoShowcaseVideoPayload(input.method, input.pathname)
+  if (!payload) return false
+  const token = readRequestBearer(
+    input.req?.headers as Record<string, unknown> | undefined,
+    null,
+  )
+  if (!token) return false
+  const user = await verifyBearerJwt(`Bearer ${token}`, {
+    ...process.env,
+    ...(env as unknown as Record<string, string>),
+  } as Record<string, string>)
+  if (!isDemoShowcaseEmail(user?.email)) return false
+  json(input.res, 200, payload)
+  return true
+}
+
 export async function handleMerchantAiVideoRoutes(input: {
   method: string
   pathname: string
@@ -2229,6 +2256,8 @@ export async function handleMerchantAiVideoRoutes(input: {
 }): Promise<boolean> {
   const { method, pathname, searchParams, res, bodyRaw, env: rawEnv } = input
   const env = await mergeVideoAiMerchantEnvWithSnapshot(input.viteRoot, rawEnv)
+
+  if (await replyDemoShowcaseVideo(input, env)) return true
 
   if (await handleAliyunIceRoutes({ ...input, env })) return true
 
