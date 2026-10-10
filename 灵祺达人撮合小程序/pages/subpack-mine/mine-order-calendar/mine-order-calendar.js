@@ -9,6 +9,7 @@ const participant = require('../../../utils/participant.js')
 const mpSubscribe = require('../../../utils/mpSubscribeMessages.js')
 const calReminder = require('../../../utils/mpCalendarReminderApi.js')
 const orderLabelApi = require('../../../utils/mpOrderCustomLabelApi.js')
+const customEventApi = require('../../../utils/mpCalendarCustomEventApi.js')
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 const REMIND_OPTIONS = [
@@ -67,6 +68,13 @@ Page({
     labelPresets: orderLabelApi.LABEL_PRESETS,
     labelCustomText: '',
     labelBusy: false,
+    eventSheetOpen: false,
+    eventSheetId: '',
+    eventTitle: '',
+    eventDateKey: '',
+    eventTimeLabel: '',
+    eventNote: '',
+    eventBusy: false,
   },
 
   async onLoad() {
@@ -129,8 +137,43 @@ Page({
         })
       }
 
-      const enriched = (events || []).map((evt) => {
-        const nav = orderCalendar.resolveEventNav(evt, { isPr })
+      let customRows = []
+      try {
+        customRows = await customEventApi.listEvents()
+      } catch (_) {}
+      const manualEvents = (customRows || [])
+        .map((row) => {
+          const dateKey = String((row && row.eventDateKey) || '').trim()
+          const dayMs = orderCalendar.parseVisitDayMs(dateKey)
+          if (!dateKey || !dayMs) return null
+          const phase = orderCalendar.resolveEventPhase({
+            kind: 'manual',
+            dayMs,
+            statusLabel: '自己的行程',
+          })
+          return {
+            id: String(row.id || '').trim(),
+            dateKey,
+            dayMs,
+            kind: 'manual',
+            mpOrderId: '',
+            orderTitle: String(row.title || '').trim(),
+            storeName: '',
+            note: String(row.note || '').trim(),
+            timeLabel: String(row.timeLabel || '').trim(),
+            statusLabel: '自己的行程',
+            phase,
+            phaseLabel: orderCalendar.phaseStatusLabel(phase),
+            kindLabel: '行程',
+            tone: 'blue',
+            actionLabel: '',
+            navUrl: '',
+          }
+        })
+        .filter(Boolean)
+
+      const enriched = (events || []).concat(manualEvents).map((evt) => {
+        const nav = evt.kind === 'manual' ? { url: '', actionLabel: '' } : orderCalendar.resolveEventNav(evt, { isPr })
         const phase = orderCalendar.resolveEventPhase(evt)
         return {
           ...evt,
@@ -147,7 +190,7 @@ Page({
       const grid = this.buildGridCells(this.data.year, this.data.month, byDate)
       const selectedEvents = (byDate[this.data.selectedDateKey] || []).map((e) => e)
       const upcomingTodos = orderCalendar.buildUpcomingTodos(enriched, { days: 7 }).map((evt) => {
-        const nav = orderCalendar.resolveEventNav(evt, { isPr })
+        const nav = evt.kind === 'manual' ? { url: '', actionLabel: '' } : orderCalendar.resolveEventNav(evt, { isPr })
         const phase = orderCalendar.resolveEventPhase(evt)
         return {
           ...evt,
@@ -361,7 +404,118 @@ Page({
       }))
       this.setData({ selectedDateKey: dateKey, selectedEvents, grid, upcomingTodos })
     }
+    if (String((e.currentTarget.dataset.kind || '')).trim() === 'manual') return
     this.onOpenEvent(e)
+  },
+
+  onEventSheetNoop() {},
+
+  openManualSheet(row) {
+    const selected = String(this.data.selectedDateKey || this.data.todayKey || '').trim()
+    this.setData({
+      eventSheetOpen: true,
+      eventSheetId: String((row && row.id) || '').trim(),
+      eventTitle: String((row && row.title) || '').trim(),
+      eventDateKey: String((row && row.dateKey) || selected).trim(),
+      eventTimeLabel: String((row && row.timeLabel) || '').trim(),
+      eventNote: String((row && row.note) || '').trim(),
+      eventBusy: false,
+    })
+  },
+
+  onOpenEventSheet() {
+    if (this.data.eventBusy) return
+    this.openManualSheet(null)
+  },
+
+  onCloseEventSheet() {
+    if (this.data.eventBusy) return
+    this.setData({
+      eventSheetOpen: false,
+      eventSheetId: '',
+      eventTitle: '',
+      eventNote: '',
+      eventTimeLabel: '',
+    })
+  },
+
+  onEventTitleInput(e) {
+    this.setData({ eventTitle: String((e && e.detail && e.detail.value) || '') })
+  },
+
+  onEventNoteInput(e) {
+    this.setData({ eventNote: String((e && e.detail && e.detail.value) || '') })
+  },
+
+  onEventDateChange(e) {
+    this.setData({ eventDateKey: String((e && e.detail && e.detail.value) || '') })
+  },
+
+  onEventTimeChange(e) {
+    this.setData({ eventTimeLabel: String((e && e.detail && e.detail.value) || '') })
+  },
+
+  onClearEventTime() {
+    this.setData({ eventTimeLabel: '' })
+  },
+
+  async onSaveManualEvent() {
+    const title = String(this.data.eventTitle || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .slice(0, 40)
+    const eventDateKey = String(this.data.eventDateKey || '').trim()
+    if (!title) {
+      wx.showToast({ title: '请填写行程标题', icon: 'none' })
+      return
+    }
+    if (!eventDateKey) {
+      wx.showToast({ title: '请选择日期', icon: 'none' })
+      return
+    }
+    if (this.data.eventBusy) return
+    this.setData({ eventBusy: true })
+    try {
+      await customEventApi.saveEvent({
+        id: this.data.eventSheetId,
+        title,
+        eventDateKey,
+        timeLabel: this.data.eventTimeLabel,
+        note: this.data.eventNote,
+      })
+      wx.showToast({ title: '行程已保存', icon: 'success' })
+      await new Promise((resolve) => {
+        this.setData({ eventSheetOpen: false, eventBusy: false, selectedDateKey: eventDateKey }, resolve)
+      })
+      await this.reload()
+    } catch (err) {
+      this.setData({ eventBusy: false })
+      wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+    }
+  },
+
+  onDeleteManualEvent(e) {
+    const id = String((e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || this.data.eventSheetId || '').trim()
+    if (!id || this.data.eventBusy) return
+    wx.showModal({
+      title: '删除行程',
+      content: '删除后电脑端和小程序都不再显示这条行程。',
+      confirmText: '删除',
+      confirmColor: '#dc2626',
+      success: async (res) => {
+        if (!res.confirm) return
+        this.setData({ eventBusy: true })
+        try {
+          await customEventApi.deleteEvent(id)
+          wx.showToast({ title: '已删除', icon: 'success' })
+          this.setData({ eventSheetOpen: false, eventBusy: false })
+          await this.reload()
+        } catch (err) {
+          this.setData({ eventBusy: false })
+          wx.showToast({ title: (err && err.message) || '删除失败', icon: 'none' })
+        }
+      },
+    })
   },
 
   onScrollToList() {
@@ -369,15 +523,26 @@ Page({
   },
 
   onOpenEvent(e) {
+    const kind = String((e.currentTarget.dataset.kind || '')).trim()
+    if (kind === 'manual') {
+      this.openManualSheet({
+        id: e.currentTarget.dataset.id,
+        title: e.currentTarget.dataset.title,
+        dateKey: e.currentTarget.dataset.dateKey,
+        timeLabel: e.currentTarget.dataset.time,
+        note: e.currentTarget.dataset.note,
+      })
+      return
+    }
     const url = String((e.currentTarget.dataset.url || '')).trim()
     if (url) {
       wx.navigateTo({ url })
       return
     }
     const mpOrderId = String((e.currentTarget.dataset.id || '')).trim()
-    const kind = String((e.currentTarget.dataset.kind || '')).trim()
+    const eventKind = String((e.currentTarget.dataset.kind || '')).trim()
     if (!mpOrderId) return
-    const nav = orderCalendar.resolveEventNav({ mpOrderId, kind }, { isPr: this.data.isPr })
+    const nav = orderCalendar.resolveEventNav({ mpOrderId, kind: eventKind }, { isPr: this.data.isPr })
     if (nav.url) wx.navigateTo({ url: nav.url })
   },
 

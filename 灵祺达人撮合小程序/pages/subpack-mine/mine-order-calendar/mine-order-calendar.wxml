@@ -35,6 +35,11 @@
           class="cal-todo-card cal-todo-card--{{item.tone}} {{item.selected ? 'cal-todo-card--active' : ''}}"
           data-url="{{item.navUrl}}"
           data-date-key="{{item.dateKey}}"
+          data-kind="{{item.kind}}"
+          data-id="{{item.id}}"
+          data-title="{{item.orderTitle}}"
+          data-time="{{item.timeLabel}}"
+          data-note="{{item.note}}"
           bindtap="onOpenTodo"
         >
           <text class="cal-todo-date {{item.selected ? 'cal-todo-date--active' : ''}}">{{item.dateShort}}</text>
@@ -57,6 +62,7 @@
           <view class="cal-mode-btn {{viewMode === 'month' ? 'cal-mode-btn--on' : ''}}" data-mode="month" bindtap="onToggleViewMode">月视图</view>
         </view>
         <view class="cal-chip" bindtap="onBackToday">今天</view>
+        <view class="cal-chip" bindtap="onOpenEventSheet">添加行程</view>
       </view>
 
       <view class="cal-toolbar cal-toolbar--sub">
@@ -95,10 +101,23 @@
     </view>
 
     <view id="cal-event-list" class="cal-card cal-list">
-      <text class="cal-section-title">{{selectedDateKey}} 的商单</text>
-      <view wx:if="{{!selectedEvents.length}}" class="cal-empty">该日暂无商单安排</view>
+      <view class="cal-list-head">
+        <text class="cal-section-title">{{selectedDateKey}} 的商单</text>
+        <text class="cal-todo-link" bindtap="onOpenEventSheet">添加行程</text>
+      </view>
+      <view wx:if="{{!selectedEvents.length}}" class="cal-empty">该日暂无安排，可添加自己的行程</view>
       <view wx:for="{{selectedEvents}}" wx:key="id" class="cal-event">
-        <view class="cal-event-main" data-url="{{item.navUrl}}" bindtap="onOpenEvent">
+        <view
+          class="cal-event-main"
+          data-url="{{item.navUrl}}"
+          data-kind="{{item.kind}}"
+          data-id="{{item.id}}"
+          data-title="{{item.orderTitle}}"
+          data-date-key="{{item.dateKey}}"
+          data-time="{{item.timeLabel}}"
+          data-note="{{item.note}}"
+          bindtap="onOpenEvent"
+        >
           <view class="cal-event-top">
             <view class="cal-event-left">
               <text class="cal-badge cal-badge--{{item.tone}}">{{item.kindLabel}}</text>
@@ -113,13 +132,22 @@
           </view>
           <view class="cal-event-meta">
             <text wx:if="{{item.timeLabel}}">{{item.timeLabel}}</text>
+            <text wx:if="{{item.note}}">{{item.note}}</text>
             <text wx:if="{{item.applicantName && isPr}}">达人：{{item.applicantName}}</text>
             <text wx:if="{{item.platform}}">{{item.platform}}</text>
           </view>
-          <text class="cal-event-action">{{item.actionLabel}} ›</text>
+          <text wx:if="{{item.actionLabel}}" class="cal-event-action">{{item.actionLabel}} ›</text>
         </view>
         <view class="cal-event-actions">
           <button
+            wx:if="{{item.kind === 'manual'}}"
+            class="cal-label-btn"
+            size="mini"
+            data-id="{{item.id}}"
+            catchtap="onDeleteManualEvent"
+          >删除</button>
+          <button
+            wx:if="{{item.kind !== 'manual'}}"
             class="cal-label-btn {{item.customLabelText ? 'cal-label-btn--set cal-label-btn--' + item.customLabelColor : ''}}"
             size="mini"
             hover-class="cal-label-btn--hover"
@@ -128,6 +156,7 @@
             catchtap="onSetLabel"
           >{{item.customLabelText || '设标签'}}</button>
           <button
+            wx:if="{{item.kind !== 'manual'}}"
             class="cal-remind-btn {{item.remindSet ? 'cal-remind-btn--set' : ''}}"
             size="mini"
             data-event-id="{{item.id}}"
@@ -142,6 +171,46 @@
       </view>
     </view>
   </block>
+
+  <view wx:if="{{eventSheetOpen}}" class="cal-label-mask" catchtouchmove="onEventSheetNoop" catchtap="onCloseEventSheet">
+    <view class="cal-label-sheet" catchtap="onEventSheetNoop">
+      <view class="cal-label-sheet-head">
+        <view class="cal-label-sheet-titles">
+          <text class="cal-label-sheet-title">{{eventSheetId ? '编辑行程' : '添加行程'}}</text>
+          <text class="cal-label-sheet-sub">只记在你当前身份下，和电脑端是同一份</text>
+        </view>
+        <view class="cal-label-sheet-close" catchtap="onCloseEventSheet">×</view>
+      </view>
+      <input
+        class="cal-label-input"
+        maxlength="40"
+        placeholder="行程标题，例如到店拍摄"
+        value="{{eventTitle}}"
+        bindinput="onEventTitleInput"
+      />
+      <picker mode="date" value="{{eventDateKey}}" bindchange="onEventDateChange">
+        <view class="cal-label-input">日期 {{eventDateKey}}</view>
+      </picker>
+      <picker mode="time" value="{{eventTimeLabel || '09:00'}}" bindchange="onEventTimeChange">
+        <view class="cal-label-input">时间 {{eventTimeLabel || '可不填'}}</view>
+      </picker>
+      <view wx:if="{{eventTimeLabel}}" class="cal-label-clear" catchtap="onClearEventTime">清除时间</view>
+      <input
+        class="cal-label-input"
+        maxlength="200"
+        placeholder="备注（选填）"
+        value="{{eventNote}}"
+        bindinput="onEventNoteInput"
+      />
+      <view class="cal-label-save {{eventBusy ? 'cal-label-save--busy' : ''}}" catchtap="onSaveManualEvent">保存</view>
+      <view
+        wx:if="{{eventSheetId}}"
+        class="cal-label-clear {{eventBusy ? 'cal-label-save--busy' : ''}}"
+        data-id="{{eventSheetId}}"
+        catchtap="onDeleteManualEvent"
+      >删除这条行程</view>
+    </view>
+  </view>
 
   <view wx:if="{{labelSheetOpen}}" class="cal-label-mask" catchtouchmove="onLabelSheetNoop" catchtap="onCloseLabelSheet">
     <view class="cal-label-sheet" catchtap="onLabelSheetNoop">

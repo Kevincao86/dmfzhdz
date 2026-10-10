@@ -15,6 +15,7 @@ const KIND_LABELS = {
   ice_deliver: '云剪交付',
   shoot_day: '外拍日',
   pr_review: '待审片',
+  manual: '行程',
 }
 
 const ACTION_LABELS = {

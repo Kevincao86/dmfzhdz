@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Loader2,
   MapPin,
+  Plus,
   Tag,
   X,
 } from 'lucide-react'
@@ -27,6 +28,12 @@ import {
   type MpOrderCustomLabel,
   type OrderLabelColor,
 } from '../lib/mpOrderCustomLabelApi'
+import {
+  deleteCalendarCustomEvent,
+  listCalendarCustomEvents,
+  saveCalendarCustomEvent,
+  type MpCalendarCustomEvent,
+} from '../lib/mpCalendarCustomEventApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
@@ -46,6 +53,7 @@ import {
   formatTodoDateShort,
   groupEventsByDate,
   kindLabel,
+  parseVisitDayMs,
   phaseStatusLabel,
   resolveDayDotPhase,
   resolveEventPhase,
@@ -82,7 +90,26 @@ function monthTitle(year: number, month: number): string {
   return `${year}年${month + 1}月`
 }
 
+function manualEventFromRow(row: MpCalendarCustomEvent): OrderCalendarEvent | null {
+  const dateKey = String(row.eventDateKey || '').trim()
+  const dayMs = parseVisitDayMs(dateKey)
+  if (!dateKey || !dayMs) return null
+  return {
+    id: row.id,
+    dateKey,
+    dayMs,
+    kind: 'manual',
+    mpOrderId: '',
+    orderTitle: row.title,
+    storeName: '',
+    timeLabel: row.timeLabel,
+    statusLabel: '自己的行程',
+    note: row.note,
+  }
+}
+
 function eventLink(role: string, evt: OrderCalendarEvent): string {
+  if (evt.kind === 'manual') return ''
   if (role === 'pr') {
     if (evt.kind === 'visit') return `/orders/${encodeURIComponent(evt.mpOrderId)}/schedule`
     if (evt.kind === 'plan_slot') return `/orders/${encodeURIComponent(evt.mpOrderId)}/schedule/dates`
@@ -143,6 +170,15 @@ export default function OrderCalendarPage() {
   const [customLabelInput, setCustomLabelInput] = useState('')
   const [orderLabels, setOrderLabels] = useState<MpOrderCustomLabel[]>([])
   const [toast, setToast] = useState('')
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualBusy, setManualBusy] = useState(false)
+  const [manualForm, setManualForm] = useState({
+    id: '',
+    title: '',
+    dateKey: '',
+    timeLabel: '',
+    note: '',
+  })
   const eventListRef = useRef<HTMLElement>(null)
   const todoScrollRef = useRef<HTMLDivElement>(null)
 
@@ -177,10 +213,9 @@ export default function OrderCalendarPage() {
     return () => window.clearTimeout(t)
   }, [toast])
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      setLoading(true)
+  const refreshCalendar = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true)
       setErr('')
       try {
         const reg = await fetchMpRegistry(
@@ -199,19 +234,28 @@ export default function OrderCalendarPage() {
           )
           list = aggregateTalentOrderCalendarEvents(orders, ids)
         }
-        if (!cancelled) setEvents(list)
-        if (!cancelled) await refreshReminders()
-        if (!cancelled) await refreshLabels()
+        let manual: OrderCalendarEvent[] = []
+        try {
+          const rows = await listCalendarCustomEvents()
+          manual = rows.map(manualEventFromRow).filter((row): row is OrderCalendarEvent => !!row)
+        } catch {
+          manual = []
+        }
+        setEvents([...list, ...manual])
+        await refreshReminders()
+        await refreshLabels()
       } catch (e) {
-        if (!cancelled) setErr(e instanceof Error ? e.message : '加载失败')
+        setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!opts?.silent) setLoading(false)
       }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [isPr, refreshReminders, refreshLabels])
+    },
+    [isPr, refreshReminders, refreshLabels],
+  )
+
+  useEffect(() => {
+    void refreshCalendar()
+  }, [refreshCalendar])
 
   const byDate = useMemo(() => groupEventsByDate(events), [events])
   const upcomingTodos = useMemo(() => buildUpcomingTodos(events), [events])
@@ -384,6 +428,71 @@ export default function OrderCalendarPage() {
     }
   }
 
+  function openManualDialog(evt?: OrderCalendarEvent) {
+    const dateKey = evt?.dateKey || selectedDateKey || todayKeyFromNow(now)
+    setManualForm({
+      id: evt?.kind === 'manual' ? evt.id : '',
+      title: evt?.kind === 'manual' ? evt.orderTitle : '',
+      dateKey,
+      timeLabel: evt?.kind === 'manual' ? evt.timeLabel || '' : '',
+      note: evt?.kind === 'manual' ? evt.note || '' : '',
+    })
+    setManualOpen(true)
+  }
+
+  async function onSaveManualEvent() {
+    const title = manualForm.title.trim().replace(/\s+/g, ' ').slice(0, 40)
+    const eventDateKey = manualForm.dateKey.trim()
+    if (!title) {
+      setToast('请填写行程标题')
+      return
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDateKey)) {
+      setToast('请选择有效日期')
+      return
+    }
+    const timeLabel = manualForm.timeLabel.trim()
+    if (timeLabel && !/^([01]\d|2[0-3]):[0-5]\d$/.test(timeLabel)) {
+      setToast('时间格式应为 HH:mm')
+      return
+    }
+    setManualBusy(true)
+    try {
+      await saveCalendarCustomEvent({
+        id: manualForm.id || undefined,
+        title,
+        eventDateKey,
+        timeLabel,
+        note: manualForm.note,
+      })
+      setManualOpen(false)
+      setSelectedDateKey(eventDateKey)
+      setToast('行程已保存，已与小程序同步')
+      await refreshCalendar({ silent: true })
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '保存失败')
+    } finally {
+      setManualBusy(false)
+    }
+  }
+
+  async function onDeleteManualEvent(id: string) {
+    const eventId = String(id || '').trim()
+    if (!eventId || manualBusy) return
+    if (!window.confirm('删除后电脑端和小程序都不再显示这条行程。')) return
+    setManualBusy(true)
+    try {
+      await deleteCalendarCustomEvent(eventId)
+      setManualOpen(false)
+      setToast('行程已删除')
+      await refreshCalendar({ silent: true })
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setManualBusy(false)
+    }
+  }
+
   const navLabel = viewMode === 'week' ? '本周' : monthTitle(year, month)
 
   return (
@@ -401,7 +510,7 @@ export default function OrderCalendarPage() {
             {calendarPageSubtitleForWork(workId)}。横向滑动查看近期事项，在日历中掌握整体进度。
           </p>
           <p className="mt-2 text-xs leading-relaxed text-violet-600/90">
-            在电脑端设置的到点提醒与自定义标签会与小程序商单日历同步；微信订阅推送需在小程序内授权一次。
+            自己添加的行程、到点提醒和自定义标签会与小程序商单日历同步；微信订阅推送需在小程序内授权一次。
           </p>
 
           <ul className="mt-6 space-y-4">
@@ -493,8 +602,11 @@ export default function OrderCalendarPage() {
                         return (
                           <Link
                             key={evt.id}
-                            to={eventLink(role, evt)}
-                            onClick={() => onSelectDay(evt.dateKey)}
+                            to={eventLink(role, evt) || '/orders/calendar'}
+                            onClick={(e) => {
+                              onSelectDay(evt.dateKey)
+                              if (evt.kind === 'manual') e.preventDefault()
+                            }}
                             className={`flex w-[220px] shrink-0 flex-col rounded-2xl border p-3.5 transition hover:shadow-md sm:w-[240px] ${toneCardClass(tone, selected)}`}
                           >
                             <span
@@ -594,6 +706,14 @@ export default function OrderCalendarPage() {
                       className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-50"
                     >
                       今天
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openManualDialog()}
+                      className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-violet-700"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      添加行程
                     </button>
                   </div>
 
@@ -712,12 +832,21 @@ export default function OrderCalendarPage() {
                 ref={eventListRef}
                 className="xx-cal-desk__day"
               >
-                <h2 className="mb-1 text-sm font-semibold text-slate-900">当日事项</h2>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">当日事项</h2>
+                  <button
+                    type="button"
+                    onClick={() => openManualDialog()}
+                    className="text-xs font-medium text-violet-600 transition hover:text-violet-700"
+                  >
+                    添加行程
+                  </button>
+                </div>
                 <p className="xx-cal-desk__day-date">
                   {selectedDateKey ? `${selectedDateKey.replace(/-/g, '/')} 的商单` : '选择日期'}
                 </p>
                 {selectedEvents.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-slate-400">该日暂无商单安排</p>
+                  <p className="py-8 text-center text-sm text-slate-400">该日暂无安排，可添加自己的行程</p>
                 ) : (
                   <ul className="space-y-2.5">
                     {selectedEvents.map((evt) => {
@@ -729,7 +858,12 @@ export default function OrderCalendarPage() {
                         <li key={evt.id}>
                           <div className="flex items-stretch gap-2 rounded-xl border border-slate-100 transition hover:border-violet-200 hover:bg-violet-50/40">
                             <Link
-                              to={eventLink(role, evt)}
+                              to={eventLink(role, evt) || '/orders/calendar'}
+                              onClick={(e) => {
+                                if (evt.kind !== 'manual') return
+                                e.preventDefault()
+                                openManualDialog(evt)
+                              }}
                               className="block min-w-0 flex-1 px-3.5 py-3"
                             >
                               <div className="flex items-start justify-between gap-2">
@@ -769,11 +903,22 @@ export default function OrderCalendarPage() {
                               </div>
                               <div className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-slate-400">
                                 {evt.timeLabel ? <span>{evt.timeLabel}</span> : null}
+                                {evt.note ? <span>{evt.note}</span> : null}
                                 {evt.applicantName && isPr ? <span>达人：{evt.applicantName}</span> : null}
                                 {evt.platform ? <span>{evt.platform}</span> : null}
                               </div>
                             </Link>
                             <div className="m-2 flex shrink-0 flex-col gap-1.5">
+                              {evt.kind === 'manual' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteManualEvent(evt.id)}
+                                  className="flex flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50"
+                                >
+                                  删除
+                                </button>
+                              ) : null}
+                              {evt.kind !== 'manual' ? (
                               <button
                                 type="button"
                                 onClick={() => openLabelDialog(evt)}
@@ -798,6 +943,7 @@ export default function OrderCalendarPage() {
                                 <Bell className="h-3.5 w-3.5" />
                                 {remindSet ? '已设提醒' : '设提醒'}
                               </button>
+                              ) : null}
                             </div>
                           </div>
                         </li>
@@ -926,6 +1072,92 @@ export default function OrderCalendarPage() {
             <p className="mt-3 text-center text-[11px] text-slate-400">
               标签按当前身份保存，与小程序商单日历同步
             </p>
+          </div>
+        </div>
+      ) : null}
+
+      {manualOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="manual-event-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-violet-100 bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 id="manual-event-title" className="text-base font-semibold text-slate-900">
+                  {manualForm.id ? '编辑行程' : '添加行程'}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">只记在当前身份下，与小程序是同一份</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !manualBusy && setManualOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <label className="block text-xs text-slate-500">
+              标题
+              <input
+                type="text"
+                maxLength={40}
+                value={manualForm.title}
+                onChange={(e) => setManualForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="例如到店拍摄"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <label className="mt-3 block text-xs text-slate-500">
+              日期
+              <input
+                type="date"
+                value={manualForm.dateKey}
+                onChange={(e) => setManualForm((f) => ({ ...f, dateKey: e.target.value }))}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <label className="mt-3 block text-xs text-slate-500">
+              时间（可不填）
+              <input
+                type="time"
+                value={manualForm.timeLabel}
+                onChange={(e) => setManualForm((f) => ({ ...f, timeLabel: e.target.value }))}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <label className="mt-3 block text-xs text-slate-500">
+              备注
+              <input
+                type="text"
+                maxLength={200}
+                value={manualForm.note}
+                onChange={(e) => setManualForm((f) => ({ ...f, note: e.target.value }))}
+                placeholder="选填"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={manualBusy}
+              onClick={() => void onSaveManualEvent()}
+              className="mt-4 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
+            >
+              {manualBusy ? '保存中…' : '保存'}
+            </button>
+            {manualForm.id ? (
+              <button
+                type="button"
+                disabled={manualBusy}
+                onClick={() => void onDeleteManualEvent(manualForm.id)}
+                className="mt-2 w-full rounded-xl border border-slate-200 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                删除这条行程
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

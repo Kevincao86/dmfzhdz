@@ -1,6 +1,6 @@
 import { isIceMpOrder } from '../mpSync/iceOrderDetect'
 
-export type OrderCalendarEventKind = 'visit' | 'plan_slot' | 'deadline'
+export type OrderCalendarEventKind = 'visit' | 'plan_slot' | 'deadline' | 'manual'
 
 export type OrderCalendarEvent = {
   id: string
@@ -16,6 +16,7 @@ export type OrderCalendarEvent = {
   timeLabel?: string
   statusLabel: string
   visitStatus?: string
+  note?: string
 }
 
 export function parseVisitDayMs(timeStr: string): number {
@@ -272,6 +273,7 @@ export function groupEventsByDate(events: OrderCalendarEvent[]): Record<string, 
 export function kindLabel(kind: OrderCalendarEventKind): string {
   if (kind === 'visit') return '探店'
   if (kind === 'plan_slot') return '可探店'
+  if (kind === 'manual') return '行程'
   return '截止'
 }
 

@@ -193,6 +193,7 @@ import mpPublisherDisplayHandler from '../api/meoo-ops-mp-publisher-display.ts'
 import mpFormRelayGroupQrHandler from '../api/meoo-ops-mp-form-relay-group-qr.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 import mpCalendarReminderHandler from '../api/meoo-ops-mp-calendar-reminder.ts'
+import mpCalendarCustomEventHandler from '../api/meoo-ops-mp-calendar-custom-event.ts'
 import mpOrderCustomLabelHandler from '../api/meoo-ops-mp-order-custom-label.ts'
 import { processDueCalendarReminders } from '../src/lib/mpCalendarReminderCore.ts'
 import wechatPayNotifyHandler from '../api/meoo-wechat-pay-notify.ts'
@@ -290,6 +291,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-shop-analysis-ai': shopAnalysisAiHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-calendar-reminder': mpCalendarReminderHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-calendar-custom-event': mpCalendarCustomEventHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-order-custom-label': mpOrderCustomLabelHandler as VercelLikeHandler,
   '/api/meoo-wechat-pay-notify': wechatPayNotifyHandler as VercelLikeHandler,
   '/api/meoo-xpay-goods-notify': xpayGoodsNotifyHandler as VercelLikeHandler,
