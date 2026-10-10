@@ -7,6 +7,18 @@
   word-break: break-all;
 }
 
+/* 招募封面底图：体验版上传会丢掉仅 JS 字符串引用的图片，这里挂住依赖 */
+.recruit-share-bg-keep {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 2px;
+  height: 2px;
+  opacity: 0;
+  pointer-events: none;
+  background: url('/images/share/recruit-card-bg.jpg') no-repeat;
+}
+
 /* 详情页补充样式（表单基础见 app.wxss） */
 .detail-hero {
   margin-top: 16rpx;

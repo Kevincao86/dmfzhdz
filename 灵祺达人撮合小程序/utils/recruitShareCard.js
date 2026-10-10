@@ -125,21 +125,40 @@ function readCardFields(order) {
 }
 
 function cacheKey(order, view) {
-  return [String((order && order.id) || ''), view.platform, view.level, view.fans, view.price, view.city].join('|')
+  return ['local-bg', String((order && order.id) || ''), view.platform, view.level, view.fans, view.price, view.city].join('|')
 }
 
 function loadImage(canvas, src) {
   const url = String(src || '').trim()
   if (!url) return Promise.resolve(null)
+  const bind = (path) =>
+    new Promise((resolve) => {
+      try {
+        const img = canvas.createImage()
+        img.onload = () => resolve(img)
+        img.onerror = () => resolve(null)
+        img.src = path || url
+      } catch (_) {
+        resolve(null)
+      }
+    })
   return new Promise((resolve) => {
-    try {
-      const img = canvas.createImage()
-      img.onload = () => resolve(img)
-      img.onerror = () => resolve(null)
-      img.src = url
-    } catch (_) {
-      resolve(null)
+    if (typeof wx === 'undefined' || typeof wx.getImageInfo !== 'function') {
+      bind(url).then(resolve)
+      return
     }
+    wx.getImageInfo({
+      src: url,
+      success(info) {
+        bind((info && (info.path || info.tempFilePath)) || url).then((img) => {
+          if (img) resolve(img)
+          else bind(url).then(resolve)
+        })
+      },
+      fail() {
+        bind(url).then(resolve)
+      },
+    })
   })
 }
 
