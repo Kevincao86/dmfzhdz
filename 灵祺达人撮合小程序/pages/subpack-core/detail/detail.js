@@ -1269,6 +1269,13 @@ Page({
         wx.showToast({ title: '招募单无效', icon: 'none' })
         return
       }
+      if (userProfile.readIdentity() !== 'pr') {
+        try {
+          await ops.bumpMpRecruitmentEngagement(id, 'form_relay_click')
+        } catch (_) {
+          /* 跳转不阻断 */
+        }
+      }
       const title = encodeURIComponent(String(view.title || ''))
       wx.navigateTo({
         url: `/pages/subpack-pr/form-relay-group-qr/form-relay-group-qr?id=${encodeURIComponent(id)}&title=${title}`,

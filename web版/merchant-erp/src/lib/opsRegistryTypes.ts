@@ -670,8 +670,10 @@ export type RegistryMpRecruitmentOrder = {
   createdAt: string
   updatedAt: string
   applicants?: RegistryMpRecruitmentApplicant[]
-  /** 可选：部分接口写入的报名计数（有 applicants 时以 applicants 为准） */
+  /** 可选：部分接口写入的报名计数（有 applicants 时以 applicants 为准，并加上转单跳转次数） */
   applicantCount?: number
+  /** 转发工具：打开原表 / 群码跳转次数。与站内报名相加后展示 */
+  formRelayClickCount?: number
   /** 累计浏览次数（大厅热度） */
   viewCount?: number
   orderKind?: RecruitmentOrderKind

@@ -71,14 +71,20 @@ export function bumpMpRecruitmentEngagement(
   }
 
   const viewCount = Math.max(0, Number(order.viewCount ?? 0)) + 1
-  let applicantCount = resolveApplicantCountFromMp(order)
-  if (action === 'form_relay_click' && readExternalFormRelayLite(order as unknown as Record<string, unknown>)) {
-    applicantCount += 1
+  const apps = Array.isArray(order.applicants) ? order.applicants.length : 0
+  const beforeCount = resolveApplicantCountFromMp(order)
+  let formRelayClickCount = Math.max(0, Number(order.formRelayClickCount ?? 0))
+  if (!Number.isFinite(Number(order.formRelayClickCount)) && apps === 0) {
+    formRelayClickCount = Math.max(formRelayClickCount, beforeCount)
   }
+  const countJump = action === 'form_relay_click' && readExternalFormRelayLite(order as unknown as Record<string, unknown>)
+  if (countJump) formRelayClickCount += 1
+  const applicantCount = beforeCount + (countJump ? 1 : 0)
 
   return {
     ...order,
     viewCount,
+    formRelayClickCount,
     applicantCount,
     mpPublishMeta: metaRaw,
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),

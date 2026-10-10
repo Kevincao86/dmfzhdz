@@ -3,7 +3,7 @@ import { Star } from 'lucide-react'
 import { resolveHallAiTagStyle } from '@merchant/lib/hallAiTagStyle'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { SIGNUP_COUNTDOWN_TONE_CLASS, formatSignupDeadlineLine } from '../../lib/mpRecruitment/listFilters'
-import { platformIconClass } from '../../lib/mpRecruitment/hallFilters'
+import { platformIconUrl } from '../../lib/mpRecruitment/hallFilters'
 import { isOrderFavorited, toggleOrderFavorite } from '../../lib/mpSync/orderFavorites'
 import { formatHallBudgetAmount } from '../../lib/mpSync/recruitmentBudgetDisplay'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
@@ -59,6 +59,26 @@ function HallMetaPills({ row }: { row: RecruitmentOrderRow }) {
   )
 }
 
+const HALL_CHANNEL_PLATFORMS = ['抖音', '小红书', '大众点评', '快手', '微信视频号'] as const
+
+function isUnlimitedChannel(platform: string): boolean {
+  const raw = platform.trim()
+  return !raw || raw === '—' || raw === '不限' || raw === '不限制' || raw === '全部'
+}
+
+function HallChannelLogos({ platform }: { platform: string }) {
+  const unlimited = isUnlimitedChannel(platform)
+  const names = unlimited ? HALL_CHANNEL_PLATFORMS : [platform]
+  return (
+    <div className="hall-order-card__platform" aria-label={unlimited ? '报名渠道不限' : `报名渠道 ${platform}`}>
+      {names.map((name) => (
+        <img key={name} className="hall-platform-logo" src={platformIconUrl(name)} alt={name} title={name} />
+      ))}
+      {unlimited ? null : <span>{platform}</span>}
+    </div>
+  )
+}
+
 function HallOrderCard({
   row,
   onClick,
@@ -71,7 +91,6 @@ function HallOrderCard({
   const cover = coverUrl || (row as { coverImage?: string }).coverImage
   const [favorited, setFavorited] = useState(() => isOrderFavorited(row.id))
   const platform = String(row.platform || '抖音').trim()
-  const platformClass = platformIconClass(platform)
 
   function onFavorite(e: MouseEvent) {
     e.stopPropagation()
@@ -102,10 +121,7 @@ function HallOrderCard({
           {!row.hideBudget ? <span className="hall-order-card__budget-label">预算</span> : null}
           <HallHotPills row={row} />
         </div>
-        <div className="hall-order-card__platform">
-          <span className={`hall-platform-icon ${platformClass}`} aria-hidden />
-          <span>{platform}</span>
-        </div>
+        <HallChannelLogos platform={platform} />
         <p className="hall-order-card__deadline">{formatSignupDeadlineLine(row.deadlineMs)}</p>
         <p className="hall-order-card__signup">
           {row.signupCountText || `报名 ${row.applicantCount}/${row.recruitCount}`}

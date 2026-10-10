@@ -33,6 +33,7 @@ import SubAccountsPanel from './settings/SubAccountsPanel'
 import XhsMerchantSection from './settings/XhsMerchantSection'
 import WaimaiMerchantSection from './settings/WaimaiMerchantSection'
 import PlatformConnectionsPanel from './settings/PlatformConnectionsPanel'
+import BindContactHelp from './settings/BindContactHelp'
 import {
   MERCHANT_BACKEND_PLATFORMS,
   PlatformBrandLogo,
@@ -338,6 +339,7 @@ export default function SettingsPage() {
 
           {tab === 'commercial' && (
             <div className="space-y-6">
+              <BindContactHelp />
               <div>
                 <h3 className="text-lg font-medium text-gray-900">商业化后台</h3>
                 <p className="mt-1 text-sm text-gray-500">
@@ -506,6 +508,7 @@ export default function SettingsPage() {
               ) : null}
               {!partnerEdition || profile.isParent ? (
               <section className="space-y-4">
+                <BindContactHelp />
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">
                     {isPartnerEdition() ? '服务商平台身份' : '团购平台'}

@@ -26,12 +26,19 @@ function parseIceSlotTotalFromMp(mp) {
   return parseRecruitCountFromMp(mp)
 }
 
-/** 已报名人数：优先 applicants 数组，回退 applicantCount 字段（大厅轻量接口） */
+function readNonNegCount(value) {
+  const n = Number.parseInt(String(value ?? ''), 10)
+  return Number.isFinite(n) && n >= 0 ? n : 0
+}
+
+/** 站内报名 + 转发原表跳转。大厅若只回了本人报名行，用已经写好的 applicantCount。 */
 function resolveApplicantCountFromMp(mp) {
   if (!mp || typeof mp !== 'object') return 0
-  if (Array.isArray(mp.applicants) && mp.applicants.length > 0) return mp.applicants.length
-  const n = Number.parseInt(String(mp.applicantCount ?? ''), 10)
-  return Number.isFinite(n) && n >= 0 ? n : 0
+  const apps = Array.isArray(mp.applicants) ? mp.applicants.length : 0
+  const stored = readNonNegCount(mp.applicantCount)
+  const clicks = readNonNegCount(mp.formRelayClickCount)
+  if (apps > 0) return Math.max(apps + clicks, stored)
+  return Math.max(stored, clicks)
 }
 
 module.exports = {

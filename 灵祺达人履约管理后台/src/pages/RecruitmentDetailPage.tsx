@@ -323,6 +323,19 @@ export default function RecruitmentDetailPage() {
         window.alert('招募单无效')
         return
       }
+      if (role !== 'pr') {
+        try {
+          const res = await bumpMpRecruitmentEngagement(id, 'form_relay_click')
+          const nextCount = Number(res.applicantCount)
+          if (Number.isFinite(nextCount) && nextCount >= 0) {
+            setMpRaw((prev) => (prev ? { ...prev, applicantCount: nextCount } : prev))
+            setView((prev) => (prev ? { ...prev, applicantCount: nextCount } : prev))
+          }
+          clearMpRegistryCache()
+        } catch {
+          /* 跳转不阻断 */
+        }
+      }
       nav(`/recruitment/${encodeURIComponent(id)}/group-qr`)
       return
     }
