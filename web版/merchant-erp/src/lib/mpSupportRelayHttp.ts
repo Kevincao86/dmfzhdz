@@ -173,6 +173,37 @@ export async function fetchMpSupportMessages(sessionId: string): Promise<MpSuppo
   return mergeMpSupportMessages([], raw)
 }
 
+function asQueueGuestFingerprint(raw: string): string {
+  const s = String(raw || '').trim()
+  if (/^lq-mp:/i.test(s) && s.length >= 16) return s
+  const body = s.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40)
+  const fp = `lq-mp:${body}`
+  return fp.length >= 16 ? fp : `lq-mp:web_${Date.now()}`
+}
+
+export async function joinSupportQueue(
+  sessionId: string,
+  guestFingerprint: string,
+): Promise<{ ahead: number; waiting: number }> {
+  const data = await relayApi({
+    action: 'queue_join',
+    sessionId,
+    guestFingerprint: asQueueGuestFingerprint(guestFingerprint),
+  })
+  return {
+    ahead: Number(data.ahead) || 0,
+    waiting: Number(data.waiting) || 0,
+  }
+}
+
+export async function leaveSupportQueue(sessionId: string, guestFingerprint: string): Promise<void> {
+  await relayApi({
+    action: 'queue_leave',
+    sessionId,
+    guestFingerprint: asQueueGuestFingerprint(guestFingerprint),
+  })
+}
+
 export async function sendMpSupportLine(input: {
   sessionId: string
   fromRole: Exclude<MpSupportRelayRole, 'ops'>

@@ -25,6 +25,42 @@ export type SupportOpsSendResult =
       supabaseHost?: string
     }
 
+/** 运营已回复则把该会话划出排队。失败不影响回复本身。 */
+async function markSupportQueueDone(
+  supabaseUrl: string,
+  serviceRole: string,
+  sessionId: string,
+): Promise<void> {
+  if (!sessionId || sessionId === '__lq_support_queue__') return
+  const ts = Date.now()
+  const nonce = Math.random().toString(36).slice(2, 8)
+  try {
+    const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRole,
+        Authorization: `Bearer ${serviceRole}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        session_id: '__lq_support_queue__',
+        customer_id: null,
+        enterprise_name: null,
+        from_role: 'system',
+        text: `LQQUEUE DONE ${sessionId}`,
+        ts,
+        client_msg_id: `q-done-${sessionId}-${ts}-${nonce}`,
+        author_user_id: null,
+        guest_fingerprint: 'lq-mp:support-queue',
+      }),
+    })
+    if (!r.ok) await r.text()
+  } catch {
+    /* 排队划除失败不阻断客服回复 */
+  }
+}
+
 export async function insertSupportOpsReply(input: SupportOpsSendInput): Promise<SupportOpsSendResult> {
   const sessionId = input.sessionId.trim()
   const text = input.text.trim()
@@ -106,6 +142,7 @@ export async function insertSupportOpsReply(input: SupportOpsSendInput): Promise
       const t = await r.text()
       // 幂等：同 session + client_msg_id 已存在视为成功
       if (/duplicate|unique|23505/i.test(t)) {
+        await markSupportQueueDone(supabaseUrl, serviceRole, sessionId)
         return { ok: true, supabaseHost, verified: true }
       }
       return {
@@ -137,6 +174,7 @@ export async function insertSupportOpsReply(input: SupportOpsSendInput): Promise
       verified = Array.isArray(rows) && rows.length > 0
     }
 
+    await markSupportQueueDone(supabaseUrl, serviceRole, sessionId)
     return { ok: true, supabaseHost, verified }
   } catch (e) {
     return {

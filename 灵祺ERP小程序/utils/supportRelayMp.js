@@ -151,6 +151,23 @@ async function sendChatLine(from, text, id, sessionId) {
   return { ok: true }
 }
 
+async function joinHumanQueue(sessionId) {
+  const data = await relayApi({
+    action: 'queue_join',
+    sessionId,
+    guestFingerprint: getOrCreateGuestFingerprint(),
+  })
+  return { ahead: Number(data.ahead) || 0, waiting: Number(data.waiting) || 0 }
+}
+
+async function leaveHumanQueue(sessionId) {
+  await relayApi({
+    action: 'queue_leave',
+    sessionId,
+    guestFingerprint: getOrCreateGuestFingerprint(),
+  })
+}
+
 function newMsgId() {
   return `m_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
@@ -164,6 +181,8 @@ module.exports = {
   mergeMessages,
   fetchSessionMessages,
   sendChatLine,
+  joinHumanQueue,
+  leaveHumanQueue,
   newMsgId,
   relayFromToRole,
 }

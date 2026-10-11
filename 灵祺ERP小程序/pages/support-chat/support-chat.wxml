@@ -18,7 +18,10 @@
     </view>
     <site-icp-footer />
   </scroll-view>
-  <view wx:if="{{!humanMode}}" class="support-human">
+  <view wx:if="{{humanMode}}" class="support-human">
+    <view class="support-human-end" bindtap="onEndHuman">{{connecting ? '正在结束…' : '结束服务'}}</view>
+  </view>
+  <view wx:elif="{{!humanMode}}" class="support-human">
     <view wx:if="{{humanOpen}}" class="support-human-btn" bindtap="onRequestHuman">{{connecting ? '排队接入中…' : '进入人工客服'}}</view>
     <text wx:else class="support-human-off">人工客服服务时间为 9:00–22:00</text>
     <text wx:if="{{queueHint}}" class="support-human-off">{{queueHint}}</text>

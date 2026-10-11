@@ -278,6 +278,25 @@ Page({
       })
   },
 
+  onEndHuman() {
+    if (!this.data.humanMode || this.data.connecting) return
+    this.setData({ connecting: true })
+    supportAi
+      .leave(this._sessionId)
+      .then(() => {
+        const sysText = '已结束人工服务，连接已断开。下次进入人工客服需要重新排队。'
+        const bid = this.pushLocal('system', sysText)
+        return relay.sendChatLine('system', sysText, bid, this._sessionId).catch(() => {})
+      })
+      .then(() => {
+        this.setData({ humanMode: false, connecting: false, queueHint: '', showHumanBtn: false })
+      })
+      .catch((e) => {
+        this.setData({ connecting: false })
+        this.pushLocal('system', (e && e.message) || '结束服务失败，请稍后重试')
+      })
+  },
+
   onSend() {
     const t = (this.data.input || '').trim()
     if (!t || !this.data.ready) return

@@ -20,6 +20,8 @@ import {
 import {
   fetchMpSupportMessages,
   getOrCreateMpSupportSessionId,
+  joinSupportQueue,
+  leaveSupportQueue,
   mergeMpSupportMessages,
   sendMpSupportLine,
 } from '../lib/mpSupportRelayHttp'
@@ -38,7 +40,6 @@ function nowTime(): string {
 }
 
 const SUPPORT_CFG_SESSION = '__lq_support_ai_cfg__'
-const SUPPORT_QUEUE_SESSION = '__lq_support_queue__'
 const SUPPORT_CFG_PREFIX = 'LQCFG:'
 
 type SupportAiCfg = {
@@ -651,49 +652,60 @@ export default function FloatingOnlineSupport({
     return mid
   }, [])
 
+  const queueFingerprint = () =>
+    isMpChannel ? getOrCreateMpSupportGuestFingerprint() : getOrCreateSupportRelayGuestFingerprint()
+
   const requestHuman = () => {
     if (humanMode || connecting) return
     if (!supportHumanOpen(supportCfgRef.current)) return
     setConnecting(true)
     void (async () => {
+      const sid = sessionIdRef.current
+      const fp = queueFingerprint()
       let ahead = 0
-      if (supabaseConfigured && supabase) {
-        const sid = sessionIdRef.current
-        const { data: auth } = await supabase.auth.getUser()
-        const uid = auth.user?.id ?? null
-        await supabase.from('support_relay_messages').insert({
-          session_id: SUPPORT_QUEUE_SESSION,
-          from_role: 'system',
-          text: `LQQUEUE OPEN ${sid}`,
-          ts: Date.now(),
-          client_msg_id: `q-open-${sid}`,
-          ...(uid ? { author_user_id: uid } : {}),
-        } as never)
-        const { data } = await supabase
-          .from('support_relay_messages')
-          .select('text,ts')
-          .eq('session_id', SUPPORT_QUEUE_SESSION)
-        const done = new Set<string>()
-        const opens: { sid: string; ts: number }[] = []
-        for (const row of data || []) {
-          const text = String((row as { text?: string }).text || '')
-          const ts = Number((row as { ts?: number }).ts) || 0
-          if (text.startsWith('LQQUEUE DONE ')) done.add(text.slice('LQQUEUE DONE '.length).trim())
-          if (text.startsWith('LQQUEUE OPEN ')) {
-            opens.push({ sid: text.slice('LQQUEUE OPEN '.length).trim(), ts })
-          }
-        }
-        const waiting = opens.filter((o) => o.sid && !done.has(o.sid)).sort((a, b) => a.ts - b.ts)
-        const idx = waiting.findIndex((o) => o.sid === sid)
-        ahead = idx <= 0 ? 0 : idx
+      try {
+        const queued = await joinSupportQueue(sid, fp)
+        ahead = queued.ahead
+      } catch (e) {
+        setConnecting(false)
+        const detail = e instanceof Error ? e.message : String(e)
+        pushMessage('system', `未能进入人工排队。${detail}`.trim())
+        return
       }
       const aheadText = ahead > 0 ? `当前前方 ${ahead} 人，` : ''
       const sysText = `已进入人工客服排队。${aheadText}客服将按顺序在本会话回复。`
       const bid = pushMessage('system', sysText)
       const r = await emitRelayLine('system', sysText, bid)
       setConnecting(false)
-      if (r.ok || (!getSupportRelayWsUrl() && !(supabaseConfigured && supabase))) setHumanMode(true)
-      else if (!r.ok) pushMessage('system', `未能进入人工排队。${r.detail ?? ''}`.trim())
+      const entered = r.ok || (!isMpChannel && !getSupportRelayWsUrl() && !(supabaseConfigured && supabase))
+      if (entered) {
+        setHumanMode(true)
+        return
+      }
+      await leaveSupportQueue(sid, fp).catch(() => {})
+      pushMessage('system', `未能进入人工排队。${r.detail ?? ''}`.trim())
+    })()
+  }
+
+  const endHuman = () => {
+    if (!humanMode || connecting) return
+    setConnecting(true)
+    void (async () => {
+      const sid = sessionIdRef.current
+      const fp = queueFingerprint()
+      try {
+        await leaveSupportQueue(sid, fp)
+      } catch (e) {
+        setConnecting(false)
+        const detail = e instanceof Error ? e.message : String(e)
+        pushMessage('system', `结束服务失败。${detail}`.trim())
+        return
+      }
+      const sysText = '已结束人工服务，连接已断开。下次进入人工客服需要重新排队。'
+      const bid = pushMessage('system', sysText)
+      void emitRelayLine('system', sysText, bid)
+      setConnecting(false)
+      setHumanMode(false)
     })()
   }
 
@@ -918,6 +930,18 @@ export default function FloatingOnlineSupport({
               ))}
             </div>
 
+            {humanMode ? (
+              <div className="border-t border-gray-100 bg-white px-3 py-2">
+                <button
+                  type="button"
+                  onClick={endHuman}
+                  disabled={connecting || relayBlocked}
+                  className="w-full rounded-lg border border-rose-200 bg-rose-50 py-2 text-xs font-medium text-rose-900 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {connecting ? '正在结束…' : '结束服务'}
+                </button>
+              </div>
+            ) : null}
             {!humanMode && !connecting && humanOpen ? (
               <div className="border-t border-gray-100 bg-white px-3 py-2">
                 <button

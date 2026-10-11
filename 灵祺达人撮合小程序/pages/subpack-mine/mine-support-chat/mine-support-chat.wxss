@@ -123,6 +123,12 @@ page {
   border-radius: 16rpx;
 }
 
+.human-end {
+  color: #9f1239;
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
 .human-off {
   display: block;
   margin-bottom: 12rpx;

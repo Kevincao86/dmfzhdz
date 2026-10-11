@@ -6,7 +6,6 @@ const relay = require('./supportRelayMp.js')
 const addon = require('./mpAddonMerchantApi.js')
 
 const CFG_SESSION = '__lq_support_ai_cfg__'
-const QUEUE_SESSION = '__lq_support_queue__'
 const CFG_PREFIX = 'LQCFG:'
 
 const PROJECT_BRIEF = `你是灵祺星选在线客服。灵祺星选是达人、拍摄、剪辑和 PR 使用的招募小程序，主要能力包括：推荐大厅、报名与履约、PR 发招募、转发工具、钱包与收款账户、培训课程、消息和在线客服。
@@ -90,29 +89,11 @@ async function askAi(userText, history, cfg) {
 }
 
 async function enqueue(userSessionId) {
-  const sid = String(userSessionId || '').trim()
-  const openId = `q-open-${sid}`
-  try {
-    await relay.sendChatLine('system', `LQQUEUE OPEN ${sid}`, openId, QUEUE_SESSION)
-  } catch (e) {
-    const msg = String((e && e.message) || '')
-    if (!/duplicate|23505|已存在|unique/i.test(msg)) throw e
-  }
-  const rows = await relay.fetchSessionMessages(QUEUE_SESSION)
-  const done = new Set()
-  const opens = []
-  for (const row of rows) {
-    const text = String(row.text || '')
-    if (text.startsWith('LQQUEUE DONE ')) done.add(text.slice('LQQUEUE DONE '.length).trim())
-    if (text.startsWith('LQQUEUE OPEN ')) {
-      opens.push({ sid: text.slice('LQQUEUE OPEN '.length).trim(), ts: Number(row.ts) || 0 })
-    }
-  }
-  const waiting = opens.filter((o) => o.sid && !done.has(o.sid))
-  waiting.sort((a, b) => a.ts - b.ts)
-  const idx = waiting.findIndex((o) => o.sid === sid)
-  const ahead = idx <= 0 ? 0 : idx
-  return { ahead, waiting: waiting.length }
+  return relay.joinHumanQueue(String(userSessionId || '').trim())
+}
+
+async function leave(userSessionId) {
+  await relay.leaveHumanQueue(String(userSessionId || '').trim())
 }
 
 module.exports = {
@@ -121,4 +102,5 @@ module.exports = {
   loadConfig,
   askAi,
   enqueue,
+  leave,
 }

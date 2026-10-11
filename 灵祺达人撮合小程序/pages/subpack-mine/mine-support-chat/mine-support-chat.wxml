@@ -27,7 +27,16 @@
 
   <view class="composer {{keyboardHeight ? 'composer--kb' : ''}}">
     <button
-      wx:if="{{humanOpen && !humanMode}}"
+      wx:if="{{humanMode}}"
+      class="human-btn human-end"
+      bindtap="onEndHuman"
+      loading="{{connecting}}"
+      disabled="{{connecting}}"
+    >
+      {{connecting ? '正在结束…' : '结束服务'}}
+    </button>
+    <button
+      wx:elif="{{humanOpen && !humanMode}}"
       class="human-btn"
       bindtap="onRequestHuman"
       loading="{{connecting}}"
