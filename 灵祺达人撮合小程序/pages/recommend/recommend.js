@@ -6,6 +6,7 @@ const hallLoad = require('../../utils/hallLoad.js')
 const userProfile = require('../../utils/userProfile.js')
 const memberStore = require('../../utils/talentMember.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
+const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const orderCard = require('../../utils/recruitmentOrderCard.js')
 const recruitmentAi = require('../../utils/recruitmentAiTags.js')
@@ -118,6 +119,9 @@ function formatCardBudgetLine(row) {
   if (bd && bd.kind === 'tiers') {
     return truncateCardText(bd.summary || bd.mode || '阶梯预算', 22)
   }
+  const raw = (bd && bd.line) || (row && row.budgetText) || ''
+  const levelBudget = budgetDisplayUtil.formatLevelTierBudget(raw)
+  if (levelBudget) return levelBudget
   if (bd && bd.line) return truncateCardText(bd.line, 22)
   return truncateCardText(row && row.budgetText, 22)
 }

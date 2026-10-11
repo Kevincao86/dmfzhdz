@@ -5,6 +5,7 @@ import { fallbackOrderAdvantageForRow } from '../../lib/mpRecruitment/recruitmen
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { platformIconClass } from '../../lib/mpRecruitment/hallFilters'
 import { isOrderFavorited, toggleOrderFavorite } from '../../lib/mpSync/orderFavorites'
+import { formatLevelTierBudget } from '../../lib/mpSync/recruitmentBudgetDisplay'
 
 type Props = {
   row: RecruitmentOrderRow
@@ -42,6 +43,8 @@ function publishLabel(ms: number): string {
 function budgetRange(row: RecruitmentOrderRow): string {
   if (row.hideBudget) return '面议'
   const text = row.budgetDisplay.kind === 'text' ? row.budgetDisplay.line || row.budgetText : row.budgetText
+  const levelBudget = formatLevelTierBudget(text || row.budgetText || '')
+  if (levelBudget) return levelBudget
   if (text && /[-–—]/.test(text)) return text
   const amt = row.priceAmount
   if (amt > 0) {

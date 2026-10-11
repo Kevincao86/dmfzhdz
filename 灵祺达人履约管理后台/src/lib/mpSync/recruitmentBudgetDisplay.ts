@@ -203,6 +203,28 @@ function formatMoney(n: number) {
   return n.toLocaleString('zh-CN')
 }
 
+/** 转发工具预算常写成「4级80 5级120」。级前面是等级，级后面才是金额。 */
+export function levelTierYuanAmounts(text: string): number[] {
+  const out: number[] = []
+  const re = /(\d+)\s*级\s*(\d+(?:\.\d+)?)/g
+  const s = String(text || '')
+  let m: RegExpExecArray | null
+  while ((m = re.exec(s))) {
+    const yuan = Number(m[2])
+    if (Number.isFinite(yuan) && yuan > 0) out.push(yuan)
+  }
+  return out
+}
+
+export function formatLevelTierBudget(text: string): string {
+  const amounts = levelTierYuanAmounts(text)
+  if (!amounts.length) return ''
+  const min = Math.min(...amounts)
+  const max = Math.max(...amounts)
+  if (min === max) return `¥ ${formatMoney(min)}`
+  return `¥ ${formatMoney(min)} - ${formatMoney(max)}`
+}
+
 /** 招募大厅卡片右侧预算：区间价显示区间，一口价显示金额 */
 export function formatHallBudgetAmount(row: {
   hideBudget?: boolean
@@ -232,6 +254,8 @@ export function formatHallBudgetAmount(row: {
   if (tierRange) {
     return `¥ ${formatMoney(Number(tierRange[1].replace(/,/g, '')))} - ${formatMoney(Number(tierRange[2].replace(/,/g, '')))}`
   }
+  const levelBudget = formatLevelTierBudget(line)
+  if (levelBudget) return levelBudget
   if ((row.priceAmount || 0) > 0 && !/自报价|阶梯|面议|置换/.test(line)) {
     return `¥ ${formatMoney(row.priceAmount || 0)}`
   }

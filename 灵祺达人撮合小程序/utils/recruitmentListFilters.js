@@ -6,6 +6,7 @@ const { parseRecruitCountFromMp, resolveApplicantCountFromMp } = require('./mpRe
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { resolveCreatedMsFromMpId } = require('./mpRecruitmentOrderId.js')
 const mpTargetedRecruit = require('./mpTargetedRecruit.js')
+const { levelTierYuanAmounts } = require('./recruitmentBudgetDisplay.js')
 
 const SORT_OPTIONS = ['当日热度', '发布时间', '截止时间', '价格从高到低']
 
@@ -83,6 +84,8 @@ function resolvePriceAmount(mp, view) {
     return Number(mp.serviceAmount)
   }
   const raw = String((view && view.budgetText) || (mp && mp.budgetText) || '')
+  const levelYuans = levelTierYuanAmounts(raw)
+  if (levelYuans.length) return Math.min.apply(null, levelYuans)
   const nums = raw.replace(/,/g, '').match(/\d+(\.\d+)?/g)
   if (nums && nums.length) return Number(nums[0]) || 0
   return 0

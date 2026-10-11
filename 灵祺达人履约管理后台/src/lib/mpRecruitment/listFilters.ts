@@ -12,6 +12,7 @@ import {
 } from '../mpSync/mpOrderIceStatus'
 import { buildSignupProgressLabel } from './iceOrderStats'
 import { resolveCreatedMsFromMpId } from '../mpSync/mpRecruitmentOrderId'
+import { levelTierYuanAmounts } from '../mpSync/recruitmentBudgetDisplay'
 
 export { HALL_STATUS_FILTERS, MP_STATUS_LABEL, isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel }
 
@@ -64,6 +65,8 @@ export function parseCreatedDayKeyFromText(text: unknown): string {
 
 export function resolvePriceAmount(mp: Record<string, unknown>, budgetText: string): number {
   if (mp.serviceAmount != null && Number(mp.serviceAmount) > 0) return Number(mp.serviceAmount)
+  const levelYuans = levelTierYuanAmounts(budgetText)
+  if (levelYuans.length) return Math.min(...levelYuans)
   const nums = String(budgetText || '').replace(/,/g, '').match(/\d+(\.\d+)?/g)
   if (nums?.length) return Number(nums[0]) || 0
   return 0

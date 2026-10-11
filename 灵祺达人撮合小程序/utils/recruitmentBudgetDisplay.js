@@ -215,6 +215,29 @@ function buildCompactBudgetText(f, feeTypeLabelFn) {
   return prefix + (typeof feeTypeLabelFn === 'function' ? feeTypeLabelFn(f.feeTypeId) : '') || '面议'
 }
 
+/** 转发工具预算常写成「4级80 5级120」。级前面是等级，级后面才是金额。 */
+function levelTierYuanAmounts(text) {
+  const out = []
+  const re = /(\d+)\s*级\s*(\d+(?:\.\d+)?)/g
+  const s = String(text || '')
+  let m
+  while ((m = re.exec(s))) {
+    const yuan = Number(m[2])
+    if (Number.isFinite(yuan) && yuan > 0) out.push(yuan)
+  }
+  return out
+}
+
+function formatLevelTierBudget(text) {
+  const amounts = levelTierYuanAmounts(text)
+  if (!amounts.length) return ''
+  const min = Math.min.apply(null, amounts)
+  const max = Math.max.apply(null, amounts)
+  const fmt = (n) => n.toLocaleString('zh-CN')
+  if (min === max) return `¥${fmt(min)}`
+  return `¥${fmt(min)} - ${fmt(max)}`
+}
+
 /** 招募卡片主价格行：区间价优先展示区间 */
 function formatCardPriceLine(row) {
   if (!row || row.hideBudget) return ''
@@ -238,6 +261,8 @@ function formatCardPriceLine(row) {
   if (fixed) return `¥${fixed[1].replace(/,/g, '')}`
   const tierRange = String(line).match(/¥([\d,]+)~¥([\d,]+)/)
   if (tierRange) return `¥${tierRange[1].replace(/,/g, '')} - ${tierRange[2].replace(/,/g, '')}`
+  const levelBudget = formatLevelTierBudget(line)
+  if (levelBudget) return levelBudget
   return line
 }
 
@@ -245,4 +270,6 @@ module.exports = {
   buildBudgetDisplay,
   buildCompactBudgetText,
   formatCardPriceLine,
+  levelTierYuanAmounts,
+  formatLevelTierBudget,
 }
