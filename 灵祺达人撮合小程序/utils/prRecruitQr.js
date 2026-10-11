@@ -22,7 +22,51 @@ function buildPrProfileSnapshot(pr) {
     province: String(p.province || '').trim(),
     city: String(p.city || '').trim(),
     intro: String(p.intro || '').trim().slice(0, 120),
+    companyLogoUrl: httpsImageUrl(p.companyLogoUrl),
   }
+}
+
+function httpsImageUrl(raw) {
+  const s = String(raw || '').trim()
+  return /^https:\/\//i.test(s) ? s : ''
+}
+
+/** 分享海报 / 招募封面：PR 公司 Logo（https） */
+function resolveSharePrLogoUrl(mp, reg) {
+  const order = mp && typeof mp === 'object' ? mp : null
+  const meta = order && order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
+  const snap =
+    meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object' ? meta.prProfileSnapshot : {}
+  let logo = httpsImageUrl(snap.companyLogoUrl || meta.companyLogoUrl)
+  const attached = order && order.publisherDisplay
+  if (!logo && attached && attached.prUser) logo = httpsImageUrl(attached.prUser.companyLogoUrl)
+  if (!logo && order && reg) {
+    const user = findRegistryPrUserForOrder(order, reg)
+    if (user) logo = httpsImageUrl(user.companyLogoUrl)
+  }
+  if (!logo && order) {
+    const live = resolveLivePrProfileForOrderShare(order)
+    if (live) logo = httpsImageUrl(live.companyLogoUrl)
+  }
+  if (!logo && !order) {
+    const local = userProfile.readPrProfile()
+    if (local) logo = httpsImageUrl(local.companyLogoUrl)
+  }
+  return logo
+}
+
+function resolveSharePrBrand(mp, reg) {
+  const logoUrl = resolveSharePrLogoUrl(mp, reg)
+  let name = resolvePosterInviterName(mp)
+  if (!name && mp && reg) {
+    const user = findRegistryPrUserForOrder(mp, reg)
+    if (user) name = publisherDisplayNameFromRegistryUser(user, mp)
+  }
+  if (!name && mp) {
+    const live = resolveLivePrProfileForOrderShare(mp)
+    if (live) name = userProfile.prDisplayName(live)
+  }
+  return { name: String(name || '').trim(), logoUrl: String(logoUrl || '').trim() }
 }
 
 function registryUserToProfile(user) {
@@ -37,6 +81,7 @@ function registryUserToProfile(user) {
     province: String(user.province || '').trim(),
     city: String(user.city || '').trim(),
     intro: String(user.intro || '').trim(),
+    companyLogoUrl: httpsImageUrl(user.companyLogoUrl),
     lingqiPrId: String(user.lingqiPrId || '').trim(),
     id: String(user.id || '').trim(),
   }
@@ -603,6 +648,8 @@ function renderPrQrImage(page, payload, canvasSelector) {
 
 module.exports = {
   buildPrProfileSnapshot,
+  resolveSharePrLogoUrl,
+  resolveSharePrBrand,
   resolvePrInfoDisplayName,
   buildPrInfoLines,
   buildPrInfoText,

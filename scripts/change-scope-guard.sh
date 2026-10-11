@@ -128,6 +128,7 @@ list_scopes() {
   erp_ops_finance       运营台客户与财务：商家 ERP 开通与充值统计
   merchant_mp_review    商家小程序审核：先浏览再登录；分析提升先付费再提醒绑定门店
   meituan_groupbuy     美团团购数据互通；大众点评商家版绑定仅提示连锁可用
+  pr_logo_share_chat   推荐商单平台logo；PR公司logo与分享海报/招募封面；聊天页去掉备案号
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -1880,6 +1881,32 @@ src/lib/tenantLocalState.ts
 灵祺ERP小程序/utils/platformBindingsMp.js
 web版/merchant-erp/.env.example
 tenant_bindings_meituan
+change-scope-guard
+PAT
+      ;;
+    pr_logo_share_chat)
+      cat <<'PAT'
+RecommendOrderCard.tsx
+pages/subpack-pr/chat/chat.wxml
+order-group-chat.wxml
+mine-support-chat.wxml
+pages/support-chat/support-chat.wxml
+pages/ai-agent/ai-agent.wxml
+mpSync/userProfile.ts
+灵祺达人撮合小程序/utils/userProfile.js
+opsRegistryTypes.ts
+registryMemberClientMap.ts
+mpPrUserUpsert.ts
+PrProfilePage.tsx
+mine-pr-profile
+prRecruitQr.ts
+prRecruitQr.js
+recruitmentSharePosterCore.ts
+recruitmentSharePosterCore.js
+recruitmentSharePosterRender.ts
+recruitmentSharePoster.js
+recruitShareCard.js
+pages/subpack-core/detail/detail.js
 change-scope-guard
 PAT
       ;;

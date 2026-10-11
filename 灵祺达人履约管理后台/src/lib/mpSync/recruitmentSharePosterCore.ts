@@ -1,7 +1,7 @@
 /**
  * 招募单分享海报：字段抽取 + 固定模版
  */
-import { resolveOrderPublisherDisplayName } from './prRecruitQr'
+import { resolveOrderPublisherDisplayName, resolveSharePrLogoUrl } from './prRecruitQr'
 import { readPrProfile } from './userProfile'
 import {
   getPosterTemplateByIndex,
@@ -322,7 +322,7 @@ export function platformAccent(platform: string): string {
   return PLATFORM_ACCENTS[platform] || '#E63946'
 }
 
-export function extractPosterFieldsFromOrder(order: Record<string, unknown>): Omit<PosterInput, 'qrUrl' | 'inviterAvatarUrl'> {
+export function extractPosterFieldsFromOrder(order: Record<string, unknown>): Omit<PosterInput, 'qrUrl'> {
   const info = String(order.recruitmentInfo || order.taskDetail || order.merchantRequirements || '')
   const platform = normalizePlatform(
     String(order.platform || '') || pickLineValue(info, '招募平台') || pickLineValue(info, '直播平台'),
@@ -353,6 +353,7 @@ export function extractPosterFieldsFromOrder(order: Record<string, unknown>): Om
     cityText,
     detailText,
     rows,
+    inviterAvatarUrl: resolveSharePrLogoUrl(order),
   }
 }
 

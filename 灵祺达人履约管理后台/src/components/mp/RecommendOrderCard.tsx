@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Star, Zap } from 'lucide-react'
 import { fallbackOrderAdvantageForRow } from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
-import { platformIconClass } from '../../lib/mpRecruitment/hallFilters'
+import { platformIconUrl } from '../../lib/mpRecruitment/hallFilters'
 import { isOrderFavorited, toggleOrderFavorite } from '../../lib/mpSync/orderFavorites'
 import { formatLevelTierBudget } from '../../lib/mpSync/recruitmentBudgetDisplay'
 
@@ -65,6 +65,13 @@ function summaryLine(row: RecruitmentOrderRow): string {
   return line.length > 72 ? `${line.slice(0, 70)}…` : line
 }
 
+const HALL_CHANNEL_PLATFORMS = ['抖音', '小红书', '大众点评', '快手', '微信视频号'] as const
+
+function isUnlimitedChannel(platform: string): boolean {
+  const raw = platform.trim()
+  return !raw || raw === '—' || raw === '不限' || raw === '不限制' || raw === '全部'
+}
+
 function cardAdvantage(row: RecruitmentOrderRow): string {
   if (row.aiAdvantage) return row.aiAdvantage
   const fb = fallbackOrderAdvantageForRow(row)
@@ -79,6 +86,8 @@ export default function RecommendOrderCard({ row, coverUrl, onDetail }: Props) {
   const [favorited, setFavorited] = useState(() => isOrderFavorited(row.id))
   const score = Math.min(100, Math.max(0, Math.round(row.matchScore || 0)))
   const platform = String(row.platform || '抖音').trim()
+  const unlimitedChannel = isUnlimitedChannel(platform)
+  const platformNames = unlimitedChannel ? [...HALL_CHANNEL_PLATFORMS] : [platform]
   const cover = coverUrl || (row as { coverImage?: string }).coverImage
 
   function onFavorite(e: MouseEvent) {
@@ -105,9 +114,14 @@ export default function RecommendOrderCard({ row, coverUrl, onDetail }: Props) {
           </p>
         </div>
         <div className="recommend-order-card__meta">
-          <span className="recommend-order-card__meta-item">
-            <span className={`hall-platform-icon ${platformIconClass(platform)}`} aria-hidden />
-            {platform}
+          <span
+            className="recommend-order-card__meta-item"
+            aria-label={unlimitedChannel ? '报名渠道不限' : `报名渠道 ${platform}`}
+          >
+            {platformNames.map((name) => (
+              <img key={name} className="hall-platform-logo" src={platformIconUrl(name)} alt={name} title={name} />
+            ))}
+            {unlimitedChannel ? null : platform}
           </span>
           <span className="recommend-order-card__meta-item">粉丝要求 {row.fansRequirement || '不限'}</span>
           <span className="recommend-order-card__meta-item">预计发布 {publishLabel(row.publishedAtMs)}</span>

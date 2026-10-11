@@ -12,6 +12,7 @@ export type PrProfileSnapshot = {
   province?: string
   city?: string
   intro?: string
+  companyLogoUrl?: string
 }
 
 export type PublisherDisplayHit = {
@@ -120,7 +121,42 @@ export function buildPrProfileSnapshot(pr: PrProfile | null | undefined): PrProf
     province: String(p.province || '').trim(),
     city: String(p.city || '').trim(),
     intro: String(p.intro || '').trim().slice(0, 120),
+    companyLogoUrl: httpsImageUrl(p.companyLogoUrl),
   }
+}
+
+function httpsImageUrl(raw: unknown): string {
+  const s = String(raw || '').trim()
+  return /^https:\/\//i.test(s) ? s : ''
+}
+
+/** 分享海报 / 招募封面：PR 公司 Logo（https） */
+export function resolveSharePrLogoUrl(
+  mp: Record<string, unknown> | null | undefined,
+  reg?: { mpPrUsers?: Record<string, unknown>[] } | null,
+): string {
+  const order = mp && typeof mp === 'object' ? mp : null
+  const meta =
+    order?.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+      ? (order.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const snap =
+    meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
+      ? (meta.prProfileSnapshot as Record<string, unknown>)
+      : {}
+  let logo = httpsImageUrl(snap.companyLogoUrl || meta.companyLogoUrl)
+  const attached = order && (order as { publisherDisplay?: PublisherDisplayHit }).publisherDisplay
+  if (!logo && attached?.prUser) logo = httpsImageUrl(attached.prUser.companyLogoUrl)
+  if (!logo && order && reg?.mpPrUsers?.length) {
+    const user = findRegistryPrUserForOrder(order, reg.mpPrUsers)
+    if (user) logo = httpsImageUrl(user.companyLogoUrl)
+  }
+  if (!logo && order) {
+    const live = resolveLivePrProfileForOrderShare(order)
+    if (live) logo = httpsImageUrl(live.companyLogoUrl)
+  }
+  if (!logo && !order) logo = httpsImageUrl(readPrProfile()?.companyLogoUrl)
+  return logo
 }
 
 function isSameAsOrderTitle(name: string, mp: Record<string, unknown>): boolean {

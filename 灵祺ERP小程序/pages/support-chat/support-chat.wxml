@@ -16,7 +16,6 @@
       </view>
       <text wx:if="{{item.role === 'user'}}" class="ava ava-me">我</text>
     </view>
-    <site-icp-footer />
   </scroll-view>
   <view wx:if="{{humanMode}}" class="support-human">
     <view class="support-human-end" bindtap="onEndHuman">{{connecting ? '正在结束…' : '结束服务'}}</view>

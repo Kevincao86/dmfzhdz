@@ -71,6 +71,50 @@
   color: #166534;
 }
 
+.pr-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-top: 12rpx;
+}
+
+.pr-logo-preview {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  border: 2rpx solid var(--lq-border, #e8e4f8);
+  flex-shrink: 0;
+}
+
+.pr-logo-preview--ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border-style: dashed;
+}
+
+.pr-logo-ph {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.pr-logo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.pr-logo-btn {
+  margin: 0;
+}
+
+.pr-logo-btn--ghost {
+  background: #fff;
+  color: #64748b;
+}
+
 .type-switch {
   display: flex;
   flex-direction: row;

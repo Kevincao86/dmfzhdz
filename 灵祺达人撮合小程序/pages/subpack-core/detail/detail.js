@@ -596,7 +596,7 @@ Page({
       return {
         title: share.title,
         path: share.path,
-        promise: recruitShareCard.buildShareCardPath(mp).then((imageUrl) => {
+        promise: recruitShareCard.buildShareCardPath(mp, this._orderReg).then((imageUrl) => {
           if (imageUrl) return Object.assign({}, share, { imageUrl })
           const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
           const wrapped = recruitShareCover.attachShareCoverPromise(share, coverUrl)

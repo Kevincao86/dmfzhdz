@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
 import { useProtectedForm } from '../hooks/useProtectedForm'
@@ -9,6 +9,39 @@ import { emptyPrProfile, readPrProfile, writePrProfile, type PrProfile } from '.
 import { readWxAccount } from '../lib/mpSync/wxAccount'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
 import { setupRegionState, validateRegion } from '../lib/mpSync/regionPicker'
+import { apiUrl } from '../lib/mpApiBase'
+
+async function uploadCompanyLogo(file: File): Promise<string> {
+  if (!/^image\/(png|jpeg|webp)$/i.test(file.type) && !/\.(png|jpe?g|webp)$/i.test(file.name)) {
+    throw new Error('请上传 PNG、JPG 或 WebP 图片')
+  }
+  if (file.size > 2 * 1024 * 1024) throw new Error('Logo 请小于 2MB，建议 PNG')
+  const contentBase64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const raw = String(reader.result || '')
+      const comma = raw.indexOf(',')
+      resolve(comma >= 0 ? raw.slice(comma + 1) : raw)
+    }
+    reader.onerror = () => reject(new Error('读取图片失败'))
+    reader.readAsDataURL(file)
+  })
+  const res = await fetch(apiUrl('/api/meoo-ops-content-image-upload'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fileName: file.name || `pr-logo-${Date.now()}.png`,
+      contentType: file.type || 'image/png',
+      contentBase64,
+    }),
+  })
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; imageUrl?: string; error?: string; detail?: string }
+  const imageUrl = String(data.imageUrl || '').trim()
+  if (!res.ok || data.ok === false || !/^https:\/\//i.test(imageUrl)) {
+    throw new Error(String(data.detail || data.error || 'Logo 上传失败'))
+  }
+  return imageUrl
+}
 
 const ACCOUNT_TYPES = [
   { id: 'company' as const, label: '公司（机构）' },
@@ -34,6 +67,7 @@ function PrProfileForm() {
   const [password, setPassword] = useState('')
   const [hasPassword, setHasPassword] = useState(!!acc?.hasPassword)
   const [saving, setSaving] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
   const [msg, setMsg] = useState('')
   const { lockForm, unlockForm, fieldFocusProps, lockedRef: formLockedRef } = useProtectedForm()
   const remoteHydratedRef = useRef(false)
@@ -119,6 +153,7 @@ function PrProfileForm() {
       lingqiPrId: accNow?.lingqiPrId || form.lingqiPrId,
       companyName: form.accountType === 'company' ? org : '',
       personalName: form.accountType === 'personal' ? org : '',
+      companyLogoUrl: /^https:\/\//i.test(String(form.companyLogoUrl || '')) ? form.companyLogoUrl : '',
       contactName: form.contactName || (form.accountType === 'personal' ? org : form.contactName),
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       registeredAt: form.registeredAt || prev?.registeredAt || new Date().toLocaleString('zh-CN', { hour12: false }),
@@ -149,6 +184,7 @@ function PrProfileForm() {
         province: saved.province,
         city: saved.city,
         intro: saved.intro,
+        companyLogoUrl: saved.companyLogoUrl,
         wxNickName: saved.wxNickName,
         wxAvatarUrl: saved.wxAvatarUrl,
         registeredAt: saved.registeredAt,
@@ -179,6 +215,22 @@ function PrProfileForm() {
   }
 
   const orgLabel = form.accountType === 'personal' ? '个人名称' : '公司/机构名称'
+
+  async function onPickLogo(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setLogoUploading(true)
+    setMsg('')
+    try {
+      const url = await uploadCompanyLogo(file)
+      setField('companyLogoUrl', url)
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Logo 上传失败')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
 
   return (
     <div className="page-content-shell page-content-shell--narrow space-y-4">
@@ -245,6 +297,34 @@ function PrProfileForm() {
             }
           />
         </label>
+        <div className="block">
+          <span className="text-slate-400">{form.accountType === 'personal' ? 'Logo' : '公司 Logo'}</span>
+          <p className="mt-0.5 text-xs text-slate-500">建议上传 PNG 图片，将显示在分享海报和招募封面左上角</p>
+          <div className="mt-2 flex items-center gap-3">
+            {form.companyLogoUrl ? (
+              <img src={form.companyLogoUrl} alt="" className="h-14 w-14 rounded-xl border border-white/10 object-contain bg-white" />
+            ) : (
+              <span className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-white/20 text-xs text-slate-500">
+                Logo
+              </span>
+            )}
+            <label className="cursor-pointer rounded-lg bg-white/10 px-3 py-1.5 text-sm">
+              {logoUploading ? '上传中…' : '上传图片'}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                disabled={logoUploading}
+                onChange={(e) => void onPickLogo(e)}
+              />
+            </label>
+            {form.companyLogoUrl ? (
+              <button type="button" className="text-sm text-slate-400" onClick={() => setField('companyLogoUrl', '')}>
+                移除
+              </button>
+            ) : null}
+          </div>
+        </div>
         <label className="block">
           <span className="text-slate-400">联系人</span>
           <input

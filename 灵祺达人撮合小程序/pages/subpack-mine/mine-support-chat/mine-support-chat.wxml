@@ -22,7 +22,6 @@
       </view>
     </view>
     <view class="scroll-pad"></view>
-    <site-icp-footer />
   </scroll-view>
 
   <view class="composer {{keyboardHeight ? 'composer--kb' : ''}}">

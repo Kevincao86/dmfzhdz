@@ -3,6 +3,7 @@
  * 平台 logo、等级、粉丝、价格、城市按招募单填入；中间不放装饰图标。
  */
 const posterCore = require('./recruitmentSharePosterCore.js')
+const prRecruitQr = require('./prRecruitQr.js')
 const hallFilters = require('./recruitmentHallFilters.js')
 const ossBase = require('./recruitCoverOssBase.js')
 
@@ -126,8 +127,18 @@ function readCardFields(order) {
   }
 }
 
-function cacheKey(order, view) {
-  return ['oss-bg-20261010c', String((order && order.id) || ''), view.platform, view.level, view.fans, view.price, view.city].join('|')
+function cacheKey(order, view, brand) {
+  return [
+    'oss-bg-20261010d',
+    String((order && order.id) || ''),
+    view.platform,
+    view.level,
+    view.fans,
+    view.price,
+    view.city,
+    brand && brand.name,
+    brand && brand.logoUrl,
+  ].join('|')
 }
 
 function downloadFile(url) {
@@ -197,7 +208,15 @@ function drawCover(ctx, img, w, h) {
   ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh)
 }
 
-function drawCard(ctx, view, bg, logo) {
+function drawRoundedImage(ctx, img, x, y, size, radius) {
+  ctx.save()
+  roundRect(ctx, x, y, size, size, radius)
+  ctx.clip()
+  ctx.drawImage(img, x, y, size, size)
+  ctx.restore()
+}
+
+function drawCard(ctx, view, bg, logo, brand) {
   if (bg) drawCover(ctx, bg, CARD_W, CARD_H)
   else {
     ctx.fillStyle = '#F3E6D4'
@@ -230,14 +249,54 @@ function drawCard(ctx, view, bg, logo) {
   const logoSize = 48
   const logoX = card[0] + 36
   const logoY = card[1] + 22
-  if (logo) ctx.drawImage(logo, logoX, logoY, logoSize, logoSize)
-
+  const brandName = brand && brand.name ? String(brand.name).trim() : ''
+  const brandLogo = brand && brand.logo
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = '#7A482A'
   ctx.font = 'bold 17px sans-serif'
-  const sloganMax = card[2] - 28 - (logoX + logoSize + 16)
-  ctx.fillText(fitText(ctx, view.slogan, sloganMax), card[2] - 28, logoY + logoSize / 2)
+  if (brandName || brandLogo) {
+    const size = 44
+    if (brandLogo) drawRoundedImage(ctx, brandLogo, logoX, logoY, size, 10)
+    else {
+      ctx.fillStyle = '#F3E8FF'
+      roundRect(ctx, logoX, logoY, size, size, 10)
+      ctx.fill()
+      ctx.fillStyle = '#6D28D9'
+      ctx.font = 'bold 20px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(brandName.slice(0, 1) || 'P', logoX + size / 2, logoY + size / 2)
+    }
+    ctx.font = 'bold 17px sans-serif'
+    ctx.textAlign = 'right'
+    ctx.fillStyle = '#7A482A'
+    const sloganText = fitText(ctx, view.slogan, 150)
+    const sloganW = ctx.measureText(sloganText).width
+    const sloganRight = card[2] - 28
+    ctx.fillText(sloganText, sloganRight, logoY + size / 2)
+    let nameRight = sloganRight - sloganW - 16
+    if (logo) {
+      const pSize = 28
+      const pX = nameRight - pSize
+      ctx.drawImage(logo, pX, logoY + (size - pSize) / 2, pSize, pSize)
+      nameRight = pX - 12
+    }
+    const nameX = logoX + size + 12
+    ctx.textAlign = 'left'
+    ctx.fillStyle = '#221C18'
+    ctx.font = 'bold 22px sans-serif'
+    if (brandName && nameRight > nameX + 24) {
+      ctx.fillText(fitText(ctx, brandName, nameRight - nameX), nameX, logoY + size / 2)
+    }
+  } else {
+    if (logo) ctx.drawImage(logo, logoX, logoY, logoSize, logoSize)
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = '#7A482A'
+    ctx.font = 'bold 17px sans-serif'
+    const sloganMax = card[2] - 28 - (logoX + logoSize + 16)
+    ctx.fillText(fitText(ctx, view.slogan, sloganMax), card[2] - 28, logoY + logoSize / 2)
+  }
 
   const panel = [card[0] + 20, card[1] + 96, card[2] - 20, card[1] + 250]
   ctx.fillStyle = '#F8F3EC'
@@ -344,9 +403,10 @@ function exportCanvas(canvas) {
   })
 }
 
-function buildShareCardPath(order) {
+function buildShareCardPath(order, reg) {
   const view = readCardFields(order)
-  const key = cacheKey(order, view)
+  const brand = prRecruitQr.resolveSharePrBrand(order, reg)
+  const key = cacheKey(order, view, brand)
   if (cache[key]) return Promise.resolve(cache[key])
   if (inflight[key]) return inflight[key]
   let canvas
@@ -356,9 +416,9 @@ function buildShareCardPath(order) {
     return Promise.reject(err)
   }
   const ctx = canvas.getContext('2d')
-  const job = Promise.all([loadBackground(canvas), loadImage(canvas, view.logo)])
-    .then(([bg, logo]) => {
-      drawCard(ctx, view, bg, logo)
+  const job = Promise.all([loadBackground(canvas), loadImage(canvas, view.logo), loadImage(canvas, brand.logoUrl)])
+    .then(([bg, logo, brandLogo]) => {
+      drawCard(ctx, view, bg, logo, { name: brand.name, logo: brandLogo })
       return exportCanvas(canvas)
     })
     .then((path) => {

@@ -38,6 +38,7 @@ Page({
   behaviors: [require('../../../behaviors/identityTheme')],
   data: {
     form: userProfile.emptyPrProfile(),
+    logoUploading: false,
     closeSheet: false,
     closeCode: '',
     closeSending: false,
@@ -112,6 +113,38 @@ Page({
   onField(e) {
     const k = e.currentTarget.dataset.k
     if (k) this.setData({ [`form.${k}`]: e.detail.value })
+  },
+  onChooseCompanyLogo() {
+    if (this.data.logoUploading) return
+    const oss = require('../../../utils/mpImageOssUpload.js')
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const file = res.tempFiles && res.tempFiles[0]
+        const path = file && (file.tempFilePath || file.path)
+        if (!path) return
+        this.setData({ logoUploading: true })
+        wx.showLoading({ title: '上传中', mask: true })
+        oss
+          .uploadImageFileToOss(path, { purpose: 'avatar', fileName: `pr-logo-${Date.now()}.png` })
+          .then((url) => {
+            this.setData({ 'form.companyLogoUrl': url })
+          })
+          .catch((err) => {
+            wx.showToast({ title: String((err && err.message) || '上传失败').slice(0, 20), icon: 'none' })
+          })
+          .then(() => {
+            this.setData({ logoUploading: false })
+            wx.hideLoading()
+          })
+      },
+    })
+  },
+  onClearCompanyLogo() {
+    this.setData({ 'form.companyLogoUrl': '' })
   },
   onChooseAvatar(e) {
     const url = e.detail?.avatarUrl
@@ -195,6 +228,7 @@ Page({
       registeredAt: (prev && prev.registeredAt) || f.registeredAt || new Date().toLocaleString('zh-CN', { hour12: false }),
       companyName: f.accountType === 'company' ? org : '',
       personalName: f.accountType === 'personal' ? org : '',
+      companyLogoUrl: /^https:\/\//i.test(String(f.companyLogoUrl || '')) ? f.companyLogoUrl : '',
       province: this.data.province,
       city: this.data.city,
       wxNickName: (wx && wx.wxNickName) || f.wxNickName || '',
@@ -239,6 +273,7 @@ Page({
             province: saved.province || '',
             city: saved.city || '',
             intro: saved.intro || '',
+            companyLogoUrl: /^https:\/\//i.test(String(saved.companyLogoUrl || '')) ? saved.companyLogoUrl : '',
             wxNickName: saved.wxNickName || '',
             wxAvatarUrl: saved.wxAvatarUrl || '',
             registeredAt: saved.registeredAt || saved.updatedAt,

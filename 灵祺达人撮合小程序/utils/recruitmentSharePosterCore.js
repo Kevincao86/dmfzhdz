@@ -157,6 +157,7 @@ function extractPosterFieldsFromOrder(order) {
     levelText,
     fansText,
     cityText,
+    inviterAvatarUrl: prRecruitQr.resolveSharePrLogoUrl(order),
     detailText,
     rows: [
       { label: '招募平台', value: platform },

@@ -386,6 +386,7 @@ export async function renderRecruitmentPosterCanvas(
   const cardH = POSTER_H - pad * 2
   const bgImg = await loadPosterBackground(tmpl)
   const qrFrameImg = await loadPosterQrFrame(tmpl)
+  const brandImg = await loadImage(String(input.inviterAvatarUrl || ''))
 
   ctx.fillStyle = tmpl.outerBg
   ctx.fillRect(0, 0, POSTER_W, POSTER_H)
@@ -401,11 +402,20 @@ export async function renderRecruitmentPosterCanvas(
   ctx.beginPath()
   ctx.arc(avatarX, y, avatarR, 0, Math.PI * 2)
   ctx.fill()
-  ctx.fillStyle = design.accentColor
-  ctx.font = 'bold 28px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(String(input.inviterName || '招').slice(0, 1), avatarX, y)
+  if (brandImg) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(avatarX, y, avatarR - 2, 0, Math.PI * 2)
+    ctx.clip()
+    ctx.drawImage(brandImg, avatarX - (avatarR - 2), y - (avatarR - 2), (avatarR - 2) * 2, (avatarR - 2) * 2)
+    ctx.restore()
+  } else {
+    ctx.fillStyle = design.accentColor
+    ctx.font = 'bold 28px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(input.inviterName || '招').slice(0, 1), avatarX, y)
+  }
 
   ctx.textAlign = 'left'
   ctx.fillStyle = '#334155'

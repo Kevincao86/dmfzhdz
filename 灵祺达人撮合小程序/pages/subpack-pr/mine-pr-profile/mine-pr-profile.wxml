@@ -62,6 +62,18 @@
         bindinput="onField"
       />
     </view>
+    <view class="form-row">
+      <text class="form-label">{{form.accountType === 'personal' ? 'Logo' : '公司 Logo'}}</text>
+      <text class="hint">建议上传 PNG 图片，将显示在分享海报和招募封面左上角</text>
+      <view class="pr-logo-row">
+        <image wx:if="{{form.companyLogoUrl}}" class="pr-logo-preview" src="{{form.companyLogoUrl}}" mode="aspectFit" />
+        <view wx:else class="pr-logo-preview pr-logo-preview--ph"><text class="pr-logo-ph">Logo</text></view>
+        <view class="pr-logo-actions">
+          <button class="pr-logo-btn" size="mini" loading="{{logoUploading}}" disabled="{{logoUploading}}" bindtap="onChooseCompanyLogo">上传图片</button>
+          <button wx:if="{{form.companyLogoUrl}}" class="pr-logo-btn pr-logo-btn--ghost" size="mini" bindtap="onClearCompanyLogo">移除</button>
+        </view>
+      </view>
+    </view>
     <view class="form-row" wx:if="{{form.accountType === 'company'}}">
       <text class="form-label">联系人</text>
       <input class="input" data-k="contactName" value="{{form.contactName}}" bindinput="onField" />

@@ -82,6 +82,7 @@ export function registryPrToClientDraft(pr: RegistryMpPrUser): Record<string, un
     province: pr.province || '',
     city: pr.city || '',
     intro: pr.intro || '',
+    companyLogoUrl: /^https:\/\//i.test(String(pr.companyLogoUrl || '')) ? String(pr.companyLogoUrl) : '',
     wxNickName: pr.wxNickName || '',
     wxAvatarUrl: pr.wxAvatarUrl || '',
     wxOpenId: pr.wxOpenId || '',

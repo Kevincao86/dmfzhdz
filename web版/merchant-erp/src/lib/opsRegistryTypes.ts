@@ -618,6 +618,8 @@ export type RegistryMpPrUser = {
   province?: string
   city?: string
   intro?: string
+  /** 公司 Logo（https，建议 PNG） */
+  companyLogoUrl?: string
   wxNickName?: string
   wxAvatarUrl?: string
   wxOpenId?: string

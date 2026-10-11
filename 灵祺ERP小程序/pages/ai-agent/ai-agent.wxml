@@ -38,7 +38,6 @@
         <text class="shortcut-t">{{item.label}}</text>
       </view>
     </view>
-    <site-icp-footer />
   </scroll-view>
 
   <scroll-view
@@ -216,7 +215,6 @@
         <text class="bubble-text muted">{{thinkingText}}</text>
       </view>
     </view>
-    <site-icp-footer />
   </scroll-view>
   <view class="wx-composer">
     <scroll-view wx:if="{{attachments.length}}" class="attach-row" scroll-x enhanced show-scrollbar="{{false}}">

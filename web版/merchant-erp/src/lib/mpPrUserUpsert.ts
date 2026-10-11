@@ -113,6 +113,7 @@ export function dedupeMpPrUsersByOpenId(
     if (!keep.intro && u.intro) keep.intro = u.intro
     if (!keep.wxNickName && u.wxNickName) keep.wxNickName = u.wxNickName
     if (!keep.wxAvatarUrl && u.wxAvatarUrl) keep.wxAvatarUrl = u.wxAvatarUrl
+    if (!keep.companyLogoUrl && u.companyLogoUrl) keep.companyLogoUrl = u.companyLogoUrl
   }
   data.mpPrUsers = list
     .filter((u) => {

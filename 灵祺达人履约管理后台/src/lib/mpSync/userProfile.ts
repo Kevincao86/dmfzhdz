@@ -16,6 +16,8 @@ export type PrProfile = {
   province: string
   city: string
   intro: string
+  /** 公司 Logo，https 图片地址，建议 PNG */
+  companyLogoUrl: string
   wxNickName: string
   wxAvatarUrl: string
   lingqiPrId: string
@@ -35,6 +37,7 @@ export function emptyPrProfile(): PrProfile {
     province: '',
     city: '',
     intro: '',
+    companyLogoUrl: '',
     wxNickName: '',
     wxAvatarUrl: '',
     lingqiPrId: '',

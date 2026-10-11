@@ -79,6 +79,7 @@ function emptyPrProfile() {
     province: '',
     city: '',
     intro: '',
+    companyLogoUrl: '',
     wxNickName: '',
     wxAvatarUrl: '',
     lingqiPrId: '',

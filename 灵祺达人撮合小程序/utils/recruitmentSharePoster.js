@@ -2,6 +2,7 @@
  * 招募单分享海报：固定模版 Canvas 绘制（小程序 offscreen canvas）
  */
 const posterCore = require('./recruitmentSharePosterCore.js')
+const prRecruitQr = require('./prRecruitQr.js')
 const posterTemplates = require('./recruitmentSharePosterTemplates.js')
 const posterAssets = require('./recruitPosterAssets.js')
 const shareCopy = require('./recruitmentShareCopy.js')
@@ -429,7 +430,39 @@ function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w
   drawTagChips(ctx, tags, x + 24, y + h - 36, w - 48)
 }
 
-function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFrameImg, qrFallbackContent) {
+function drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y) {
+  const avatarR = 28
+  const avatarX = pad + 36
+  const name = String(input.inviterName || '').trim()
+  ctx.fillStyle = (design && design.accentLight) || '#EEF2FF'
+  ctx.beginPath()
+  ctx.arc(avatarX, y, avatarR, 0, Math.PI * 2)
+  ctx.fill()
+  if (brandImg) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(avatarX, y, avatarR - 2, 0, Math.PI * 2)
+    ctx.clip()
+    ctx.drawImage(brandImg, avatarX - (avatarR - 2), y - (avatarR - 2), (avatarR - 2) * 2, (avatarR - 2) * 2)
+    ctx.restore()
+  } else {
+    ctx.fillStyle = (design && design.accentColor) || '#7C3AED'
+    ctx.font = 'bold 28px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(name || '招').slice(0, 1), avatarX, y)
+  }
+  if (name) {
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = '#334155'
+    ctx.font = '26px sans-serif'
+    const suffix = (design && design.inviterSuffix) || ''
+    ctx.fillText(truncateText(ctx, `${name}${suffix}`, cardW - 120), pad + 84, y)
+  }
+}
+
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFrameImg, qrFallbackContent, brandImg) {
   const tmpl = design.template || {}
   const pad = 40
   const cardW = POSTER_W - pad * 2
@@ -442,7 +475,16 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   ctx.fillStyle = '#FFFFFF'
   ctx.fill()
 
-  let y = pad + 24
+  let y = pad + 36
+  const brandName = String(input.inviterName || '').trim()
+  if (brandName || brandImg) {
+    drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y)
+    y += 56
+  } else {
+    y = pad + 24
+  }
+  ctx.textBaseline = 'alphabetic'
+  ctx.textAlign = 'left'
 
   const heroH = 280
   const heroX = pad + 24
@@ -576,12 +618,14 @@ function resolvePosterThemeColor(design) {
 }
 
 function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
-  void opts
   const shareOrder = order && typeof order === 'object' ? order : {}
   const orderId = String(shareOrder.id || '').trim()
   const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
   const qrFallback = shareCopy.buildRecruitmentApplyLink(orderId) || qrUrl
   const input = posterCore.buildPosterInput(shareOrder, qrUrl)
+  const brand = prRecruitQr.resolveSharePrBrand(shareOrder, opts && opts.reg)
+  if (brand.name) input.inviterName = brand.name
+  if (brand.logoUrl) input.inviterAvatarUrl = brand.logoUrl
   const design = resolvePosterDesign(shareOrder, styleIndex)
   let canvas
   try {
@@ -602,7 +646,8 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
       loadCanvasImageCandidates(canvas, posterAssets.posterQrFrameCandidates(tmpl)),
       loadCanvasImage(canvas, tags.platformIcon),
       wxLoad,
-    ]).then(([bgImg, qrFrameImg, platformImg, wxacodeImg]) => {
+      loadCanvasImage(canvas, input.inviterAvatarUrl),
+    ]).then(([bgImg, qrFrameImg, platformImg, wxacodeImg, brandImg]) => {
       const useWx = !!(wxDataUrl && wxacodeImg)
       if (!useWx && wxDataUrl) {
         console.warn('[poster] wxacode image load failed, fallback local qr')
@@ -619,6 +664,7 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
         useWx ? wxacodeImg : null,
         qrFrameImg,
         useWx ? '' : qrFallback,
+        brandImg,
       ).then(() => exportCanvasToFile(canvas))
     })
   })
