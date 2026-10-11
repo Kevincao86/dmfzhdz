@@ -265,18 +265,24 @@ async function sessionAnsweredSince(
   return Array.isArray(rows) && rows.length > 0
 }
 
-/** 客服已经回复过、但队列里还挂着 OPEN 的人，补一条 DONE，避免继续占「前方 N 人」。 */
+/** 超过一个人工班次仍挂在队列里的旧会话，不再继续占「前方 N 人」。 */
+const STALE_QUEUE_MS = 18 * 60 * 60 * 1000
+
+/** 客服已经回复，或排队已过期的人，补一条 DONE。 */
 async function reconcileAnsweredQueue(
   supabaseUrl: string,
   serviceRole: string,
 ): Promise<void> {
+  const now = Date.now()
   const waiting = waitingQueue(latestQueueMarks(await fetchQueueRows(supabaseUrl, serviceRole))).slice(0, 40)
   for (let i = 0; i < waiting.length; i += 8) {
     const part = waiting.slice(i, i + 8)
     const hits = await Promise.all(
       part.map(async (item) => ({
         sid: item.sid,
-        answered: await sessionAnsweredSince(supabaseUrl, serviceRole, item.sid, item.ts),
+        answered:
+          now - item.ts >= STALE_QUEUE_MS ||
+          (await sessionAnsweredSince(supabaseUrl, serviceRole, item.sid, item.ts)),
       })),
     )
     for (const hit of hits) {
