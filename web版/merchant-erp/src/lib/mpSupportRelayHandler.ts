@@ -7,6 +7,8 @@ import {
 
 const MP_SESSION_RE = /^(lq-mp|lq-erp)[-:]/i
 const MP_GUEST_FP_RE = /^lq-mp:/i
+/** 人工排队共用会话。网页客服直写此 id；小程序走本接口，不能按普通会话号拒绝。 */
+const MP_QUEUE_SESSION = '__lq_support_queue__'
 const ALLOWED_FROM = new Set(['user', 'bot', 'agent', 'system'])
 
 export type MpSupportRelayBody = {
@@ -41,6 +43,7 @@ function relayErrorResponse(e: unknown): { status: number; data: Record<string, 
 
 function validMpSessionId(sessionId: string): boolean {
   const s = String(sessionId || '').trim()
+  if (s === MP_QUEUE_SESSION) return true
   return MP_SESSION_RE.test(s) && s.length >= 12
 }
 
