@@ -5,7 +5,13 @@
   right: 0;
   bottom: 0;
   z-index: 10000;
-  background: #0f172a;
+  background: #f6f3ff;
+}
+
+.launch-splash__stage {
+  position: absolute;
+  left: 36rpx;
+  right: 36rpx;
 }
 
 .launch-splash__media {

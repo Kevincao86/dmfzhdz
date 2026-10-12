@@ -1316,6 +1316,7 @@ PAT
 灵祺达人撮合小程序/images/share/recruit-card-bg.jpg
 灵祺达人撮合小程序/images/share/talent-lift-poster.jpg
 灵祺达人撮合小程序/pages/subpack-core/detail/detail
+灵祺达人撮合小程序/components/launch-splash/
 change-scope-guard
 PAT
       ;;

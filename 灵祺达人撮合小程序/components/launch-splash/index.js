@@ -10,6 +10,7 @@ Component({
     isVideo: false,
     remain: 3,
     skipStyle: '',
+    stageStyle: '',
   },
 
   lifetimes: {
@@ -39,9 +40,21 @@ Component({
         const menu = wx.getMenuButtonBoundingClientRect()
         const top = Math.max(8, Number(menu.top) || 24)
         const right = Math.max(12, win.windowWidth - Number(menu.left) + 8)
-        this.setData({ skipStyle: `top:${top}px;right:${right}px;` })
+        const stageTop = Math.max(top + 40, Number(menu.bottom) || 0) + 12
+        const insetBottom = Number(win.safeAreaInsets && win.safeAreaInsets.bottom) || 0
+        const safeBottom =
+          insetBottom ||
+          (win.safeArea && win.screenHeight ? Math.max(0, win.screenHeight - win.safeArea.bottom) : 0)
+        const stageBottom = Math.max(20, safeBottom + 16)
+        this.setData({
+          skipStyle: `top:${top}px;right:${right}px;`,
+          stageStyle: `top:${stageTop}px;bottom:${stageBottom}px;`,
+        })
       } catch (_) {
-        this.setData({ skipStyle: 'top:48px;right:24px;' })
+        this.setData({
+          skipStyle: 'top:48px;right:24px;',
+          stageStyle: 'top:108px;bottom:28px;',
+        })
       }
     },
 
