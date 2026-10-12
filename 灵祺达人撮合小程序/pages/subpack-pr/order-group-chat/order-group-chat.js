@@ -3,6 +3,7 @@ const groupReadState = require('../../../utils/mpOrderGroupChatReadState.js')
 const chatBadgeWatcher = require('../../../utils/chatBadgeWatcher.js')
 const composer = require('../../../utils/mpChatComposer.js')
 const { applyCapsulePadding } = require('../../../utils/navLayout.js')
+const threadCache = require('../../../utils/mpThreadCache.js')
 
 Page({
   data: {
@@ -32,6 +33,24 @@ Page({
     this._pollTimer = null
     this._recorder = composer.createRecorderManager(this)
     this.setData({ mpOrderId })
+    const cached = threadCache.readGroupThread(mpOrderId)
+    if (cached && cached.messages && cached.messages.length) {
+      const last = cached.messages[cached.messages.length - 1]
+      this._sinceTs = cached.messages.reduce((max, m) => Math.max(max, Number(m && m.ts) || 0), 0)
+      this.data.ready = true
+      this.data.messages = cached.messages
+      this.setData({
+        groupTitle: cached.groupTitle || '商单群',
+        memberCount: cached.memberCount || 0,
+        messages: cached.messages,
+        scrollTo: last && last.id ? `msg-${last.id}` : '',
+        canSend: cached.canSend !== false,
+        groupClosed: !!cached.groupClosed,
+        mentionMembers: cached.mentionMembers || [],
+        ready: true,
+        statusSub: cached.groupClosed ? '已关闭' : '历史消息',
+      })
+    }
     void this.bootstrap()
   },
   onShow() {
@@ -77,19 +96,25 @@ Page({
       await this.syncGroup(true)
       this.setData({ ready: true })
     } catch (e) {
+      if ((this.data.messages || []).length) return
       this.setData({ ready: false, statusSub: String(e.message || '加载失败').slice(0, 40) })
     }
   },
   applyGroupPayload(body) {
     const group = body && body.group
     if (!group) return
+    const orderId = String((group && group.mpOrderId) || this._mpOrderId || '').trim()
     const myKey = groupChat.myParticipantKey()
-    const ui = groupChat.mapMessages(group, myKey)
+    const cached = threadCache.readGroupThread(orderId || this._mpOrderId)
+    const base =
+      this.data.messages && this.data.messages.length
+        ? this.data.messages
+        : (cached && cached.messages) || []
+    const ui = threadCache.mergeById(base, groupChat.mapMessages(group, myKey))
     const last = ui[ui.length - 1]
     if (ui.length) {
       this._sinceTs = Math.max(this._sinceTs, ...ui.map((m) => m.ts || 0))
     }
-    const orderId = String((group && group.mpOrderId) || this._mpOrderId || '').trim()
     if (orderId) this._mpOrderId = orderId
     if (orderId && ui.length) {
       const maxTs = Math.max(...ui.map((m) => Number(m.ts) || 0))
@@ -106,6 +131,14 @@ Page({
       groupClosed: closed,
       statusSub: closed ? '已关闭' : `${(group.memberParticipantKeys || []).length} 人`,
       mentionMembers: groupChat.mapMentionMembers(group, myKey),
+    })
+    threadCache.writeGroupThread(orderId || this._mpOrderId, {
+      groupTitle: group.title || '商单群',
+      memberCount: (group.memberParticipantKeys || []).length,
+      groupClosed: closed,
+      canSend: !closed,
+      mentionMembers: groupChat.mapMentionMembers(group, myKey),
+      messages: ui,
     })
     if (this.data.showMentionPanel) {
       composer.syncFilteredMentionMembers(this)

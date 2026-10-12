@@ -38,7 +38,7 @@
       refresher-triggered="{{refreshing}}"
       bindrefresherrefresh="onPullRefresh"
      enable-flex>
-      <view wx:if="{{ntfLoading}}" class="msg-fixed-tip card state-loading">
+      <view wx:if="{{ntfLoading && !ntfTotalCount}}" class="msg-fixed-tip card state-loading">
         <view class="loading-dot-wrap">
           <view class="loading-dot" />
           <view class="loading-dot" />
@@ -137,7 +137,7 @@
   </block>
 
   <block wx:elif="{{msgTab === 'group'}}">
-    <view wx:if="{{groupLoading}}" class="msg-fixed-tip card state-loading">
+    <view wx:if="{{groupLoading && !groupSessions.length}}" class="msg-fixed-tip card state-loading">
       <view class="loading-dot-wrap">
         <view class="loading-dot" />
         <view class="loading-dot" />
@@ -189,7 +189,7 @@
   </block>
 
   <block wx:elif="{{msgTab === 'chat'}}">
-    <view wx:if="{{chatLoading}}" class="msg-fixed-tip card state-loading">
+    <view wx:if="{{chatLoading && !sessions.length}}" class="msg-fixed-tip card state-loading">
       <view class="loading-dot-wrap">
         <view class="loading-dot" />
         <view class="loading-dot" />

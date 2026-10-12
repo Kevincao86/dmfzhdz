@@ -20,6 +20,7 @@ import { getCurrentParticipant } from '../../lib/mpSync/participant'
 import { buildChatImageMessage, CHAT_EMOJIS } from '../../lib/mpSync/chatMessageMedia'
 import ChatMessageBody from './ChatMessageBody'
 import ChatMsgAvatar from './ChatMsgAvatar'
+import { readPrivateThread, writePrivateThread } from '../../lib/mpSync/threadViewCache'
 
 type Props = {
   sessionId: string
@@ -82,15 +83,17 @@ export default function ChatPanel({
     if (list.length) {
       sinceTsRef.current = Math.max(sinceTsRef.current, ...list.map((m) => m.ts || 0))
     }
+    writePrivateThread(sessionId, list)
     setMessages(list)
-  }, [])
+  }, [sessionId])
 
   useEffect(() => {
     stickToBottomRef.current = true
-    sinceTsRef.current = 0
-    setMessages([])
-    setReady(false)
-    setStatusSub('连接中…')
+    const cached = readPrivateThread<UiChatMessage>(sessionId)
+    sinceTsRef.current = cached.reduce((max, m) => Math.max(max, Number(m.ts) || 0), 0)
+    setMessages(cached)
+    setReady(cached.length > 0)
+    setStatusSub(cached.length ? '历史消息' : '连接中…')
   }, [sessionId])
 
   useEffect(() => {
@@ -111,8 +114,9 @@ export default function ChatPanel({
     }
     try {
       await syncProfile(me)
+      const cached = readPrivateThread<UiChatMessage>(sessionId)
       const rows = await fetchMessages(sessionId, 0, me)
-      const merged = mergeMessages([], rows, me.role)
+      const merged = mergeMessages(cached, rows, me.role)
       applyMessages(merged)
       await markRead(sessionId, me)
       setReady(true)
@@ -120,8 +124,10 @@ export default function ChatPanel({
       stickToBottomRef.current = true
       requestAnimationFrame(() => scrollToBottom('auto'))
     } catch (e) {
-      setReady(false)
-      setStatusSub(formatChatError(e).slice(0, 48))
+      if (!readPrivateThread<UiChatMessage>(sessionId).length) {
+        setReady(false)
+        setStatusSub(formatChatError(e).slice(0, 48))
+      }
     }
   }, [sessionId, me, applyMessages, scrollToBottom])
 
@@ -136,6 +142,7 @@ export default function ChatPanel({
         const merged = mergeMessages(prev, rows, me.role)
         shouldScroll = merged.some((m) => !prevIds.has(m.id))
         sinceTsRef.current = Math.max(sinceTsRef.current, ...merged.map((m) => m.ts || 0))
+        writePrivateThread(sessionId, merged)
         return merged
       })
       await markRead(sessionId, me)

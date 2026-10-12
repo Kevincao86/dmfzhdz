@@ -995,6 +995,8 @@ page {
 .home-poster {
   position: relative;
   height: 396rpx;
+  min-height: 396rpx;
+  flex: 0 0 396rpx;
   margin: 20rpx 24rpx 0;
   border-radius: 28rpx;
   overflow: hidden;

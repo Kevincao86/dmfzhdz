@@ -38,6 +38,7 @@ import {
   type OrderGroupPayload,
 } from '../../lib/mpSync/orderGroupChat'
 import { formatChatError } from '../../lib/mpSync/talentChat'
+import { mergeById, readGroupThread, writeGroupThread } from '../../lib/mpSync/threadViewCache'
 
 const SCROLL_STICK_THRESHOLD_PX = 96
 
@@ -153,21 +154,32 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
     (body: Record<string, unknown>) => {
       const group = body.group as OrderGroupPayload | undefined
       if (!group) return
-      const ui = mapMessages(group, myKey)
+      const fresh = mapMessages(group, myKey)
+      const cached = readGroupThread<OrderGroupMessage>(mpOrderId)
+      const ui = mergeById(cached?.messages || [], fresh)
       if (ui.length) {
         sinceTsRef.current = Math.max(sinceTsRef.current, ...ui.map((m) => m.ts || 0))
       }
       const closed = group.status === 'closed' || body.canSend === false
-      setTitle(String(group.title || '商单群'))
+      const nextTitle = String(group.title || '商单群')
+      setTitle(nextTitle)
       const count = (group.memberParticipantKeys || []).length
       setMemberCount(count)
       setMembers(mapAllMembers(group, myKey))
       setMentionMembers(mapMentionMembers(group, myKey))
       setMessages(ui)
       setCanSend(!closed)
-      setStatusSub(closed ? '已关闭' : `${count} 人 · 商单协作群`)
+      const nextStatus = closed ? '已关闭' : `${count} 人 · 商单协作群`
+      setStatusSub(nextStatus)
+      writeGroupThread(mpOrderId, {
+        title: nextTitle,
+        memberCount: count,
+        canSend: !closed,
+        statusSub: nextStatus,
+        messages: ui,
+      })
     },
-    [myKey],
+    [myKey, mpOrderId],
   )
 
   const syncGroup = useCallback(
@@ -194,11 +206,18 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
 
   useEffect(() => {
     let cancelled = false
-    sinceTsRef.current = 0
-    setMessages([])
-    setReady(false)
-    readyRef.current = false
-    setStatusSub('连接中…')
+    const cached = readGroupThread<OrderGroupMessage>(mpOrderId)
+    sinceTsRef.current = (cached?.messages || []).reduce((max, m) => Math.max(max, Number(m.ts) || 0), 0)
+    setMessages(cached?.messages || [])
+    const hasCache = !!(cached && cached.messages.length)
+    setReady(hasCache)
+    readyRef.current = hasCache
+    setStatusSub(hasCache ? cached?.statusSub || '历史消息' : '连接中…')
+    if (hasCache) {
+      if (cached?.title) setTitle(cached.title)
+      setMemberCount(Number(cached?.memberCount) || 0)
+      setCanSend(cached?.canSend !== false)
+    }
     setSendErr('')
     ;(async () => {
       if (!mpOrderId) {
@@ -216,7 +235,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
           readyRef.current = true
         }
       } catch (e) {
-        if (!cancelled) {
+        if (!cancelled && !hasCache) {
           setReady(false)
           readyRef.current = false
           setSendErr(formatChatError(e))

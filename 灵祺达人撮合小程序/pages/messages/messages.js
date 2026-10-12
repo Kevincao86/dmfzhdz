@@ -13,6 +13,7 @@ const inboxNoticeState = require('../../utils/inboxNoticeState.js')
 const talentInboxMatch = require('../../utils/talentInboxMatch.js')
 const ntfPage = require('../../utils/notificationInboxPage.js')
 const mpOrderGroupChatApi = require('../../utils/mpOrderGroupChatApi.js')
+const threadCache = require('../../utils/mpThreadCache.js')
 const api = require('../../utils/api.js')
 
 const MSG_TABS = [
@@ -78,8 +79,34 @@ Page({
   },
   onLoad() {
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
+    this.paintMessageCache()
     this.setData({ showDevTest: !!config.MP_CHAT_DEV_TEST })
     this.applyIdentityCopy()
+  },
+  paintMessageCache() {
+    const sessions = threadCache.readChatSessions()
+    const groups = threadCache.readGroupSessions()
+    const notices = threadCache.readNotifications()
+    const patch = {}
+    if (sessions.length) {
+      patch.allSessions = sessions
+      patch.sessions = sessions
+      patch.chatConfigured = true
+      patch.chatLoading = false
+    }
+    if (groups.length) {
+      patch.allGroupSessions = groups
+      patch.groupSessions = groups
+      patch.groupLoading = false
+    }
+    if (notices.length) {
+      this._ntfRows = notices
+      Object.assign(patch, ntfPage.patchFromRows(notices, this.data.ntfActiveTab), { ntfLoading: false })
+    }
+    if (Object.keys(patch).length) {
+      Object.assign(this.data, patch)
+      this.setData(patch)
+    }
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -163,10 +190,13 @@ Page({
   },
   async bootstrap() {
     const refreshing = !!this.data.refreshing
+    const hasNtf = (this._ntfRows || []).length > 0
+    const hasChat = (this.data.allSessions || []).length > 0
+    const hasGroup = (this.data.allGroupSessions || []).length > 0
     this.setData({
-      ntfLoading: !refreshing,
-      chatLoading: !refreshing,
-      groupLoading: !refreshing,
+      ntfLoading: !refreshing && !hasNtf,
+      chatLoading: !refreshing && !hasChat,
+      groupLoading: !refreshing && !hasGroup,
       err: '',
     })
     const tasks = [
@@ -216,11 +246,14 @@ Page({
   },
   async loadNotifications() {
     const local = ntfPage.localNotificationRows()
-    if (local.length) {
-      this.reapplyNtfView(local)
+    const cached = threadCache.readNotifications()
+    const seed = local.length ? local : cached
+    if (seed.length) {
+      this.reapplyNtfView(seed)
       this.setData({ ntfLoading: false })
     }
     const rows = await ntfPage.fetchNotificationRows()
+    threadCache.writeNotifications(rows)
     this.reapplyNtfView(rows)
   },
   reapplyNtfView(rows) {
@@ -254,6 +287,7 @@ Page({
         return this.mapSession(s, authKey, reg)
       })
       .sort(compareSessionsUnreadRecent)
+    threadCache.writeChatSessions(sessions)
     this.setData({ allSessions: sessions })
   },
   async loadGroupSessions() {
@@ -262,10 +296,13 @@ Page({
       const sessions = (mpOrderGroupChatApi.mapGroupSessions(body && body.groups) || []).sort(
         compareSessionsUnreadRecent,
       )
+      threadCache.writeGroupSessions(sessions)
       this.setData({ allGroupSessions: sessions })
     } catch (e) {
       console.warn('[messages] loadGroupSessions', e)
-      this.setData({ allGroupSessions: [] })
+      if (!(this.data.allGroupSessions || []).length) {
+        this.setData({ allGroupSessions: [] })
+      }
     }
   },
   onPullRefresh() {

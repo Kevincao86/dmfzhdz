@@ -43,6 +43,14 @@ import {
 } from '../lib/mpSync/orderGroupChat'
 import ChatPanel from '../components/chat/ChatPanel'
 import OrderGroupChatPanel from '../components/chat/OrderGroupChatPanel'
+import {
+  readChatSessions,
+  readGroupSessions,
+  readNotifications,
+  writeChatSessions,
+  writeGroupSessions,
+  writeNotifications,
+} from '../lib/mpSync/threadViewCache'
 
 type MsgTab = 'system' | 'direct' | 'group'
 type SidebarKind = 'chat' | 'system' | 'group'
@@ -77,12 +85,18 @@ export default function MessagesPage() {
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
-  const [rows, setRows] = useState<NotificationRow[]>(() => readAllNotificationRows())
+  const cachedSessions = readChatSessions<ChatSession>()
+  const cachedGroups = readGroupSessions<OrderGroupSession>()
+  const localNotes = readAllNotificationRows()
+  const cachedNotes = localNotes.length ? localNotes : readNotifications<NotificationRow>()
+  const [rows, setRows] = useState<NotificationRow[]>(cachedNotes)
   const [unread, setUnread] = useState(() => unreadNotificationCount())
-  const [pageLoading, setPageLoading] = useState(true)
+  const [pageLoading, setPageLoading] = useState(
+    cachedSessions.length === 0 && cachedGroups.length === 0 && cachedNotes.length === 0,
+  )
   const [refreshing, setRefreshing] = useState(false)
-  const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [groupSessions, setGroupSessions] = useState<OrderGroupSession[]>([])
+  const [sessions, setSessions] = useState<ChatSession[]>(cachedSessions)
+  const [groupSessions, setGroupSessions] = useState<OrderGroupSession[]>(cachedGroups)
   const [sessionsErr, setSessionsErr] = useState('')
   const [activeId, setActiveId] = useState('')
   const [activeKind, setActiveKind] = useState<SidebarKind>('chat')
@@ -130,9 +144,11 @@ export default function MessagesPage() {
     }
     try {
       const body = await listMine()
-      setGroupSessions(mapGroupSessions((body.groups as Parameters<typeof mapGroupSessions>[0]) || []))
+      const next = mapGroupSessions((body.groups as Parameters<typeof mapGroupSessions>[0]) || [])
+      setGroupSessions(next)
+      writeGroupSessions(next)
     } catch {
-      setGroupSessions([])
+      setGroupSessions((prev) => prev)
     }
   }, [])
 
@@ -148,10 +164,10 @@ export default function MessagesPage() {
       const list = await listSessionsForMe()
       const sorted = [...list].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
       setSessions(sorted)
+      writeChatSessions(sorted)
       if (reg) setRegistryForChat(reg)
     } catch (e) {
       setSessionsErr(formatChatError(e))
-      setSessions([])
     }
   }, [])
 
@@ -179,10 +195,14 @@ export default function MessagesPage() {
           merged = mergeNotificationsWithRegistry(registryRows, merged)
         }
         setRows(merged)
+        writeNotifications(merged)
         setUnread(merged.filter((m) => !m.read).length)
         await Promise.all([refreshSessions(reg), refreshGroupSessions()])
       } catch {
-        setRows(readAllNotificationRows())
+        setRows((prev) => {
+          const local = readAllNotificationRows()
+          return local.length ? local : prev
+        })
         setUnread(unreadNotificationCount())
         try {
           await Promise.all([refreshSessions(registryForChatRef.current), refreshGroupSessions()])

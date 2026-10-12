@@ -351,6 +351,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         r ? { ...r, favorited: orderFavorites.isFavorite(r.id) } : r,
       )
       this.setData(patch)
+      void this.loadDecorBanner()
       void loadHallList(this).then(afterHall)
       return
     }
@@ -395,7 +396,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     }
   },
   async loadDecorBanner() {
-    const identity = this.data.workIdentity || userProfile.readIdentity() || ''
+    const identity = userProfile.readIdentity() || this.data.workIdentity || ''
     let decor = []
     try {
       decor = await mpPlatformDecor.fetchDecorItems('mp.home.banner', identity)

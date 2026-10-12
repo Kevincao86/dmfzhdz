@@ -6,6 +6,7 @@ const richMsg = require('../../../utils/mpChatRichMessage.js')
 const { applyCapsulePadding } = require('../../../utils/navLayout.js')
 const chatBadgeWatcher = require('../../../utils/chatBadgeWatcher.js')
 const wxProfileDisplay = require('../../../utils/wxProfileDisplay.js')
+const threadCache = require('../../../utils/mpThreadCache.js')
 
 function toRawMessages(uiList) {
   return (uiList || []).map((m) => ({
@@ -61,6 +62,12 @@ Page({
       peerAvatar,
       myAvatar: wxProfileDisplay.sanitizeDisplayAvatar(me.avatarUrl) || '/images/logo.png',
     })
+    const cached = threadCache.readPrivateThread(sessionId)
+    if (cached.length) {
+      this.data.ready = true
+      this.setMessages(cached, me.role)
+      this.setData({ ready: true, statusSub: '历史消息' })
+    }
     void this.bootstrap()
   },
   onShow() {
@@ -112,11 +119,15 @@ Page({
         })
       }
       const rows = await chat.fetchMessages(this._sessionId, 0, me)
-      const merged = chat.mergeMessages([], rows)
+      const shown = toRawMessages(this.data.messages)
+      const cached = shown.length ? shown : threadCache.readPrivateThread(this._sessionId)
+      const merged = chat.mergeMessages(cached, rows)
       await chat.markRead(this._sessionId, me)
+      this.data.ready = true
       this.setData({ ready: true, statusSub: '消息已同步' })
       this.setMessages(merged, me.role)
     } catch (e) {
+      if ((this.data.messages || []).length) return
       this.setData({ ready: false, statusSub: chat.formatChatError(e).slice(0, 48) })
     }
   },
@@ -158,6 +169,7 @@ Page({
     if (ui.length) {
       this._sinceTs = Math.max(this._sinceTs, ...ui.map((m) => m.ts || 0))
     }
+    threadCache.writePrivateThread(this._sessionId, list)
     const gate = chat.canSendNextMessage(ui, myRole)
     const ready = this.data.ready
     this.setData({

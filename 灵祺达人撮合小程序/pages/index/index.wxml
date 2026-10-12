@@ -69,6 +69,7 @@
     <swiper
       wx:if="{{homeSlides.length}}"
       class="home-poster"
+      style="height:396rpx;min-height:396rpx;flex:0 0 396rpx;"
       indicator-dots
       indicator-color="rgba(255,255,255,0.55)"
       indicator-active-color="#f5c84c"
@@ -96,7 +97,7 @@
         </view>
       </swiper-item>
     </swiper>
-    <view wx:else class="home-poster" bindtap="onFallbackPosterTap">
+    <view wx:else class="home-poster" style="height:396rpx;min-height:396rpx;flex:0 0 396rpx;" bindtap="onFallbackPosterTap">
       <image class="home-poster__img" src="{{posterPresetUrl}}" mode="aspectFill" />
     </view>
 
