@@ -791,6 +791,43 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   grid-column: 1 / -1;
 }
 
+/* 左栏筛选不要被右侧商单卡片压住，下拉菜单要露在卡片上面 */
+.recommend-hall-page--rail .recommend-hall-rail {
+  min-width: 0;
+  width: 100%;
+  position: relative;
+  z-index: 6;
+  overflow: visible;
+}
+.recommend-hall-page--rail .recommend-hall-stack {
+  overflow: visible;
+}
+.recommend-hall-page--rail .recommend-hall-section__sub {
+  max-width: none;
+}
+.recommend-hall-page--rail .recommend-hall-filter-v2 {
+  position: relative;
+  z-index: 2;
+  flex-direction: column;
+  align-items: stretch;
+}
+.recommend-hall-page--rail .recommend-hall-filter-v2__cell {
+  min-width: 0;
+  width: 100%;
+}
+.recommend-hall-page--rail .recommend-hall-filter-menu {
+  z-index: 30;
+  right: 0;
+  min-width: 100%;
+}
+.recommend-hall-page--rail .recommend-hall-list,
+.recommend-hall-page--rail .recommend-hall-hint,
+.recommend-hall-page--rail .recommend-hall-err {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
 /* 黑暗模式：内容区跟着主题变，不再锁在浅色纸面上 */
 html[data-theme='dark'] .app-frame.xx-erp-shell .xx-content-plate,
 html[data-theme='dark'] .app-frame.xx-erp-shell .app-main,
