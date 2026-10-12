@@ -1223,6 +1223,95 @@
   font-weight: 300 !important;
 }
 
+.detail-page--v3 .detail-nav-logo {
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  width: 56rpx;
+  height: 56rpx;
+  margin-left: 4rpx;
+  border-radius: 50%;
+}
+
+.detail-lift-poster {
+  position: relative;
+  margin: 8rpx 48rpx 20rpx;
+  border-radius: 28rpx;
+  overflow: hidden;
+  box-shadow: 0 16rpx 40rpx rgba(76, 29, 149, 0.16);
+}
+
+.detail-lift-poster__bg {
+  width: 100%;
+  display: block;
+}
+
+.detail-lift-poster__head {
+  position: absolute;
+  left: 36rpx;
+  right: 36rpx;
+  top: 67%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.detail-lift-poster__kicker {
+  font-size: 22rpx;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 2rpx;
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.45);
+}
+
+.detail-lift-poster__title {
+  margin-top: 4rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff;
+  letter-spacing: 2rpx;
+  text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.5);
+}
+
+.detail-lift-poster__metrics {
+  position: absolute;
+  left: 5.5%;
+  right: 5.5%;
+  top: 76%;
+  bottom: 4.2%;
+  display: flex;
+  justify-content: space-between;
+}
+
+.detail-lift-poster__metric {
+  width: 46%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 8rpx;
+  text-align: center;
+}
+
+.detail-lift-poster__metric-k {
+  font-size: 22rpx;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.detail-lift-poster__metric-v {
+  margin-top: 12rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #fff;
+  letter-spacing: 1rpx;
+}
+
 .detail-page--v3 .lq-sub-nav__title {
   position: absolute;
   left: 50%;

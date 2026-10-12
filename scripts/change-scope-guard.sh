@@ -1314,6 +1314,7 @@ PAT
       cat <<'PAT'
 灵祺达人撮合小程序/utils/recruitShareCard.js
 灵祺达人撮合小程序/images/share/recruit-card-bg.jpg
+灵祺达人撮合小程序/images/share/talent-lift-poster.jpg
 灵祺达人撮合小程序/pages/subpack-core/detail/detail
 change-scope-guard
 PAT

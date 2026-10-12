@@ -1,5 +1,24 @@
 <view class="detail-page detail-page--v3 page-shell page-with-bar {{lqThemeClass}} foot-col">
-  <include src="../../../partials/subpage-nav.wxml" />
+  <view class="lq-sub-nav lq-hero-header" style="{{subNavBandStyle}}">
+    <view class="lq-hero-bg lq-hero-bg--sub" aria-hidden="true">
+      <view class="lq-hero-bg__pattern" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--1" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
+    </view>
+    <view class="lq-sub-nav__inner lq-hero-header__inner" style="{{subNavInnerStyle}}">
+      <view class="lq-sub-nav__bar">
+        <image
+          wx:if="{{shareEntry}}"
+          class="detail-nav-logo"
+          src="/images/logo.png"
+          mode="aspectFill"
+          bindtap="onGoHome"
+        />
+        <text wx:else class="lq-sub-nav__back" bindtap="onSubNavBack">‹</text>
+        <text class="lq-sub-nav__title">{{subNavTitle}}</text>
+      </view>
+    </view>
+  </view>
   <view class="detail-page__scroll">
   <view wx:if="{{loading}}" class="card state-loading">
     <view class="loading-dot-wrap">
@@ -217,6 +236,24 @@
       <view class="detail-v2-merchant-loc__row">
         <text class="detail-v2-merchant-loc__addr">{{merchantLocationDisplay}}</text>
         <view wx:if="{{merchantLocationNav}}" class="detail-v2-merchant-loc__nav" bindtap="onOpenMerchantLocationNav">导航</view>
+      </view>
+    </view>
+
+    <view class="detail-lift-poster" bindtap="onOpenTalentEval">
+      <image class="detail-lift-poster__bg" src="/images/share/talent-lift-poster.jpg" mode="widthFix" />
+      <view class="detail-lift-poster__head">
+        <text class="detail-lift-poster__kicker">专业数据分析评估</text>
+        <text class="detail-lift-poster__title">达人分析提升</text>
+      </view>
+      <view class="detail-lift-poster__metrics">
+        <view class="detail-lift-poster__metric">
+          <text class="detail-lift-poster__metric-k">预计增长曝光</text>
+          <text class="detail-lift-poster__metric-v">{{liftExposureText}}</text>
+        </view>
+        <view class="detail-lift-poster__metric">
+          <text class="detail-lift-poster__metric-k">预计增长带货金额</text>
+          <text class="detail-lift-poster__metric-v">{{liftSalesText}}</text>
+        </view>
       </view>
     </view>
 

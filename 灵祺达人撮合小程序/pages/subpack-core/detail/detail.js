@@ -126,6 +126,65 @@ function formatDetailTime(ms) {
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function collectLevelTiers(text) {
+  const out = []
+  const re = /(\d+)\s*级\s*(\d+(?:\.\d+)?)/g
+  const s = String(text || '')
+  let m
+  while ((m = re.exec(s))) {
+    const level = Number(m[1])
+    const yuan = Number(m[2])
+    if (level >= 1 && level <= 8 && yuan > 0) out.push({ level, yuan })
+  }
+  return out
+}
+
+function formatLiftSales(yuan) {
+  const n = Math.round(Number(yuan) || 0)
+  if (n >= 10000) {
+    const wan = n / 10000
+    const text = wan >= 100 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, '')
+    return '¥' + text + '万'
+  }
+  return '¥' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+/** 与达人分析页同一套曝光/带货估算，按本单等级和金额出预计增量。 */
+function estimateOrderTalentLift(priceText, lines) {
+  let tiers = collectLevelTiers(priceText)
+  if (!tiers.length) {
+    const arr = lines || []
+    tiers = []
+    for (let i = 0; i < arr.length; i += 1) {
+      const part = collectLevelTiers(arr[i])
+      for (let j = 0; j < part.length; j += 1) tiers.push(part[j])
+    }
+  }
+  let level = 4
+  let yuan = 100
+  if (tiers.length) {
+    const sorted = tiers.slice().sort((a, b) => a.level - b.level)
+    const pick = sorted[Math.floor((sorted.length - 1) / 2)]
+    level = pick.level
+    yuan = pick.yuan
+  } else {
+    const money = String(priceText || '').replace(/,/g, '').match(/(\d+(?:\.\d+)?)/)
+    const n = money ? Number(money[1]) : 0
+    if (n >= 20 && n <= 20000) yuan = n
+  }
+  const fansByLevel = [0, 3000, 6000, 12000, 20000, 35000, 70000, 140000, 250000]
+  const scoreByLevel = [0, 48, 54, 58, 62, 66, 70, 74, 78]
+  const fans = fansByLevel[level] || 20000
+  const score = scoreByLevel[level] || 62
+  const exposurePct = Math.min(60, Math.max(8, Math.round((100 - Math.min(92, score)) * 1.5)))
+  const orders = Math.max(1, Math.round(fans * (exposurePct / 100) * 0.002))
+  const salesYuan = Math.min(5000000, Math.max(500, Math.round(orders * yuan)))
+  return {
+    liftExposureText: '+' + exposurePct + '%',
+    liftSalesText: formatLiftSales(salesYuan),
+  }
+}
+
 function formatDetailDate(ms) {
   const n = Number(ms) || 0
   if (!n) return ''
@@ -240,6 +299,7 @@ function buildDetailDisplayFields(view, mp, opts) {
     coverImage,
     merchantLocationDisplay: (view && view.merchantLocationDisplay) || '',
     merchantLocationNav: (view && view.merchantLocationNav) || null,
+    ...estimateOrderTalentLift(detailPriceText, taskDetailLines),
   }
 }
 
@@ -248,6 +308,9 @@ Page({
     subNavTitle: '招募详情',
     subNavBandStyle: '',
     subNavInnerStyle: '',
+    shareEntry: false,
+    liftExposureText: '',
+    liftSalesText: '',
     id: '',
     loading: true,
     err: '',
@@ -390,6 +453,12 @@ Page({
     }
   },
   onSubNavBack: subpageNav.onSubNavBack,
+  onGoHome() {
+    wx.switchTab({ url: '/pages/index/index' })
+  },
+  onOpenTalentEval() {
+    wx.navigateTo({ url: '/pages/subpack-mine/mine-local-life-eval/mine-local-life-eval' })
+  },
   onToggleFavorite() {
     const id = this.data.id
     if (!id) return
@@ -407,6 +476,7 @@ Page({
   },
   onLoad(options) {
     subpageNav.setupSubpageNav(this, '招募详情')
+    const shareEntry = getCurrentPages().length <= 1 || !!(options && options.scene)
     let id = options && options.id ? decodeURIComponent(options.id) : ''
     if (!id && options && options.scene) {
       const scene = decodeURIComponent(String(options.scene))
@@ -416,7 +486,7 @@ Page({
     const applied = options && options.applied === '1'
     this._fromApply = !!(options && options.from === 'apply')
     this._pendingOpenFormRelay = options && String(options.openFormRelay || '') === '1'
-    this.setData({ id, applied, fromApply: this._fromApply })
+    this.setData({ id, applied, fromApply: this._fromApply, shareEntry })
     if (id) this.loadOrder(id)
     else this.setData({ loading: false, err: '缺少招募单号' })
   },
