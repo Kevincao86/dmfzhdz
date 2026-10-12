@@ -7,7 +7,11 @@ import {
 } from './mpTalentPlatformProfileResolve.js'
 import { normalizeRecruitmentPlatform } from './recruitmentInfoFilter.js'
 import { collectTagsForPlatform } from './talentLibraryFilters.js'
-import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
+import {
+  dropIncompleteTalentLibraryForMember,
+  upsertIncompleteTalentLibraryFromMember,
+  upsertTalentLibraryFromApplicant,
+} from './talentLibraryUpsert.js'
 import { extractProfileLinkUrl } from './talentProfileLink.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 
@@ -88,17 +92,29 @@ export function upsertMpTalentMember(
   else list.unshift(next)
   data.mpTalentMembers = list.slice(0, 5000)
 
+  const profiles = collectMemberPlatformProfiles(next)
+  const isSupplier = next.workIdentity === 'shoot' || next.workIdentity === 'edit'
+  if (!isSupplier && profiles.length === 0 && !next.lingqiTalentId) {
+    next.lingqiTalentId = allocateLingqiTalentId(data, '')
+    const memberIdx = (data.mpTalentMembers ?? []).findIndex((m) => m.id === next.id)
+    if (memberIdx >= 0) data.mpTalentMembers![memberIdx] = next
+  }
   const libOpts = {
     mpOrderId: '',
     merchantOrderNo: '',
     lingqiTalentId: next.lingqiTalentId,
   }
-  for (const { platform, profile } of collectMemberPlatformProfiles(next)) {
-    upsertTalentLibraryFromApplicant(data, {
-      platform,
-      applicant: profileToApplicant(platform, profile, next),
-      ...libOpts,
-    })
+  if (profiles.length) {
+    dropIncompleteTalentLibraryForMember(data, next)
+    for (const { platform, profile } of profiles) {
+      upsertTalentLibraryFromApplicant(data, {
+        platform,
+        applicant: profileToApplicant(platform, profile, next),
+        ...libOpts,
+      })
+    }
+  } else {
+    upsertIncompleteTalentLibraryFromMember(data, next)
   }
   return upsertSupplierTeamLibraryFromMember(data, next)
 }

@@ -75,3 +75,59 @@ console.log('OK talent-library-sync', {
   nickname: entry.platformNickname,
   profileLink: entry.profileLink,
 })
+
+const bare = {
+  mpTalentMembers: [],
+  talentLibraryEntries: [],
+}
+const bareSaved = upsertMpTalentMember(bare, {
+  id: 'MTM-bare',
+  memberType: 'douyin',
+  wxNickName: '只注册',
+  wxAvatarUrl: '',
+  contact: '13800001111',
+  wechatId: '13800001111',
+  workIdentity: 'talent',
+  registeredAt: '2026/10/12 10:00:00',
+  updatedAt: '2026/10/12 10:00:00',
+})
+const placeholder = bare.talentLibraryEntries.find((e) => (e.accountTags || []).includes('资料未完善'))
+if (!placeholder) {
+  console.error('FAIL: registered member without platform account was not written to library')
+  process.exit(1)
+}
+if (placeholder.platformAccount !== '13800001111') {
+  console.error('FAIL: placeholder account', placeholder.platformAccount)
+  process.exit(1)
+}
+if (!bareSaved.lingqiTalentId?.startsWith('LQ-D-')) {
+  console.error('FAIL: bare member lingqi id', bareSaved.lingqiTalentId)
+  process.exit(1)
+}
+
+const filled = upsertMpTalentMember(bare, {
+  ...bareSaved,
+  platformProfiles: {
+    douyin: {
+      enabled: true,
+      platformAccount: 'real_dy',
+      platformNickname: '只注册',
+      profileLink: '',
+      followers: 100,
+      quotePrice: '',
+    },
+  },
+})
+if (bare.talentLibraryEntries.some((e) => (e.accountTags || []).includes('资料未完善'))) {
+  console.error('FAIL: incomplete placeholder remained after real profile')
+  process.exit(1)
+}
+const real = bare.talentLibraryEntries.find((e) => e.platformAccount === 'real_dy')
+if (!real || real.lingqiTalentId !== filled.lingqiTalentId) {
+  console.error('FAIL: real profile not synced', real)
+  process.exit(1)
+}
+console.log('OK talent-library-placeholder', {
+  lingqiTalentId: filled.lingqiTalentId,
+  realAccount: real.platformAccount,
+})

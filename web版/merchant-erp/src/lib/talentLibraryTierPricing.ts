@@ -5,6 +5,7 @@ import {
   type KolTierBand,
 } from './recruitmentCityTierPricing'
 import type { RegistryTalentLibraryEntry } from './opsRegistryTypes'
+import { isIncompleteTalentLibraryEntry } from './talentLibraryUpsert'
 
 export type TierAvgPrices = Record<KolTierKey, { avgYuan: number; sampleCount: number }>
 
@@ -110,7 +111,9 @@ export function resolveTalentLibraryEntriesForCity(params: {
   city: string
   platform?: RegistryTalentLibraryEntry['platform']
 }): TalentLibraryCityResolve {
-  const all = Array.isArray(params.entries) ? params.entries : []
+  const all = (Array.isArray(params.entries) ? params.entries : []).filter(
+    (e) => !isIncompleteTalentLibraryEntry(e),
+  )
   const city = params.city.trim()
   const platform = params.platform ?? '抖音'
   const byPlatform = platformFilter(all, platform)

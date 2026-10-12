@@ -529,7 +529,14 @@ export default function OpsTalentLibraryPage() {
                         {e.lingqiTalentId || '—'}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-300">{e.platformAccount}</td>
-                      <td className="px-3 py-2 text-slate-200">{e.platformNickname}</td>
+                      <td className="px-3 py-2 text-slate-200">
+                        {e.platformNickname}
+                        {(e.accountTags || []).includes('资料未完善') ? (
+                          <span className="ml-2 rounded bg-amber-950/60 px-1.5 py-0.5 text-[10px] text-amber-200">
+                            资料未完善
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-3 py-2 text-slate-400">{e.gender || '—'}</td>
                       <td className="max-w-[160px] px-3 py-2 text-xs text-slate-400">
                         {tags.length ? (
