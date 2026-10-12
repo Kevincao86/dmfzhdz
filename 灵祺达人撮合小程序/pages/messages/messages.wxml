@@ -1,4 +1,5 @@
 <view class="msg-page page-with-bar page-shell-fixed {{lqThemeClass}}">
+  <feature-guide page="messages" />
   <view class="msg-nav lq-hero-header lq-hero-header--home" style="{{recHeadBandStyle}}">
     <view class="msg-nav-inner lq-hero-header__inner" style="{{recHeadInnerStyle}}">
       <text class="msg-nav-title">消息</text>
@@ -10,6 +11,7 @@
     <view
       wx:for="{{msgTabs}}"
       wx:key="id"
+      id="guide-msg-{{item.id}}"
       class="msg-tab {{msgTab === item.id ? 'msg-tab--on' : ''}}"
       data-id="{{item.id}}"
       bindtap="onMsgTab"

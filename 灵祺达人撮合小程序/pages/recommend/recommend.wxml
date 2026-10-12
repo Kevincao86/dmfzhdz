@@ -1,4 +1,5 @@
 <view class="rec-page page-with-bar page-shell-fixed {{lqThemeClass}} {{isPrMode ? 'rec-page--pr' : ''}}">
+  <feature-guide page="recommend" />
   <view class="rec-top">
     <!-- 达人端：标题 + 横滑区 -->
     <block wx:if="{{!isPrMode}}">
@@ -14,7 +15,7 @@
         </view>
       </view>
 
-      <view class="rec-ai-panel">
+      <view id="guide-rec-strip" class="rec-ai-panel">
         <view class="rec-ai-panel__head">
           <view class="rec-ai-panel__title-wrap">
             <text class="rec-ai-panel__spark">✦</text>
@@ -107,7 +108,7 @@
     </view>
 
     <block wx:elif="{{isPrMode}}">
-    <view class="rec-pr-hot-strip">
+    <view id="guide-rec-talents" class="rec-pr-hot-strip">
       <view class="rec-ai-panel rec-pr-hot-strip__panel">
         <view class="rec-ai-panel__head">
           <view class="rec-ai-panel__title-wrap">
@@ -187,7 +188,7 @@
     </view>
 
     <view class="rec-pr-toolbar" wx:if="{{isPrMode}}">
-      <view class="rec-pr-toolbar__match" bindtap="openPrMatchOrderSheet">
+      <view id="guide-pr-match" class="rec-pr-toolbar__match" bindtap="openPrMatchOrderSheet">
         <text class="rec-pr-toolbar__match-prefix">匹配招募单：</text>
         <text class="rec-pr-toolbar__match-value">{{prMatchOrderLabel}}</text>
         <text class="rec-pr-toolbar__match-arrow">▾</text>
@@ -199,6 +200,7 @@
       <view
         wx:for="{{orderSegments}}"
         wx:key="id"
+        id="guide-seg-{{item.id}}"
         class="rec-seg-item lq-gradient-tabs__item {{orderSegment === item.id ? 'rec-seg-item--on lq-gradient-tabs__item--on' : ''}}"
         data-id="{{item.id}}"
         bindtap="onOrderSegment"

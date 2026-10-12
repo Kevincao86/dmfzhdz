@@ -4,6 +4,7 @@
   "disableScroll": true,
   "enablePullDownRefresh": true,
   "usingComponents": {
-    "launch-splash": "/components/launch-splash/index"
+    "launch-splash": "/components/launch-splash/index",
+    "feature-guide": "/components/feature-guide/index"
   }
 }

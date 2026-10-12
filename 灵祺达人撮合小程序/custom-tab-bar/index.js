@@ -95,6 +95,7 @@ Component({
   },
   methods: {
     maybeStartMenuGuide() {
+      return
       this._alive = true
       const identity = userProfile.readIdentity() || 'talent'
       if (readGuideDone()[identity]) {

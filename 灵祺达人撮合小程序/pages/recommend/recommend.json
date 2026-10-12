@@ -1,5 +1,8 @@
 {
   "navigationStyle": "custom",
   "navigationBarTitleText": "推荐大厅",
-  "disableScroll": true
+  "disableScroll": true,
+  "usingComponents": {
+    "feature-guide": "/components/feature-guide/index"
+  }
 }

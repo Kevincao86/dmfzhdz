@@ -1,0 +1,12 @@
+<view class="fg" wx:if="{{on}}" catchtouchmove="preventMove">
+  <view class="fg-hole" style="top:{{holeTop}}px;left:{{holeLeft}}px;width:{{holeW}}px;height:{{holeH}}px;"></view>
+  <view class="fg-card" style="top:{{cardTop}}px;">
+    <text class="fg-kicker">操作指引 {{stepNo}}/{{total}}</text>
+    <text class="fg-title">{{title}}</text>
+    <text class="fg-body">{{body}}</text>
+    <view class="fg-actions">
+      <view class="fg-skip" catchtap="onSkip">跳过</view>
+      <view class="fg-next" catchtap="onNext">{{last ? '知道了' : '下一步'}}</view>
+    </view>
+  </view>
+</view>

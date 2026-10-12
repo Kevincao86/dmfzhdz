@@ -1,4 +1,5 @@
 <view class="mine-page page-with-bar page-shell-fixed {{lqThemeClass}}">
+  <feature-guide page="mine" />
   <view class="wb-hero lq-hero-header" style="{{headerBandStyle}}">
     <view class="wb-hero-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
       <view class="wb-hero-top">
@@ -93,6 +94,8 @@
   <scroll-view
     class="mine-scroll page-scroll-body foot-col"
     scroll-y
+    scroll-into-view="{{featureGuideAnchor}}"
+    scroll-with-animation
     enhanced
     show-scrollbar="{{false}}"
     refresher-enabled
@@ -107,6 +110,7 @@
         <view
           wx:for="{{quickMenus}}"
           wx:key="key"
+          id="guide-{{item.key}}"
           class="wb-quick-tile {{item.comingSoon ? 'wb-quick-tile--soon' : ''}}"
           hover-class="wb-quick-tile--hover"
           data-key="{{item.key}}"
@@ -131,6 +135,7 @@
           wx:for="{{item.items}}"
           wx:for-item="menu"
           wx:key="key"
+          id="guide-{{menu.key}}"
           class="wb-quick-tile {{menu.comingSoon ? 'wb-quick-tile--soon' : ''}}"
           hover-class="wb-quick-tile--hover"
           data-key="{{menu.key}}"

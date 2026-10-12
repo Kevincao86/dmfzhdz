@@ -1,5 +1,6 @@
 <view class="home-page page-with-bar page-shell-fixed home-page--v1 {{lqThemeClass}}">
   <launch-splash />
+  <feature-guide page="index" />
   <view class="home-sticky-top">
     <view class="home-hero-shell lq-hero-header lq-hero-header--home" style="{{navTopStyle}}">
       <view class="home-top-v1">
@@ -41,7 +42,7 @@
     </view>
   </view>
 
-  <scroll-view class="home-list-scroll page-scroll-body foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
+  <scroll-view class="home-list-scroll page-scroll-body foot-col" scroll-y enhanced show-scrollbar="{{false}}" scroll-into-view="{{featureGuideAnchor}}" scroll-with-animation enable-flex>
     <view class="home-kpi">
       <view class="home-kpi__pill">
         <image class="home-kpi__icon" src="{{kpiRecruitIcon}}" mode="aspectFit" />
@@ -102,7 +103,7 @@
     </view>
 
     <text class="home-feed-title">常用入口</text>
-    <view class="home-entry">
+    <view id="guide-home-entry" class="home-entry">
       <view
         wx:for="{{homeEntries}}"
         wx:key="key"
@@ -115,7 +116,7 @@
       </view>
     </view>
 
-    <text class="home-feed-title">推荐商单</text>
+    <text id="guide-home-orders" class="home-feed-title">推荐商单</text>
 
     <view class="paichian-sub-tabs paichian-sub-tabs--v1" wx:if="{{hallTab === 'paichian' && showPaichianTab}}">
         <view

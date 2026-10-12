@@ -2,5 +2,7 @@
   "navigationStyle": "custom",
   "navigationBarTitleText": "我的",
   "disableScroll": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "feature-guide": "/components/feature-guide/index"
+  }
 }

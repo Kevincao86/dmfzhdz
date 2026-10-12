@@ -1,5 +1,8 @@
 {
   "navigationStyle": "custom",
   "navigationBarTitleText": "消息",
-  "disableScroll": true
+  "disableScroll": true,
+  "usingComponents": {
+    "feature-guide": "/components/feature-guide/index"
+  }
 }
