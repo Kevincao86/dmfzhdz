@@ -1235,16 +1235,15 @@
   position: relative;
   z-index: 3;
   flex-shrink: 0;
-  width: 56rpx;
-  height: 56rpx;
-  margin-left: 4rpx;
+  width: 64rpx;
+  height: 64rpx;
   border-radius: 50%;
 }
 
 .detail-nav-home__text {
-  margin-left: 8rpx;
-  font-size: 26rpx;
-  font-weight: 600;
+  margin-left: 10rpx;
+  font-size: 30rpx;
+  font-weight: 700;
   line-height: 1;
   color: #1a1a2e;
 }
@@ -1294,29 +1293,29 @@
 }
 
 .detail-lift-poster__cta {
-  margin-top: 8rpx;
-  padding: 6rpx 20rpx 8rpx;
-  border-radius: 999rpx;
-  background: linear-gradient(90deg, #f97316, #fbbf24);
-  box-shadow: 0 6rpx 14rpx rgba(249, 115, 22, 0.4);
-  animation: lift-cta-pulse 1.35s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  background: linear-gradient(90deg, #f97316, #f59e0b);
+  animation: lift-cta-pulse 1.4s ease-in-out infinite;
 }
 
 .detail-lift-poster__cta-text {
-  font-size: 22rpx;
+  font-size: 34rpx;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1;
   color: #fff;
-  letter-spacing: 1rpx;
+  letter-spacing: 4rpx;
 }
 
 @keyframes lift-cta-pulse {
   0%,
   100% {
-    transform: scale(1);
+    opacity: 1;
   }
   50% {
-    transform: scale(1.08);
+    opacity: 0.86;
   }
 }
 
