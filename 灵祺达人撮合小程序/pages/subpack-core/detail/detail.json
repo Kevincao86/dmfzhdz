@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "招募详情",
-  "navigationStyle": "custom"
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "launch-splash": "/components/launch-splash/index"
+  }
 }

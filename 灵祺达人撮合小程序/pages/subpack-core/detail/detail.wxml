@@ -1,4 +1,5 @@
 <view class="detail-page detail-page--v3 page-shell page-with-bar {{lqThemeClass}} foot-col">
+  <launch-splash />
   <view class="lq-sub-nav lq-hero-header" style="{{subNavBandStyle}}">
     <view class="lq-hero-bg lq-hero-bg--sub" aria-hidden="true">
       <view class="lq-hero-bg__pattern" />
