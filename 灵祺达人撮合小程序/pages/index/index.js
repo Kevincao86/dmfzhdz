@@ -77,31 +77,42 @@ function homeEntryUrl(name) {
   return `${base}/home/${name}?v=20261003c`
 }
 
+function homeEntry(key, file) {
+  return { key, url: homeEntryUrl(file) }
+}
+
 function homeEntriesForIdentity(identity) {
   const posterTalent = homeBannerAssets.posterDefault
+  const shared = [
+    homeEntry('calendar', 'entry-calendar.jpg'),
+    homeEntry('aiReview', 'entry-ai-review.jpg'),
+  ]
   if (identity === 'pr') {
     return {
-      entryLeftKey: 'publish',
-      entryLeftUrl: homeEntryUrl('entry-publish.jpg'),
-      entryRightKey: 'apps',
-      entryRightUrl: homeEntryUrl('entry-orders.jpg'),
+      homeEntries: [
+        homeEntry('publish', 'entry-publish.jpg'),
+        homeEntry('apps', 'entry-orders.jpg'),
+        ...shared,
+      ],
       posterPresetUrl: homeEntryUrl('poster-pr.jpg'),
     }
   }
   if (identity === 'shoot' || identity === 'edit') {
     return {
-      entryLeftKey: 'course',
-      entryLeftUrl: homeEntryUrl('entry-course.jpg'),
-      entryRightKey: 'apps',
-      entryRightUrl: homeEntryUrl('entry-apply.jpg'),
+      homeEntries: [
+        homeEntry('course', 'entry-course.jpg'),
+        homeEntry('apps', 'entry-apply.jpg'),
+        ...shared,
+      ],
       posterPresetUrl: posterTalent,
     }
   }
   return {
-    entryLeftKey: 'eval',
-    entryLeftUrl: homeEntryUrl('entry-eval.jpg'),
-    entryRightKey: 'apps',
-    entryRightUrl: homeEntryUrl('entry-apply.jpg'),
+    homeEntries: [
+      homeEntry('eval', 'entry-eval.jpg'),
+      homeEntry('apps', 'entry-apply.jpg'),
+      ...shared,
+    ],
     posterPresetUrl: posterTalent,
   }
 }
@@ -483,6 +494,24 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         return
       }
       wx.navigateTo({ url: courseUrl })
+      return
+    }
+    if (key === 'calendar') {
+      const calendarUrl = '/pages/subpack-mine/mine-order-calendar/mine-order-calendar'
+      if (!auth.isLoggedIn()) {
+        require('../../utils/mpGuestRoutes.js').redirectToLogin(calendarUrl)
+        return
+      }
+      wx.navigateTo({ url: calendarUrl })
+      return
+    }
+    if (key === 'aiReview') {
+      const reviewUrl = '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review'
+      if (!auth.isLoggedIn()) {
+        require('../../utils/mpGuestRoutes.js').redirectToLogin(reviewUrl)
+        return
+      }
+      wx.navigateTo({ url: reviewUrl })
       return
     }
     const identity = this.data.workIdentity || userProfile.readIdentity()

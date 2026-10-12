@@ -103,12 +103,14 @@
 
     <text class="home-feed-title">常用入口</text>
     <view class="home-entry">
-      <view class="home-entry__card home-entry__card--img" data-key="{{entryLeftKey}}" bindtap="goHomeEntry">
-        <image class="home-entry__img" src="{{entryLeftUrl}}" mode="aspectFill" />
-        <view class="home-entry__shade"></view>
-      </view>
-      <view class="home-entry__card home-entry__card--img" data-key="{{entryRightKey}}" bindtap="goHomeEntry">
-        <image class="home-entry__img" src="{{entryRightUrl}}" mode="aspectFill" />
+      <view
+        wx:for="{{homeEntries}}"
+        wx:key="key"
+        class="home-entry__card home-entry__card--img"
+        data-key="{{item.key}}"
+        bindtap="goHomeEntry"
+      >
+        <image class="home-entry__img" src="{{item.url}}" mode="aspectFill" />
         <view class="home-entry__shade"></view>
       </view>
     </view>

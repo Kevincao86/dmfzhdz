@@ -1058,6 +1058,7 @@ page {
 
 .home-entry {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   margin: 8rpx 24rpx 0;
 }
@@ -1076,6 +1077,7 @@ page {
   position: relative;
   padding: 0;
   height: 126rpx;
+  margin-bottom: 16rpx;
   overflow: hidden;
   border: none;
   background: transparent;

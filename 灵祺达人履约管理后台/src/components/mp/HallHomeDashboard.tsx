@@ -413,9 +413,9 @@ function TalentHomeDashboard({
 
   const shortcuts = [
     { to: '/hall?tab=hall', label: '报名', icon: Send },
-    { to: '/orders/calendar', label: '日历', icon: CalendarDays },
+    { to: '/orders/calendar', label: '商单日历', icon: CalendarDays },
     { to: '/training', label: '课程', icon: GraduationCap },
-    { to: '/profile/ai-review', label: '审核', icon: ShieldCheck },
+    { to: '/profile/ai-review', label: 'AI视频审核', icon: ShieldCheck },
     { to: '/profile/wallet', label: '钱包', icon: Wallet },
     { to: '/help', label: '帮助', icon: CircleHelp },
   ]
