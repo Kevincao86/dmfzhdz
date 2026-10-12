@@ -1,8 +1,10 @@
 import type {
   RegistryFile,
   RegistryMpRecruitmentApplicant,
+  RegistryMpTalentMember,
   RegistryTalentLibraryEntry,
 } from './opsRegistryTypes.js'
+import { allocateLingqiTalentId } from './lingqiIdentity.js'
 import { normalizeRecruitmentPlatform } from './recruitmentInfoFilter.js'
 import { extractProfileLinkUrl } from './talentProfileLink.js'
 
@@ -22,6 +24,68 @@ export function isIncompleteTalentLibraryEntry(entry: {
 export function talentLibraryDedupeKey(platform: string, platformAccount: string): string {
   const plat = normalizeRecruitmentPlatform(platform)
   return `${plat}::${platformAccount.trim().toLowerCase()}`
+}
+
+const TALENT_ID_RE = /^LQ-D-\d+$/i
+
+function canonTalentId(raw: string | undefined): string {
+  const s = String(raw || '').trim()
+  return TALENT_ID_RE.test(s) ? s.toUpperCase() : ''
+}
+
+function phoneKeyFromText(raw: string | undefined): string {
+  const digits = String(raw || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+  return digits.length >= 11 ? digits : ''
+}
+
+function findMemberForTalentPhone(
+  data: RegistryFile,
+  phone: string,
+): RegistryMpTalentMember | null {
+  if (!phone) return null
+  const hits = (data.mpTalentMembers ?? []).filter(
+    (m) => phoneKeyFromText(m.contact) === phone || phoneKeyFromText(m.wechatId) === phone,
+  )
+  return hits.find((m) => canonTalentId(m.lingqiTalentId)) || hits[0] || null
+}
+
+/** 达人库行必须有灵祺编号：沿用已有编号，否则按手机号认会员，再没有就新发一个。 */
+function ensureLibraryLingqiTalentId(
+  data: RegistryFile,
+  opts: {
+    lingqiTalentId?: string
+    applicant: RegistryMpRecruitmentApplicant
+  },
+  list: RegistryTalentLibraryEntry[],
+  idx: number,
+): string {
+  const direct =
+    canonTalentId(opts.lingqiTalentId) ||
+    (idx >= 0 ? canonTalentId(list[idx]!.lingqiTalentId) : '')
+  if (direct) return direct
+  const phone = phoneKeyFromText(opts.applicant.contact) || phoneKeyFromText(opts.applicant.wechatId)
+  const member = findMemberForTalentPhone(data, phone)
+  const fromMember = canonTalentId(member?.lingqiTalentId)
+  if (fromMember) return fromMember
+  const fromSibling = phone
+    ? canonTalentId(
+        list.find(
+          (e, i) =>
+            i !== idx &&
+            (phoneKeyFromText(e.contact) === phone || phoneKeyFromText(e.wechatId) === phone) &&
+            canonTalentId(e.lingqiTalentId),
+        )?.lingqiTalentId,
+      )
+    : ''
+  if (fromSibling) {
+    if (member && !canonTalentId(member.lingqiTalentId)) member.lingqiTalentId = fromSibling
+    return fromSibling
+  }
+  const allocated = allocateLingqiTalentId(data, '')
+  if (member) member.lingqiTalentId = allocated
+  return allocated
 }
 
 export function upsertTalentLibraryFromApplicant(
@@ -44,9 +108,7 @@ export function upsertTalentLibraryFromApplicant(
   const alipay = String(opts.applicant.alipayAccount || '').trim()
   const paymentMethod = alipay ? `支付宝：${alipay}` : '支付宝'
 
-  const lingqiTalentId =
-    String(opts.lingqiTalentId || '').trim() ||
-    (idx >= 0 ? list[idx]!.lingqiTalentId : undefined)
+  const lingqiTalentId = ensureLibraryLingqiTalentId(data, opts, list, idx)
   const next: RegistryTalentLibraryEntry = {
     id: idx >= 0 ? list[idx]!.id : `TL-${Date.now()}`,
     lingqiTalentId: lingqiTalentId || undefined,

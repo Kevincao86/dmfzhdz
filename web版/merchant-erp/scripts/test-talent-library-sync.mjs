@@ -3,6 +3,7 @@
  * node scripts/test-talent-library-sync.mjs
  */
 import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.ts'
+import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.ts'
 
 const data = {
   mpTalentMembers: [],
@@ -130,4 +131,89 @@ if (!real || real.lingqiTalentId !== filled.lingqiTalentId) {
 console.log('OK talent-library-placeholder', {
   lingqiTalentId: filled.lingqiTalentId,
   realAccount: real.platformAccount,
+})
+
+const idData = {
+  mpTalentMembers: [
+    {
+      id: 'MTM-has',
+      lingqiTalentId: 'LQ-D-000088',
+      contact: '13900001111',
+      wechatId: '13900001111',
+      wxNickName: '已有编号',
+      registeredAt: '2026/10/1',
+      updatedAt: '2026/10/1',
+    },
+    {
+      id: 'MTM-none',
+      contact: '13900002222',
+      wechatId: '13900002222',
+      wxNickName: '待发编号',
+      registeredAt: '2026/10/1',
+      updatedAt: '2026/10/1',
+    },
+  ],
+  talentLibraryEntries: [],
+}
+upsertTalentLibraryFromApplicant(idData, {
+  platform: '抖音',
+  mpOrderId: 'MO-1',
+  merchantOrderNo: '',
+  applicant: {
+    id: 'a1',
+    name: '已有编号',
+    platformAccount: 'has_dy',
+    platformNickname: '已有编号',
+    contact: '13900001111',
+    followers: 10,
+  },
+})
+upsertTalentLibraryFromApplicant(idData, {
+  platform: '抖音',
+  mpOrderId: 'MO-2',
+  merchantOrderNo: '',
+  applicant: {
+    id: 'a2',
+    name: '待发编号',
+    platformAccount: 'need_dy',
+    platformNickname: '待发编号',
+    contact: '13900002222',
+    followers: 20,
+  },
+})
+upsertTalentLibraryFromApplicant(idData, {
+  platform: '抖音',
+  mpOrderId: 'MO-3',
+  merchantOrderNo: '',
+  applicant: {
+    id: 'a3',
+    name: '待发编号',
+    platformAccount: 'need_dy_2',
+    platformNickname: '待发编号2',
+    contact: '13900002222',
+    followers: 21,
+  },
+})
+const reused = idData.talentLibraryEntries.find((e) => e.platformAccount === 'has_dy')
+const issued = idData.talentLibraryEntries.find((e) => e.platformAccount === 'need_dy')
+const sibling = idData.talentLibraryEntries.find((e) => e.platformAccount === 'need_dy_2')
+if (reused?.lingqiTalentId !== 'LQ-D-000088') {
+  console.error('FAIL: did not reuse member lingqi id', reused)
+  process.exit(1)
+}
+if (!issued?.lingqiTalentId?.startsWith('LQ-D-')) {
+  console.error('FAIL: did not issue lingqi id', issued)
+  process.exit(1)
+}
+if (sibling?.lingqiTalentId !== issued.lingqiTalentId) {
+  console.error('FAIL: same phone got two lingqi ids', issued?.lingqiTalentId, sibling?.lingqiTalentId)
+  process.exit(1)
+}
+if (idData.mpTalentMembers.find((m) => m.id === 'MTM-none')?.lingqiTalentId !== issued.lingqiTalentId) {
+  console.error('FAIL: member was not given the new lingqi id')
+  process.exit(1)
+}
+console.log('OK talent-library-lingqi-id', {
+  reused: reused.lingqiTalentId,
+  issued: issued.lingqiTalentId,
 })
