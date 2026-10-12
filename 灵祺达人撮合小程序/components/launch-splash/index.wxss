@@ -10,8 +10,6 @@
 
 .launch-splash__stage {
   position: absolute;
-  left: 36rpx;
-  right: 36rpx;
 }
 
 .launch-splash__media {

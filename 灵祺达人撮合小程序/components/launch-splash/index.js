@@ -40,20 +40,25 @@ Component({
         const menu = wx.getMenuButtonBoundingClientRect()
         const top = Math.max(8, Number(menu.top) || 24)
         const right = Math.max(12, win.windowWidth - Number(menu.left) + 8)
-        const stageTop = Math.max(top + 40, Number(menu.bottom) || 0) + 12
-        const insetBottom = Number(win.safeAreaInsets && win.safeAreaInsets.bottom) || 0
-        const safeBottom =
-          insetBottom ||
-          (win.safeArea && win.screenHeight ? Math.max(0, win.screenHeight - win.safeArea.bottom) : 0)
-        const stageBottom = Math.max(20, safeBottom + 16)
+        const winW = Number(win.windowWidth) || 375
+        const winH = Number(win.windowHeight) || 667
+        const ratio = 9 / 16
+        let posterW = winW
+        let posterH = posterW / ratio
+        if (posterH > winH) {
+          posterH = winH
+          posterW = posterH * ratio
+        }
+        const left = Math.max(0, (winW - posterW) / 2)
+        const stageTop = Math.max(0, (winH - posterH) / 2)
         this.setData({
           skipStyle: `top:${top}px;right:${right}px;`,
-          stageStyle: `top:${stageTop}px;bottom:${stageBottom}px;`,
+          stageStyle: `left:${left}px;top:${stageTop}px;width:${posterW}px;height:${posterH}px;`,
         })
       } catch (_) {
         this.setData({
           skipStyle: 'top:48px;right:24px;',
-          stageStyle: 'top:108px;bottom:28px;',
+          stageStyle: 'left:0;top:0;width:100%;height:100%;',
         })
       }
     },
