@@ -48,8 +48,8 @@ const WALLET_MENU = {
 
 const BRIEF_GEN_MENU = {
   key: 'briefGen',
-  label: '爆款 Brief 生成',
-  sub: '钩子 · 分镜 · 话题 · 审片清单',
+  label: 'AI 爆款脚本',
+  sub: 'AI 写钩子、分镜、话题和审片清单',
   icon: 'tpl',
 }
 
@@ -72,16 +72,16 @@ function injectAffiliatePortalMenu(menus) {
 
 const AI_REVIEW_MENU = {
   key: 'aiReview',
-  label: '视频/文稿审核',
-  sub: 'AI 合规检核 · 单条与批量',
+  label: 'AI 视频审核',
+  sub: 'AI 审视频和文稿，支持单条与批量',
   icon: 'briefTemplates',
   hot: true,
 }
 
 const ADDONS_HUB_MENU = {
   key: 'addonsHub',
-  label: '增值服务',
-  sub: '短视频 · 数字人 · 视觉工坊 · 云剪',
+  label: 'AI 创作工坊',
+  sub: 'AI 短视频、数字人、视觉工坊和云剪',
   icon: 'wallet',
 }
 
@@ -142,7 +142,7 @@ function filterMenusForAccount(menus, account, identity) {
     list = attachMenuGlyphs(injectAiReviewMenu(list))
   }
   const access = prFeatureAccess.readAccountPrFeatureAccess(account)
-  // 短视频 / 数字人 / 视觉工坊仅在「增值服务」hub 内进入，不在「我的」重复列出
+  // 短视频 / 数字人 / 视觉工坊仅在「AI 创作工坊」hub 内进入，不在「我的」重复列出
   if (mpFeatureFlags.ADDONS_NAV_VISIBLE && access.any) {
     const afterKey = list.some((i) => i.key === 'aiReview')
       ? 'aiReview'
@@ -186,8 +186,8 @@ function injectMyCoursesMenu(menus) {
   const item = attachMenuGlyphs([
     {
       key: 'myCourses',
-      label: '我的课程',
-      sub: '发布、编辑和结算自己的培训',
+      label: 'AI 培训课',
+      sub: '发布、编辑和结算 AI 培训',
       icon: 'list',
     },
   ])[0]
@@ -215,7 +215,7 @@ const BIZ_GROUP_DEFS = [
   },
   {
     id: 'tools',
-    title: '内容与数据',
+    title: 'AI 创作',
     keys: ['briefGen', 'aiReview', 'addonsHub', 'myCourses', 'analytics'],
   },
   { id: 'help', title: '帮助服务', keys: ['manual', 'support'] },
@@ -238,7 +238,7 @@ function groupBizMenus(biz) {
   if (rest.length) {
     const tools = groups.find((group) => group.id === 'tools')
     if (tools) tools.items.push(...rest)
-    else groups.push({ id: 'tools', title: '内容与数据', items: rest })
+    else groups.push({ id: 'tools', title: 'AI 创作', items: rest })
   }
   return groups
 }
@@ -286,7 +286,7 @@ function talentMenusForIdentity(identity) {
       MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
       { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
-      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+      { key: 'analytics', label: 'AI 数据洞察', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
   }
@@ -304,7 +304,7 @@ function talentMenusForIdentity(identity) {
       MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
       { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
-      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+      { key: 'analytics', label: 'AI 数据洞察', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
   }
@@ -321,7 +321,7 @@ function talentMenusForIdentity(identity) {
     MY_ORDERS_MENU,
     { key: 'subscriptions', label: '订阅通知', sub: '商单匹配提醒 · 服务号邀约通知', icon: 'star' },
     { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
-    { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+    { key: 'analytics', label: 'AI 数据洞察', sub: '报名与发单概况', icon: 'chart' },
     { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
   ])
 }
@@ -343,7 +343,7 @@ function buildPrMenus() {
     { key: 'talentWatchlist', label: '黑灰名单', sub: '团队共享 · 避免重复踩坑', icon: 'list' },
     { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
     { key: 'funnel', label: '招募漏斗', sub: '曝光→报名→入选→发布转化', icon: 'chart' },
-    { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
+    { key: 'analytics', label: 'AI 数据洞察', sub: '发单与转化概况', icon: 'chart' },
     { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
   ])
 }

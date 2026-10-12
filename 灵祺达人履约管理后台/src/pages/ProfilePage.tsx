@@ -41,7 +41,7 @@ type MenuEntry = {
 const BIZ_SECTIONS = [
   { id: 'deal', title: '接单合作' },
   { id: 'money', title: '资金推广' },
-  { id: 'tools', title: '内容与数据' },
+  { id: 'tools', title: 'AI 创作' },
   { id: 'help', title: '帮助服务' },
 ] as const
 
@@ -267,21 +267,21 @@ export default function ProfilePage() {
     },
     {
       to: '/profile/ai-review',
-      label: 'AI审核',
-      desc: '文稿与短视频合规检核',
+      label: 'AI 视频审核',
+      desc: 'AI 审视频和文稿，支持单条与批量',
       hot: true,
       group: 'tools',
     },
     {
       to: '/training?mine=1',
-      label: '我的课程',
-      desc: '发布、编辑和结算自己的培训',
+      label: 'AI 培训课',
+      desc: '发布、编辑和结算 AI 培训',
       group: 'tools',
     },
     {
       to: '/profile/analytics',
-      label: '数据分析',
-      desc: isPr ? '发单与转化概况' : '报名与发单概况',
+      label: 'AI 数据洞察',
+      desc: isPr ? 'AI 看发单和转化' : 'AI 看报名和发单',
       group: 'tools',
     },
     { to: '/help', label: '使用说明', desc: '功能与操作方式', group: 'help' },
