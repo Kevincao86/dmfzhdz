@@ -7,13 +7,10 @@
     </view>
     <view class="lq-sub-nav__inner lq-hero-header__inner" style="{{subNavInnerStyle}}">
       <view class="lq-sub-nav__bar">
-        <image
-          wx:if="{{shareEntry}}"
-          class="detail-nav-logo"
-          src="/images/logo.png"
-          mode="aspectFill"
-          bindtap="onGoHome"
-        />
+        <view wx:if="{{shareEntry}}" class="detail-nav-home" bindtap="onGoHome">
+          <image class="detail-nav-logo" src="/images/logo.png" mode="aspectFill" />
+          <text class="detail-nav-home__text">首页</text>
+        </view>
         <text wx:else class="lq-sub-nav__back" bindtap="onSubNavBack">‹</text>
         <text class="lq-sub-nav__title">{{subNavTitle}}</text>
       </view>
@@ -248,6 +245,9 @@
       <view class="detail-lift-poster__head">
         <text class="detail-lift-poster__kicker">专业数据分析评估</text>
         <text class="detail-lift-poster__title">达人分析提升</text>
+        <view class="detail-lift-poster__cta" catchtap="onOpenTalentEval">
+          <text class="detail-lift-poster__cta-text">免费评估</text>
+        </view>
       </view>
       <view class="detail-lift-poster__metrics">
         <view class="detail-lift-poster__metric">
