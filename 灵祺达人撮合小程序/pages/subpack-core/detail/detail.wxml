@@ -236,27 +236,30 @@
     </view>
 
     <view class="detail-lift-poster" bindtap="onOpenTalentEval">
-      <image
-        class="detail-lift-poster__bg"
-        src="https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/posters/talent-lift-banner.jpg?v=20261012"
-        mode="widthFix"
-      />
-      <view class="detail-lift-poster__head">
-        <text class="detail-lift-poster__kicker">专业数据分析评估</text>
-        <text class="detail-lift-poster__title">达人分析提升</text>
-      </view>
-      <view class="detail-lift-poster__metrics">
-        <view class="detail-lift-poster__metric">
+      <view class="detail-lift-poster__stage">
+        <image
+          class="detail-lift-poster__bg"
+          src="https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/posters/talent-lift-banner.jpg?v=20261012"
+          mode="widthFix"
+        />
+        <view class="detail-lift-poster__head">
+          <text class="detail-lift-poster__kicker">专业数据分析评估</text>
+          <text class="detail-lift-poster__title">达人分析提升</text>
+        </view>
+        <view class="detail-lift-poster__metric detail-lift-poster__metric--exposure">
           <text class="detail-lift-poster__metric-k">预计增长曝光</text>
           <text class="detail-lift-poster__metric-v">{{liftExposureText}}</text>
         </view>
-        <view class="detail-lift-poster__metric">
+        <view class="detail-lift-poster__metric detail-lift-poster__metric--sales">
           <text class="detail-lift-poster__metric-k">预计增长带货金额</text>
           <text class="detail-lift-poster__metric-v">{{liftSalesText}}</text>
         </view>
       </view>
       <view class="detail-lift-poster__cta" catchtap="onOpenTalentEval">
-        <text class="detail-lift-poster__cta-text">免费评估</text>
+        <view class="detail-lift-poster__cta-shine" />
+        <view class="detail-lift-poster__cta-label">
+          <text class="detail-lift-poster__cta-text">免费评估</text>
+        </view>
       </view>
     </view>
 

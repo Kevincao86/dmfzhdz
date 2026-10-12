@@ -1258,6 +1258,10 @@
   box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
 }
 
+.detail-lift-poster__stage {
+  position: relative;
+}
+
 .detail-lift-poster__bg {
   width: 100%;
   display: block;
@@ -1293,12 +1297,29 @@
 }
 
 .detail-lift-poster__cta {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   height: 88rpx;
+  overflow: hidden;
   background: linear-gradient(90deg, #f97316, #f59e0b);
-  animation: lift-cta-pulse 1.4s ease-in-out infinite;
+}
+
+.detail-lift-poster__cta-shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 120rpx;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
+  animation: lift-cta-shine 1.6s linear infinite;
+}
+
+.detail-lift-poster__cta-label {
+  position: relative;
+  z-index: 1;
+  animation: lift-cta-pop 1.6s ease-in-out infinite;
 }
 
 .detail-lift-poster__cta-text {
@@ -1309,36 +1330,46 @@
   letter-spacing: 4rpx;
 }
 
-@keyframes lift-cta-pulse {
-  0%,
-  100% {
-    opacity: 1;
+@keyframes lift-cta-shine {
+  0% {
+    transform: translateX(-160rpx);
   }
-  50% {
-    opacity: 0.86;
+  100% {
+    transform: translateX(760rpx);
   }
 }
 
-.detail-lift-poster__metrics {
-  position: absolute;
-  left: 66.6%;
-  right: 0.8%;
-  top: 34%;
-  bottom: 15%;
-  display: flex;
-  justify-content: space-between;
+@keyframes lift-cta-pop {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
 }
 
 .detail-lift-poster__metric {
-  width: 48%;
-  height: 100%;
+  position: absolute;
+  top: 33%;
+  height: 51%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  padding: 4rpx;
+  padding: 0 4rpx;
   text-align: center;
+}
+
+.detail-lift-poster__metric--exposure {
+  left: 66.7%;
+  width: 15.8%;
+}
+
+.detail-lift-poster__metric--sales {
+  left: 83.8%;
+  width: 15.7%;
 }
 
 .detail-lift-poster__metric-k {
