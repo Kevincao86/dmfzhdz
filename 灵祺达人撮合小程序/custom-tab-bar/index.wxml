@@ -54,7 +54,8 @@
   </view>
 </view>
 <view class="menu-guide" wx:if="{{guideOn && !hidden}}" catchtouchmove="preventGuideMove">
-  <view class="menu-guide__card" style="left: {{guideLeft}}%;">
+  <view class="menu-guide__card">
+    <view class="menu-guide__arrow" style="left: {{guideArrow}}rpx;"></view>
     <text class="menu-guide__kicker">操作指引 {{guideStep + 1}}/{{guideTotal}}</text>
     <text class="menu-guide__title">{{guideTitle}}</text>
     <text class="menu-guide__body">{{guideBody}}</text>

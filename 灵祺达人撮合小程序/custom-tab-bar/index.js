@@ -3,7 +3,7 @@ const identityTheme = require('../utils/identityTheme.js')
 const { getTabList } = require('../utils/tabBarConfig.js')
 const chatBadgeWatcher = require('../utils/chatBadgeWatcher.js')
 
-const GUIDE_STORAGE = 'mp_menu_guide_v1'
+const GUIDE_STORAGE = 'mp_menu_guide_v2'
 const GUIDE_COPY = {
   talent: [
     { text: '首页', title: '首页', body: '先看今日商单和常用入口。点商单进详情报名；商单日历看当天要做的事，AI视频审核用来检查成片和文稿。' },
@@ -70,7 +70,7 @@ Component({
     guideTotal: 0,
     guideTitle: '',
     guideBody: '',
-    guideLeft: 50,
+    guideArrow: 80,
     guideLast: false,
     guideSpot: -1,
   },
@@ -129,14 +129,15 @@ Component({
       const list = this.data.list || []
       const spot = list.findIndex((item) => item.text === step.text)
       const n = list.length || 1
-      const raw = ((Math.max(spot, 0) + 0.5) / n) * 100
+      const tabCenter = ((Math.max(spot, 0) + 0.5) / n) * 750
+      const arrow = Math.max(36, Math.min(650, tabCenter - 32))
       this.setData({
         guideOn: true,
         guideStep: guideSession.step,
         guideTotal: steps.length,
         guideTitle: step.title,
         guideBody: step.body,
-        guideLeft: Math.max(28, Math.min(72, raw)),
+        guideArrow: arrow,
         guideLast: guideSession.step >= steps.length - 1,
         guideSpot: spot,
       })
