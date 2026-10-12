@@ -16,7 +16,7 @@ import { onShellRefresh } from '../lib/shellRefresh'
 import { syncAccountAccessOnBoot } from '../lib/registryProfileSync'
 
 const MENU_GUIDE_COPY: Record<string, string> = {
-  招募大厅: '先看首页概况，再进招募大厅浏览商单。筛选后点进详情，达人可报名，PR 可查看在招进度。',
+  招募大厅: '首页点商单即可报名，常用入口可进日历和审核。推荐里左右滑动看轮播达人，并用智能匹配找合适对象。',
   发布招募: '按步骤填写商单要求并发布。发布后到「我的发单」跟进报名。',
   我的发单: '查看已发商单的报名、排期和审核进度，点进一条继续处理。',
   我的报名: '查看报名进度。待探店、待传视频的任务从这里进入下一步。',
@@ -25,9 +25,9 @@ const MENU_GUIDE_COPY: Record<string, string> = {
   我的模版: '保存常用招募或报名模版，下次发单或报名时直接套用。',
   培训课程: '查看可报名的课程。讲师可以在这里发布和结算自己的课程。',
   我的订单: '查看会员开通和积分充值的支付记录。',
-  消息: '邀约、审核结果和系统通知都在这里。点进会话即可回复。',
-  增值服务: '使用 AI 短视频、数字人、视觉工坊等创作工具。',
-  我的: '管理资料、钱包和账号设置。AI 创作相关入口也在这里。',
+  消息: '「私信」用来一对一沟通，「群聊」用来跟进合作群。点进会话即可回复。',
+  增值服务: '这里是 AI 创作工坊，可使用短视频、数字人、视觉工坊和云剪。',
+  我的: '先完成账号绑定。这里还有 AI 视频审核和我的推广。',
 }
 
 type MenuGuideState = { index: number; steps: { label: string; body: string }[] }
@@ -58,7 +58,7 @@ export default function AppShell() {
   const signedIn = Boolean(account)
   useEffect(() => {
     if (!signedIn) return
-    const key = `xx_menu_guide_v1_${role}`
+    const key = `xx_menu_guide_v2_${role}`
     try {
       if (window.localStorage.getItem(key)) return
     } catch {
@@ -85,7 +85,7 @@ export default function AppShell() {
   }, [guideLabel, role])
 
   function finishMenuGuide() {
-    const key = `xx_menu_guide_v1_${role}`
+    const key = `xx_menu_guide_v2_${role}`
     try {
       window.localStorage.setItem(key, '1')
     } catch {
