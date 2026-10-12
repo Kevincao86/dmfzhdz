@@ -41,19 +41,10 @@ Component({
         const top = Math.max(8, Number(menu.top) || 24)
         const right = Math.max(12, win.windowWidth - Number(menu.left) + 8)
         const winW = Number(win.windowWidth) || 375
-        const winH = Number(win.windowHeight) || 667
-        const ratio = 9 / 16
-        let posterW = winW
-        let posterH = posterW / ratio
-        if (posterH > winH) {
-          posterH = winH
-          posterW = posterH * ratio
-        }
-        const left = Math.max(0, (winW - posterW) / 2)
-        const stageTop = Math.max(0, (winH - posterH) / 2)
+        const winH = Number(win.windowHeight) || 812
         this.setData({
           skipStyle: `top:${top}px;right:${right}px;`,
-          stageStyle: `left:${left}px;top:${stageTop}px;width:${posterW}px;height:${posterH}px;`,
+          stageStyle: `left:0;top:0;width:${winW}px;height:${winH}px;`,
         })
       } catch (_) {
         this.setData({
