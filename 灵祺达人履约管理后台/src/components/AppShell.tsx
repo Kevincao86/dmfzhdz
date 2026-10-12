@@ -15,6 +15,23 @@ import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { onShellRefresh } from '../lib/shellRefresh'
 import { syncAccountAccessOnBoot } from '../lib/registryProfileSync'
 
+const MENU_GUIDE_COPY: Record<string, string> = {
+  招募大厅: '先看首页概况，再进招募大厅浏览商单。筛选后点进详情，达人可报名，PR 可查看在招进度。',
+  发布招募: '按步骤填写商单要求并发布。发布后到「我的发单」跟进报名。',
+  我的发单: '查看已发商单的报名、排期和审核进度，点进一条继续处理。',
+  我的报名: '查看报名进度。待探店、待传视频的任务从这里进入下一步。',
+  商单日历: '按日期查看探店、交片和待办，点某一天处理当天的事。',
+  转发工具: '把报名表转给达人填写，回收后在这里查看结果。',
+  我的模版: '保存常用招募或报名模版，下次发单或报名时直接套用。',
+  培训课程: '查看可报名的课程。讲师可以在这里发布和结算自己的课程。',
+  我的订单: '查看会员开通和积分充值的支付记录。',
+  消息: '邀约、审核结果和系统通知都在这里。点进会话即可回复。',
+  增值服务: '使用 AI 短视频、数字人、视觉工坊等创作工具。',
+  我的: '管理资料、钱包和账号设置。AI 创作相关入口也在这里。',
+}
+
+type MenuGuideState = { index: number; steps: { label: string; body: string }[] }
+
 export default function AppShell() {
   const nav = useNavigate()
   const location = useLocation()
@@ -34,7 +51,58 @@ export default function AppShell() {
   const primaryNav = useMoreMenu ? NAV.slice(0, orderIdx + 1) : NAV
   const moreNav = useMoreMenu ? NAV.slice(orderIdx + 1) : []
   const [moreOpen, setMoreOpen] = useState(false)
+  const [menuGuide, setMenuGuide] = useState<MenuGuideState | null>(null)
   const moreRef = useRef<HTMLDivElement>(null)
+  const guideLabel = menuGuide ? menuGuide.steps[menuGuide.index]?.label || '' : ''
+
+  const signedIn = Boolean(account)
+  useEffect(() => {
+    if (!signedIn) return
+    const key = `xx_menu_guide_v1_${role}`
+    try {
+      if (window.localStorage.getItem(key)) return
+    } catch {
+      return
+    }
+    const steps = navItemsForRole(role, getAccount()).map((item) => ({
+      label: item.label,
+      body: MENU_GUIDE_COPY[item.label] || `打开「${item.label}」后，按页面上的按钮完成对应操作。`,
+    }))
+    if (!steps.length) return
+    const timer = window.setTimeout(() => {
+      setMenuGuide((current) => current || { index: 0, steps })
+    }, 600)
+    return () => window.clearTimeout(timer)
+  }, [signedIn, role])
+
+  useEffect(() => {
+    if (!guideLabel) return
+    const items = navItemsForRole(role, getAccount())
+    const orderIdx = items.findIndex((item) => item.to === '/profile/my-orders')
+    const useMore = orderIdx >= 5 && orderIdx < items.length - 1
+    const more = useMore ? items.slice(orderIdx + 1) : []
+    if (more.some((item) => item.label === guideLabel)) setMoreOpen(true)
+  }, [guideLabel, role])
+
+  function finishMenuGuide() {
+    const key = `xx_menu_guide_v1_${role}`
+    try {
+      window.localStorage.setItem(key, '1')
+    } catch {
+      /* ignore */
+    }
+    setMenuGuide(null)
+    setMoreOpen(false)
+  }
+
+  function nextMenuGuide() {
+    if (!menuGuide) return
+    if (menuGuide.index >= menuGuide.steps.length - 1) {
+      finishMenuGuide()
+      return
+    }
+    setMenuGuide({ ...menuGuide, index: menuGuide.index + 1 })
+  }
 
   useEffect(() => {
     setMoreOpen(false)
@@ -73,7 +141,7 @@ export default function AppShell() {
       className="app-frame xx-erp-shell min-h-screen"
       data-work-identity={identityWorkAttr(shellWorkId)}
     >
-      <header className="xx-header-bar">
+      <header className="xx-header-bar" style={menuGuide ? { zIndex: 90 } : undefined}>
         <div className="xx-header-bar__row">
           <NavLink to="/hall?tab=home" className="xx-header-brand">
             <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="xx-header-brand__logo" />
@@ -83,10 +151,15 @@ export default function AppShell() {
             </span>
           </NavLink>
 
-          <div className="xx-header-nav-cluster">
+          <div className="xx-header-nav-cluster" style={menuGuide ? { pointerEvents: 'none' } : undefined}>
           <nav className="xx-header-nav" aria-label="主导航">
             {primaryNav.map((item) => (
-              <NavLink key={item.to} to={item.to} className={navLinkClass(item.to)}>
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={navLinkClass(item.to)}
+                style={guideLabel === item.label ? { outline: '2px solid #ddd6fe', outlineOffset: '4px', borderRadius: '999px' } : undefined}
+              >
                 {item.label}
               </NavLink>
             ))}
@@ -119,6 +192,7 @@ export default function AppShell() {
                           ? ' xx-header-more__item--active'
                           : ''
                       }`}
+                      style={guideLabel === item.label ? { outline: '2px solid #7c5cff', outlineOffset: '2px' } : undefined}
                       onClick={() => setMoreOpen(false)}
                     >
                       {item.label}
@@ -146,6 +220,27 @@ export default function AppShell() {
       <div className="xx-subbar">
         <AppTopBar variant="crumb" />
       </div>
+
+      {menuGuide ? (
+        <>
+          <div className="fixed inset-0 z-[80] bg-slate-950/45" />
+          <div className="fixed left-1/2 top-20 z-[91] w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 rounded-2xl bg-white p-5 text-slate-900 shadow-2xl">
+            <p className="text-xs font-semibold text-violet-600">
+              操作指引 {menuGuide.index + 1}/{menuGuide.steps.length}
+            </p>
+            <h2 className="mt-1 text-lg font-bold">{menuGuide.steps[menuGuide.index].label}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{menuGuide.steps[menuGuide.index].body}</p>
+            <div className="mt-4 flex justify-end gap-3">
+              <button type="button" className="rounded-full bg-stone-100 px-4 py-2 text-sm font-semibold text-stone-600" onClick={finishMenuGuide}>
+                跳过
+              </button>
+              <button type="button" className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white" onClick={nextMenuGuide}>
+                {menuGuide.index >= menuGuide.steps.length - 1 ? '知道了' : '下一步'}
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <div className="app-main-wrap">
         <main className="app-main">

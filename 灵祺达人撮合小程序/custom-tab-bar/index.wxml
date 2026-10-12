@@ -1,8 +1,8 @@
-<view class="tab-bar {{lqThemeClass}} {{hasCenterFab ? 'tab-bar--fab' : ''}}" wx:if="{{!hidden}}">
+<view class="tab-bar {{lqThemeClass}} {{hasCenterFab ? 'tab-bar--fab' : ''}} {{guideOn ? 'tab-bar--guide' : ''}}" wx:if="{{!hidden}}">
   <view
     wx:for="{{list}}"
     wx:key="pagePath"
-    class="tab-item {{item.center ? 'tab-item--center' : ''}} {{selected === index ? 'active' : ''}}"
+    class="tab-item {{item.center ? 'tab-item--center' : ''}} {{selected === index ? 'active' : ''}} {{guideOn && guideSpot === index ? 'tab-item--spot' : ''}}"
     data-index="{{index}}"
     bindtap="switchTab"
   >
@@ -51,5 +51,16 @@
       </view>
       <text class="tab-text {{item.compact ? 'tab-text--compact' : ''}}">{{item.text}}</text>
     </block>
+  </view>
+</view>
+<view class="menu-guide" wx:if="{{guideOn && !hidden}}" catchtouchmove="preventGuideMove">
+  <view class="menu-guide__card" style="left: {{guideLeft}}%;">
+    <text class="menu-guide__kicker">操作指引 {{guideStep + 1}}/{{guideTotal}}</text>
+    <text class="menu-guide__title">{{guideTitle}}</text>
+    <text class="menu-guide__body">{{guideBody}}</text>
+    <view class="menu-guide__actions">
+      <view class="menu-guide__skip" catchtap="onGuideSkip">跳过</view>
+      <view class="menu-guide__next" catchtap="onGuideNext">{{guideLast ? '知道了' : '下一步'}}</view>
+    </view>
   </view>
 </view>
