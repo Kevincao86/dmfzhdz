@@ -9,7 +9,7 @@ function currentRoute() {
 
 function isWelcomeRoute() {
   const route = currentRoute()
-  return route === '' || route === 'pages/login/login' || route === 'pages/subpack-signup/signup/signup' || route === 'pages/legal/legal'
+  return route === '' || route === 'pages/login/login' || route === 'pages/subpack-signup/signup/signup' || route === 'pages/subpack-signup/legal/legal'
 }
 
 /** 已登录则同步身份。未登录留在首页浏览，不在打开时要求手机号、头像或昵称。 */

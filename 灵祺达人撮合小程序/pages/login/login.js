@@ -290,7 +290,7 @@ Page({
 
   onOpenPrivacyContract() {
     mpPrivacyAuthorize.openPrivacyContract(() => {
-      wx.navigateTo({ url: '/pages/legal/legal?doc=privacy' })
+      wx.navigateTo({ url: '/pages/subpack-signup/legal/legal?doc=privacy' })
     })
   },
 
@@ -474,7 +474,7 @@ Page({
 
   onOpenLegal(e) {
     const doc = e.currentTarget.dataset.doc === 'aup' ? 'aup' : 'privacy'
-    wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
+    wx.navigateTo({ url: `/pages/subpack-signup/legal/legal?doc=${doc}` })
   },
 
   onWxLogin() {

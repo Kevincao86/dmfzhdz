@@ -8,7 +8,6 @@
     "pages/mine/mine",
     "pages/register/register",
     "pages/apply/apply",
-    "pages/legal/legal",
     "pages/web-link/web-link"
   ],
   "subPackages": [
@@ -16,7 +15,8 @@
       "root": "pages/subpack-signup",
       "name": "subpackSignup",
       "pages": [
-        "signup/signup"
+        "signup/signup",
+        "legal/legal"
       ]
     },
     {

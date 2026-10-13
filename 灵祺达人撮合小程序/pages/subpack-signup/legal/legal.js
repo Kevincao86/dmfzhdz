@@ -1,5 +1,5 @@
-const legal = require('../../utils/legalContentMp.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const legal = require('./legalContentMp.js')
+const { syncPageIdentity } = require('../../../utils/pageIdentityChrome.js')
 
 Page({
   data: {

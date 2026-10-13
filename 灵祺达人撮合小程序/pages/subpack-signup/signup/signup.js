@@ -127,7 +127,7 @@ Page({
   },
   onOpenLegal(e) {
     const doc = e.currentTarget.dataset.doc === 'aup' ? 'aup' : 'privacy'
-    wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
+    wx.navigateTo({ url: `/pages/subpack-signup/legal/legal?doc=${doc}` })
   },
   onWxOneTapNeedLegal() {
     this.setData({ err: '请先勾选并同意《用户协议》和《隐私政策》' })

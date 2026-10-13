@@ -154,6 +154,26 @@
       {
         "value": "*.map",
         "type": "suffix"
+      },
+      {
+        "value": "preview/**",
+        "type": "glob"
+      },
+      {
+        "value": "pages/welcome/**",
+        "type": "glob"
+      },
+      {
+        "value": "components/login-orbit-wall/**",
+        "type": "glob"
+      },
+      {
+        "value": ".DS_Store",
+        "type": "file"
+      },
+      {
+        "value": "**/.DS_Store",
+        "type": "glob"
       }
     ],
     "include": []

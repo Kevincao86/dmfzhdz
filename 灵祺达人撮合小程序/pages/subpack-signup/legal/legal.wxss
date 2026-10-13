@@ -1,4 +1,4 @@
-@import '../../styles/theme.wxss';
+@import '../../../styles/theme.wxss';
 
 .legal-page {
   min-height: 100vh;

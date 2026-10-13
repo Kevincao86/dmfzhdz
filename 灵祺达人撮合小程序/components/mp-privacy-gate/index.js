@@ -31,7 +31,7 @@ Component({
     onOpenContract() {
       mpPrivacy.openPrivacyContract(() => {
         try {
-          wx.navigateTo({ url: '/pages/legal/legal?doc=privacy' })
+          wx.navigateTo({ url: '/pages/subpack-signup/legal/legal?doc=privacy' })
         } catch (_) {}
       })
     },
