@@ -112,7 +112,8 @@
           wx:key="key"
           id="guide-{{item.key}}"
           class="wb-quick-tile {{item.comingSoon ? 'wb-quick-tile--soon' : ''}}"
-          hover-class="wb-quick-tile--hover"
+          hover-class="tap-press"
+          hover-stay-time="80"
           data-key="{{item.key}}"
           bindtap="onMenuTap"
         >
@@ -137,7 +138,8 @@
           wx:key="key"
           id="guide-{{menu.key}}"
           class="wb-quick-tile {{menu.comingSoon ? 'wb-quick-tile--soon' : ''}}"
-          hover-class="wb-quick-tile--hover"
+          hover-class="tap-press"
+          hover-stay-time="80"
           data-key="{{menu.key}}"
           bindtap="onMenuTap"
         >

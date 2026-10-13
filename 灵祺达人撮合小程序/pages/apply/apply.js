@@ -55,7 +55,7 @@ const {
 const DOUYIN_LEVELS = platformForm.DOUYIN_LEVELS
 
 function detailUrlAfterApply(mpOrderId) {
-  return `/pages/subpack-core/detail/detail?id=${encodeURIComponent(String(mpOrderId || '').trim())}&applied=1`
+  return `/pages/subpack-core/detail/detail?id=${encodeURIComponent(String(mpOrderId || '').trim())}&applied=1&from=apply`
 }
 
 function isAlreadyAppliedError(err) {

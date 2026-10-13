@@ -128,4 +128,8 @@
   <view class="reg-copy foot-col">
     <site-icp-footer />
   </view>
+  <view class="success-burst" wx:if="{{celebrate}}">
+    <text class="success-burst__mark">✓</text>
+    <text class="success-burst__title">注册成功</text>
+  </view>
 </view>

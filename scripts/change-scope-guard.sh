@@ -853,7 +853,17 @@ PAT
 灵祺达人撮合小程序/pages/mine/mine.wxml
 灵祺达人撮合小程序/pages/mine/mine.json
 灵祺达人履约管理后台/src/components/AppShell.tsx
+灵祺达人履约管理后台/src/xingxuan-desk.css
+灵祺达人撮合小程序/pages/subpack-signup/signup/signup.js
+灵祺达人撮合小程序/pages/subpack-signup/signup/signup.wxml
+灵祺达人撮合小程序/pages/subpack-signup/signup/signup.wxss
+灵祺达人撮合小程序/pages/subpack-core/detail/detail.wxml
+灵祺达人撮合小程序/pages/subpack-core/detail/detail.wxss
+灵祺达人撮合小程序/pages/apply/apply.js
+灵祺达人撮合小程序/app.wxss
 灵祺达人撮合小程序/app.json
+.agents/skills/micro-interactions
+skills-lock.json
 灵祺达人撮合小程序/utils/identityTheme.js
 灵祺达人撮合小程序/pages/welcome/welcome.wxml
 灵祺达人撮合小程序/pages/welcome/welcome.wxss

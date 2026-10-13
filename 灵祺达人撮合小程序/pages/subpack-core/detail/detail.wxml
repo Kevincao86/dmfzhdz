@@ -54,7 +54,7 @@
         <canvas type="2d" id="detailPrQrCanvas" class="detail-hero-qr-canvas" />
       </view>
 
-      <view class="card card--success" wx:if="{{applied && !isIce}}">
+      <view class="card card--success {{fromApply ? 'card--success-pop' : ''}}" wx:if="{{applied && !isIce}}">
         <text class="success-title">✓ 报名已提交</text>
         <view wx:if="{{visitScheduleSubmitted}}" class="visit-schedule-status">
           <text class="visit-schedule-status__title">✓ 档期已提交</text>
@@ -373,7 +373,7 @@
       </view>
     </view>
 
-    <view class="card card--success" wx:if="{{fromApply && applied && isOpenLoop && applicationApproved}}">
+    <view class="card card--success card--success-pop" wx:if="{{fromApply && applied && isOpenLoop && applicationApproved}}">
       <text class="success-title">报名成功 · 扫码进群</text>
       <text class="hint" style="display:block;margin-top:8rpx;">长按下方二维码图片识别，即可加入微信群</text>
       <image

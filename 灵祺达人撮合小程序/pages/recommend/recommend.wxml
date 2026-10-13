@@ -404,7 +404,8 @@
       bindtap="goOrderDetail"
       data-id="{{item.id}}"
       data-mock="{{item.isMock}}"
-      hover-class="job-card-rec--hover"
+      hover-class="tap-press"
+      hover-stay-time="80"
     >
       <text class="job-card-rec__ribbon job-card-rec__ribbon--demo" wx:if="{{item.isMock}}">演示</text>
       <view

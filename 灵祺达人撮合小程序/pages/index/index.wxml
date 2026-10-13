@@ -108,6 +108,8 @@
         wx:for="{{homeEntries}}"
         wx:key="key"
         class="home-entry__card home-entry__card--img"
+        hover-class="tap-press"
+        hover-stay-time="80"
         data-key="{{item.key}}"
         bindtap="goHomeEntry"
       >
@@ -204,7 +206,7 @@
         bindtap="goDetail"
         data-id="{{item.id}}"
         data-mock="{{item.isMock}}"
-        hover-class="job-card-v1--hover"
+        hover-class="tap-press"
       >
         <view class="job-card-v1__thumb-wrap">
           <image

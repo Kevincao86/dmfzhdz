@@ -35,6 +35,11 @@ function navigateAfterRegister() {
   wx.switchTab({ url: '/pages/index/index' })
 }
 
+function celebrateThenEnter(page) {
+  page.setData({ celebrate: true })
+  setTimeout(() => navigateAfterRegister(), 1100)
+}
+
 function applyIdentity(page, id, restartMotion) {
   const scene = IDENTITY_OPTIONS.find((item) => item.id === id) || DEFAULT_IDENTITY
   page.setData({
@@ -66,6 +71,7 @@ Page({
     smsSending: false,
     smsCooldown: 0,
     loading: false,
+    celebrate: false,
     err: '',
     legalAgreed: false,
     fromWx: false,
@@ -171,8 +177,7 @@ Page({
         if (loginName) await auth.setLoginCredentials(loginName, password)
       }
       if (account) userProfile.adoptAccountIdentity(account)
-      wx.showToast({ title: '注册成功', icon: 'success' })
-      navigateAfterRegister()
+      celebrateThenEnter(this)
     } catch (err) {
       this.setData({ err: mpApiErrors.formatMpApiErr(err, '一键注册失败，请稍后重试') })
     } finally {
@@ -331,8 +336,7 @@ Page({
         account = (data && data.account) || auth.readAccount()
       }
       if (account) userProfile.adoptAccountIdentity(account)
-      wx.showToast({ title: '注册成功', icon: 'success' })
-      navigateAfterRegister()
+      celebrateThenEnter(this)
     } catch (e) {
       this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
     } finally {

@@ -791,6 +791,32 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .hall-tab-strip {
   grid-column: 1 / -1;
 }
 
+/* 商单卡片与功能入口：按下缩小，悬停略抬起。只动 transform，避开减弱动效的系统设置。 */
+@media (prefers-reduced-motion: no-preference) {
+  .app-frame.xx-erp-shell .recommend-order-card,
+  .app-frame.xx-erp-shell .hall-order-card,
+  .app-frame.xx-erp-shell .talent-home__icon-tile,
+  .app-frame.xx-erp-shell .shell-nav-link,
+  .app-frame.xx-erp-shell .recommend-order-card__detail-link,
+  .app-frame.xx-erp-shell .recommend-order-card__apply,
+  .app-frame.xx-erp-shell .hall-order-card__detail {
+    transition: transform 80ms ease-out, box-shadow 180ms ease-out;
+  }
+  .app-frame.xx-erp-shell .recommend-order-card:hover,
+  .app-frame.xx-erp-shell .hall-order-card:hover {
+    transform: translateY(-2px);
+  }
+  .app-frame.xx-erp-shell .recommend-order-card:active,
+  .app-frame.xx-erp-shell .hall-order-card:active,
+  .app-frame.xx-erp-shell .talent-home__icon-tile:active,
+  .app-frame.xx-erp-shell .shell-nav-link:active,
+  .app-frame.xx-erp-shell .recommend-order-card__detail-link:active,
+  .app-frame.xx-erp-shell .recommend-order-card__apply:active,
+  .app-frame.xx-erp-shell .hall-order-card__detail:active {
+    transform: scale(0.98);
+  }
+}
+
 /* 左栏筛选不要被右侧商单卡片压住，下拉菜单要露在卡片上面 */
 .recommend-hall-page--rail .recommend-hall-rail {
   min-width: 0;
