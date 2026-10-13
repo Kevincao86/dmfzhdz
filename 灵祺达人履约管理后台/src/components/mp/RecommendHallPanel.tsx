@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Info, Settings } from 'lucide-react'
 import { fetchMpRegistry } from '../../lib/mpApi'
+import { readHallOrders, writeHallOrders } from '../../lib/mpRecruitment/hallOrderCache'
 import { getActiveRole } from '../../lib/mpSession'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
@@ -195,35 +196,50 @@ function SupplierRecommendOrders({
   }, [])
 
   useEffect(() => {
-    ;(async () => {
+    let alive = true
+    const allowDemo = showDemoOrders()
+    function paint(reg: Record<string, unknown>) {
+      if (!alive) return
+      const mpOrders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+      setMpById(
+        new Map(
+          mpOrders.map((o) => [String((o as { id?: string })?.id || ''), o as Record<string, unknown>]),
+        ),
+      )
+      let rows = filterRecommendHallOrders(loadAllOrderRows(reg), workId)
+      if (!rows.length && allowDemo) {
+        rows = listFilters.buildRecommendHallDemoRows()
+      } else if (allowDemo) {
+        rows = listFilters.mergeHallDisplayRows(rows, { allowDemo: true })
+      }
+      setAllOrderRows(rows)
+    }
+    const cached = readHallOrders()
+    if (cached.length) {
+      paint({ mpRecruitmentOrders: cached })
+      setLoading(false)
+    } else {
       setLoading(true)
+    }
+    ;(async () => {
       setErr('')
-      const allowDemo = showDemoOrders()
       try {
         const reg = await fetchMpRegistry()
         const mpOrders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-        setMpById(
-          new Map(
-            mpOrders.map((o) => [String((o as { id?: string })?.id || ''), o as Record<string, unknown>]),
-          ),
-        )
-        let rows = filterRecommendHallOrders(loadAllOrderRows(reg), workId)
-        if (!rows.length && allowDemo) {
-          rows = listFilters.buildRecommendHallDemoRows()
-        } else if (allowDemo) {
-          rows = listFilters.mergeHallDisplayRows(rows, { allowDemo: true })
-        }
-        setAllOrderRows(rows)
+        writeHallOrders(mpOrders as Record<string, unknown>[])
+        paint(reg)
       } catch {
-        if (allowDemo) {
-          setAllOrderRows(listFilters.buildRecommendHallDemoRows())
-        } else {
-          setErr('请求失败，请稍后重试')
+        if (alive && !cached.length) {
+          if (allowDemo) setAllOrderRows(listFilters.buildRecommendHallDemoRows())
+          else setErr('请求失败，请稍后重试')
         }
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
     })()
+    return () => {
+      alive = false
+    }
   }, [workId])
 
   function renderFilterMenu(items: string[], active: string, onPick: (v: string) => void) {

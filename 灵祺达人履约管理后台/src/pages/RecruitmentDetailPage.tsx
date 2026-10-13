@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement, cancelMpRecruitmentApply } from '../lib/mpApi'
+import { detailCacheIsCurrent, readHallOrders, readOrderDetail, writeOrderDetail } from '../lib/mpRecruitment/hallOrderCache'
 import { resolveSignupDeadlineMsFromMp } from '../lib/mpRecruitment/listFilters'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { hasAppliedToOrder, upsertApplication, markApplicationWithdrawn } from '../lib/mpSync/applicationsStore'
@@ -243,8 +244,59 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
       setLoading(false)
       return
     }
-    void (async () => {
+    let alive = true
+    function applyOrder(mp: Record<string, unknown>, reg: Record<string, unknown>) {
+      if (!alive || !id) return false
+      const rawStatus = String(mp.status || '')
+      const isEnded =
+        rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'
+      const gate = evaluateContactPrGate(mp, id)
+      if (gate.hasApplication && gate.applicant) {
+        const entry = applicationFromMpOrder(mp, gate.applicant as Record<string, unknown>)
+        if (entry) upsertApplication(entry)
+      }
+      const canViewEnded =
+        gate.hasApplication ||
+        hasAppliedToOrder(id) ||
+        (role === 'pr' && mpOrderOwnedByCurrentPr(mp, getAccount()))
+      if (isEnded && !canViewEnded) {
+        setErr('该招募已结束')
+        return false
+      }
+      const enriched = enrichMpOrder(mp)
+      setMpRegistry(reg)
+      setMpRaw(mp)
+      setView(enriched)
+      setReadOnlyEnded(isEnded && canViewEnded)
+      setContactGate(gate)
+      setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
+      const inviteState = resolveTargetedInviteState(mp, resolveTalentMemberId())
+      setShowTargetedInviteActions(inviteState.showTargetedInviteActions)
+      setTargetedInviteStatus(inviteState.targetedInviteStatus)
+      setTargetedInviteStatusLabel(inviteState.targetedInviteStatusLabel)
+      setErr('')
+      return true
+    }
+    const cached = detailCacheIsCurrent(id)
+    if (cached) {
+      const reg = { mpRecruitmentOrders: [cached.mp] }
+      reconcileApplicationsFromRegistry(reg)
+      applyOrder(cached.mp, reg)
+      setLoading(false)
+      return () => {
+        alive = false
+      }
+    }
+    const preview = readOrderDetail(id)?.mp || readHallOrders().find((row) => String(row.id || '') === id)
+    if (preview) {
+      const reg = { mpRecruitmentOrders: [preview] }
+      reconcileApplicationsFromRegistry(reg)
+      applyOrder(preview, reg)
+      setLoading(false)
+    } else {
       setLoading(true)
+    }
+    void (async () => {
       setErr('')
       try {
         const reg = await fetchMpRegistry({ includeMpOrderIds: [id], includeOnly: true })
@@ -252,48 +304,24 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
         const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
         const mp = list.find((o) => o && o.id === id)
         if (!mp) {
-          setErr('招募单不存在或已结束')
+          if (alive) setErr('招募单不存在或已结束')
           return
         }
-        const rawStatus = String(mp.status || '')
-        const isEnded =
-          rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'
-        const gate = evaluateContactPrGate(mp, id)
-        if (gate.hasApplication && gate.applicant) {
-          const entry = applicationFromMpOrder(mp, gate.applicant as Record<string, unknown>)
-          if (entry) upsertApplication(entry)
-        }
-        const canViewEnded =
-          gate.hasApplication ||
-          hasAppliedToOrder(id) ||
-          (role === 'pr' && mpOrderOwnedByCurrentPr(mp, getAccount()))
-        if (isEnded && !canViewEnded) {
-          setErr('该招募已结束')
-          return
-        }
-        const enriched = enrichMpOrder(mp)
-        setMpRegistry(reg as Record<string, unknown>)
-        setMpRaw(mp)
-        setView(enriched)
-        setReadOnlyEnded(isEnded && canViewEnded)
-        setContactGate(gate)
-        setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
-        const inviteState = resolveTargetedInviteState(mp, resolveTalentMemberId())
-        setShowTargetedInviteActions(inviteState.showTargetedInviteActions)
-        setTargetedInviteStatus(inviteState.targetedInviteStatus)
-        setTargetedInviteStatusLabel(inviteState.targetedInviteStatusLabel)
+        writeOrderDetail(mp)
+        applyOrder(mp, reg as Record<string, unknown>)
         if (detailViewBumpRef.current !== id) {
           detailViewBumpRef.current = id
-          void bumpMpRecruitmentEngagement(id, 'detail_view')
-            .then(() => clearMpRegistryCache())
-            .catch(() => {})
+          void bumpMpRecruitmentEngagement(id, 'detail_view').catch(() => {})
         }
       } catch (e) {
-        setErr(e instanceof Error ? e.message : '加载失败')
+        if (alive) setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
     })()
+    return () => {
+      alive = false
+    }
   }, [id])
 
   useEffect(() => {
@@ -492,6 +520,7 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
     const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
     const mp = list.find((o) => o && o.id === id)
     if (!mp) return
+    writeOrderDetail(mp)
     const rawStatus = String(mp.status || '')
     const isEnded =
       rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'

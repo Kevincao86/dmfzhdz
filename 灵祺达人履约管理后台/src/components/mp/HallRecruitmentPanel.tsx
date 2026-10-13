@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchMpRegistry } from '../../lib/mpApi'
+import { readHallOrders, writeHallOrders } from '../../lib/mpRecruitment/hallOrderCache'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
 import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
@@ -207,35 +208,51 @@ export default function HallRecruitmentPanel({ prMode = false, expandedId = '', 
   }, [])
 
   useEffect(() => {
-    ;(async () => {
+    let alive = true
+    function paint(reg: Record<string, unknown>) {
+      if (!alive) return
+      const mpOrders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+      setMpById(
+        new Map(
+          mpOrders.map((o) => [String((o as { id?: string })?.id || ''), o as Record<string, unknown>]),
+        ),
+      )
+      const mapped = loadAllOrderRows(reg)
+      const { normalRows: n, urgentRows: u, shootRows: sh, editRows: ed, iceRows: i, todayCount: tc } =
+        splitRoleHallRows(mapped, hallIdentity)
+      setNormalRows(listFilters.mergeHallDisplayRows(n, { allowDemo: showDemoOrders() }))
+      setUrgentRows(u)
+      setShootRows(sh)
+      setEditRows(ed)
+      setIceRows(i)
+      setTodayCount(tc)
+      if (hallIdentity === 'edit') setPaichianSubTab('edit')
+      else if (hallIdentity === 'shoot') setPaichianSubTab('shoot')
+      else if (hallIdentity === 'talent' && !sh.length && !ed.length && i.length) setPaichianSubTab('ice')
+    }
+    const cached = readHallOrders()
+    if (cached.length) {
+      paint({ mpRecruitmentOrders: cached })
+      setLoading(false)
+    } else {
       setLoading(true)
+    }
+    ;(async () => {
       setErr('')
       try {
         const reg = await fetchMpRegistry()
         const mpOrders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-        setMpById(
-          new Map(
-            mpOrders.map((o) => [String((o as { id?: string })?.id || ''), o as Record<string, unknown>]),
-          ),
-        )
-        const mapped = loadAllOrderRows(reg)
-        const { normalRows: n, urgentRows: u, shootRows: sh, editRows: ed, iceRows: i, todayCount: tc } =
-          splitRoleHallRows(mapped, hallIdentity)
-        setNormalRows(listFilters.mergeHallDisplayRows(n, { allowDemo: showDemoOrders() }))
-        setUrgentRows(u)
-        setShootRows(sh)
-        setEditRows(ed)
-        setIceRows(i)
-        setTodayCount(tc)
-        if (hallIdentity === 'edit') setPaichianSubTab('edit')
-        else if (hallIdentity === 'shoot') setPaichianSubTab('shoot')
-        else if (hallIdentity === 'talent' && !sh.length && !ed.length && i.length) setPaichianSubTab('ice')
+        writeHallOrders(mpOrders as Record<string, unknown>[])
+        paint(reg)
       } catch (e) {
-        setErr(e instanceof Error ? e.message : '加载失败')
+        if (!cached.length) setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
     })()
+    return () => {
+      alive = false
+    }
   }, [hallIdentity])
 
   const roleHint =

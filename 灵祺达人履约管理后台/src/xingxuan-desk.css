@@ -946,7 +946,8 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .talent-home__announce-more {
   z-index: 81;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: clip;
+  contain: paint;
   box-sizing: border-box;
   background: var(--panel-card, #fff);
   border: 1px solid var(--shell-border, #e7e1d6);
@@ -983,8 +984,23 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .talent-home__announce-more {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overflow-x: hidden;
   opacity: 0;
-  padding: 0 0.85rem 1rem;
+  padding: 0 0.85rem 1.25rem;
+}
+.order-expand-detail .recruitment-detail-body {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.order-expand-detail .mockup-tips-card {
+  position: static;
+  top: auto;
+}
+.order-expand-detail .mockup-sticky-actions {
+  position: static;
+  margin-top: 1rem;
+  padding: 0.75rem 0 0;
+  background: var(--panel-card, #fff);
 }
 .order-expand-card--open .order-expand-card__body {
   opacity: 1;

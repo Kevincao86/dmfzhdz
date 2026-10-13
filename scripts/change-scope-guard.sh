@@ -1564,6 +1564,7 @@ HallPage
 HallRecruitmentPanel
 RecommendHallPanel
 RecruitmentDetailPage
+hallOrderCache
 switchWorkIdentity
 memberProfileApplyGate
 formRelayGroupQrFeature
