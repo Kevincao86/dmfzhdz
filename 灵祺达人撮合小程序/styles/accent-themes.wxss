@@ -1,3 +1,5 @@
+@import './accent-dark-surfaces.wxss';
+
 /* 用户自选主题色：板块、卡片、子页头图跟随 --lq-card / --lq-border */
 .lq-accent-on .wb-quick-grid,
 .lq-accent-on .wb-biz-grid,
@@ -83,4 +85,55 @@
 
 .tab-bar.lq-accent-dark .tab-item.active .tab-text {
   color: #fafafa;
+}
+
+/* 暗黑：写死的深色字统一提亮。分数环保持浅底，数字仍用紫色。 */
+.lq-accent-dark view,
+.lq-accent-dark text,
+.lq-accent-dark button,
+.lq-accent-dark input,
+.lq-accent-dark textarea,
+.lq-accent-dark navigator,
+.lq-accent-dark label {
+  color: #f4f4f5 !important;
+}
+
+.lq-accent-dark .home-entry__sub,
+.lq-accent-dark .home-search-v2__ph,
+.lq-accent-dark .eval-tab-tx,
+.lq-accent-dark .tab-text,
+.lq-accent-dark .hint,
+.lq-accent-dark .form-label,
+.lq-accent-dark .did,
+.lq-accent-dark .page-hero-sub,
+.lq-accent-dark .wb-stat-lbl,
+.lq-accent-dark .mine-accent-cap {
+  color: #a1a1aa !important;
+}
+
+.lq-accent-dark .score {
+  color: #5b21b6 !important;
+}
+
+.lq-accent-dark .home-chip--on,
+.lq-accent-dark .gender-chip--on,
+.lq-accent-dark .btn-primary,
+.lq-accent-dark .btn-main,
+.lq-accent-dark .plat--on,
+.lq-accent-dark .eval-tab--on .eval-tab-tx,
+.lq-accent-dark .tab-item.active .tab-text,
+.lq-accent-dark .mine-accent-hit.is-on .mine-accent-cap,
+.lq-accent-dark .home-hall-mini__item--on {
+  color: #fafafa !important;
+}
+
+.lq-accent-dark .job-card-v1__ai-tag,
+.lq-accent-dark .job-card-v1__meta-pill,
+.lq-accent-dark .home-chip--on,
+.lq-accent-dark .gender-chip--on,
+.lq-accent-dark .btn-primary,
+.lq-accent-dark .btn-main,
+.lq-accent-dark .plat--on {
+  background-color: #3f3f46 !important;
+  border-color: #71717a !important;
 }

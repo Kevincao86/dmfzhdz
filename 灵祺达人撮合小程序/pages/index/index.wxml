@@ -108,14 +108,20 @@
       <view
         wx:for="{{homeEntries}}"
         wx:key="key"
-        class="home-entry__card home-entry__card--img"
+        class="home-entry__card {{lqAccentClass ? '' : 'home-entry__card--img'}}"
         hover-class="tap-press"
         hover-stay-time="80"
         data-key="{{item.key}}"
         bindtap="goHomeEntry"
       >
-        <image class="home-entry__img" src="{{item.url}}" mode="aspectFill" />
-        <view class="home-entry__shade"></view>
+        <block wx:if="{{lqAccentClass}}">
+          <text class="home-entry__title">{{item.title}}</text>
+          <text class="home-entry__sub">{{item.sub}}</text>
+        </block>
+        <block wx:else>
+          <image class="home-entry__img" src="{{item.url}}" mode="aspectFill" />
+          <view class="home-entry__shade"></view>
+        </block>
       </view>
     </view>
 

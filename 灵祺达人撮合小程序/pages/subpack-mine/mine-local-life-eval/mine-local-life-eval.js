@@ -36,7 +36,7 @@ function radarRows(situations) {
   })
 }
 
-function paintRadar(ctx, w, h, rows, progress, sweep, showScore) {
+function paintRadar(ctx, w, h, rows, progress, sweep, showScore, dark) {
   ctx.clearRect(0, 0, w, h)
   const cx = w / 2
   const cy = h * 0.5
@@ -46,7 +46,7 @@ function paintRadar(ctx, w, h, rows, progress, sweep, showScore) {
     const ang = -Math.PI / 2 + (index * 2 * Math.PI) / count
     return { x: cx + Math.cos(ang) * radius * ratio, y: cy + Math.sin(ang) * radius * ratio, ang }
   }
-  ctx.strokeStyle = '#d7e4f4'
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.2)' : '#d7e4f4'
   ctx.lineWidth = 1
   ;[0.25, 0.5, 0.75, 1].forEach((ring) => {
     ctx.beginPath()
@@ -100,11 +100,11 @@ function paintRadar(ctx, w, h, rows, progress, sweep, showScore) {
     const p = point(index, 1.38)
     const cos = Math.cos(p.ang)
     ctx.textAlign = cos > 0.34 ? 'left' : cos < -0.34 ? 'right' : 'center'
-    ctx.fillStyle = '#1e293b'
+    ctx.fillStyle = dark ? '#f4f4f5' : '#1e293b'
     ctx.font = '600 12px sans-serif'
     ctx.fillText(row.name, p.x, p.y - 8)
     if (showScore) {
-      ctx.fillStyle = '#1d4ed8'
+      ctx.fillStyle = dark ? '#93c5fd' : '#1d4ed8'
       ctx.font = '700 12px sans-serif'
       ctx.fillText(Math.round(row.points * progress) + '/' + row.max, p.x, p.y + 10)
     }
@@ -269,6 +269,7 @@ Page({
       progress,
       sweep,
       !!this.data.scoreReady,
+      String(this.data.lqAccentClass || '').indexOf('lq-accent-dark') >= 0,
     )
   },
 

@@ -77,21 +77,21 @@ function homeEntryUrl(name) {
   return `${base}/home/${name}?v=20261003c`
 }
 
-function homeEntry(key, file) {
-  return { key, url: homeEntryUrl(file) }
+function homeEntry(key, file, title, sub) {
+  return { key, url: homeEntryUrl(file), title, sub }
 }
 
 function homeEntriesForIdentity(identity) {
   const posterTalent = homeBannerAssets.posterDefault
   const shared = [
-    homeEntry('calendar', 'entry-calendar.jpg'),
-    homeEntry('aiReview', 'entry-ai-review.jpg'),
+    homeEntry('calendar', 'entry-calendar.jpg', '商单日历', '查看档期安排'),
+    homeEntry('aiReview', 'entry-ai-review.jpg', 'AI视频审核', '审核视频素材'),
   ]
   if (identity === 'pr') {
     return {
       homeEntries: [
-        homeEntry('publish', 'entry-publish.jpg'),
-        homeEntry('apps', 'entry-orders.jpg'),
+        homeEntry('publish', 'entry-publish.jpg', '发招募', '发布新商单'),
+        homeEntry('apps', 'entry-orders.jpg', '我的发单', '查看报名情况'),
         ...shared,
       ],
       posterPresetUrl: homeEntryUrl('poster-pr.jpg'),
@@ -100,8 +100,8 @@ function homeEntriesForIdentity(identity) {
   if (identity === 'shoot' || identity === 'edit') {
     return {
       homeEntries: [
-        homeEntry('course', 'entry-course.jpg'),
-        homeEntry('apps', 'entry-apply.jpg'),
+        homeEntry('course', 'entry-course.jpg', '培训课程', '学习拍摄剪辑'),
+        homeEntry('apps', 'entry-apply.jpg', '我的报名', '进行中的商单'),
         ...shared,
       ],
       posterPresetUrl: posterTalent,
@@ -109,8 +109,8 @@ function homeEntriesForIdentity(identity) {
   }
   return {
     homeEntries: [
-      homeEntry('eval', 'entry-eval.jpg'),
-      homeEntry('apps', 'entry-apply.jpg'),
+      homeEntry('eval', 'entry-eval.jpg', '达人账号分析', '看带货等级'),
+      homeEntry('apps', 'entry-apply.jpg', '我的报名', '进行中的商单'),
       ...shared,
     ],
     posterPresetUrl: posterTalent,

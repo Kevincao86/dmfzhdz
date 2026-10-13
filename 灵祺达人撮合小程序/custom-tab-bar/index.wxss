@@ -448,3 +448,34 @@
 .tab-icon.is-active .ico-user-head {
   background: var(--lq-active-tint);
 }
+
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-home-roof {
+  border-bottom-color: #fafafa;
+}
+
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-home-body,
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-chat,
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-chat-tail,
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-user-head,
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-user-shoulder {
+  border-color: #fafafa;
+}
+
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-home-door,
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-star {
+  background: #fafafa;
+}
+
+.tab-bar.lq-accent-dark .ico-insight {
+  background: #3f3f46;
+  box-shadow: none;
+}
+
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-insight {
+  background: #fafafa;
+  box-shadow: none;
+}
+
+.tab-bar.lq-accent-dark .tab-icon.is-active .ico-insight-spark {
+  background: #18181b;
+}
