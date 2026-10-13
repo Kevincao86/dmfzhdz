@@ -8,11 +8,17 @@ const memberStore = require('../../utils/talentMember.js')
 const memberProfileApplyGate = require('../../utils/memberProfileApplyGate.js')
 const recruitApplyGate = require('../../utils/recruitApplyGate.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
+const orderFavorites = require('../../utils/orderFavorites.js')
 
 function openBox() {
   const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+  let menuBottom = 88
+  try {
+    const menu = wx.getMenuButtonBoundingClientRect()
+    if (menu && menu.bottom) menuBottom = menu.bottom
+  } catch (_) {}
   const margin = 12
-  const top = 56
+  const top = Math.max(menuBottom + 12, 96)
   const tab = 96
   const safe = win.safeAreaInsets && win.safeAreaInsets.bottom ? win.safeAreaInsets.bottom : 0
   return {
@@ -53,6 +59,8 @@ Component({
     isIce: false,
     isFormRelay: false,
     merchantOrderNo: '',
+    favorited: false,
+    shareCover: '',
   },
   observers: {
     'opened, origin': function () {
@@ -77,6 +85,18 @@ Component({
     },
     onMask() {
       this.triggerEvent('close')
+    },
+    onToggleFavorite() {
+      const id = String(this.data.orderId || '')
+      if (!id) return
+      if (!auth.isLoggedIn()) {
+        guestRoutes.redirectToLogin('/pages/index/index')
+        return
+      }
+      const favorited = orderFavorites.toggleFavorite(id)
+      this.setData({ favorited })
+      this.triggerEvent('favorite', { id, favorited })
+      wx.showToast({ title: favorited ? '已收藏' : '已取消收藏', icon: 'none' })
     },
     load(id) {
       const token = (this._loadToken || 0) + 1
@@ -121,7 +141,10 @@ Component({
             isIce: !!view.isIce,
             isFormRelay: !!view.isFormRelay,
             merchantOrderNo: view.merchantOrderNo || '',
+            favorited: orderFavorites.isFavorite(id),
+            shareCover: cover,
           })
+          this.triggerEvent('meta', { id, title: view.title || '', cover })
         })
         .catch((e) => {
           if (this._loadToken !== token) return

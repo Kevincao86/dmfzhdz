@@ -5,7 +5,17 @@
 >
   <view class="order-expand-card {{opened ? 'is-open' : ''}}" style="{{cardStyle}}" catchtap="noop">
     <view class="order-expand-card__bar">
-      <text class="order-expand-card__close" bindtap="onMask">关闭</text>
+      <view class="order-expand-card__x" bindtap="onMask" aria-label="关闭">×</view>
+      <view class="order-expand-card__tools">
+        <view class="order-expand-card__tool" bindtap="onToggleFavorite">
+          <text class="order-expand-card__tool-icon {{favorited ? 'is-on' : ''}}">★</text>
+          <text>{{favorited ? '已收藏' : '收藏'}}</text>
+        </view>
+        <button class="order-expand-card__tool order-expand-card__tool--share" open-type="share" hover-class="none">
+          <text class="order-expand-card__tool-icon">↗</text>
+          <text>分享</text>
+        </button>
+      </view>
     </view>
     <scroll-view class="order-expand-card__body" scroll-y enhanced show-scrollbar="{{false}}">
       <view wx:if="{{loading}}" class="order-expand-card__state">加载任务详情…</view>

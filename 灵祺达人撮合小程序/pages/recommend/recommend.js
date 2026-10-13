@@ -631,6 +631,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     expandOrderId: '',
     expandOrigin: null,
     expandOpen: false,
+    expandShareTitle: '',
+    expandShareCover: '',
     spotlightRows: [],
     stripMode: 'hotcity',
     stripTitle: '热门 · 同城急单',
@@ -716,6 +718,17 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
+    const id = String(this.data.expandOrderId || '')
+    if (id) {
+      const recruitShareCover = require('../../utils/recruitShareCover.js')
+      const share = {
+        title: this.data.expandShareTitle || '招募商单',
+        path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}`,
+      }
+      const cover = String(this.data.expandShareCover || '').trim()
+      if (cover) return recruitShareCover.attachShareCoverPromise(share, cover)
+      return share
+    }
     return mpShare.defaultShare('/pages/recommend/recommend')
   },
   onShareTimeline() {
@@ -1558,6 +1571,23 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       setTimeout(() => {
         if (this.data.expandOrderId === orderId) this.setData({ expandOpen: true })
       }, 32)
+    })
+  },
+  onOrderExpandMeta(e) {
+    const detail = (e && e.detail) || {}
+    this.setData({
+      expandShareTitle: detail.title || '',
+      expandShareCover: detail.cover || '',
+    })
+  },
+  onOrderExpandFavorite(e) {
+    const id = e && e.detail ? e.detail.id : ''
+    const favorited = !!(e && e.detail && e.detail.favorited)
+    if (!id) return
+    const mark = (list) => (list || []).map((r) => (r && r.id === id ? { ...r, favorited } : r))
+    this.setData({
+      orderDisplayRows: mark(this.data.orderDisplayRows),
+      spotlightRows: mark(this.data.spotlightRows),
     })
   },
   onCloseOrderExpand() {

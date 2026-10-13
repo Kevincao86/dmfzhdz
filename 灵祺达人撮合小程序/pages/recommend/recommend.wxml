@@ -539,5 +539,7 @@
     origin="{{expandOrigin}}"
     opened="{{expandOpen}}"
     bind:close="onCloseOrderExpand"
+    bind:meta="onOrderExpandMeta"
+    bind:favorite="onOrderExpandFavorite"
   />
 </view>

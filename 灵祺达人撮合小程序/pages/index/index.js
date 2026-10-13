@@ -255,6 +255,8 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     expandOrderId: '',
     expandOrigin: null,
     expandOpen: false,
+    expandShareTitle: '',
+    expandShareCover: '',
     tabCounts: { normal: 0, urgent: 0, shoot: 0, edit: 0, ice: 0 },
     categoryChips: HOME_CATEGORY_CHIPS,
     activeCategoryChip: 'all',
@@ -331,6 +333,17 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
+    const id = String(this.data.expandOrderId || '')
+    if (id) {
+      const recruitShareCover = require('../../utils/recruitShareCover.js')
+      const share = {
+        title: this.data.expandShareTitle || '招募商单',
+        path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}`,
+      }
+      const cover = String(this.data.expandShareCover || '').trim()
+      if (cover) return recruitShareCover.attachShareCoverPromise(share, cover)
+      return share
+    }
     return mpShare.defaultShare('/pages/index/index')
   },
   onShareTimeline() {
@@ -963,6 +976,22 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         if (this.data.expandOrderId === id) this.setData({ expandOpen: true })
       }, 32)
     })
+  },
+  onOrderExpandMeta(e) {
+    const detail = (e && e.detail) || {}
+    this.setData({
+      expandShareTitle: detail.title || '',
+      expandShareCover: detail.cover || '',
+    })
+  },
+  onOrderExpandFavorite(e) {
+    const id = e && e.detail ? e.detail.id : ''
+    const favorited = !!(e && e.detail && e.detail.favorited)
+    if (!id) return
+    const displayRows = (this.data.displayRows || []).map((r) =>
+      r && r.id === id ? { ...r, favorited } : r,
+    )
+    this.setData({ displayRows })
   },
   onCloseOrderExpand() {
     if (!this.data.expandOrderId) return
