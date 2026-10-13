@@ -1,4 +1,5 @@
-<scroll-view class="manual-page foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view class="{{lqAccentClass}} manual-page foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="card manual-hero">
     <text class="title-lg">{{productName}}</text>
     <text class="hint">当前功能与操作方式</text>

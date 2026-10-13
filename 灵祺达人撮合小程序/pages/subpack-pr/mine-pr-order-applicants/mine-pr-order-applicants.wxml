@@ -1,5 +1,6 @@
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
 <template name="applicantFitPanels">
-  <view class="applicant-fit {{below ? 'applicant-fit--below' : ''}}">
+  <view class="{{lqAccentClass}} applicant-fit {{below ? 'applicant-fit--below' : ''}}" style="{{lqPageStyle}}">
     <view class="applicant-fit__panel applicant-fit__panel--profile">
       <view class="applicant-fit__head">
         <view class="applicant-fit__badge applicant-fit__badge--profile">

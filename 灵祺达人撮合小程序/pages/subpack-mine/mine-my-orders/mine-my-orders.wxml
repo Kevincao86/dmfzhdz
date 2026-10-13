@@ -1,4 +1,5 @@
-<view class="orders-page {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} orders-page {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view class="orders-tabs">
     <view
       class="orders-tab {{tab === 'spend' ? 'is-active' : ''}}"

@@ -1,4 +1,5 @@
-<view class="tgt-inv-page {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} tgt-inv-page {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view wx:if="{{loading}}" class="addon-hint" style="margin:24rpx;">加载中…</view>
   <view wx:elif="{{!rows.length}}" class="addon-card" style="margin-top:20rpx;">
     <text class="addon-card__title">暂无定向邀约</text>

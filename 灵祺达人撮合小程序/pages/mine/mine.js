@@ -24,18 +24,9 @@ const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const training = require('../../utils/mpTraining.js')
+const accentTheme = require('../../utils/accentTheme.js')
 
-const MINE_THEME_KEY = 'mineThemeColorOn'
 const THEME_VEIL_MS = 560
-
-function readMineThemeOn() {
-  try {
-    const v = wx.getStorageSync(MINE_THEME_KEY)
-    return v === '1' || v === true
-  } catch (_) {
-    return false
-  }
-}
 
 const MY_ORDERS_MENU = {
   key: 'myOrders',
@@ -448,8 +439,7 @@ Page({
     membershipExpiryLabel: '',
     membershipCtaLabel: '升级会员',
     statusBarHeightPx: 32,
-    themeColorOn: false,
-    themeColorApplied: false,
+    accentSwatches: accentTheme.SWATCHES,
     themeVeilOn: false,
     themeVeilAnimate: false,
     themeVeilOpen: false,
@@ -458,8 +448,6 @@ Page({
   onLoad() {
     applyCapsulePadding(this, null, { band: 'headerBandStyle', right: 'headerInnerStyle' })
     this.applyMineStatusBarMetrics()
-    const themeOn = readMineThemeOn()
-    this.setData({ themeColorOn: themeOn, themeColorApplied: themeOn })
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -489,12 +477,12 @@ Page({
         displaySub: '页面加载异常，请删除小程序后重试',
       })
       wx.showToast({ title: '我的页加载失败', icon: 'none' })
-      this.syncMineStatusBar(!!this.data.themeColorApplied)
+      this.syncMineStatusBar(!!accentTheme.readId())
       return
     }
     void this.refreshNotifyBadge()
     void this.refreshCalendarTodoBadge()
-    this.syncMineStatusBar(!!this.data.themeColorApplied)
+    this.syncMineStatusBar(!!accentTheme.readId())
 
     const now = Date.now()
     if (this._lastMineSyncAt && now - this._lastMineSyncAt < 45000) return
@@ -543,28 +531,31 @@ Page({
     } catch (_) {}
   },
   syncMineStatusBar(on) {
-    const color = identityTheme.pack(this.data.identity || userProfile.readIdentity()).navBar
+    const accent = on ? accentTheme.pack(accentTheme.readId()) : null
+    const color = accent ? accent.nav : '#f7f3ec'
     try {
       wx.setNavigationBarColor({
         frontColor: on ? '#ffffff' : '#000000',
-        backgroundColor: on ? color : '#f7f3ec',
+        backgroundColor: color,
         animation: { duration: 0, timingFunc: 'linear' },
       })
     } catch (_) {}
   },
-  onToggleThemeColor() {
+  onPickAccent(e) {
     if (this._themeAnimating) return
-    const next = !this.data.themeColorOn
+    const id = e.currentTarget.dataset.id
+    const chosen = accentTheme.pack(id)
+    if (!chosen) return
+    const retract = this.data.accentId === id
     this._themeAnimating = true
-    this._themeTarget = next
-    try {
-      wx.setStorageSync(MINE_THEME_KEY, next ? '1' : '0')
-    } catch (_) {}
+    this._themeTarget = retract ? '' : id
     const query = wx.createSelectorQuery().in(this)
-    query.select('.mine-theme-switch').boundingClientRect()
+    query.selectAll('.mine-accent-dot').boundingClientRect()
     query.exec((res) => {
       if (!this._themeAnimating) return
-      const rect = res && res[0]
+      const rects = (res && res[0]) || []
+      const idx = (this.data.accentSwatches || []).findIndex((item) => item.id === id)
+      const rect = rects[idx]
       const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
       const cx = rect ? rect.left + rect.width / 2 : win.windowWidth - 36
       const cy = rect ? rect.top + rect.height / 2 : 48
@@ -572,14 +563,12 @@ Page({
       const dy = Math.max(cy, win.windowHeight - cy)
       const radius = Math.ceil(Math.sqrt(dx * dx + dy * dy)) + 2
       const size = radius * 2
-      const color = identityTheme.pack(this.data.identity || userProfile.readIdentity()).navBar
-      const style = `width:${size}px;height:${size}px;left:${cx - radius}px;top:${cy - radius}px;background:${color};`
+      const style = `width:${size}px;height:${size}px;left:${cx - radius}px;top:${cy - radius}px;background:${chosen.nav};`
       if (this._veilTimer) clearTimeout(this._veilTimer)
       this._veilTimer = setTimeout(() => this.finishThemeVeil(), THEME_VEIL_MS + 90)
-      if (next) {
+      if (!retract) {
         this.setData(
           {
-            themeColorOn: true,
             themeVeilOn: true,
             themeVeilAnimate: false,
             themeVeilOpen: false,
@@ -594,10 +583,9 @@ Page({
         )
         return
       }
+      accentTheme.save('')
       this.setData(
         {
-          themeColorOn: false,
-          themeColorApplied: false,
           themeVeilOn: true,
           themeVeilAnimate: false,
           themeVeilOpen: true,
@@ -625,14 +613,14 @@ Page({
       clearTimeout(this._veilTimer)
       this._veilTimer = null
     }
-    const applied = !!this._themeTarget
+    const id = this._themeTarget || ''
+    if (id) accentTheme.save(id)
     this.setData({
-      themeColorApplied: applied,
       themeVeilOn: false,
       themeVeilAnimate: false,
       themeVeilOpen: false,
     })
-    this.syncMineStatusBar(applied)
+    this.syncMineStatusBar(!!id)
   },
   refresh() {
     const identity = userProfile.readIdentity()

@@ -1,4 +1,5 @@
-<view class="tp foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} tp foot-col" style="{{lqPageStyle}}">
   <view class="tp-hero">
     <text class="tp-hero__kicker">本地生活培训</text>
     <text class="tp-hero__title">{{view === 'form' ? (editingId ? '编辑培训' : '新增培训') : '我的课程'}}</text>

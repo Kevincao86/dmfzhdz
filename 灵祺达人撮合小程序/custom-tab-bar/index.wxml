@@ -1,4 +1,4 @@
-<view class="tab-bar {{lqThemeClass}} {{hasCenterFab ? 'tab-bar--fab' : ''}} {{guideOn ? 'tab-bar--guide' : ''}}" wx:if="{{!hidden}}">
+<view class="tab-bar {{lqThemeClass}} {{lqAccentClass}} {{hasCenterFab ? 'tab-bar--fab' : ''}} {{guideOn ? 'tab-bar--guide' : ''}}" style="{{lqPageStyle}}" wx:if="{{!hidden}}">
   <view
     wx:for="{{list}}"
     wx:key="pagePath"

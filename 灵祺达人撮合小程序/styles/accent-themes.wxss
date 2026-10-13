@@ -1,0 +1,19 @@
+/* 用户自选主题色：板块、卡片、子页头图跟随 --lq-card / --lq-border */
+.lq-accent-on .wb-quick-grid,
+.lq-accent-on .wb-biz-grid,
+.lq-accent-on .mp-sub-hero,
+.lq-accent-on .mp-sub-hero--blue,
+.lq-accent-on .xingxuan-card {
+  background: var(--lq-card);
+  border-color: var(--lq-border);
+}
+
+.lq-accent-on [class*='card']:not([class*='__']) {
+  background: var(--lq-card) !important;
+  border-color: var(--lq-border) !important;
+}
+
+.tab-bar.lq-accent-on {
+  background: var(--lq-card);
+  border-top-color: var(--lq-border);
+}

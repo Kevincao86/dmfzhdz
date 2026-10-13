@@ -1,4 +1,5 @@
-<view class="msg-page page-with-bar page-shell-fixed {{lqThemeClass}}">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} msg-page page-with-bar page-shell-fixed {{lqThemeClass}}" style="{{lqPageStyle}}">
   <feature-guide page="messages" />
   <view class="msg-nav lq-hero-header lq-hero-header--home" style="{{recHeadBandStyle}}">
     <view class="msg-nav-inner lq-hero-header__inner" style="{{recHeadInnerStyle}}">

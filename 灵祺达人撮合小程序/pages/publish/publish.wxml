@@ -1,5 +1,6 @@
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
 <template name="pubLifeBg">
-  <view class="pub-life-bg" aria-hidden="true">
+  <view class="{{lqAccentClass}} pub-life-bg" aria-hidden="true" style="{{lqPageStyle}}">
     <view class="pub-life-blob pub-life-blob--1"></view>
     <view class="pub-life-blob pub-life-blob--2"></view>
     <view class="pub-life-blob pub-life-blob--3"></view>

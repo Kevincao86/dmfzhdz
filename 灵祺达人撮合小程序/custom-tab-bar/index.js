@@ -64,6 +64,8 @@ Component({
     hasCenterFab: false,
     chatBadge: 0,
     lqThemeClass: identityTheme.themeClass(userProfile.readIdentity()),
+    lqAccentClass: '',
+    lqPageStyle: '',
     list: getTabList(userProfile.readIdentity()),
     guideOn: false,
     guideStep: 0,
@@ -175,11 +177,14 @@ Component({
       const list = getTabList(identity)
       const hasCenterFab = list.some((item) => item && item.center)
       const lqThemeClass = identityTheme.themeClass(identity)
+      const accent = require('../utils/accentTheme.js').viewModel()
       const cur = this.data.list || []
       const same =
         cur.length === list.length && cur.every((item, i) => item.pagePath === list[i].pagePath)
       const patch = {}
       if (this.data.lqThemeClass !== lqThemeClass) patch.lqThemeClass = lqThemeClass
+      if (this.data.lqAccentClass !== accent.lqAccentClass) patch.lqAccentClass = accent.lqAccentClass
+      if (this.data.lqPageStyle !== accent.lqPageStyle) patch.lqPageStyle = accent.lqPageStyle
       if (!same || this.data.hasCenterFab !== hasCenterFab) {
         patch.list = list
         patch.hasCenterFab = hasCenterFab

@@ -52,63 +52,63 @@
   background: #efe8dc;
 }
 
-.mine-page.mine-theme-color {
-  background: var(--lq-primary, #7c4dff);
+.mine-page.lq-accent-on {
+  background: var(--lq-bg);
 }
 
-.mine-page.mine-theme-color .wb-hero,
-.mine-page.mine-theme-color .lq-hero-header {
-  background: var(--lq-primary, #7c4dff);
+.mine-page.lq-accent-on .wb-hero,
+.mine-page.lq-accent-on .lq-hero-header {
+  background: var(--lq-primary);
 }
 
-.mine-page.mine-theme-color .wb-name,
-.mine-page.mine-theme-color .wb-nick-input {
+.mine-page.lq-accent-on .wb-name,
+.mine-page.lq-accent-on .wb-nick-input {
   color: #fff;
 }
 
-.mine-page.mine-theme-color .wb-sub,
-.mine-page.mine-theme-color .wb-id,
-.mine-page.mine-theme-color .wb-greeting {
+.mine-page.lq-accent-on .wb-sub,
+.mine-page.lq-accent-on .wb-id,
+.mine-page.lq-accent-on .wb-greeting {
   color: rgba(255, 255, 255, 0.86);
 }
 
-.mine-page.mine-theme-color .wb-role-pill,
-.mine-page.mine-theme-color .profile-badge {
+.mine-page.lq-accent-on .wb-role-pill,
+.mine-page.lq-accent-on .profile-badge {
   color: #fff;
   background: rgba(255, 255, 255, 0.22);
   border-color: rgba(255, 255, 255, 0.45);
 }
 
-.mine-page.mine-theme-color .profile-badge--muted {
+.mine-page.lq-accent-on .profile-badge--muted {
   color: rgba(255, 255, 255, 0.9);
   background: rgba(15, 23, 42, 0.15);
 }
 
-.mine-page.mine-theme-color .wb-avatar {
+.mine-page.lq-accent-on .wb-avatar {
   border-color: rgba(255, 255, 255, 0.92);
 }
 
-.mine-page.mine-theme-color .wb-avatar--ph {
+.mine-page.lq-accent-on .wb-avatar--ph {
   background: rgba(255, 255, 255, 0.2);
 }
 
-.mine-page.mine-theme-color .wb-membership-panel,
-.mine-page.mine-theme-color .wb-membership-panel--hover {
+.mine-page.lq-accent-on .wb-membership-panel,
+.mine-page.lq-accent-on .wb-membership-panel--hover {
   background: rgba(255, 255, 255, 0.18);
   border-color: rgba(255, 255, 255, 0.48);
 }
 
-.mine-page.mine-theme-color .wb-membership-kicker,
-.mine-page.mine-theme-color .wb-membership-plan {
+.mine-page.lq-accent-on .wb-membership-kicker,
+.mine-page.lq-accent-on .wb-membership-plan {
   color: #fff;
 }
 
-.mine-page.mine-theme-color .wb-membership-exp {
+.mine-page.lq-accent-on .wb-membership-exp {
   color: rgba(255, 255, 255, 0.78);
 }
 
-.mine-page.mine-theme-color .wb-section-title {
-  color: #fff;
+.mine-page.lq-accent-on .wb-section-title {
+  color: var(--lq-primary-dark);
 }
 
 .mine-page .wb-membership-panel,
@@ -155,55 +155,24 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 12rpx;
   box-sizing: border-box;
 }
 
-.mine-theme-switch {
-  width: 88rpx;
-  height: 88rpx;
-  margin-right: -8rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.mine-accent-dot {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 3rpx solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2rpx 8rpx rgba(20, 24, 31, 0.16);
 }
 
-.mine-theme-switch--hover {
-  opacity: 0.86;
-}
-
-.mine-theme-switch__track {
-  position: relative;
-  width: 84rpx;
-  height: 52rpx;
-  border-radius: 999rpx;
-  background: rgba(28, 25, 23, 0.12);
-  transition: background 0.2s ease;
-}
-
-.mine-theme-switch__thumb {
-  position: absolute;
-  top: 4rpx;
-  left: 4rpx;
+.mine-accent-dot.is-on {
   width: 44rpx;
   height: 44rpx;
-  border-radius: 50%;
-  background: var(--lq-primary, #7c4dff);
-  box-shadow: 0 2rpx 8rpx rgba(20, 24, 31, 0.16);
-  transition: transform 0.2s ease, background 0.2s ease;
-}
-
-.mine-theme-switch.is-on .mine-theme-switch__track {
-  background: var(--lq-primary, #7c4dff);
-}
-
-.mine-theme-switch.is-on .mine-theme-switch__thumb {
-  transform: translateX(32rpx);
-  background: #fffdf8;
-}
-
-.mine-page.mine-theme-color .mine-theme-switch.is-on .mine-theme-switch__track {
-  background: rgba(255, 255, 255, 0.28);
+  border-color: #fff;
+  box-shadow: 0 0 0 4rpx var(--lq-primary, #7c4dff);
 }
 
 .mine-theme-veil {
@@ -494,7 +463,7 @@
   display: flex;
   margin: 8rpx 28rpx 8rpx;
   padding: 20rpx 12rpx;
-  background: #fff;
+  background: var(--lq-card, #fff);
   border-radius: 24rpx;
   border: 2rpx solid rgba(255, 255, 255, 0.95);
   box-shadow: var(--lq-shadow-soft);
@@ -636,7 +605,7 @@
 .wb-quick-grid {
   display: flex;
   flex-wrap: nowrap;
-  background: #fff;
+  background: var(--lq-card, #fff);
   border-radius: 24rpx;
   padding: 16rpx 8rpx 10rpx;
   box-shadow: var(--lq-shadow-soft);
@@ -730,7 +699,7 @@
 .wb-biz-grid {
   display: flex;
   flex-wrap: wrap;
-  background: #fff;
+  background: var(--lq-card, #fff);
   border-radius: 24rpx;
   padding: 16rpx 8rpx 10rpx;
   box-shadow: var(--lq-shadow-soft);
@@ -752,7 +721,7 @@
 
 /* —— 业务管理列表 —— */
 .wb-biz-card {
-  background: #fff;
+  background: var(--lq-card, #fff);
   border-radius: 24rpx;
   overflow: hidden;
   box-shadow: var(--lq-shadow-soft);

@@ -1,4 +1,5 @@
-<view class="portal-page foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} portal-page foot-col" style="{{lqPageStyle}}">
   <scroll-view scroll-y class="portal-scroll" enhanced show-scrollbar="{{false}}">
     <view class="mp-sub-hero">
       <view class="mp-sub-hero__glow"></view>

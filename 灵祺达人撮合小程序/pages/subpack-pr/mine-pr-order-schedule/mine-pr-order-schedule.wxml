@@ -1,4 +1,5 @@
-<view class="sch-page page-shell {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} sch-page page-shell {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view class="sch-hero card" wx:if="{{!loading}}">
     <text class="title-lg">{{pageTitle}}</text>
     <text class="hint">{{title}}</text>

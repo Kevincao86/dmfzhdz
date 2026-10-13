@@ -102,6 +102,9 @@ function applyToPage(page) {
   }
   if (Object.keys(patch).length) page.setData(patch)
   applyChrome(id, { animate: false })
+  try {
+    require('./accentTheme.js').pin(page)
+  } catch (_) {}
 }
 
 function tabListSame(a, b) {
@@ -149,6 +152,9 @@ function broadcast() {
     }
   } catch (_) {}
   syncTabBar()
+  try {
+    require('./accentTheme.js').pinAll()
+  } catch (_) {}
 }
 
 module.exports = {

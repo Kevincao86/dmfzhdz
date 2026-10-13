@@ -1,4 +1,5 @@
-<view class="reg-page {{newIdentity ? 'reg-page--' + newIdentity : ''}} {{stageMotion ? 'reg-page--play' : ''}}">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} reg-page {{newIdentity ? 'reg-page--' + newIdentity : ''}} {{stageMotion ? 'reg-page--play' : ''}}" style="{{lqPageStyle}}">
   <view class="reg-nav-back" bindtap="onBackLogin">‹ 返回</view>
   <image wx:if="{{stageSrc}}" class="reg-page__bg" src="{{stageSrc}}" mode="aspectFill" />
   <view class="reg-fx reg-fx--wash"></view>

@@ -1,4 +1,5 @@
-<view class="xingxuan-page {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} xingxuan-page {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view class="xingxuan-card" wx:if="{{showOa}}">
     <view class="row between">
       <text class="xingxuan-title">服务号通知</text>

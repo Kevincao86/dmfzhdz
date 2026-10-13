@@ -1,4 +1,5 @@
-<view class="app-list-page page-shell {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} app-list-page page-shell {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <scroll-view wx:if="{{rows.length > 0 || !loading}}" class="app-platform-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="app-platform-bar">
       <view

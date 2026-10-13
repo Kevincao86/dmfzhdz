@@ -1,4 +1,5 @@
-<view class="page" style="bottom: {{keyboardHeight}}px;">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} page" style="{{lqPageStyle}}bottom: {{keyboardHeight}}px;">
   <view class="status-bar">
     <text class="status-title">{{humanMode ? '人工客服已接入' : '联系客服 · 智能助手'}}</text>
     <text class="status-sub">{{statusSub}}</text>

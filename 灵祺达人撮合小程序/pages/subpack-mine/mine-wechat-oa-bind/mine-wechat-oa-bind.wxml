@@ -1,4 +1,5 @@
-<view class="oa-bind-page {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} oa-bind-page {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view class="oa-bind-hero">
     <view class="oa-bind-hero__badge">微信服务号</view>
     <text class="oa-bind-hero__title">服务号订阅通知</text>

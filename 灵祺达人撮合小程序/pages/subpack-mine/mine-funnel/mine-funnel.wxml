@@ -1,4 +1,5 @@
-<view class="xingxuan-page {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} xingxuan-page {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view class="xingxuan-card">
     <text class="xingxuan-title">招募漏斗概览</text>
     <text class="xingxuan-hint">统计您发单的曝光→报名→审核→成片全链路转化</text>

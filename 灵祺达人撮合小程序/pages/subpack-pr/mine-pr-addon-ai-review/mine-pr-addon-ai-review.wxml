@@ -1,4 +1,5 @@
-<view class="addon-page addon-page--review {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} addon-page addon-page--review {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view class="addon-hero-brief addon-hero-brief--review">
     <view class="addon-hero-brief__glow"></view>
     <view class="addon-hero-brief__inner">

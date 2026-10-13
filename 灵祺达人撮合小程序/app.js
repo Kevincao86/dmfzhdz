@@ -2,6 +2,24 @@ const config = require('./utils/config.js')
 const mpRuntime = require('./utils/mpRuntime.js')
 const mpPrivacyAuthorize = require('./utils/mpPrivacyAuthorize.js')
 
+const _NativePage = Page
+Page = function (opts) {
+  const pageOpts = opts || {}
+  try {
+    const accentTheme = require('./utils/accentTheme.js')
+    pageOpts.data = Object.assign({}, accentTheme.viewModel(), pageOpts.data || {})
+  } catch (_) {}
+  const userOnShow = pageOpts.onShow
+  pageOpts.onShow = function () {
+    const ret = typeof userOnShow === 'function' ? userOnShow.apply(this, arguments) : undefined
+    try {
+      require('./utils/accentTheme.js').pin(this)
+    } catch (_) {}
+    return ret
+  }
+  return _NativePage(pageOpts)
+}
+
 function currentRoute() {
   const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
   return pages.length ? String(pages[pages.length - 1].route || '') : ''

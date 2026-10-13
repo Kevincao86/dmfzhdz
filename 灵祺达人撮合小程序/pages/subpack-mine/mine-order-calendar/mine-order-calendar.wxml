@@ -1,4 +1,5 @@
-<view class="cal-page {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} cal-page {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view class="cal-hero">
     <text class="cal-title">商单日历</text>
     <text class="cal-sub">{{pageSub}}</text>

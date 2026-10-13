@@ -1,4 +1,5 @@
-<view class="addon-page {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} addon-page {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view class="addon-hero">
     <view class="addon-hero__badge">
       <text class="addon-hero__spark">✦</text>

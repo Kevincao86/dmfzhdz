@@ -1,4 +1,5 @@
-<view class="ogc-page chat-page">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} ogc-page chat-page" style="{{lqPageStyle}}">
   <view class="chat-nav" style="{{navBarStyle}}">
     <view class="chat-nav-inner" style="{{navInnerStyle}}">
       <text class="chat-back" bindtap="onBack">‹</text>

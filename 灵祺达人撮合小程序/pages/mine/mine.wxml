@@ -1,20 +1,18 @@
-<view class="mine-page page-with-bar page-shell-fixed {{lqThemeClass}} {{themeColorApplied ? 'mine-theme-color' : ''}}">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="mine-page page-with-bar page-shell-fixed {{lqThemeClass}} {{lqAccentClass}}" style="{{lqPageStyle}}">
   <feature-guide page="mine" />
   <view class="wb-hero lq-hero-header" style="{{headerBandStyle}}">
     <view class="wb-hero-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
       <view class="mine-status-bar" style="height:{{statusBarHeightPx}}px;">
         <view
-          class="mine-theme-switch {{themeColorOn ? 'is-on' : ''}}"
-          bindtap="onToggleThemeColor"
-          hover-class="mine-theme-switch--hover"
-          aria-role="switch"
-          aria-checked="{{themeColorOn}}"
-          aria-label="主题色彩"
-        >
-          <view class="mine-theme-switch__track">
-            <view class="mine-theme-switch__thumb"></view>
-          </view>
-        </view>
+          wx:for="{{accentSwatches}}"
+          wx:key="id"
+          class="mine-accent-dot {{accentId === item.id ? 'is-on' : ''}}"
+          style="background:{{item.color}}"
+          data-id="{{item.id}}"
+          bindtap="onPickAccent"
+          aria-label="主题色"
+        ></view>
       </view>
       <view class="wb-hero-top">
         <view class="wb-profile-row">

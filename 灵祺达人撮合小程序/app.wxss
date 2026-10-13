@@ -1,5 +1,6 @@
 @import './styles/theme.wxss';
 @import './styles/identity-themes.wxss';
+@import './styles/accent-themes.wxss';
 @import './styles/subpage-nav.wxss';
 
 page {

@@ -1,4 +1,5 @@
-<view class="xingxuan-page page-shell {{lqThemeClass}} foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} xingxuan-page page-shell {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
   <view wx:if="{{loading}}" class="xingxuan-card state-loading">
     <text class="hint">加载履约信用…</text>
   </view>
