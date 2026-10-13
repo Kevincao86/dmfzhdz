@@ -62,6 +62,37 @@
       </block>
     </block>
     <block wx:else>
+      <button
+        wx:if="{{!legalAgreed}}"
+        class="btn-v2 wx-login"
+        loading="{{wxBusy}}"
+        disabled="{{busy || wxBusy}}"
+        bindtap="onWxLogin"
+      >
+        <text>微信一键注册</text>
+      </button>
+      <button
+        wx:elif="{{wxPrivacyPending}}"
+        id="merchant-privacy-agree-btn"
+        class="btn-v2 wx-login"
+        loading="{{wxBusy}}"
+        disabled="{{busy || wxBusy}}"
+        open-type="agreePrivacyAuthorization"
+        bindagreeprivacyauthorization="onWxPrivacyAgree"
+      >
+        <text>同意隐私保护指引</text>
+      </button>
+      <button
+        wx:else
+        class="btn-v2 wx-login"
+        loading="{{wxBusy}}"
+        disabled="{{busy || wxBusy}}"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onGetPhoneNumberRegister"
+      >
+        <text>微信一键注册</text>
+      </button>
+      <text class="guest-browse-hint">或填写资料注册</text>
       <view class="field-v2">
         <text class="field-label">登录名</text>
         <view class="input-wrap"><input class="input-field" placeholder="如 shop2026" value="{{regLoginName}}" bindinput="onRegLoginName" /></view>

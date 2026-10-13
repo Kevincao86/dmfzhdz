@@ -523,6 +523,66 @@ Page({
     void this._doWxLogin(phoneCode)
   },
 
+  onGetPhoneNumberRegister(e) {
+    const detail = (e && e.detail) || {}
+    const phoneCode = String(detail.code || '').trim()
+    if (this.data.busy || this.data.wxBusy) return
+    if (!this._ensureLegalAgreed('wx')) return
+    if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
+      if (isWxPrivacyBlock(detail)) {
+        this.setData({ wxPrivacyPending: true, err: '' })
+        return
+      }
+      this.setData({ err: wxPhoneAuthFailHint(detail).replace('微信一键登录', '微信一键注册') })
+      return
+    }
+    if (!phoneCode) {
+      this.setData({ err: '未能读取微信手机号，请再点一次「微信一键注册」' })
+      return
+    }
+    void this._doWxRegister(phoneCode)
+  },
+
+  async _doWxRegister(phoneCode) {
+    if (this.data.busy || this.data.wxBusy) return
+    if (!tenantAuthApi.apiRoot()) {
+      this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用微信注册' })
+      return
+    }
+    const phoneAuthCode = String(phoneCode || '').trim()
+    if (!phoneAuthCode) {
+      this.setData({ err: '请先授权微信绑定的手机号' })
+      return
+    }
+    this.setData({ wxBusy: true, err: '', infoHint: '' })
+    try {
+      const wxSession = await wxAccountMp.fetchWxLoginCode()
+      const r = await tenantAuthApi.loginWithWxCode({
+        code: wxSession.code,
+        stableDevOpenId: wxSession.stableDevOpenId,
+        phoneCode: phoneAuthCode,
+      })
+      if (!r.ok || !r.access_token) {
+        this.setData({ err: r.message || r.detail || '一键注册失败' })
+        return
+      }
+      if (r.isNew === false) {
+        this.setData({ err: '该账号已注册，请返回并登录' })
+        return
+      }
+      api.persistSession(
+        { access_token: r.access_token, refresh_token: r.refresh_token || '' },
+        r.loginName || '',
+      )
+      this._goHome()
+    } catch (e) {
+      const msg = e && e.message ? e.message : '一键注册失败'
+      this.setData({ err: msg })
+    } finally {
+      this.setData({ wxBusy: false })
+    }
+  },
+
   async _doWxLogin(phoneCode) {
     if (this.data.busy || this.data.wxBusy) return
     if (!tenantAuthApi.apiRoot()) {
@@ -680,7 +740,10 @@ Page({
         confirmPassword,
       })
       if (!r.ok) {
-        this.setData({ err: r.message || r.detail || '注册失败' })
+        const msg = r.message || r.detail || '注册失败'
+        this.setData({
+          err: /已注册|phone_exists/.test(String(msg)) ? '该账号已注册，请返回并登录' : msg,
+        })
         return
       }
       this.setData({

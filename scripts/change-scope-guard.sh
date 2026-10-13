@@ -1391,6 +1391,7 @@ AccountProfilePage
 AuthBindContactModal
 App.tsx
 灵祺ERP小程序/pages/login/
+灵祺达人撮合小程序/pages/subpack-signup/signup/
 灵祺ERP小程序/pages/profile-edit/
 灵祺ERP小程序/pages/mine/
 change-scope-guard

@@ -168,6 +168,11 @@ Page({
         role,
         workIdentity: workId,
       })
+      if (data && data.isNew === false) {
+        auth.clearSession()
+        this.setData({ err: '该账号已注册，请返回并登录' })
+        return
+      }
       let account = (data && data.account) || auth.readAccount()
       await auth.ensureIdentity(role, workId === 'pr' ? undefined : workId)
       account = auth.readAccount() || account
