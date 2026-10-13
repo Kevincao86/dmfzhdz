@@ -716,18 +716,12 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   _retryAfterPrivacyAgreed() {
     void this.applyHallLocateFilter()
   },
-  onShareAppMessage() {
+  onShareAppMessage(res) {
     mpShare.enableShareMenu()
-    const id = String(this.data.expandOrderId || '')
-    if (id) {
-      const recruitShareCover = require('../../utils/recruitShareCover.js')
-      const share = {
-        title: this.data.expandShareTitle || '招募商单',
-        path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}`,
-      }
-      const cover = String(this.data.expandShareCover || '').trim()
-      if (cover) return recruitShareCover.attachShareCoverPromise(share, cover)
-      return share
+    const card = this.selectComponent('#order-expand')
+    if (card && this.data.expandOrderId && card.buildShareMessage) {
+      const msg = card.buildShareMessage(res)
+      if (msg) return msg
     }
     return mpShare.defaultShare('/pages/recommend/recommend')
   },

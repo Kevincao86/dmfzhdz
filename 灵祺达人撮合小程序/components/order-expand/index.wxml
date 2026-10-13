@@ -4,6 +4,7 @@
   catchtouchmove="noop"
 >
   <view class="order-expand-card {{opened ? 'is-open' : ''}}" style="{{cardStyle}}" catchtap="noop">
+    <view wx:if="{{showShareMenu}}" class="order-expand-share-dismiss" catchtap="onShareMenuClose" />
     <view class="order-expand-card__bar">
       <view class="order-expand-card__x" bindtap="onMask" aria-label="关闭">×</view>
       <view class="order-expand-card__tools">
@@ -11,10 +12,17 @@
           <text class="order-expand-card__tool-icon {{favorited ? 'is-on' : ''}}">★</text>
           <text>{{favorited ? '已收藏' : '收藏'}}</text>
         </view>
-        <button class="order-expand-card__tool order-expand-card__tool--share" open-type="share" hover-class="none">
-          <text class="order-expand-card__tool-icon">↗</text>
-          <text>分享</text>
-        </button>
+        <view class="order-expand-share-wrap">
+          <view wx:if="{{showShareMenu}}" class="order-expand-share-menu" catchtap="noop">
+            <button class="order-expand-share-menu__item order-expand-share-menu__item--primary" open-type="share" data-cover="recruit" hover-class="none" bindtap="onShareMenuClose">招募封面</button>
+            <button class="order-expand-share-menu__item" open-type="share" data-cover="poster" hover-class="none" bindtap="onShareMenuClose">海报封面</button>
+            <view class="order-expand-share-menu__item" bindtap="onSharePickPoster">分享海报</view>
+          </view>
+          <view class="order-expand-card__tool" bindtap="onShareTap">
+            <text class="order-expand-card__tool-icon">↗</text>
+            <text>分享</text>
+          </view>
+        </view>
       </view>
     </view>
     <scroll-view class="order-expand-card__body" scroll-y enhanced show-scrollbar="{{false}}">
@@ -44,6 +52,28 @@
     <view class="order-expand-card__foot" wx:if="{{!loading && !err}}">
       <view wx:if="{{isPr}}" class="order-expand-card__apply order-expand-card__apply--muted">当前是 PR 版本，不能报名</view>
       <view wx:else class="order-expand-card__apply" bindtap="onApply">{{applyLabel}}</view>
+    </view>
+  </view>
+  <view wx:if="{{showSharePosterSheet}}" class="order-expand-poster-mask" catchtap="onCloseSharePosterSheet">
+    <view class="order-expand-poster-sheet" catchtap="noop">
+      <view class="order-expand-poster-sheet__head">
+        <text class="order-expand-poster-sheet__title">分享海报</text>
+        <text class="order-expand-poster-sheet__close" bindtap="onCloseSharePosterSheet">×</text>
+      </view>
+      <view wx:if="{{sharePosterLoading}}" class="order-expand-poster-sheet__state">生成海报中…</view>
+      <image
+        wx:elif="{{sharePosterPath}}"
+        class="order-expand-poster-sheet__img"
+        src="{{sharePosterPath}}"
+        mode="widthFix"
+        show-menu-by-longpress="{{true}}"
+      />
+      <text wx:else class="order-expand-poster-sheet__state">{{sharePosterErr || '海报生成失败'}}</text>
+      <view wx:if="{{sharePosterPath || sharePosterStyleLabel}}" class="order-expand-poster-sheet__style">
+        <text wx:if="{{sharePosterStyleLabel}}">当前样式：{{sharePosterStyleLabel}}</text>
+        <text class="order-expand-poster-sheet__switch" bindtap="onSwitchSharePosterStyle">换个样式</text>
+      </view>
+      <view wx:if="{{sharePosterPath}}" class="order-expand-poster-sheet__save" bindtap="onSaveSharePoster">保存海报到相册</view>
     </view>
   </view>
 </view>

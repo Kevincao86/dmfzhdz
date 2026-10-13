@@ -9,6 +9,10 @@ const memberProfileApplyGate = require('../../utils/memberProfileApplyGate.js')
 const recruitApplyGate = require('../../utils/recruitApplyGate.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const orderFavorites = require('../../utils/orderFavorites.js')
+const sharePoster = require('../../utils/recruitmentSharePoster.js')
+const recruitShareCover = require('../../utils/recruitShareCover.js')
+const recruitShareCard = require('../../utils/recruitShareCard.js')
+const mpShare = require('../../utils/mpShare.js')
 
 function openBox() {
   const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
@@ -61,6 +65,13 @@ Component({
     merchantOrderNo: '',
     favorited: false,
     shareCover: '',
+    showShareMenu: false,
+    showSharePosterSheet: false,
+    sharePosterPath: '',
+    sharePosterErr: '',
+    sharePosterLoading: false,
+    sharePosterStyleIndex: 0,
+    sharePosterStyleLabel: '',
   },
   observers: {
     'opened, origin': function () {
@@ -98,11 +109,149 @@ Component({
       this.triggerEvent('favorite', { id, favorited })
       wx.showToast({ title: favorited ? '已收藏' : '已取消收藏', icon: 'none' })
     },
+    onShareTap() {
+      if (!this._mp) {
+        wx.showToast({ title: '订单加载中', icon: 'none' })
+        return
+      }
+      this.setData({ showShareMenu: !this.data.showShareMenu })
+    },
+    onShareMenuClose() {
+      if (this.data.showShareMenu) this.setData({ showShareMenu: false })
+    },
+    buildShareMessage(res) {
+      const mp = this._mp
+      const id = String(this.data.orderId || '')
+      if (!id) return null
+      const share = {
+        title: this.data.title || mpShare.DEFAULT_TITLE,
+        path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}`,
+      }
+      if (mp && recruitShareCard.readShareCoverKind(res) === 'recruit') {
+        return {
+          title: share.title,
+          path: share.path,
+          promise: recruitShareCard.buildShareCardPath(mp, this._reg).then((imageUrl) => {
+            if (imageUrl) return Object.assign({}, share, { imageUrl })
+            const coverUrl = coverLib.resolveOrderCoverUrl(mp)
+            const wrapped = recruitShareCover.attachShareCoverPromise(share, coverUrl)
+            if (wrapped && typeof wrapped.promise === 'object' && wrapped.promise) return wrapped.promise
+            return wrapped || share
+          }),
+        }
+      }
+      if (mp) {
+        const coverUrl = coverLib.resolveOrderCoverUrl(mp)
+        return recruitShareCover.attachShareCoverPromise(share, coverUrl)
+      }
+      return share
+    },
+    posterOrder() {
+      const order = this._mp
+      if (!order) return null
+      const orderId = String(this.data.orderId || order.id || '').trim()
+      return orderId ? Object.assign({}, order, { id: orderId }) : order
+    },
+    posterFailMessage(err) {
+      const raw = String((err && err.message) || err || '海报生成失败')
+      if (raw === 'publisher_name_unavailable') return '未读取到发单方名称，请稍后重试'
+      if (raw === 'wxacode_unavailable') return '小程序码生成失败，请稍后重试'
+      return raw.slice(0, 40)
+    },
+    paintPoster(styleIndex) {
+      const order = this.posterOrder()
+      if (!order) return
+      this.setData({
+        sharePosterStyleIndex: styleIndex,
+        sharePosterLoading: true,
+        sharePosterErr: '',
+        sharePosterPath: '',
+        sharePosterStyleLabel: '',
+      })
+      sharePoster
+        .buildRecruitmentSharePosterPath(order, styleIndex, { reg: this._reg })
+        .then((path) => {
+          const design = sharePoster.resolvePosterDesign(order, styleIndex)
+          this.setData({
+            sharePosterPath: path,
+            sharePosterLoading: false,
+            sharePosterStyleLabel: design.styleLabel || '',
+          })
+        })
+        .catch((err) => {
+          this.setData({
+            sharePosterLoading: false,
+            sharePosterErr: this.posterFailMessage(err),
+          })
+        })
+    },
+    onSharePickPoster() {
+      if (!this._mp) {
+        wx.showToast({ title: '订单加载中', icon: 'none' })
+        return
+      }
+      this.setData({
+        showShareMenu: false,
+        showSharePosterSheet: true,
+        sharePosterPath: '',
+        sharePosterErr: '',
+        sharePosterLoading: false,
+        sharePosterStyleIndex: 0,
+      })
+      const reg = this._reg
+      const id = String(this.data.orderId || '')
+      const needsPublisher = !reg || !Array.isArray(reg.mpPrUsers) || !reg.mpPrUsers.length
+      if (!needsPublisher) {
+        this.paintPoster(0)
+        return
+      }
+      ops
+        .fetchRegistryForPoster(id)
+        .then((extra) => {
+          if (extra && Array.isArray(extra.mpPrUsers) && extra.mpPrUsers.length) {
+            this._reg = Object.assign({}, reg || {}, { mpPrUsers: extra.mpPrUsers })
+          }
+        })
+        .catch(() => {})
+        .then(() => this.paintPoster(0))
+    },
+    onCloseSharePosterSheet() {
+      this.setData({
+        showSharePosterSheet: false,
+        sharePosterPath: '',
+        sharePosterLoading: false,
+        sharePosterErr: '',
+      })
+    },
+    onSwitchSharePosterStyle() {
+      if (!this._mp || this.data.sharePosterLoading) return
+      const nextIndex = sharePoster.normalizePosterStyleIndex((this.data.sharePosterStyleIndex || 0) + 1)
+      this.paintPoster(nextIndex)
+    },
+    onSaveSharePoster() {
+      const path = this.data.sharePosterPath
+      if (!path) return
+      wx.showLoading({ title: '保存中', mask: true })
+      sharePoster
+        .savePosterToAlbum(path)
+        .then(() => {
+          wx.hideLoading()
+          wx.showToast({ title: '已保存到相册', icon: 'success' })
+        })
+        .catch((err) => {
+          wx.hideLoading()
+          wx.showToast({
+            title: String((err && err.message) || err || '保存失败').slice(0, 24),
+            icon: 'none',
+          })
+        })
+    },
     load(id) {
       const token = (this._loadToken || 0) + 1
       this._loadToken = token
       this._mp = null
-      this.setData({ loading: true, err: '' })
+      this._reg = null
+      this.setData({ loading: true, err: '', showShareMenu: false, showSharePosterSheet: false })
       ops
         .fetchRegistry({ includeMpOrderIds: [id], includeOnly: true })
         .then((reg) => {
@@ -115,6 +264,7 @@ Component({
           const merchant = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
           const view = display.enrichMpOrder(mp, merchant)
           this._mp = mp
+          this._reg = reg
           let cover = ''
           try {
             cover = coverLib.resolveOrderCoverUrl(mp) || ''

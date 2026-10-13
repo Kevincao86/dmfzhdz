@@ -78,14 +78,141 @@
   color: #ea580c;
 }
 
-.order-expand-card__tool--share {
-  margin: 0;
-  border: 0;
-  line-height: 1;
+.order-expand-card__bar {
+  position: relative;
+  z-index: 6;
 }
 
-.order-expand-card__tool--share::after {
+.order-expand-share-dismiss {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 4;
+}
+
+.order-expand-share-wrap {
+  position: relative;
+}
+
+.order-expand-share-menu {
+  position: absolute;
+  top: calc(100% + 10rpx);
+  right: 0;
+  z-index: 7;
+  min-width: 220rpx;
+  padding: 8rpx 0;
+  border-radius: 16rpx;
+  background: #fff;
+  box-shadow: 0 12rpx 40rpx rgba(15, 23, 42, 0.16);
+}
+
+.order-expand-share-menu__item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 18rpx 28rpx;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #1c1917;
+  font-size: 28rpx;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.order-expand-share-menu__item::after {
   border: none;
+}
+
+.order-expand-share-menu__item--primary {
+  color: #c2410c;
+  font-weight: 700;
+}
+
+.order-expand-poster-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 920;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 24rpx 24rpx calc(140rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.order-expand-poster-sheet {
+  width: 100%;
+  max-height: 78vh;
+  overflow: auto;
+  padding: 28rpx 28rpx 32rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.order-expand-poster-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.order-expand-poster-sheet__title {
+  color: #1c1917;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.order-expand-poster-sheet__close {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 999rpx;
+  background: #f5f0e8;
+  color: #1c1917;
+  font-size: 40rpx;
+  line-height: 60rpx;
+  text-align: center;
+}
+
+.order-expand-poster-sheet__img {
+  width: 100%;
+  margin-top: 20rpx;
+  border-radius: 16rpx;
+}
+
+.order-expand-poster-sheet__state {
+  display: block;
+  padding: 48rpx 0;
+  color: #78716c;
+  font-size: 26rpx;
+  text-align: center;
+}
+
+.order-expand-poster-sheet__style {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 16rpx;
+  color: #57534e;
+  font-size: 24rpx;
+}
+
+.order-expand-poster-sheet__switch,
+.order-expand-poster-sheet__save {
+  color: #c2410c;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.order-expand-poster-sheet__save {
+  margin-top: 20rpx;
+  text-align: center;
 }
 
 .order-expand-card__body {

@@ -534,6 +534,7 @@
   </view>
   <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
   <order-expand
+    id="order-expand"
     wx:if="{{expandOrderId}}"
     order-id="{{expandOrderId}}"
     origin="{{expandOrigin}}"

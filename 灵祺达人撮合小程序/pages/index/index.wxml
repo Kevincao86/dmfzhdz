@@ -381,6 +381,7 @@
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
   <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
   <order-expand
+    id="order-expand"
     wx:if="{{expandOrderId}}"
     order-id="{{expandOrderId}}"
     origin="{{expandOrigin}}"
