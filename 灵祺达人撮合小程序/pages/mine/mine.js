@@ -25,6 +25,18 @@ const applicationsStore = require('../../utils/applicationsStore.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const training = require('../../utils/mpTraining.js')
 
+const MINE_THEME_KEY = 'mineThemeColorOn'
+const THEME_VEIL_MS = 560
+
+function readMineThemeOn() {
+  try {
+    const v = wx.getStorageSync(MINE_THEME_KEY)
+    return v === '1' || v === true
+  } catch (_) {
+    return false
+  }
+}
+
 const MY_ORDERS_MENU = {
   key: 'myOrders',
   label: '我的订单',
@@ -435,9 +447,19 @@ Page({
     membershipPlanLabel: '基础版（免费）',
     membershipExpiryLabel: '',
     membershipCtaLabel: '升级会员',
+    statusBarHeightPx: 32,
+    themeColorOn: false,
+    themeColorApplied: false,
+    themeVeilOn: false,
+    themeVeilAnimate: false,
+    themeVeilOpen: false,
+    themeVeilStyle: '',
   },
   onLoad() {
     applyCapsulePadding(this, null, { band: 'headerBandStyle', right: 'headerInnerStyle' })
+    this.applyMineStatusBarMetrics()
+    const themeOn = readMineThemeOn()
+    this.setData({ themeColorOn: themeOn, themeColorApplied: themeOn })
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -467,10 +489,12 @@ Page({
         displaySub: '页面加载异常，请删除小程序后重试',
       })
       wx.showToast({ title: '我的页加载失败', icon: 'none' })
+      this.syncMineStatusBar(!!this.data.themeColorApplied)
       return
     }
     void this.refreshNotifyBadge()
     void this.refreshCalendarTodoBadge()
+    this.syncMineStatusBar(!!this.data.themeColorApplied)
 
     const now = Date.now()
     if (this._lastMineSyncAt && now - this._lastMineSyncAt < 45000) return
@@ -505,6 +529,110 @@ Page({
         }
       })()
     }, 80)
+  },
+  onUnload() {
+    if (this._veilTimer) {
+      clearTimeout(this._veilTimer)
+      this._veilTimer = null
+    }
+  },
+  applyMineStatusBarMetrics() {
+    try {
+      const menu = wx.getMenuButtonBoundingClientRect()
+      if (menu && menu.height) this.setData({ statusBarHeightPx: menu.height })
+    } catch (_) {}
+  },
+  syncMineStatusBar(on) {
+    const color = identityTheme.pack(this.data.identity || userProfile.readIdentity()).navBar
+    try {
+      wx.setNavigationBarColor({
+        frontColor: on ? '#ffffff' : '#000000',
+        backgroundColor: on ? color : '#f7f3ec',
+        animation: { duration: 0, timingFunc: 'linear' },
+      })
+    } catch (_) {}
+  },
+  onToggleThemeColor() {
+    if (this._themeAnimating) return
+    const next = !this.data.themeColorOn
+    this._themeAnimating = true
+    this._themeTarget = next
+    try {
+      wx.setStorageSync(MINE_THEME_KEY, next ? '1' : '0')
+    } catch (_) {}
+    const query = wx.createSelectorQuery().in(this)
+    query.select('.mine-theme-switch').boundingClientRect()
+    query.exec((res) => {
+      if (!this._themeAnimating) return
+      const rect = res && res[0]
+      const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+      const cx = rect ? rect.left + rect.width / 2 : win.windowWidth - 36
+      const cy = rect ? rect.top + rect.height / 2 : 48
+      const dx = Math.max(cx, win.windowWidth - cx)
+      const dy = Math.max(cy, win.windowHeight - cy)
+      const radius = Math.ceil(Math.sqrt(dx * dx + dy * dy)) + 2
+      const size = radius * 2
+      const color = identityTheme.pack(this.data.identity || userProfile.readIdentity()).navBar
+      const style = `width:${size}px;height:${size}px;left:${cx - radius}px;top:${cy - radius}px;background:${color};`
+      if (this._veilTimer) clearTimeout(this._veilTimer)
+      this._veilTimer = setTimeout(() => this.finishThemeVeil(), THEME_VEIL_MS + 90)
+      if (next) {
+        this.setData(
+          {
+            themeColorOn: true,
+            themeVeilOn: true,
+            themeVeilAnimate: false,
+            themeVeilOpen: false,
+            themeVeilStyle: style,
+          },
+          () => {
+            setTimeout(() => {
+              if (!this._themeAnimating) return
+              this.setData({ themeVeilAnimate: true, themeVeilOpen: true })
+            }, 30)
+          },
+        )
+        return
+      }
+      this.setData(
+        {
+          themeColorOn: false,
+          themeColorApplied: false,
+          themeVeilOn: true,
+          themeVeilAnimate: false,
+          themeVeilOpen: true,
+          themeVeilStyle: style,
+        },
+        () => {
+          this.syncMineStatusBar(false)
+          setTimeout(() => {
+            if (!this._themeAnimating) return
+            this.setData({ themeVeilAnimate: true, themeVeilOpen: false })
+          }, 40)
+        },
+      )
+    })
+  },
+  onThemeVeilEnd(e) {
+    const prop = e && e.detail && e.detail.propertyName
+    if (prop && prop !== 'transform') return
+    this.finishThemeVeil()
+  },
+  finishThemeVeil() {
+    if (!this._themeAnimating) return
+    this._themeAnimating = false
+    if (this._veilTimer) {
+      clearTimeout(this._veilTimer)
+      this._veilTimer = null
+    }
+    const applied = !!this._themeTarget
+    this.setData({
+      themeColorApplied: applied,
+      themeVeilOn: false,
+      themeVeilAnimate: false,
+      themeVeilOpen: false,
+    })
+    this.syncMineStatusBar(applied)
   },
   refresh() {
     const identity = userProfile.readIdentity()

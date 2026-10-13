@@ -52,6 +52,65 @@
   background: #efe8dc;
 }
 
+.mine-page.mine-theme-color {
+  background: var(--lq-primary, #7c4dff);
+}
+
+.mine-page.mine-theme-color .wb-hero,
+.mine-page.mine-theme-color .lq-hero-header {
+  background: var(--lq-primary, #7c4dff);
+}
+
+.mine-page.mine-theme-color .wb-name,
+.mine-page.mine-theme-color .wb-nick-input {
+  color: #fff;
+}
+
+.mine-page.mine-theme-color .wb-sub,
+.mine-page.mine-theme-color .wb-id,
+.mine-page.mine-theme-color .wb-greeting {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.mine-page.mine-theme-color .wb-role-pill,
+.mine-page.mine-theme-color .profile-badge {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.mine-page.mine-theme-color .profile-badge--muted {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(15, 23, 42, 0.15);
+}
+
+.mine-page.mine-theme-color .wb-avatar {
+  border-color: rgba(255, 255, 255, 0.92);
+}
+
+.mine-page.mine-theme-color .wb-avatar--ph {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mine-page.mine-theme-color .wb-membership-panel,
+.mine-page.mine-theme-color .wb-membership-panel--hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.48);
+}
+
+.mine-page.mine-theme-color .wb-membership-kicker,
+.mine-page.mine-theme-color .wb-membership-plan {
+  color: #fff;
+}
+
+.mine-page.mine-theme-color .wb-membership-exp {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.mine-page.mine-theme-color .wb-section-title {
+  color: #fff;
+}
+
 .mine-page .wb-membership-panel,
 .mine-page .wb-membership-panel--hover {
   background: #fffdf8;
@@ -90,6 +149,77 @@
   padding-bottom: 96rpx;
   min-height: 220rpx;
   box-sizing: border-box;
+}
+
+.mine-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  box-sizing: border-box;
+}
+
+.mine-theme-switch {
+  width: 88rpx;
+  height: 88rpx;
+  margin-right: -8rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mine-theme-switch--hover {
+  opacity: 0.86;
+}
+
+.mine-theme-switch__track {
+  position: relative;
+  width: 84rpx;
+  height: 52rpx;
+  border-radius: 999rpx;
+  background: rgba(28, 25, 23, 0.12);
+  transition: background 0.2s ease;
+}
+
+.mine-theme-switch__thumb {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: var(--lq-primary, #7c4dff);
+  box-shadow: 0 2rpx 8rpx rgba(20, 24, 31, 0.16);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.mine-theme-switch.is-on .mine-theme-switch__track {
+  background: var(--lq-primary, #7c4dff);
+}
+
+.mine-theme-switch.is-on .mine-theme-switch__thumb {
+  transform: translateX(32rpx);
+  background: #fffdf8;
+}
+
+.mine-page.mine-theme-color .mine-theme-switch.is-on .mine-theme-switch__track {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.mine-theme-veil {
+  position: fixed;
+  z-index: 10050;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: scale(0);
+}
+
+.mine-theme-veil.is-animate {
+  transition: transform 560ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mine-theme-veil.is-open {
+  transform: scale(1);
 }
 
 .wb-hero-top {
