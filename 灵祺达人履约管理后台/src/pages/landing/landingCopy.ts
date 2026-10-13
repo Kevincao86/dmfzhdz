@@ -3,7 +3,7 @@ import { WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
 
 export const HERO_FRAME_FILES = ['hero-1.png', 'hero-2.png', 'hero-3.png'] as const
 
-export const HERO_LOOP_VIDEO_FILE = 'hero-loop.mp4'
+export const HERO_LOOP_VIDEO_FILE = 'hero-visit-30.mp4'
 
 export const ROLE_LABEL = WORK_EDITION_LABEL
 

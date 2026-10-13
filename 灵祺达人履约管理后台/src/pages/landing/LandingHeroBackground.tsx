@@ -12,7 +12,7 @@ export default function LandingHeroBackground({ className }: { className?: strin
   if (useVideo) {
     return (
       <video
-        className={cn('absolute inset-0 h-full w-full object-cover', className)}
+        className={cn('absolute inset-0 z-0 h-full w-full object-cover', className)}
         src={video.src}
         autoPlay
         loop
