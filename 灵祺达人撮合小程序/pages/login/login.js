@@ -30,6 +30,21 @@ const LEGAL_PROMPT_COPY = {
   },
 }
 
+function wxPhoneAuthFailHint(detail) {
+  const errMsg = String((detail && detail.errMsg) || '')
+  let platform = ''
+  try {
+    platform = String((wx.getSystemInfoSync() || {}).platform || '')
+  } catch (_) {}
+  if (platform === 'devtools') {
+    return '开发者工具读不到真实手机号，请用「真机调试」或预览到手机上再点微信一键登录'
+  }
+  if (/deny|cancel|拒绝/i.test(errMsg)) {
+    return '需要授权微信绑定的手机号，才能登录并对上已有账号'
+  }
+  return '未能读取微信手机号，请再点一次「微信一键登录」'
+}
+
 function openLegalPrompt(page, workId, action) {
   const copy = LEGAL_PROMPT_COPY[action] || LEGAL_PROMPT_COPY.wx
   page.setData({
@@ -522,7 +537,7 @@ Page({
       return
     }
     if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
-      this.setData({ err: '需要授权微信绑定的手机号，才能登录并对上已有账号' })
+      this.setData({ err: wxPhoneAuthFailHint(detail) })
       return
     }
     if (!phoneCode) {
