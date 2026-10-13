@@ -108,6 +108,17 @@
       <text>微信一键登录</text>
     </button>
     <button
+      wx:elif="{{wxPrivacyPending}}"
+      id="merchant-privacy-agree-btn"
+      class="btn-v2 wx-login"
+      loading="{{wxBusy}}"
+      disabled="{{busy || wxBusy}}"
+      open-type="agreePrivacyAuthorization"
+      bindagreeprivacyauthorization="onWxPrivacyAgree"
+    >
+      <text>同意隐私保护指引</text>
+    </button>
+    <button
       wx:else
       class="btn-v2 wx-login"
       loading="{{wxBusy}}"

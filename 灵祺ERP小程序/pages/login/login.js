@@ -5,6 +5,39 @@ const wxAccountMp = require('../../utils/wxAccountMp.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 const { assetUrl } = require('../../utils/mpStaticAssets.js')
 
+const PRIVACY_AGREE_BTN_ID = 'merchant-privacy-agree-btn'
+
+function isWxPrivacyUndeclared(detail) {
+  const errMsg = String((detail && detail.errMsg) || '')
+  const errno = Number(detail && detail.errno)
+  return errno === 112 || /not declared in the privacy agreement/i.test(errMsg)
+}
+
+function isWxPrivacyBlock(detail) {
+  if (isWxPrivacyUndeclared(detail)) return false
+  const errMsg = String((detail && detail.errMsg) || '')
+  const errno = Number(detail && detail.errno)
+  return errno === 104 || /privacy|needAuthorization/i.test(errMsg)
+}
+
+function wxPhoneAuthFailHint(detail) {
+  const errMsg = String((detail && detail.errMsg) || '')
+  let platform = ''
+  try {
+    platform = String((wx.getSystemInfoSync() || {}).platform || '')
+  } catch (_) {}
+  if (isWxPrivacyUndeclared(detail)) {
+    return '请先在微信公众平台的用户隐私保护指引里填写「手机号」用途，保存后再登录'
+  }
+  if (platform === 'devtools') {
+    return '开发者工具读不到真实手机号，请用「预览」扫到手机上再点快捷登录'
+  }
+  if (/deny|cancel|拒绝/i.test(errMsg)) {
+    return '需要在微信弹窗里允许使用绑定的手机号'
+  }
+  return '未能读取微信手机号，请再点一次「微信一键登录」'
+}
+
 const LANDING_WAYS = [
   { id: 'pwd', mark: '账号', label: '密码登录', sub: '登录名与密码进入工作台' },
   { id: 'sms', mark: '快捷', label: '验证码', sub: '手机号短信验证码登录' },
@@ -56,6 +89,7 @@ Page({
     bindAccessToken: '',
     logoSrc: assetUrl('logo.png'),
     pickedId: '',
+    wxPrivacyPending: false,
     hasSession: false,
     navBandStyle: '',
     landingWays: LANDING_WAYS,
@@ -83,6 +117,7 @@ Page({
     })
     this._applyNavPadding()
     this._syncModeHint()
+    this._bindWxPrivacy()
     void api.bootstrapSupabaseConfig()
     this._waitSplash = true
     this._splashSafety = setTimeout(() => this.onLaunchSplashDone(), 8000)
@@ -174,7 +209,42 @@ Page({
   },
 
   onToggleLegalAgree() {
-    this.setData({ legalAgreed: !this.data.legalAgreed, err: '' })
+    const legalAgreed = !this.data.legalAgreed
+    this.setData({ legalAgreed, err: '' })
+    if (legalAgreed && this.data.pickedId === 'wx') this._refreshWxPrivacy()
+  },
+
+  _bindWxPrivacy() {
+    if (this._wxPrivacyBound) return
+    this._wxPrivacyBound = true
+    if (typeof wx.onNeedPrivacyAuthorization !== 'function') return
+    wx.onNeedPrivacyAuthorization((resolve) => {
+      this._privacyResolve = resolve
+      this.setData({ wxPrivacyPending: true, err: '' })
+    })
+  },
+
+  _refreshWxPrivacy() {
+    if (typeof wx.getPrivacySetting !== 'function') {
+      this.setData({ wxPrivacyPending: false })
+      return
+    }
+    wx.getPrivacySetting({
+      success: (res) => {
+        const pending = !!(res && res.needAuthorization)
+        this.setData({ wxPrivacyPending: pending, err: pending ? '' : this.data.err })
+      },
+      fail: () => this.setData({ wxPrivacyPending: false }),
+    })
+  },
+
+  onWxPrivacyAgree() {
+    const resolve = this._privacyResolve
+    this._privacyResolve = null
+    if (typeof resolve === 'function') {
+      resolve({ event: 'agree', buttonId: PRIVACY_AGREE_BTN_ID })
+    }
+    this.setData({ wxPrivacyPending: false, err: '' })
   },
 
   onOpenLegal(e) {
@@ -274,6 +344,7 @@ Page({
     } else if (id === 'wx') {
       this.setData({ pickedId: 'wx', mode: 'login', loginMethod: 'password' })
       this._syncModeHint()
+      if (this.data.legalAgreed) this._refreshWxPrivacy()
       return
     }
     this._syncModeHint()
@@ -438,7 +509,11 @@ Page({
     if (this.data.busy || this.data.wxBusy) return
     if (!this._ensureLegalAgreed('wx')) return
     if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
-      this.setData({ err: '需要授权微信绑定的手机号，才能登录并对上已有账号' })
+      if (isWxPrivacyBlock(detail)) {
+        this.setData({ wxPrivacyPending: true, err: '' })
+        return
+      }
+      this.setData({ err: wxPhoneAuthFailHint(detail) })
       return
     }
     if (!phoneCode) {
