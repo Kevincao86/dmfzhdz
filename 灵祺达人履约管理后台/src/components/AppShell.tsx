@@ -16,20 +16,18 @@ import { onShellRefresh } from '../lib/shellRefresh'
 import { syncAccountAccessOnBoot } from '../lib/registryProfileSync'
 
 const MENU_GUIDE_COPY: Record<string, string> = {
-  招募大厅: '首页点商单即可报名。推荐里左右滑动看轮播达人，并用智能匹配找合适对象。',
+  招募大厅: '首页点商单即可报名，常用入口可进日历和审核。推荐里左右滑动看轮播达人，并用智能匹配找合适对象。',
   发布招募: '按步骤填写商单要求并发布。发布后到「我的发单」跟进报名。',
   我的发单: '查看已发商单的报名、排期和审核进度，点进一条继续处理。',
   我的报名: '查看报名进度。待探店、待传视频的任务从这里进入下一步。',
   商单日历: '按日期查看探店、交片和待办，点某一天处理当天的事。',
-  达人评估提升: '打开达人账号分析，看曝光和带货还能提升多少。',
-  AI合规审片: '用 AI 检查成片和文稿是否合规。',
   转发工具: '把报名表转给达人填写，回收后在这里查看结果。',
   我的模版: '保存常用招募或报名模版，下次发单或报名时直接套用。',
   培训课程: '查看可报名的课程。讲师可以在这里发布和结算自己的课程。',
   我的订单: '查看会员开通和积分充值的支付记录。',
   消息: '「私信」用来一对一沟通，「群聊」用来跟进合作群。点进会话即可回复。',
   增值服务: '这里是 AI 创作工坊，可使用短视频、数字人、视觉工坊和云剪。',
-  我的: '先完成账号绑定和我的推广。',
+  我的: '先完成账号绑定。这里还有 AI 视频审核和我的推广。',
 }
 
 type MenuGuideState = { index: number; steps: { label: string; body: string }[] }
@@ -60,7 +58,7 @@ export default function AppShell() {
   const signedIn = Boolean(account)
   useEffect(() => {
     if (!signedIn) return
-    const key = `xx_menu_guide_v3_${role}`
+    const key = `xx_menu_guide_v2_${role}`
     try {
       if (window.localStorage.getItem(key)) return
     } catch {
@@ -70,15 +68,6 @@ export default function AppShell() {
       label: item.label,
       body: MENU_GUIDE_COPY[item.label] || `打开「${item.label}」后，按页面上的按钮完成对应操作。`,
     }))
-    const calendarAt = steps.findIndex((step) => step.label === '商单日历')
-    const featureSteps = [
-      ...(role === 'pr'
-        ? []
-        : [{ label: '达人评估提升', body: MENU_GUIDE_COPY['达人评估提升'] }]),
-      { label: 'AI合规审片', body: MENU_GUIDE_COPY['AI合规审片'] },
-    ]
-    const insertAt = calendarAt >= 0 ? calendarAt : 0
-    steps.splice(insertAt, 0, ...featureSteps)
     if (!steps.length) return
     const timer = window.setTimeout(() => {
       setMenuGuide((current) => current || { index: 0, steps })
@@ -96,7 +85,7 @@ export default function AppShell() {
   }, [guideLabel, role])
 
   function finishMenuGuide() {
-    const key = `xx_menu_guide_v3_${role}`
+    const key = `xx_menu_guide_v2_${role}`
     try {
       window.localStorage.setItem(key, '1')
     } catch {
