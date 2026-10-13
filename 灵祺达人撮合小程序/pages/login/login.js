@@ -250,7 +250,8 @@ Page({
     showPhoneBindSheet: false,
     bindPhone: '',
     pendingWorkIdForBind: '',
-    wxPrivacyNeeded: false,
+    wxPrivacyPending: false,
+    wxPhoneDebug: '',
   },
 
   onLoad(options) {
@@ -269,7 +270,7 @@ Page({
       wxAvatarUrl: wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, local && local.wxAvatarUrl),
     })
     syncLoginIdentityFromProfile(this)
-    this.refreshWxPrivacyNeeded()
+    if (this.data.legalAgreed) this.primeWxPrivacy()
     if (auth.isLoggedIn()) {
       if (accountNeedsPhoneBind()) {
         this.setData({
@@ -289,12 +290,13 @@ Page({
     try {
       require('../../utils/identityTheme.js').applyToPage(this)
     } catch (_) {}
-    this.refreshWxPrivacyNeeded()
   },
 
-  refreshWxPrivacyNeeded() {
-    mpPrivacyAuthorize.queryNeedAuthorization().then((need) => {
-      this.setData({ wxPrivacyNeeded: !!need })
+  primeWxPrivacy() {
+    if (typeof wx.requirePrivacyAuthorize !== 'function') return
+    wx.requirePrivacyAuthorize({
+      success: () => this.setData({ wxPrivacyPending: false }),
+      fail: () => {},
     })
   },
 
@@ -314,18 +316,16 @@ Page({
 
   _handleNeedPrivacyAuthorization(resolve) {
     this._privacyResolve = resolve
-    this.setData({
-      wxPrivacyNeeded: true,
-      err: '',
-      ...(this.data.showWxAuthSheet
-        ? { wxAuthStep: 'privacy' }
-        : { showWxAuthSheet: true, wxAuthStep: 'privacy' }),
-    })
+    if (this.data.showWxAuthSheet) {
+      this.setData({ wxAuthStep: 'privacy', err: '' })
+      return
+    }
+    this.setData({ wxPrivacyPending: true, err: '' })
   },
 
   onPrivacyAuthorizeAgree() {
     mpPrivacyAuthorize.resolvePrivacyAuthorization(this, mpPrivacyAuthorize.PRIVACY_AGREE_BTN_ID)
-    this.setData({ wxPrivacyNeeded: false, err: '' })
+    this.setData({ wxPrivacyPending: false, err: '' })
     if (this.data.wxAuthStep === 'privacy') {
       this.setData({ wxAuthStep: 'avatar' })
       wx.showToast({ title: '请授权微信头像', icon: 'none' })
@@ -334,8 +334,11 @@ Page({
 
   onWxPrivacyAgreeThenPhone() {
     mpPrivacyAuthorize.resolvePrivacyAuthorization(this, mpPrivacyAuthorize.PRIVACY_AGREE_BTN_ID)
-    this.setData({ wxPrivacyNeeded: false, err: '' })
-    wx.showToast({ title: '请再点一次微信一键登录', icon: 'none' })
+    this.setData({
+      wxPrivacyPending: false,
+      err: '请再点一次「微信一键登录」，选择微信绑定的手机号',
+      wxPhoneDebug: '',
+    })
   },
 
   onOpenPrivacyContract() {
@@ -519,7 +522,8 @@ Page({
   onToggleLegalAgree() {
     const next = !this.data.legalAgreed
     loginLegalAgree.writeAgreed(next)
-    this.setData({ legalAgreed: next, err: '' })
+    this.setData({ legalAgreed: next, err: '', wxPhoneDebug: '' })
+    if (next) this.primeWxPrivacy()
   },
 
   onOpenLegal(e) {
@@ -554,6 +558,7 @@ Page({
       legalPromptAction: 'wx',
       err: '',
     })
+    if (action === 'wx') this.primeWxPrivacy()
     if (action === 'pwd') {
       void this.doPwdLogin(workId)
       return
@@ -572,15 +577,19 @@ Page({
       return
     }
     if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
-      console.warn('[mp] getPhoneNumber fail', detail.errMsg, detail.errno)
+      const debug = [detail.errMsg, detail.errno != null ? `#${detail.errno}` : '']
+        .filter(Boolean)
+        .join(' ')
+      console.warn('[mp] getPhoneNumber fail', debug)
       if (isWxPrivacyBlock(detail)) {
         this.setData({
-          wxPrivacyNeeded: true,
-          err: wxPhoneAuthFailHint(detail),
+          wxPrivacyPending: true,
+          err: '请先点「同意隐私保护指引」，再点微信一键登录',
+          wxPhoneDebug: debug,
         })
         return
       }
-      this.setData({ err: wxPhoneAuthFailHint(detail) })
+      this.setData({ err: wxPhoneAuthFailHint(detail), wxPhoneDebug: debug })
       return
     }
     if (!phoneCode) {
