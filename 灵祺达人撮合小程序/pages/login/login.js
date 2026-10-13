@@ -30,6 +30,12 @@ const LEGAL_PROMPT_COPY = {
   },
 }
 
+function isWxPrivacyUndeclared(detail) {
+  const errMsg = String((detail && detail.errMsg) || '')
+  const errno = Number(detail && detail.errno)
+  return errno === 112 || /not declared in the privacy agreement/i.test(errMsg)
+}
+
 function wxPhoneAuthFailHint(detail) {
   const errMsg = String((detail && detail.errMsg) || '')
   const errno = Number(detail && detail.errno)
@@ -41,13 +47,16 @@ function wxPhoneAuthFailHint(detail) {
   try {
     envVersion = String(((wx.getAccountInfoSync() || {}).miniProgram || {}).envVersion || '')
   } catch (_) {}
+  if (isWxPrivacyUndeclared(detail)) {
+    return '微信后台还没在《用户隐私保护指引》里声明「手机号」。请用小程序账号登录 mp.weixin.qq.com → 设置 → 服务内容声明 → 用户隐私保护指引，勾选手机号后保存，约 5 分钟后再试'
+  }
   if (platform === 'devtools') {
     return '开发者工具读不到真实手机号，请用「预览」扫到手机上再点微信一键登录'
   }
-  if (errno === 104 || /privacy|隐私|needAuthorization/i.test(errMsg)) {
+  if (errno === 104 || /needAuthorization/i.test(errMsg)) {
     return '请先同意微信《隐私保护指引》，再点微信一键登录'
   }
-  if (errno === 112 || /deny|cancel|拒绝/i.test(errMsg)) {
+  if (/deny|cancel|拒绝/i.test(errMsg)) {
     return '需要在微信弹窗里允许获取绑定手机号'
   }
   if (/no permission|banned|jsapi/i.test(errMsg)) {
@@ -60,9 +69,10 @@ function wxPhoneAuthFailHint(detail) {
 }
 
 function isWxPrivacyBlock(detail) {
+  if (isWxPrivacyUndeclared(detail)) return false
   const errMsg = String((detail && detail.errMsg) || '')
   const errno = Number(detail && detail.errno)
-  return errno === 104 || /privacy|隐私|needAuthorization/i.test(errMsg)
+  return errno === 104 || /needAuthorization/i.test(errMsg)
 }
 
 function openLegalPrompt(page, workId, action) {
