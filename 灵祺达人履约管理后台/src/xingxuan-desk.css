@@ -922,6 +922,85 @@ html[data-theme='dark'] .app-frame.xx-erp-shell .messages-hub__sidebar {
 html[data-theme='dark'] .app-frame.xx-erp-shell .talent-home__announce-more {
   color: var(--xx-brass) !important;
 }
+/* 商单卡片原地展开：大卡片盖住列表，点外面或关闭再缩回原卡片 */
+.order-card-source {
+  min-width: 0;
+  cursor: pointer;
+}
+.order-card-source.is-expanded {
+  visibility: hidden;
+}
+.order-expand-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgb(15 23 42 / 0.38);
+  opacity: 0;
+  transition: opacity 280ms ease;
+}
+.order-expand-backdrop--open {
+  opacity: 1;
+}
+.order-expand-card {
+  position: fixed;
+  z-index: 81;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--panel-card, #fff);
+  border: 1px solid var(--shell-border, #e7e1d6);
+  border-radius: 0.85rem;
+  box-shadow: 0 28px 80px rgb(15 23 42 / 0.28);
+  transition:
+    top 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    left 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 320ms ease,
+    box-shadow 320ms ease;
+}
+.order-expand-card--open {
+  border-radius: 1.15rem;
+}
+.order-expand-card__bar {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding: 0.7rem 0.75rem 0;
+}
+.order-expand-card__close {
+  min-height: 36px;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  border: 1px solid var(--shell-border, #e7e1d6);
+  background: var(--panel-card, #fff);
+  color: var(--shell-text, #12161a);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.order-expand-card__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  opacity: 0;
+  padding: 0 0.85rem 1rem;
+}
+.order-expand-card--open .order-expand-card__body {
+  opacity: 1;
+  transition: opacity 180ms ease 90ms;
+}
+.order-expand-detail {
+  min-width: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .order-expand-backdrop,
+  .order-expand-card,
+  .order-expand-card__body {
+    transition: none;
+  }
+}
+
 html[data-theme='dark'] .app-frame.xx-erp-shell [class*='from-violet'],
 html[data-theme='dark'] .app-frame.xx-erp-shell [class*='to-fuchsia'],
 html[data-theme='dark'] .app-frame.xx-erp-shell [class*='from-fuchsia'] {

@@ -38,8 +38,18 @@ import { findProvinceForCity } from '../../lib/mpSync/chinaRegion'
 
 type FilterMenu = 'platform' | 'category' | 'budget' | 'city' | null
 
-function SupplierRecommendOrders() {
+function SupplierRecommendOrders({
+  expandedId = '',
+  onOpenOrder,
+}: {
+  expandedId?: string
+  onOpenOrder?: (row: RecruitmentOrderRow) => void
+}) {
   const goDetail = useRecruitmentNav()
+  function openOrder(row: RecruitmentOrderRow) {
+    if (onOpenOrder) onOpenOrder(row)
+    else goDetail(row)
+  }
   const workId = getWorkIdentity()
   const profileLink = workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'
   const [orderSegment, setOrderSegment] = useState<RecommendOrderSegment>('match')
@@ -343,12 +353,22 @@ function SupplierRecommendOrders() {
 
       <div className="recommend-hall-list">
         {orderDisplayRows.map((o) => (
-          <RecommendOrderCard
+          <div
             key={o.id}
-            row={o}
-            coverUrl={resolveOrderCoverUrl(mpById.get(o.id) || { platform: o.platform })}
-            onDetail={() => goDetail(o)}
-          />
+            data-order-expand={o.id}
+            className={`order-card-source${expandedId === o.id ? ' is-expanded' : ''}`}
+            onClick={(e) => {
+              const target = e.target as HTMLElement
+              if (target.closest('a, .recommend-order-card__fav')) return
+              openOrder(o)
+            }}
+          >
+            <RecommendOrderCard
+              row={o}
+              coverUrl={resolveOrderCoverUrl(mpById.get(o.id) || { platform: o.platform })}
+              onDetail={() => openOrder(o)}
+            />
+          </div>
         ))}
       </div>
 
@@ -393,7 +413,13 @@ function SupplierRecommendOrders() {
   )
 }
 
-export default function RecommendHallPanel() {
+export default function RecommendHallPanel({
+  expandedId = '',
+  onOpenOrder,
+}: {
+  expandedId?: string
+  onOpenOrder?: (row: RecruitmentOrderRow) => void
+}) {
   const role = getActiveRole()
   if (role === 'pr') {
     if (!canUsePrRecommendHall()) {
@@ -407,5 +433,5 @@ export default function RecommendHallPanel() {
     }
     return <RecommendTalentPanel embedded />
   }
-  return <SupplierRecommendOrders />
+  return <SupplierRecommendOrders expandedId={expandedId} onOpenOrder={onOpenOrder} />
 }

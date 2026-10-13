@@ -68,10 +68,18 @@ function filterHallRows(
   })
 }
 
-type Props = { prMode?: boolean }
+type Props = {
+  prMode?: boolean
+  expandedId?: string
+  onOpenOrder?: (row: RecruitmentOrderRow) => void
+}
 
-export default function HallRecruitmentPanel({ prMode = false }: Props) {
+export default function HallRecruitmentPanel({ prMode = false, expandedId = '', onOpenOrder }: Props) {
   const goDetail = useRecruitmentNav()
+  function openOrder(row: RecruitmentOrderRow) {
+    if (onOpenOrder) onOpenOrder(row)
+    else goDetail(row)
+  }
   const role = getActiveRole()
   const workId = getWorkIdentity()
   const hallIdentity = prMode || role === 'pr' ? 'pr' : workId
@@ -364,13 +372,23 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
 
       <div className={`hall-list${listTwoCol ? ' hall-list--two-col' : ''}`}>
         {displayRows.map((o) => (
-          <RecruitmentOrderCard
+          <div
             key={o.id}
-            row={o}
-            variant="hall"
-            coverUrl={resolveOrderCoverUrl(mpById.get(o.id) || { platform: o.platform })}
-            onClick={() => goDetail(o)}
-          />
+            data-order-expand={o.id}
+            className={`order-card-source${expandedId === o.id ? ' is-expanded' : ''}`}
+            onClick={(e) => {
+              const target = e.target as HTMLElement
+              if (target.closest('a, .hall-order-card__fav')) return
+              openOrder(o)
+            }}
+          >
+            <RecruitmentOrderCard
+              row={o}
+              variant="hall"
+              coverUrl={resolveOrderCoverUrl(mpById.get(o.id) || { platform: o.platform })}
+              onClick={() => openOrder(o)}
+            />
+          </div>
         ))}
       </div>
       {!loading && !displayRows.length ? (

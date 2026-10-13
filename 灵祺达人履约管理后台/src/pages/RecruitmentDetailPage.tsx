@@ -93,8 +93,14 @@ function resolveTargetedInviteState(mp: Record<string, unknown> | null | undefin
   }
 }
 
-export default function RecruitmentDetailPage() {
-  const { id } = useParams()
+type RecruitmentDetailPageProps = {
+  orderId?: string
+  embedded?: boolean
+}
+
+export default function RecruitmentDetailPage({ orderId, embedded = false }: RecruitmentDetailPageProps = {}) {
+  const { id: routeId } = useParams()
+  const id = orderId || routeId
   const location = useLocation()
   const [search] = useSearchParams()
   const nav = useNavigate()
@@ -584,7 +590,7 @@ export default function RecruitmentDetailPage() {
         : '← 返回上一页'
 
   return (
-    <div className="page-content-shell page-content-shell--wide space-y-4">
+    <div className={embedded ? 'order-expand-detail space-y-4' : 'page-content-shell page-content-shell--wide space-y-4'}>
       <input
         ref={fileRef}
         type="file"
@@ -592,9 +598,11 @@ export default function RecruitmentDetailPage() {
         className="hidden"
         onChange={(e) => void onVideoFileChange(e)}
       />
-      <Link to={detailReturnTo} className="recruitment-detail-back text-sm hover:underline">
-        {detailBackLabel}
-      </Link>
+      {embedded ? null : (
+        <Link to={detailReturnTo} className="recruitment-detail-back text-sm hover:underline">
+          {detailBackLabel}
+        </Link>
+      )}
       {loading ? <p className="recruitment-detail-muted">加载中…</p> : null}
       {err ? <p className="text-red-600">{err}</p> : null}
       {view ? (
