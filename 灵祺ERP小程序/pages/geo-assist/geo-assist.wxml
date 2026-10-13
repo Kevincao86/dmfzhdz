@@ -1,4 +1,5 @@
-<view class="geo-page foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} geo-page foot-col" style="{{lqPageStyle}}">
   <view class="geo-nav">
     <text class="geo-nav-title">GEO运营优化</text>
     <view class="geo-nav-report" bindtap="onOpenReport">

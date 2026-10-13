@@ -1,4 +1,5 @@
-<view class="agent-page" style="{{keyboardHeight ? 'bottom:' + keyboardHeight + 'px;' : ''}}">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} agent-page" style="{{lqPageStyle}}{{keyboardHeight ? 'bottom:' + keyboardHeight + 'px;' : ''}}">
   <view class="agent-hero">
     <view class="agent-hero-main">
       <image class="agent-logo" src="{{logoSrc}}" mode="aspectFit" />

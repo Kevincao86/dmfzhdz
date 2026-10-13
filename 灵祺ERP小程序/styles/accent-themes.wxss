@@ -1,0 +1,86 @@
+/* 商家小程序自选主题。选择器保持短，避免主包超限。 */
+.lq-accent-on,
+.lq-accent-on .login-welcome,
+.lq-accent-on .page-func-v2,
+.lq-accent-on .page-mine-v2,
+.lq-accent-on .home-page {
+  background: var(--lq-bg) !important;
+}
+
+.lq-accent-on [class*='card'],
+.lq-accent-on [class*='input'],
+.lq-accent-on [class*='sheet'],
+.lq-accent-on [class*='panel'],
+.lq-accent-on [class*='modal'],
+.lq-accent-on [class*='search'],
+.lq-accent-on .profile-v2,
+.lq-accent-on .menu-v2,
+.lq-accent-on .func-block,
+.lq-accent-on .func-top,
+.lq-accent-on .guest-banner,
+.lq-accent-on .guest-login-card,
+.lq-accent-on .mine-accent-row,
+.lq-accent-on .erp-card,
+.lq-accent-on .erp-hero,
+.lq-accent-on input,
+.lq-accent-on textarea {
+  background: var(--lq-card) !important;
+  border-color: var(--lq-border) !important;
+}
+
+.lq-accent-on .home-chip--on,
+.lq-accent-on .btn-v2.primary,
+.lq-accent-on .btn-primary {
+  background: var(--lq-primary) !important;
+  border-color: var(--lq-primary) !important;
+  color: #fff !important;
+}
+
+.tab-bar.lq-accent-on {
+  background: var(--lq-card) !important;
+  border-top-color: var(--lq-border) !important;
+}
+
+.tab-bar.lq-accent-on .tab-item.active {
+  color: var(--lq-primary);
+}
+
+.tab-bar.lq-accent-on .tab-item.active .tab-icon-wrap {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.lq-accent-dark view,
+.lq-accent-dark text,
+.lq-accent-dark button,
+.lq-accent-dark input,
+.lq-accent-dark textarea,
+.lq-accent-dark navigator,
+.lq-accent-dark label {
+  color: #f4f4f5 !important;
+}
+
+.lq-accent-dark .tab-text,
+.lq-accent-dark .mine-accent-cap,
+.lq-accent-dark .home-muted,
+.lq-accent-dark .guest-login-a,
+.lq-accent-dark .func-group-title {
+  color: #a1a1aa !important;
+}
+
+.tab-bar.lq-accent-dark .tab-item {
+  color: #a1a1aa;
+}
+
+.tab-bar.lq-accent-dark .tab-item.active,
+.tab-bar.lq-accent-dark .tab-item.active .tab-text,
+.lq-accent-dark .mine-accent-hit.is-on .mine-accent-cap {
+  color: #fafafa !important;
+}
+
+.lq-accent-on .wb-nick-input,
+.lq-accent-on .home-entry__img,
+.lq-accent-on .home-poster,
+.lq-accent-on .home-poster__img {
+  background: transparent !important;
+  border-color: transparent !important;
+}

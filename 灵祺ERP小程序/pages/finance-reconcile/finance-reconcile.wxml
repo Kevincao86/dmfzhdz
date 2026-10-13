@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="fin-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} fin-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="fin-hero">
     <view class="fin-hero-main">
       <text class="fin-title">财务对账</text>

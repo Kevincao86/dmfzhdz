@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="plist-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} plist-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <scroll-view scroll-x class="plist-tab-scroll" enhanced show-scrollbar="{{false}}">
     <view class="plist-tab-row">
       <view

@@ -1,5 +1,6 @@
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
 <launch-splash />
-<scroll-view scroll-y class="home-page foot-col" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)" enable-flex>
+<scroll-view scroll-y class="{{lqAccentClass}} home-page foot-col" enhanced show-scrollbar="{{false}}" style="{{lqPageStyle}}padding-bottom:var(--tab-bar-pad)" enable-flex>
   <swiper
     class="home-poster"
     indicator-dots
@@ -39,7 +40,10 @@
       data-id="{{item.id}}"
       bindtap="onEntryTap"
     >
-      <image class="home-entry__img" src="{{item.imageUrl}}" mode="aspectFill" />
+      <block wx:if="{{lqAccentClass}}">
+        <text class="home-entry__title">{{item.title}}</text>
+      </block>
+      <image wx:else class="home-entry__img" src="{{item.imageUrl}}" mode="aspectFill" />
     </view>
   </view>
   <view class="home-card">

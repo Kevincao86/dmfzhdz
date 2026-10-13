@@ -1,3 +1,21 @@
+const _NativePage = Page
+Page = function (opts) {
+  const pageOpts = opts || {}
+  try {
+    const accentTheme = require('./utils/accentTheme.js')
+    pageOpts.data = Object.assign({}, accentTheme.viewModel(), pageOpts.data || {})
+  } catch (_) {}
+  const userOnShow = pageOpts.onShow
+  pageOpts.onShow = function () {
+    const ret = typeof userOnShow === 'function' ? userOnShow.apply(this, arguments) : undefined
+    try {
+      require('./utils/accentTheme.js').pin(this)
+    } catch (_) {}
+    return ret
+  }
+  return _NativePage(pageOpts)
+}
+
 const devAuth = require('./utils/devAuth.js')
 const sessionSync = require('./utils/merchantSessionSyncMp.js')
 const supabaseCfg = require('./utils/supabaseClientConfigMp.js')

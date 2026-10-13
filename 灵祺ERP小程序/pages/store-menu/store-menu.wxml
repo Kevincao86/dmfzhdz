@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="sm-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} sm-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="sm-hero">
     <text class="sm-title">菜单价目表</text>
     <text class="sm-sub">与电脑端同源。拍照识别或上传 Excel，保存后门店经营分析可引用。</text>

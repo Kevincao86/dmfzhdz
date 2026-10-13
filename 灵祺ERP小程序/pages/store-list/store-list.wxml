@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="store-page-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} store-page-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view wx:if="{{mode === 'info' && showNotice}}" class="store-notice">
     <text class="store-notice-text">完善多平台店铺信息，提升曝光与转化</text>
     <text class="store-notice-close" bindtap="onCloseNotice">×</text>

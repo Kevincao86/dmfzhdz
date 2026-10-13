@@ -1,6 +1,8 @@
 Component({
   data: {
     selected: 0,
+    lqAccentClass: '',
+    lqPageStyle: '',
     list: [
       { pagePath: '/pages/dashboard/dashboard', text: '首页', icon: 'chart' },
       { pagePath: '/pages/ai-agent/ai-agent', text: '助手', icon: 'ai' },

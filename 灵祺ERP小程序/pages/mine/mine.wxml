@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="page-mine-v2 foot-col" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} page-mine-v2 foot-col" enhanced show-scrollbar="{{false}}" style="{{lqPageStyle}}padding-bottom:var(--tab-bar-pad)" enable-flex>
   <view class="profile-v2" bindtap="onEditProfile" hover-class="profile-v2-hover">
     <view class="store-logo-line">
       <image class="store-logo-img" src="{{avatarUrl || storeLogoSrc}}" mode="aspectFit" />
@@ -13,6 +14,19 @@
       </view>
     </view>
     <text class="chev">›</text>
+  </view>
+
+  <view class="mine-accent-row">
+    <view
+      wx:for="{{accentSwatches}}"
+      wx:key="id"
+      class="mine-accent-hit {{(item.id === 'origin' ? !accentId : accentId === item.id) ? 'is-on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onPickAccent"
+    >
+      <view class="mine-accent-dot mine-accent-dot--{{item.id}}" style="{{item.dotStyle}}"></view>
+      <text class="mine-accent-cap" wx:if="{{item.cap}}">{{item.cap}}</text>
+    </view>
   </view>
 
   <view wx:if="{{guestMode}}" class="guest-login-card" bindtap="onGoLogin">
@@ -53,7 +67,13 @@
   <button wx:if="{{!guestMode}}" class="logout-v2 danger" bindtap="onLogout">退出登录</button>
 <site-icp-footer />
 </scroll-view>
-<view wx:if="{{showLogoutConfirm}}" class="logout-mask" catchtouchmove="true">
+<view
+  wx:if="{{themeVeilOn}}"
+  class="mine-theme-veil {{themeVeilAnimate ? 'is-animate' : ''}} {{themeVeilOpen ? 'is-open' : ''}}"
+  style="{{themeVeilStyle}}"
+  bindtransitionend="onThemeVeilEnd"
+></view>
+<view wx:if="{{showLogoutConfirm}}" class="logout-mask {{lqAccentClass}}" style="{{lqPageStyle}}" catchtouchmove="true">
   <view class="sec-card-v2 logout-dialog" catchtap="true">
     <text class="sec-strong">退出当前账号</text>
     <text class="body">确定退出登录？</text>

@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="page-pad-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} page-pad-v2 foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="lq-hero">
     <text class="lq-hero-title">活动中心</text>
     <text class="lq-hero-sub">多平台活动同步 · 状态筛选与网页同源</text>

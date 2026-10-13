@@ -1,4 +1,5 @@
-<view class="voice-page foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} voice-page foot-col" style="{{lqPageStyle}}">
   <view class="voice-hero meoo-card">
     <text class="voice-hero-title">短视频优化 · 语音</text>
     <text class="voice-hero-desc">口述脚本结构、卖点、时长与结尾 CTA；自动拆解段落与镜头提示，编辑页做微调。</text>

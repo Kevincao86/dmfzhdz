@@ -1,4 +1,5 @@
-<scroll-view class="vs-page foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view class="{{lqAccentClass}} vs-page foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="vs-hero">
     <text class="vs-hero__badge">与商家 Web 同源</text>
     <text class="vs-hero__title">灵祺视觉工坊</text>

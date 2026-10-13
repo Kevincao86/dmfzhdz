@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="ads-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} ads-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="ads-head">
     <view class="ads-head-main">
       <text class="ads-title">投流管理</text>

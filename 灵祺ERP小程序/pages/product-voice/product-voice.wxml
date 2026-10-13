@@ -1,4 +1,5 @@
-<view class="voice-root">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} voice-root" style="{{lqPageStyle}}">
   <scroll-view scroll-y class="voice-scroll foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
     <view class="voice-inner">
       <view class="voice-hero">

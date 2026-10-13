@@ -6,6 +6,71 @@
   background: #f4f8fc;
 }
 
+.mine-accent-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: 0 0 20rpx;
+  padding: 16rpx 8rpx 12rpx;
+  background: #fff;
+  border: 1rpx solid rgba(30, 58, 95, 0.12);
+  border-radius: 24rpx;
+}
+
+.mine-accent-hit {
+  width: 72rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mine-accent-dot {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 3rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2rpx 8rpx rgba(15, 23, 42, 0.16);
+}
+
+.mine-accent-dot--origin {
+  background: linear-gradient(135deg, #f4f8fc 50%, #2f6fed 50%);
+}
+
+.mine-accent-hit.is-on .mine-accent-dot {
+  width: 44rpx;
+  height: 44rpx;
+  box-shadow: 0 0 0 4rpx var(--lq-primary, #2f6fed);
+}
+
+.mine-accent-cap {
+  margin-top: 6rpx;
+  font-size: 18rpx;
+  line-height: 1.2;
+  color: #5b6b7c;
+}
+
+.mine-accent-hit.is-on .mine-accent-cap {
+  color: var(--lq-primary-dark, #1d4ed8);
+  font-weight: 700;
+}
+
+.mine-theme-veil {
+  position: fixed;
+  z-index: 10050;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: scale(0);
+}
+
+.mine-theme-veil.is-animate {
+  transition: transform 560ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mine-theme-veil.is-open {
+  transform: scale(1);
+}
+
 .profile-v2-hover {
   opacity: 0.94;
 }

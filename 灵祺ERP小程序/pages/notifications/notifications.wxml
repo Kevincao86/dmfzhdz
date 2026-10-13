@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="notify-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} notify-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view wx:if="{{!items.length}}" class="notify-empty">暂无消息</view>
   <block wx:else>
     <view

@@ -1,4 +1,5 @@
-<view class="voice-page foot-col">
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} voice-page foot-col" style="{{lqPageStyle}}">
   <view class="voice-hero meoo-card">
     <text class="voice-hero-title">达人招募 · 语音</text>
     <text class="voice-hero-desc">口述岗位类型、预算、交付物、周期与平台偏好；自动归纳要点后进入编辑页确认发布。</text>

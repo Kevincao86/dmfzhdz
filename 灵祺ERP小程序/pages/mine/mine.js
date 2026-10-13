@@ -4,10 +4,12 @@ const devAuth = require('../../utils/devAuth.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const platformBindingsMp = require('../../utils/platformBindingsMp.js')
 const mpUi = require('../../utils/mpUiFlags.js')
+const accentTheme = require('../../utils/accentTheme.js')
 const { iconDataUri } = require('../../utils/funcIconAssetsMp.js')
 
 const PROFILE_KEY = 'meoo_merchant_profile_v1'
 const WEB_BIND_HINT = '请在网页端进行平台授权绑定，具体操作见网页版系统设置。'
+const THEME_VEIL_MS = 560
 
 function consumeOpenPlatformBind() {
   const app = getApp()
@@ -147,6 +149,11 @@ Page({
     avatarUrl: '',
     guestMode: true,
     menu: enrichMenu(buildVisibleMenu(true)),
+    accentSwatches: accentTheme.SWATCHES,
+    themeVeilOn: false,
+    themeVeilAnimate: false,
+    themeVeilOpen: false,
+    themeVeilStyle: '',
   },
 
   onShow() {
@@ -395,5 +402,70 @@ Page({
     this.setData({ showLogoutConfirm: false })
     // 退出后必须回到登录页（勿仅切游客态留在「我的」）
     api.logoutAndGoLogin()
+  },
+
+  onPickAccent(e) {
+    if (this._themeAnimating) return
+    const raw = e.currentTarget.dataset.id
+    const current = this.data.accentId || ''
+    const nextId = raw === 'origin' || raw === current ? '' : raw
+    if (!nextId && !current) return
+    const veilPack = accentTheme.pack(nextId || current)
+    if (!veilPack) return
+    const retract = !nextId
+    this._themeAnimating = true
+    this._themeTarget = nextId
+    const query = wx.createSelectorQuery().in(this)
+    query.selectAll('.mine-accent-dot').boundingClientRect()
+    query.exec((res) => {
+      if (!this._themeAnimating) return
+      const rects = (res && res[0]) || []
+      const idx = (this.data.accentSwatches || []).findIndex((item) => item.id === (raw || 'origin'))
+      const rect = rects[idx]
+      const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+      const cx = rect ? rect.left + rect.width / 2 : win.windowWidth / 2
+      const cy = rect ? rect.top + rect.height / 2 : 160
+      const dx = Math.max(cx, win.windowWidth - cx)
+      const dy = Math.max(cy, win.windowHeight - cy)
+      const radius = Math.ceil(Math.sqrt(dx * dx + dy * dy)) + 2
+      const size = radius * 2
+      const style = 'width:' + size + 'px;height:' + size + 'px;left:' + (cx - radius) + 'px;top:' + (cy - radius) + 'px;background:' + veilPack.nav + ';'
+      if (this._veilTimer) clearTimeout(this._veilTimer)
+      this._veilTimer = setTimeout(() => this.finishThemeVeil(), THEME_VEIL_MS + 90)
+      if (!retract) {
+        this.setData({ themeVeilOn: true, themeVeilAnimate: false, themeVeilOpen: false, themeVeilStyle: style }, () => {
+          setTimeout(() => {
+            if (!this._themeAnimating) return
+            this.setData({ themeVeilAnimate: true, themeVeilOpen: true })
+          }, 30)
+        })
+        return
+      }
+      accentTheme.save('')
+      this.setData({ themeVeilOn: true, themeVeilAnimate: false, themeVeilOpen: true, themeVeilStyle: style }, () => {
+        setTimeout(() => {
+          if (!this._themeAnimating) return
+          this.setData({ themeVeilAnimate: true, themeVeilOpen: false })
+        }, 40)
+      })
+    })
+  },
+
+  onThemeVeilEnd(e) {
+    const prop = e && e.detail && e.detail.propertyName
+    if (prop && prop !== 'transform') return
+    this.finishThemeVeil()
+  },
+
+  finishThemeVeil() {
+    if (!this._themeAnimating) return
+    this._themeAnimating = false
+    if (this._veilTimer) {
+      clearTimeout(this._veilTimer)
+      this._veilTimer = null
+    }
+    const id = this._themeTarget || ''
+    if (id) accentTheme.save(id)
+    this.setData({ themeVeilOn: false, themeVeilAnimate: false, themeVeilOpen: false })
   },
 })

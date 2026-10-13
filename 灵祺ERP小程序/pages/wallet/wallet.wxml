@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="wallet-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} wallet-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="wallet-nav">
     <view class="wallet-nav-spacer"></view>
     <view class="wallet-nav-detail" bindtap="onShowLedger">

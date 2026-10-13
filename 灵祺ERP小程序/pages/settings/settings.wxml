@@ -1,4 +1,5 @@
-<scroll-view scroll-y class="erp-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex>
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<scroll-view scroll-y class="{{lqAccentClass}} erp-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="erp-hero">
     <text class="erp-hero-title">系统设置</text>
     <text class="erp-hero-sub">平台连接与电脑端同账号云端同步。OAuth 深度绑定仍在电脑端完成，完成后下拉本页即可拉取。</text>
