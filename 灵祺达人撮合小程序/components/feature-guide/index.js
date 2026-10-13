@@ -1,6 +1,6 @@
 const userProfile = require('../../utils/userProfile.js')
 
-const STORAGE = 'mp_feature_guide_v1'
+const STORAGE = 'mp_feature_guide_v2'
 const PAGE_URL = {
   index: '/pages/index/index',
   recommend: '/pages/recommend/recommend',
@@ -30,12 +30,27 @@ function writeDone(identity) {
 
 function stepsFor(identity) {
   const isPr = identity === 'pr'
-  return [
+  const steps = []
+  if (identity === 'talent') {
+    steps.push({
+      page: 'index',
+      anchor: 'guide-entry-eval',
+      title: '达人评估提升',
+      body: '点这张卡片做达人账号分析，看曝光和带货还能提升多少。',
+    })
+  }
+  steps.push(
     {
       page: 'index',
-      anchor: 'guide-home-entry',
-      title: '常用入口',
-      body: '这四个入口可以进账号分析、我的报名、商单日历和 AI视频审核。',
+      anchor: 'guide-entry-aiReview',
+      title: 'AI合规审片',
+      body: '点这张卡片，用 AI 检查成片和文稿是否合规。',
+    },
+    {
+      page: 'index',
+      anchor: 'guide-entry-calendar',
+      title: '商单日历',
+      body: '点这张卡片，按日期查看探店、交片和待办。',
     },
     {
       page: 'index',
@@ -43,6 +58,8 @@ function stepsFor(identity) {
       title: '报名商单',
       body: '点下方商单卡片进入详情，按页面提示提交报名。',
     },
+  )
+  return steps.concat([
     {
       page: 'recommend',
       anchor: isPr ? 'guide-rec-talents' : 'guide-rec-strip',
@@ -75,12 +92,6 @@ function stepsFor(identity) {
     },
     {
       page: 'mine',
-      anchor: 'guide-aiReview',
-      title: 'AI审核',
-      body: '点 AI 视频审核，检查成片和文稿是否合规。',
-    },
-    {
-      page: 'mine',
       anchor: 'guide-affiliatePortal',
       title: '我的推广',
       body: '在这里查看推广码、佣金和商户明细。',
@@ -91,7 +102,7 @@ function stepsFor(identity) {
       title: '增值服务',
       body: '这是 AI 创作工坊，里面有短视频、数字人、视觉工坊和云剪。',
     },
-  ]
+  ])
 }
 
 Component({

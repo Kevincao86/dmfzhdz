@@ -107,6 +107,7 @@
       <view
         wx:for="{{homeEntries}}"
         wx:key="key"
+        id="guide-entry-{{item.key}}"
         class="home-entry__card home-entry__card--img"
         data-key="{{item.key}}"
         bindtap="goHomeEntry"
