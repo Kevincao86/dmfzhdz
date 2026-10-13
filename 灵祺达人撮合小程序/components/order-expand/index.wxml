@@ -60,20 +60,24 @@
         <text class="order-expand-poster-sheet__title">分享海报</text>
         <text class="order-expand-poster-sheet__close" bindtap="onCloseSharePosterSheet">×</text>
       </view>
-      <view wx:if="{{sharePosterLoading}}" class="order-expand-poster-sheet__state">生成海报中…</view>
-      <image
-        wx:elif="{{sharePosterPath}}"
-        class="order-expand-poster-sheet__img"
-        src="{{sharePosterPath}}"
-        mode="widthFix"
-        show-menu-by-longpress="{{true}}"
-      />
-      <text wx:else class="order-expand-poster-sheet__state">{{sharePosterErr || '海报生成失败'}}</text>
-      <view wx:if="{{sharePosterPath || sharePosterStyleLabel}}" class="order-expand-poster-sheet__style">
-        <text wx:if="{{sharePosterStyleLabel}}">当前样式：{{sharePosterStyleLabel}}</text>
-        <text class="order-expand-poster-sheet__switch" bindtap="onSwitchSharePosterStyle">换个样式</text>
+      <scroll-view class="order-expand-poster-sheet__scroll" scroll-y enhanced show-scrollbar="{{false}}">
+        <view wx:if="{{sharePosterLoading}}" class="order-expand-poster-sheet__state">生成海报中…</view>
+        <image
+          wx:elif="{{sharePosterPath}}"
+          class="order-expand-poster-sheet__img"
+          src="{{sharePosterPath}}"
+          mode="widthFix"
+          show-menu-by-longpress="{{true}}"
+        />
+        <text wx:else class="order-expand-poster-sheet__state">{{sharePosterErr || '海报生成失败'}}</text>
+      </scroll-view>
+      <view class="order-expand-poster-sheet__foot">
+        <view wx:if="{{sharePosterPath || sharePosterStyleLabel}}" class="order-expand-poster-sheet__style">
+          <text wx:if="{{sharePosterStyleLabel}}">当前样式：{{sharePosterStyleLabel}}</text>
+          <text class="order-expand-poster-sheet__switch" bindtap="onSwitchSharePosterStyle">换个样式</text>
+        </view>
+        <view wx:if="{{sharePosterPath}}" class="order-expand-poster-sheet__save" bindtap="onSaveSharePoster">保存海报到相册</view>
       </view>
-      <view wx:if="{{sharePosterPath}}" class="order-expand-poster-sheet__save" bindtap="onSaveSharePoster">保存海报到相册</view>
     </view>
   </view>
 </view>
