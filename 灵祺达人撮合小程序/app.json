@@ -151,7 +151,8 @@
   },
   "usingComponents": {
     "site-icp-footer": "/components/site-icp-footer/index",
-    "mp-privacy-gate": "/components/mp-privacy-gate/index"
+    "mp-privacy-gate": "/components/mp-privacy-gate/index",
+    "order-expand": "/components/order-expand/index"
   },
   "__usePrivacyCheck__": true
 }

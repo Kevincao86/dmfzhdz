@@ -862,6 +862,7 @@ PAT
 灵祺达人撮合小程序/pages/apply/apply.js
 灵祺达人撮合小程序/app.wxss
 灵祺达人撮合小程序/app.json
+灵祺达人撮合小程序/components/order-expand
 .agents/skills/micro-interactions
 skills-lock.json
 灵祺达人撮合小程序/utils/identityTheme.js

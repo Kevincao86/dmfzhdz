@@ -31,10 +31,12 @@
             <view
               wx:for="{{spotlightRows}}"
               wx:key="id"
-              class="rec-ai-card"
+              id="spotcard-{{index}}"
+              class="rec-ai-card {{expandOrderId === item.id ? 'is-expanded' : ''}}"
               bindtap="goOrderDetail"
               data-id="{{item.id}}"
               data-mock="{{item.isMock}}"
+              data-node="spotcard-{{index}}"
             >
               <view class="rec-ai-card__thumb-wrap">
                 <image
@@ -400,10 +402,12 @@
     <view
       wx:for="{{orderDisplayRows}}"
       wx:key="id"
-      class="job-card-rec"
+      id="reccard-{{index}}"
+      class="job-card-rec {{expandOrderId === item.id ? 'is-expanded' : ''}}"
       bindtap="goOrderDetail"
       data-id="{{item.id}}"
       data-mock="{{item.isMock}}"
+      data-node="reccard-{{index}}"
       hover-class="tap-press"
       hover-stay-time="80"
     >
@@ -529,4 +533,11 @@
     </view>
   </view>
   <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
+  <order-expand
+    wx:if="{{expandOrderId}}"
+    order-id="{{expandOrderId}}"
+    origin="{{expandOrigin}}"
+    opened="{{expandOpen}}"
+    bind:close="onCloseOrderExpand"
+  />
 </view>

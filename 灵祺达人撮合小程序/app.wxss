@@ -644,3 +644,9 @@ picker {
   0% { transform: scale(0.6); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+.job-card-v1.is-expanded,
+.job-card-rec.is-expanded,
+.rec-ai-card.is-expanded {
+  visibility: hidden;
+}

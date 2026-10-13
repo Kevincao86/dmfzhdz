@@ -202,10 +202,12 @@
       <view
         wx:for="{{displayRows}}"
         wx:key="id"
-        class="job-card-v1"
+        id="homecard-{{index}}"
+        class="job-card-v1 {{expandOrderId === item.id ? 'is-expanded' : ''}}"
         bindtap="goDetail"
         data-id="{{item.id}}"
         data-mock="{{item.isMock}}"
+        data-node="homecard-{{index}}"
         hover-class="tap-press"
       >
         <view class="job-card-v1__thumb-wrap">
@@ -378,4 +380,11 @@
   </view>
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
   <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
+  <order-expand
+    wx:if="{{expandOrderId}}"
+    order-id="{{expandOrderId}}"
+    origin="{{expandOrigin}}"
+    opened="{{expandOpen}}"
+    bind:close="onCloseOrderExpand"
+  />
 </view>

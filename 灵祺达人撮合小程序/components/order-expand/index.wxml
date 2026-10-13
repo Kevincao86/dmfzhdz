@@ -1,0 +1,39 @@
+<view
+  class="order-expand-mask {{opened ? 'is-on' : ''}}"
+  bindtap="onMask"
+  catchtouchmove="noop"
+>
+  <view class="order-expand-card {{opened ? 'is-open' : ''}}" style="{{cardStyle}}" catchtap="noop">
+    <view class="order-expand-card__bar">
+      <text class="order-expand-card__close" bindtap="onMask">关闭</text>
+    </view>
+    <scroll-view class="order-expand-card__body" scroll-y enhanced show-scrollbar="{{false}}">
+      <view wx:if="{{loading}}" class="order-expand-card__state">加载任务详情…</view>
+      <view wx:elif="{{err}}" class="order-expand-card__state">{{err}}</view>
+      <block wx:else>
+        <image wx:if="{{cover}}" class="order-expand-card__cover" src="{{cover}}" mode="aspectFill" />
+        <text class="order-expand-card__title">{{title}}</text>
+        <view class="order-expand-card__tags">
+          <text wx:if="{{platform}}" class="order-expand-card__tag">{{platform}}</text>
+          <text wx:if="{{region}}" class="order-expand-card__tag">{{region}}</text>
+          <text wx:if="{{category}}" class="order-expand-card__tag">{{category}}</text>
+        </view>
+        <text wx:if="{{price}}" class="order-expand-card__price">{{price}}</text>
+        <text class="order-expand-card__meta">粉丝要求 {{fans}} · {{signup}}</text>
+        <text wx:if="{{location}}" class="order-expand-card__meta">商家位置 {{location}}</text>
+        <view wx:if="{{infoLines.length}}" class="order-expand-card__section">
+          <text class="order-expand-card__section-title">合作内容</text>
+          <text wx:for="{{infoLines}}" wx:key="*this" class="order-expand-card__line">{{item}}</text>
+        </view>
+        <view wx:if="{{taskLines.length}}" class="order-expand-card__section">
+          <text class="order-expand-card__section-title">任务详情</text>
+          <text wx:for="{{taskLines}}" wx:key="*this" class="order-expand-card__line">{{item}}</text>
+        </view>
+      </block>
+    </scroll-view>
+    <view class="order-expand-card__foot" wx:if="{{!loading && !err}}">
+      <view wx:if="{{isPr}}" class="order-expand-card__apply order-expand-card__apply--muted">当前是 PR 版本，不能报名</view>
+      <view wx:else class="order-expand-card__apply" bindtap="onApply">{{applyLabel}}</view>
+    </view>
+  </view>
+</view>

@@ -252,6 +252,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     editRows: [],
     iceRows: [],
     displayRows: [],
+    expandOrderId: '',
+    expandOrigin: null,
+    expandOpen: false,
     tabCounts: { normal: 0, urgent: 0, shoot: 0, edit: 0, ice: 0 },
     categoryChips: HOME_CATEGORY_CHIPS,
     activeCategoryChip: 'all',
@@ -939,11 +942,36 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   goDetail(e) {
     const id = e.currentTarget.dataset.id
     const isMock = e.currentTarget.dataset.mock
+    const node = e.currentTarget.dataset.node
     if (!id) return
-    if (isMock) {
+    if (isMock === true || isMock === 'true') {
       wx.showToast({ title: '演示商单，仅供预览', icon: 'none' })
       return
     }
-    wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
+    this.openOrderCard(String(id), node)
+  },
+  openOrderCard(id, node) {
+    const query = wx.createSelectorQuery().in(this)
+    query.select(`#${node}`).boundingClientRect()
+    query.exec((res) => {
+      const rect = res && res[0]
+      const origin = rect && rect.width
+        ? { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+        : { top: 160, left: 16, width: 320, height: 112 }
+      this.setData({ expandOrderId: id, expandOrigin: origin, expandOpen: false })
+      setTimeout(() => {
+        if (this.data.expandOrderId === id) this.setData({ expandOpen: true })
+      }, 32)
+    })
+  },
+  onCloseOrderExpand() {
+    if (!this.data.expandOrderId) return
+    this.setData({ expandOpen: false })
+    setTimeout(() => {
+      if (!this.data.expandOpen) this.setData({ expandOrderId: '', expandOrigin: null })
+    }, 340)
+  },
+  onHide() {
+    if (this.data.expandOrderId) this.setData({ expandOrderId: '', expandOrigin: null, expandOpen: false })
   },
 }))

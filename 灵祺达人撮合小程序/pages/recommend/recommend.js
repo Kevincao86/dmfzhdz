@@ -628,6 +628,9 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     priceBuckets: hallFilters.priceBucketsForView([]),
     allOrderRows: [],
     orderDisplayRows: [],
+    expandOrderId: '',
+    expandOrigin: null,
+    expandOpen: false,
     spotlightRows: [],
     stripMode: 'hotcity',
     stripTitle: '热门 · 同城急单',
@@ -817,6 +820,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   },
   onHide() {
     hallCountdownTick.stopHallCountdownTick(this)
+    if (this.data.expandOrderId) this.setData({ expandOrderId: '', expandOrigin: null, expandOpen: false })
   },
   onUnload() {
     hallCountdownTick.stopHallCountdownTick(this)
@@ -1536,12 +1540,32 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
   goOrderDetail(e) {
     const id = e.currentTarget.dataset.id
     const isMock = e.currentTarget.dataset.mock
+    const node = e.currentTarget.dataset.node
     if (!id) return
-    if (isMock) {
+    if (isMock === true || isMock === 'true') {
       wx.showToast({ title: '演示商单，仅供预览', icon: 'none' })
       return
     }
-    wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
+    const query = wx.createSelectorQuery().in(this)
+    query.select(`#${node}`).boundingClientRect()
+    query.exec((res) => {
+      const rect = res && res[0]
+      const origin = rect && rect.width
+        ? { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+        : { top: 160, left: 16, width: 320, height: 112 }
+      const orderId = String(id)
+      this.setData({ expandOrderId: orderId, expandOrigin: origin, expandOpen: false })
+      setTimeout(() => {
+        if (this.data.expandOrderId === orderId) this.setData({ expandOpen: true })
+      }, 32)
+    })
+  },
+  onCloseOrderExpand() {
+    if (!this.data.expandOrderId) return
+    this.setData({ expandOpen: false })
+    setTimeout(() => {
+      if (!this.data.expandOpen) this.setData({ expandOrderId: '', expandOrigin: null })
+    }, 340)
   },
   goEditSelfProfile() {
     const url = '/pages/register/register?edit=1'
