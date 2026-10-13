@@ -3,17 +3,6 @@
   <feature-guide page="mine" />
   <view class="wb-hero lq-hero-header" style="{{headerBandStyle}}">
     <view class="wb-hero-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
-      <view class="mine-status-bar" style="height:{{statusBarHeightPx}}px;">
-        <view
-          wx:for="{{accentSwatches}}"
-          wx:key="id"
-          class="mine-accent-dot {{accentId === item.id ? 'is-on' : ''}}"
-          style="background:{{item.color}}"
-          data-id="{{item.id}}"
-          bindtap="onPickAccent"
-          aria-label="主题色"
-        ></view>
-      </view>
       <view class="wb-hero-top">
         <view class="wb-profile-row">
           <button
@@ -80,6 +69,22 @@
         <text class="wb-membership-exp" wx:if="{{membershipExpiryLabel}}">{{membershipExpiryLabel}}</text>
         <view class="wb-membership-cta">{{membershipCtaLabel}}</view>
       </view>
+    </view>
+  </view>
+
+  <view class="mine-accent-row">
+    <view
+      wx:for="{{accentSwatches}}"
+      wx:key="id"
+      class="mine-accent-hit {{(item.id === 'origin' ? !accentId : accentId === item.id) ? 'is-on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onPickAccent"
+    >
+      <view
+        class="mine-accent-dot mine-accent-dot--{{item.id}}"
+        style="{{item.dotStyle}}"
+      ></view>
+      <text class="mine-accent-cap" wx:if="{{item.cap}}">{{item.cap}}</text>
     </view>
   </view>
 

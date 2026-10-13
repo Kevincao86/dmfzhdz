@@ -11,15 +11,28 @@ const PALETTE = {
   orange: { nav: '#ea580c', dark: '#c2410c', soft: '#fdba74', t50: '#fff7ed', t100: '#ffedd5', rgb: '234, 88, 12' },
   rose: { nav: '#e11d48', dark: '#be123c', soft: '#fda4af', t50: '#fff1f2', t100: '#ffe4e6', rgb: '225, 29, 72' },
   green: { nav: '#059669', dark: '#047857', soft: '#6ee7b7', t50: '#ecfdf5', t100: '#d1fae5', rgb: '5, 150, 105' },
+  dark: {
+    nav: '#18181b',
+    dark: '#fafafa',
+    soft: '#d4d4d8',
+    t50: '#09090b',
+    t100: '#27272a',
+    rgb: '244, 244, 245',
+    text: '#fafafa',
+    textSecondary: '#a1a1aa',
+    mode: 'dark',
+  },
 }
 
 const SWATCHES = [
-  { id: 'violet', color: PALETTE.violet.nav },
-  { id: 'blue', color: PALETTE.blue.nav },
-  { id: 'teal', color: PALETTE.teal.nav },
-  { id: 'orange', color: PALETTE.orange.nav },
-  { id: 'rose', color: PALETTE.rose.nav },
-  { id: 'green', color: PALETTE.green.nav },
+  { id: 'origin', cap: '原色', dotStyle: '' },
+  { id: 'violet', color: PALETTE.violet.nav, dotStyle: `background:${PALETTE.violet.nav}` },
+  { id: 'blue', color: PALETTE.blue.nav, dotStyle: `background:${PALETTE.blue.nav}` },
+  { id: 'teal', color: PALETTE.teal.nav, dotStyle: `background:${PALETTE.teal.nav}` },
+  { id: 'orange', color: PALETTE.orange.nav, dotStyle: `background:${PALETTE.orange.nav}` },
+  { id: 'rose', color: PALETTE.rose.nav, dotStyle: `background:${PALETTE.rose.nav}` },
+  { id: 'green', color: PALETTE.green.nav, dotStyle: `background:${PALETTE.green.nav}` },
+  { id: 'dark', color: PALETTE.dark.nav, cap: '暗黑', dotStyle: `background:${PALETTE.dark.nav}` },
 ]
 
 function readId() {
@@ -49,10 +62,10 @@ function styleOf(p) {
     `--lq-violet:${p.nav}`,
     `--lq-gradient:${solid}`,
     `--lq-gradient-header:${solid}`,
-    `--lq-gradient-deep:${deep}`,
+    `--lq-gradient-deep:${p.mode === 'dark' ? solid : deep}`,
     `--lq-gradient-tab:${solid}`,
     `--lq-gradient-tab-track:linear-gradient(90deg,${p.t50} 0%,${p.t50} 100%)`,
-    `--lq-gradient-filter:linear-gradient(180deg,#ffffff 0%,${p.t50} 100%)`,
+    `--lq-gradient-filter:linear-gradient(180deg,${p.mode === 'dark' ? p.t100 : '#ffffff'} 0%,${p.t50} 100%)`,
     `--lq-bg:${p.t50}`,
     `--lq-home-bg:${p.t50}`,
     `--lq-home-nav:${p.nav}`,
@@ -64,7 +77,9 @@ function styleOf(p) {
     `--lq-chip-on-bg:${p.t100}`,
     `--lq-chip-on-border:${p.soft}`,
     `--lq-active-tint:rgba(${p.rgb},0.16)`,
-  ].join(';') + ';'
+    p.text ? `--lq-text:${p.text}` : '',
+    p.textSecondary ? `--lq-text-secondary:${p.textSecondary}` : '',
+  ].filter(Boolean).join(';') + ';'
 }
 
 function viewModel() {
@@ -74,7 +89,7 @@ function viewModel() {
     return { lqAccentClass: '', lqPageStyle: '', lqPageBg: '#f7f3ec', lqNavBg: '#f7f3ec', accentId: '' }
   }
   return {
-    lqAccentClass: 'lq-accent-on',
+    lqAccentClass: p.mode === 'dark' ? 'lq-accent-on lq-accent-dark' : 'lq-accent-on',
     lqPageStyle: styleOf(p),
     lqPageBg: p.t50,
     lqNavBg: p.nav,

@@ -28,9 +28,9 @@
 
 .mine-page .wb-role-pill,
 .mine-page .profile-badge {
-  color: #6d28d9;
-  background: #f5f3ff;
-  border-color: #ddd6fe;
+  color: var(--lq-primary-dark, #6d28d9);
+  background: var(--lq-primary-50, #f5f3ff);
+  border-color: var(--lq-chip-on-border, #ddd6fe);
 }
 
 .mine-page .profile-badge--muted {
@@ -151,28 +151,55 @@
   box-sizing: border-box;
 }
 
-.mine-status-bar {
+.mine-accent-row {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: 8rpx 28rpx 4rpx;
+  padding: 16rpx 12rpx 12rpx;
+  background: var(--lq-card, #fffdf8);
+  border: 1rpx solid var(--lq-border, #efe8dc);
+  border-radius: 24rpx;
+}
+
+.mine-accent-hit {
+  width: 72rpx;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12rpx;
-  box-sizing: border-box;
+  justify-content: flex-start;
+  padding-top: 4rpx;
 }
 
 .mine-accent-dot {
-  width: 36rpx;
-  height: 36rpx;
+  width: 40rpx;
+  height: 40rpx;
   border-radius: 50%;
   box-sizing: border-box;
-  border: 3rpx solid rgba(255, 255, 255, 0.85);
+  border: 3rpx solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 2rpx 8rpx rgba(20, 24, 31, 0.16);
 }
 
-.mine-accent-dot.is-on {
+.mine-accent-dot--origin {
+  background: linear-gradient(135deg, #f7f3ec 50%, #7c4dff 50%);
+}
+
+.mine-accent-hit.is-on .mine-accent-dot {
   width: 44rpx;
   height: 44rpx;
-  border-color: #fff;
   box-shadow: 0 0 0 4rpx var(--lq-primary, #7c4dff);
+}
+
+.mine-accent-cap {
+  margin-top: 6rpx;
+  font-size: 18rpx;
+  line-height: 1.2;
+  color: var(--lq-text-secondary, #78716c);
+}
+
+.mine-accent-hit.is-on .mine-accent-cap {
+  color: var(--lq-primary-dark, #5b3fd4);
+  font-weight: 700;
 }
 
 .mine-theme-veil {

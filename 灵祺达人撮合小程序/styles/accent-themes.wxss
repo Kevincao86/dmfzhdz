@@ -17,3 +17,70 @@
   background: var(--lq-card);
   border-top-color: var(--lq-border);
 }
+
+/* 写死的品牌色、行内标签色，在自选主题下让位 */
+.lq-accent-on .job-card-v1__ai-tag,
+.lq-accent-on .job-card-v1__meta-pill {
+  background: var(--lq-primary-50) !important;
+  color: var(--lq-primary-dark) !important;
+}
+
+.lq-accent-on .section-head-dot,
+.lq-accent-on .gender-chip--on,
+.lq-accent-on .home-chip--on,
+.lq-accent-on .btn-primary {
+  background: var(--lq-primary) !important;
+  border-color: var(--lq-primary) !important;
+}
+
+.lq-accent-on .gender-chip--on,
+.lq-accent-on .home-chip--on,
+.lq-accent-on .btn-primary {
+  color: #fff !important;
+}
+
+.lq-accent-dark .section-head-dot,
+.lq-accent-dark .gender-chip--on,
+.lq-accent-dark .home-chip--on,
+.lq-accent-dark .btn-primary {
+  background: #3f3f46 !important;
+  border-color: #d4d4d8 !important;
+  color: #fafafa !important;
+}
+
+.lq-accent-dark,
+.lq-accent-dark .home-greet,
+.lq-accent-dark .home-brand-v1,
+.lq-accent-dark .job-card-v1__title,
+.lq-accent-dark .page-hero-title,
+.lq-accent-dark .section-title,
+.lq-accent-dark .wb-section-title,
+.lq-accent-dark .wb-stat-num,
+.lq-accent-dark .input,
+.lq-accent-dark .apply-textarea,
+.lq-accent-dark .picker-val,
+.lq-accent-dark .apply-recruit-val {
+  color: #fafafa !important;
+}
+
+.lq-accent-dark .home-hall-mini__item,
+.lq-accent-dark .page-hero-sub,
+.lq-accent-dark .hint,
+.lq-accent-dark .form-label,
+.lq-accent-dark .wb-stat-lbl,
+.lq-accent-dark .mine-accent-cap {
+  color: #a1a1aa !important;
+}
+
+.lq-accent-dark .home-hall-mini__item--on,
+.lq-accent-dark .mine-accent-hit.is-on .mine-accent-cap {
+  color: #fafafa !important;
+}
+
+.tab-bar.lq-accent-dark .tab-text {
+  color: #a1a1aa;
+}
+
+.tab-bar.lq-accent-dark .tab-item.active .tab-text {
+  color: #fafafa;
+}

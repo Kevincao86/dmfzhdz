@@ -22,7 +22,7 @@
 .cred-ready-text {
   font-size: 28rpx;
   font-weight: 600;
-  color: #047857;
+  color: var(--lq-primary-dark, #047857);
 }
 
 .cred-edit-btn {

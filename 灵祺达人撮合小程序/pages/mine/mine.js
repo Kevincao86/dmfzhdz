@@ -543,27 +543,30 @@ Page({
   },
   onPickAccent(e) {
     if (this._themeAnimating) return
-    const id = e.currentTarget.dataset.id
-    const chosen = accentTheme.pack(id)
-    if (!chosen) return
-    const retract = this.data.accentId === id
+    const raw = e.currentTarget.dataset.id
+    const current = this.data.accentId || ''
+    const nextId = raw === 'origin' || raw === current ? '' : raw
+    if (!nextId && !current) return
+    const veilPack = accentTheme.pack(nextId || current)
+    if (!veilPack) return
+    const retract = !nextId
     this._themeAnimating = true
-    this._themeTarget = retract ? '' : id
+    this._themeTarget = nextId
     const query = wx.createSelectorQuery().in(this)
     query.selectAll('.mine-accent-dot').boundingClientRect()
     query.exec((res) => {
       if (!this._themeAnimating) return
       const rects = (res && res[0]) || []
-      const idx = (this.data.accentSwatches || []).findIndex((item) => item.id === id)
+      const idx = (this.data.accentSwatches || []).findIndex((item) => item.id === (raw || 'origin'))
       const rect = rects[idx]
       const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
-      const cx = rect ? rect.left + rect.width / 2 : win.windowWidth - 36
-      const cy = rect ? rect.top + rect.height / 2 : 48
+      const cx = rect ? rect.left + rect.width / 2 : win.windowWidth / 2
+      const cy = rect ? rect.top + rect.height / 2 : 120
       const dx = Math.max(cx, win.windowWidth - cx)
       const dy = Math.max(cy, win.windowHeight - cy)
       const radius = Math.ceil(Math.sqrt(dx * dx + dy * dy)) + 2
       const size = radius * 2
-      const style = `width:${size}px;height:${size}px;left:${cx - radius}px;top:${cy - radius}px;background:${chosen.nav};`
+      const style = `width:${size}px;height:${size}px;left:${cx - radius}px;top:${cy - radius}px;background:${veilPack.nav};`
       if (this._veilTimer) clearTimeout(this._veilTimer)
       this._veilTimer = setTimeout(() => this.finishThemeVeil(), THEME_VEIL_MS + 90)
       if (!retract) {

@@ -178,11 +178,11 @@
 }
 
 page {
-  background: #f7f3ec;
+  background: var(--lq-bg, #f7f3ec);
 }
 
 .paper-page {
-  background: #f7f3ec;
+  background: var(--lq-bg, #f7f3ec);
 }
 
 .paper-page .page-hero {
@@ -205,27 +205,27 @@ page {
 }
 
 .paper-page .card {
-  background: #fffdf8;
-  border: 1rpx solid #efe8dc;
+  background: var(--lq-card, #fffdf8);
+  border: 1rpx solid var(--lq-border, #efe8dc);
   border-radius: 28rpx;
   box-shadow: none;
 }
 
 .paper-page .section-head-dot {
-  background: #6d28d9;
+  background: var(--lq-primary, #6d28d9);
 }
 
 .paper-page .btn-primary {
-  background: #6d28d9;
+  background: var(--lq-primary, #6d28d9);
   border: none;
   box-shadow: none;
   border-radius: 999rpx;
 }
 
 .paper-page .btn-outline {
-  color: #6d28d9;
-  background: #fffdf8;
-  border: 1rpx solid #ddd6fe;
+  color: var(--lq-primary, #6d28d9);
+  background: var(--lq-card, #fffdf8);
+  border: 1rpx solid var(--lq-chip-on-border, #ddd6fe);
   border-radius: 999rpx;
   box-shadow: none;
 }
