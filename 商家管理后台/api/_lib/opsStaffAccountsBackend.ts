@@ -37,7 +37,9 @@ export const OPS_PERMISSION_MODULE_KEYS = [
   'support',
   'support_mp',
   'help_manual',
+  'knowledge_base',
   'platform_decor',
+  'marketing',
   'team_intro',
   'regional_partners',
 ] as const
