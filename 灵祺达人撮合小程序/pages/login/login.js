@@ -32,17 +32,37 @@ const LEGAL_PROMPT_COPY = {
 
 function wxPhoneAuthFailHint(detail) {
   const errMsg = String((detail && detail.errMsg) || '')
+  const errno = Number(detail && detail.errno)
   let platform = ''
+  let envVersion = ''
   try {
     platform = String((wx.getSystemInfoSync() || {}).platform || '')
   } catch (_) {}
+  try {
+    envVersion = String(((wx.getAccountInfoSync() || {}).miniProgram || {}).envVersion || '')
+  } catch (_) {}
   if (platform === 'devtools') {
-    return '开发者工具读不到真实手机号，请用「真机调试」或预览到手机上再点微信一键登录'
+    return '开发者工具读不到真实手机号，请用「预览」扫到手机上再点微信一键登录'
   }
-  if (/deny|cancel|拒绝/i.test(errMsg)) {
-    return '需要授权微信绑定的手机号，才能登录并对上已有账号'
+  if (errno === 104 || /privacy|隐私|needAuthorization/i.test(errMsg)) {
+    return '请先同意微信《隐私保护指引》，再点微信一键登录'
+  }
+  if (errno === 112 || /deny|cancel|拒绝/i.test(errMsg)) {
+    return '需要在微信弹窗里允许获取绑定手机号'
+  }
+  if (/no permission|banned|jsapi/i.test(errMsg)) {
+    return '当前小程序还不能读取手机号。请到微信公众平台确认已认证，并在「管理 → 付费管理」查看手机号快速验证额度'
+  }
+  if (envVersion === 'develop') {
+    return '真机调试有时拉不起选号窗。请用开发者工具「预览」扫码，或上传体验版后再试'
   }
   return '未能读取微信手机号，请再点一次「微信一键登录」'
+}
+
+function isWxPrivacyBlock(detail) {
+  const errMsg = String((detail && detail.errMsg) || '')
+  const errno = Number(detail && detail.errno)
+  return errno === 104 || /privacy|隐私|needAuthorization/i.test(errMsg)
 }
 
 function openLegalPrompt(page, workId, action) {
@@ -230,6 +250,7 @@ Page({
     showPhoneBindSheet: false,
     bindPhone: '',
     pendingWorkIdForBind: '',
+    wxPrivacyNeeded: false,
   },
 
   onLoad(options) {
@@ -248,6 +269,7 @@ Page({
       wxAvatarUrl: wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, local && local.wxAvatarUrl),
     })
     syncLoginIdentityFromProfile(this)
+    this.refreshWxPrivacyNeeded()
     if (auth.isLoggedIn()) {
       if (accountNeedsPhoneBind()) {
         this.setData({
@@ -267,6 +289,13 @@ Page({
     try {
       require('../../utils/identityTheme.js').applyToPage(this)
     } catch (_) {}
+    this.refreshWxPrivacyNeeded()
+  },
+
+  refreshWxPrivacyNeeded() {
+    mpPrivacyAuthorize.queryNeedAuthorization().then((need) => {
+      this.setData({ wxPrivacyNeeded: !!need })
+    })
   },
 
   onShareAppMessage() {
@@ -285,22 +314,28 @@ Page({
 
   _handleNeedPrivacyAuthorization(resolve) {
     this._privacyResolve = resolve
-    if (this.data.showWxAuthSheet) {
-      this.setData({ wxAuthStep: 'privacy' })
-      return
-    }
     this.setData({
-      showWxAuthSheet: true,
-      wxAuthStep: 'privacy',
+      wxPrivacyNeeded: true,
+      err: '',
+      ...(this.data.showWxAuthSheet
+        ? { wxAuthStep: 'privacy' }
+        : { showWxAuthSheet: true, wxAuthStep: 'privacy' }),
     })
   },
 
   onPrivacyAuthorizeAgree() {
     mpPrivacyAuthorize.resolvePrivacyAuthorization(this, mpPrivacyAuthorize.PRIVACY_AGREE_BTN_ID)
+    this.setData({ wxPrivacyNeeded: false, err: '' })
     if (this.data.wxAuthStep === 'privacy') {
       this.setData({ wxAuthStep: 'avatar' })
       wx.showToast({ title: '请授权微信头像', icon: 'none' })
     }
+  },
+
+  onWxPrivacyAgreeThenPhone() {
+    mpPrivacyAuthorize.resolvePrivacyAuthorization(this, mpPrivacyAuthorize.PRIVACY_AGREE_BTN_ID)
+    this.setData({ wxPrivacyNeeded: false, err: '' })
+    wx.showToast({ title: '请再点一次微信一键登录', icon: 'none' })
   },
 
   onOpenPrivacyContract() {
@@ -537,6 +572,14 @@ Page({
       return
     }
     if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
+      console.warn('[mp] getPhoneNumber fail', detail.errMsg, detail.errno)
+      if (isWxPrivacyBlock(detail)) {
+        this.setData({
+          wxPrivacyNeeded: true,
+          err: wxPhoneAuthFailHint(detail),
+        })
+        return
+      }
       this.setData({ err: wxPhoneAuthFailHint(detail) })
       return
     }

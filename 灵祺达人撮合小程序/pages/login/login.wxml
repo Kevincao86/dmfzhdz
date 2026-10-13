@@ -66,6 +66,16 @@
             <text>微信一键登录</text>
           </button>
           <button
+            wx:elif="{{wxPrivacyNeeded}}"
+            class="login-btn login-btn--wx"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+            open-type="agreePrivacyAuthorization"
+            bindagreeprivacyauthorization="onWxPrivacyAgreeThenPhone"
+          >
+            <text>同意隐私保护指引</text>
+          </button>
+          <button
             wx:else
             class="login-btn login-btn--wx"
             loading="{{loading}}"
