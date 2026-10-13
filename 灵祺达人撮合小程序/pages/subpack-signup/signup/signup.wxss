@@ -78,6 +78,8 @@
 .reg-page--play .reg-picks,
 .reg-page--play .reg-field,
 .reg-page--play .reg-sms,
+.reg-page--play .reg-wx-one,
+.reg-page--play .reg-or,
 .reg-page--play .reg-submit,
 .reg-page--play .reg-legal,
 .reg-page--play .reg-back {
@@ -93,6 +95,8 @@
 .reg-page--play.reg-page--talent .reg-picks,
 .reg-page--play.reg-page--talent .reg-field,
 .reg-page--play.reg-page--talent .reg-sms,
+.reg-page--play.reg-page--talent .reg-wx-one,
+.reg-page--play.reg-page--talent .reg-or,
 .reg-page--play.reg-page--talent .reg-submit,
 .reg-page--play.reg-page--talent .reg-legal,
 .reg-page--play.reg-page--talent .reg-back {
@@ -110,6 +114,8 @@
 .reg-page--play.reg-page--shoot .reg-picks,
 .reg-page--play.reg-page--shoot .reg-field,
 .reg-page--play.reg-page--shoot .reg-sms,
+.reg-page--play.reg-page--shoot .reg-wx-one,
+.reg-page--play.reg-page--shoot .reg-or,
 .reg-page--play.reg-page--shoot .reg-submit,
 .reg-page--play.reg-page--shoot .reg-legal,
 .reg-page--play.reg-page--shoot .reg-back {
@@ -127,6 +133,8 @@
 .reg-page--play.reg-page--edit .reg-picks,
 .reg-page--play.reg-page--edit .reg-field,
 .reg-page--play.reg-page--edit .reg-sms,
+.reg-page--play.reg-page--edit .reg-wx-one,
+.reg-page--play.reg-page--edit .reg-or,
 .reg-page--play.reg-page--edit .reg-submit,
 .reg-page--play.reg-page--edit .reg-legal,
 .reg-page--play.reg-page--edit .reg-back {
@@ -143,6 +151,8 @@
 .reg-page--play.reg-page--pr .reg-picks,
 .reg-page--play.reg-page--pr .reg-field,
 .reg-page--play.reg-page--pr .reg-sms,
+.reg-page--play.reg-page--pr .reg-wx-one,
+.reg-page--play.reg-page--pr .reg-or,
 .reg-page--play.reg-page--pr .reg-submit,
 .reg-page--play.reg-page--pr .reg-legal,
 .reg-page--play.reg-page--pr .reg-back {
@@ -294,7 +304,8 @@
   color: #a16207;
   background: #fffdf8;
 }
-.reg-page--talent .reg-submit {
+.reg-page--talent .reg-submit,
+.reg-page--talent .reg-wx-one {
   background: #a16207;
   color: #fff;
 }
@@ -306,7 +317,9 @@
   background: #fffdf8;
 }
 .reg-page--shoot .reg-submit,
-.reg-page--pr .reg-submit {
+.reg-page--pr .reg-submit,
+.reg-page--shoot .reg-wx-one,
+.reg-page--pr .reg-wx-one {
   background: #6d28d9;
   color: #fff;
 }
@@ -316,7 +329,8 @@
   color: #44403c;
   background: #fffdf8;
 }
-.reg-page--edit .reg-submit {
+.reg-page--edit .reg-submit,
+.reg-page--edit .reg-wx-one {
   background: #44403c;
   color: #fff;
 }
@@ -385,6 +399,36 @@
   margin-bottom: 12rpx;
   font-size: 24rpx;
   color: #b91c1c;
+}
+
+.reg-wx-one {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  margin-bottom: 8rpx;
+  padding: 0;
+  border-radius: 20rpx;
+  border: 0;
+  background: #6d28d9;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.reg-wx-one::after {
+  border: none;
+}
+
+.reg-wx-one[disabled] {
+  opacity: 0.55;
+}
+
+.reg-or {
+  display: block;
+  margin: 4rpx 0 20rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: #a8a29e;
 }
 
 .reg-submit {

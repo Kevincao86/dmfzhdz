@@ -309,6 +309,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
         registerTalent: body.registerTalent as never,
         registerPr: body.registerPr as never,
+        phoneCode: pickAuthField(req, body, 'phoneCode'),
       })
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, token, isNew, account: payload })
@@ -1851,6 +1852,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'email_unchanged' ||
       msg === 'account_email_missing' ||
       msg === 'wx_openid_conflict' ||
+      msg === 'invalid_phone_code' ||
+      msg === 'wx_phone_failed' ||
+      /^wx_phone_failed_/i.test(msg) ||
       msg === 'dy_openid_conflict' ||
       msg === 'invalid_password' ||
       msg === 'wx_openid_already_bound' ||
@@ -1903,13 +1907,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       email_unchanged: '新邮箱与当前绑定相同',
       account_email_missing: '当前账号未绑定邮箱',
       wx_openid_conflict: '该微信已绑定其他手机号账号',
+      invalid_phone_code: '请授权微信绑定的手机号后再登录',
+      wx_phone_failed: '未能读取微信手机号，请再点一次授权',
       dy_openid_conflict: '该抖音已绑定其他手机号账号',
       missing_openid: '缺少微信 openid，请重新登录后再试',
       unknown_action: '后台接口未更新，请稍后再试',
     }
     const message =
       zh[msg] ||
-      (msg.startsWith('registry_patch_too_large')
+      (msg.startsWith('wx_phone_failed')
+        ? '未能读取微信手机号，请再点一次授权'
+        : msg.startsWith('registry_patch_too_large')
         ? '注册表同步体积过大，请联系管理员在轻量执行 nginx 热修并部署最新 auth-api'
         : msg.includes('invalid')
           ? '请求参数无效'

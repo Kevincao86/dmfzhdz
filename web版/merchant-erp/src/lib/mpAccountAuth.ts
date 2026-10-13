@@ -18,6 +18,7 @@ import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.j
 import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
 import { purgeClosedAccountIdentities } from './mpAccountCloseIdentity.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+import { getMpBoundPhoneNumber } from './mpWechatMiniProgramAccess.js'
 import { ensureDouyinSalesLevelMonthlyReset } from './mpDouyinSalesLevelMonthlyReset.js'
 import {
   normalizeMpLoginName,
@@ -880,6 +881,8 @@ export type MpAuthWxLoginInput = {
   registerPr?: RegistryMpPrUser
   /** 仅新注册写入；老账号忽略 */
   workIdentity?: MpFixedWorkIdentity
+  /** 微信 getPhoneNumber 一次性 code，用于对上已有手机号账号 */
+  phoneCode?: string
 }
 
 export async function mpAuthWxLogin(
@@ -889,16 +892,46 @@ export async function mpAuthWxLogin(
 ): Promise<{ token: string; account: MpAccountRow; isNew: boolean }> {
   const rest = restClient(supabaseUrl, serviceRole)
   const { openid } = await wxCodeToOpenId(input.code, input.stableDevOpenId)
+  const phone = input.phoneCode ? await getMpBoundPhoneNumber(input.phoneCode) : ''
   let account = await findAccountByOpenId(rest, openid)
   let isNew = false
   const requestedRole: MpAccountRole =
     input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent'
   let role: MpAccountRole = requestedRole
 
+  if (phone) {
+    const holder = await findAccountByLoginName(rest, phone)
+    if (account && holder && holder.id !== account.id) {
+      account = await mergeMpAccountIntoPhoneHolder(
+        rest,
+        supabaseUrl,
+        serviceRole,
+        account,
+        holder,
+        'wx',
+      )
+    } else if (holder && !account) {
+      const holderWx = String(holder.openid || '').trim()
+      if (holderWx && holderWx !== openid) throw new Error('wx_openid_conflict')
+      if (!holderWx) {
+        await updateAccount(rest, holder.id, {
+          openid,
+          wx_nick_name: mergeWxNick(input.wxNickName || '', holder.wx_nick_name),
+          wx_avatar_url: mergeWxAvatar(input.wxAvatarUrl || '', holder.wx_avatar_url),
+        })
+      }
+      account = (await findAccountById(rest, holder.id))!
+    } else if (account && !isValidMpLoginPhone(String(account.login_name || ''))) {
+      await updateAccount(rest, account.id, { login_name: phone })
+      account = (await findAccountById(rest, account.id))!
+    }
+  }
+
   if (!account) {
     isNew = true
     account = await insertAccount(rest, {
       openid,
+      login_name: phone || null,
       active_role: role,
       wx_nick_name: input.wxNickName || '',
       wx_avatar_url: input.wxAvatarUrl || '',

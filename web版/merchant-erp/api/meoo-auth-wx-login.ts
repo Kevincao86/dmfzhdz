@@ -49,12 +49,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       stableDevOpenId?: string
       wxNickName?: string
       wxAvatarUrl?: string
+      phoneCode?: string
     }
     const out = await signInWithWxLoginCode({
       code: String(body.code ?? ''),
       stableDevOpenId: typeof body.stableDevOpenId === 'string' ? body.stableDevOpenId : undefined,
       wxNickName: typeof body.wxNickName === 'string' ? body.wxNickName : undefined,
       wxAvatarUrl: typeof body.wxAvatarUrl === 'string' ? body.wxAvatarUrl : undefined,
+      phoneCode: typeof body.phoneCode === 'string' ? body.phoneCode : undefined,
     })
     if (!out.ok) {
       const status =

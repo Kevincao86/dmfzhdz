@@ -9,7 +9,7 @@ const LANDING_WAYS = [
   { id: 'pwd', mark: '账号', label: '密码登录', sub: '登录名与密码进入工作台' },
   { id: 'sms', mark: '快捷', label: '验证码', sub: '手机号短信验证码登录' },
   { id: 'reg', mark: '入驻', label: '注册', sub: '新开商家账号，免费起步' },
-  { id: 'wx', mark: '手机', label: '快捷登录', sub: '手机号快捷登录，进入工作台' },
+  { id: 'wx', mark: '手机', label: '快捷登录', sub: '微信授权手机号，进入工作台' },
 ]
 
 const MODE_HINT = {
@@ -274,7 +274,6 @@ Page({
     } else if (id === 'wx') {
       this.setData({ pickedId: 'wx', mode: 'login', loginMethod: 'password' })
       this._syncModeHint()
-      void this.onWxLogin()
       return
     }
     this._syncModeHint()
@@ -431,13 +430,33 @@ Page({
   async onWxLogin() {
     if (this.data.busy || this.data.wxBusy) return
     if (!this._ensureLegalAgreed('wx')) return
-    await this._doWxLogin()
   },
 
-  async _doWxLogin() {
+  onGetPhoneNumber(e) {
+    const detail = (e && e.detail) || {}
+    const phoneCode = String(detail.code || '').trim()
+    if (this.data.busy || this.data.wxBusy) return
+    if (!this._ensureLegalAgreed('wx')) return
+    if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
+      this.setData({ err: '需要授权微信绑定的手机号，才能登录并对上已有账号' })
+      return
+    }
+    if (!phoneCode) {
+      this.setData({ err: '未能读取微信手机号，请再点一次「微信一键登录」' })
+      return
+    }
+    void this._doWxLogin(phoneCode)
+  },
+
+  async _doWxLogin(phoneCode) {
     if (this.data.busy || this.data.wxBusy) return
     if (!tenantAuthApi.apiRoot()) {
       this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用快捷登录' })
+      return
+    }
+    const phoneAuthCode = String(phoneCode || '').trim()
+    if (!phoneAuthCode) {
+      this.setData({ err: '请先授权微信绑定的手机号' })
       return
     }
     this.setData({ wxBusy: true, err: '', infoHint: '' })
@@ -446,6 +465,7 @@ Page({
       const r = await tenantAuthApi.loginWithWxCode({
         code: wxSession.code,
         stableDevOpenId: wxSession.stableDevOpenId,
+        phoneCode: phoneAuthCode,
       })
       if (!r.ok || !r.access_token) {
         this.setData({

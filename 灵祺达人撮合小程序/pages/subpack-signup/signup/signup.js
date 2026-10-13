@@ -24,9 +24,9 @@ function regNoteText(fromWx, channel) {
   if (fromWx) {
     return channel === 'email'
       ? '微信已登录，请选定身份并绑定邮箱，选定后不可更改'
-      : '微信已登录，请选定身份并绑定手机号，选定后不可更改'
+      : '微信已登录，请选定身份。可一键读取微信绑定手机号，或手动填写。选定后不可更改'
   }
-  return '用手机号或邮箱作为登录账号。选定后不可更改，登录后自动进入这一版'
+  return '用手机号或邮箱作为登录账号。手机号也可一键读取微信绑定号。选定后不可更改，登录后自动进入这一版'
 }
 
 function navigateAfterRegister() {
@@ -129,6 +129,57 @@ Page({
     const doc = e.currentTarget.dataset.doc === 'aup' ? 'aup' : 'privacy'
     wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
   },
+  onWxOneTapNeedLegal() {
+    this.setData({ err: '请先勾选并同意《用户协议》和《隐私政策》' })
+  },
+
+  async onWxOneTapRegister(e) {
+    const workId = this.data.newIdentity
+    if (!identityTypes.isWorkIdentity(workId)) {
+      this.setData({ err: '请先选择身份，选定后不可更改' })
+      return
+    }
+    if (!this.data.legalAgreed) {
+      this.setData({ err: '请先勾选并同意《用户协议》和《隐私政策》' })
+      return
+    }
+    const detail = (e && e.detail) || {}
+    const phoneCode = String(detail.code || '').trim()
+    if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
+      this.setData({ err: '需要授权微信绑定的手机号才能一键注册' })
+      return
+    }
+    if (!phoneCode) {
+      this.setData({ err: '未能读取微信手机号，请再点一次「微信一键注册」' })
+      return
+    }
+    const password = String(this.data.password || '')
+    this.setData({ loading: true, err: '' })
+    try {
+      const role = identityTypes.accountRoleForWorkIdentity(workId)
+      const data = await auth.wxLogin({
+        phoneCode,
+        role,
+        workIdentity: workId,
+      })
+      let account = (data && data.account) || auth.readAccount()
+      await auth.ensureIdentity(role, workId === 'pr' ? undefined : workId)
+      account = auth.readAccount() || account
+      if (password.length >= 6) {
+        const loginName =
+          (account && (account.loginName || account.login_name)) || this.data.phone
+        if (loginName) await auth.setLoginCredentials(loginName, password)
+      }
+      if (account) userProfile.adoptAccountIdentity(account)
+      wx.showToast({ title: '注册成功', icon: 'success' })
+      navigateAfterRegister()
+    } catch (err) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(err, '一键注册失败，请稍后重试') })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
   onBackLogin() {
     wx.navigateBack({
       delta: 1,

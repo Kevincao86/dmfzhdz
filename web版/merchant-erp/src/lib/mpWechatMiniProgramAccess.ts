@@ -36,3 +36,33 @@ export async function getMpMiniProgramAccessToken(): Promise<string> {
   }
   return cached.token
 }
+
+/** 微信 getPhoneNumber 一次性 code → 绑定手机号 */
+export async function getMpBoundPhoneNumber(phoneCode: string): Promise<string> {
+  const code = String(phoneCode || '').trim()
+  if (!code) throw new Error('invalid_phone_code')
+  if (process.env.MP_AUTH_DEV_MODE === 'true') {
+    const dev = String(process.env.MP_DEV_WX_PHONE || '').replace(/\D/g, '')
+    if (/^1\d{10}$/.test(dev)) return dev
+  }
+  const token = await getMpMiniProgramAccessToken()
+  const res = await fetch(
+    `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${encodeURIComponent(token)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    },
+  )
+  const data = (await res.json()) as {
+    errcode?: number
+    errmsg?: string
+    phone_info?: { phoneNumber?: string; purePhoneNumber?: string; countryCode?: string }
+  }
+  const raw = String(data.phone_info?.purePhoneNumber || data.phone_info?.phoneNumber || '').replace(/\D/g, '')
+  const phone = raw.startsWith('86') && raw.length === 13 ? raw.slice(2) : raw
+  if (!/^1\d{10}$/.test(phone)) {
+    throw new Error(data.errmsg || `wx_phone_failed_${data.errcode ?? res.status}`)
+  }
+  return phone
+}

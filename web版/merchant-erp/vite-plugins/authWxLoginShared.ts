@@ -3,15 +3,17 @@ import { randomBytes } from 'node:crypto'
 import {
   fetchAuthUserById,
   needsPhoneBindFromUser,
+  patchUserMetadata,
 } from './authIdentityBindCore.js'
 import { provisionMerchantTenant } from './authRegisterProvision.js'
 import {
   createAdminSessionForUserId,
+  findAuthUserByPhone,
   loginNameToTenantEmail,
   smsLoginErrorMessage,
 } from './authSmsAuthShared.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
-import { erpWxCodeToOpenId } from '../src/lib/erpMpWechatAccess.js'
+import { erpWxCodeToOpenId, getErpMpBoundPhoneNumber } from '../src/lib/erpMpWechatAccess.js'
 import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 const ERP_WX_OPENID_META_KEY = 'erp_wx_openid'
@@ -240,13 +242,15 @@ function loginNameFromOpenId(openid: string): string {
 
 async function registerMerchantByWxProfile(input: {
   openid: string
+  phone?: string
   wxNickName?: string
   wxAvatarUrl?: string
 }): Promise<
   | { ok: true; userId: string; email: string; loginName: string }
   | { ok: false; error: string; message: string; detail?: string }
 > {
-  let loginName = loginNameFromOpenId(input.openid)
+  const phone = String(input.phone || '').replace(/\D/g, '')
+  let loginName = /^1\d{10}$/.test(phone) ? phone : loginNameFromOpenId(input.openid)
   const merchantName = String(input.wxNickName || '').trim() || '微信商家'
   const password = randomPassword()
 
@@ -266,11 +270,32 @@ async function registerMerchantByWxProfile(input: {
       if (!bind.ok) {
         return { ok: false, error: bind.error, message: bind.message }
       }
+      if (/^1\d{10}$/.test(phone)) {
+        await patchUserMetadata(provision.userId, { phone }, { phone })
+      }
       return {
         ok: true,
         userId: provision.userId,
         email: provision.email,
         loginName,
+      }
+    }
+    if (provision.error === 'login_exists' && /^1\d{10}$/.test(phone)) {
+      const existing = await findAuthUserByPhone(phone)
+      if (existing) {
+        const bind = await bindErpWxOpenIdToAuthUser(existing.userId, input.openid, {
+          wxNickName: input.wxNickName,
+          wxAvatarUrl: input.wxAvatarUrl,
+        })
+        if (!bind.ok) {
+          return { ok: false, error: bind.error, message: bind.message }
+        }
+        return {
+          ok: true,
+          userId: existing.userId,
+          email: existing.email,
+          loginName: existing.loginName,
+        }
       }
     }
     if (provision.error !== 'login_exists') {
@@ -296,6 +321,12 @@ export function wxLoginErrorMessage(error: string, detail?: string): string {
   if (error === 'invalid_wx_code') {
     return '微信授权已过期，请重试'
   }
+  if (error === 'invalid_phone_code' || error === 'wx_phone_failed') {
+    return '请授权微信绑定的手机号后再登录'
+  }
+  if (error === 'wx_login_failed') {
+    return '微信登录失败，请稍后重试'
+  }
   if (error === 'magiclink_failed' || error === 'verify_failed' || error === 'session_missing') {
     return smsLoginErrorMessage(error, detail)
   }
@@ -307,6 +338,7 @@ export async function signInWithWxLoginCode(input: {
   stableDevOpenId?: string
   wxNickName?: string
   wxAvatarUrl?: string
+  phoneCode?: string
 }): Promise<WxLoginResult> {
   const code = String(input.code || '').trim()
   if (!code && !String(input.stableDevOpenId || '').trim()) {
@@ -328,12 +360,56 @@ export async function signInWithWxLoginCode(input: {
     return { ok: false, error: 'invalid_wx_code', message: wxLoginErrorMessage('invalid_wx_code') }
   }
 
-  let user = await findAuthUserByErpWxOpenId(openid)
-  let isNew = false
+  let phone = ''
+  if (String(input.phoneCode || '').trim()) {
+    try {
+      phone = await getErpMpBoundPhoneNumber(String(input.phoneCode || ''))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return {
+        ok: false,
+        error: /invalid_phone_code/.test(msg) ? 'invalid_phone_code' : 'wx_phone_failed',
+        message: wxLoginErrorMessage('wx_phone_failed', msg),
+      }
+    }
+  }
 
-  if (!user) {
+  const wxUser = await findAuthUserByErpWxOpenId(openid)
+  const phoneUser = phone ? await findAuthUserByPhone(phone) : null
+  let user = wxUser
+  let isNew = false
+  const profile = { wxNickName: input.wxNickName, wxAvatarUrl: input.wxAvatarUrl }
+
+  if (phoneUser && wxUser && phoneUser.userId !== wxUser.userId) {
+    const phoneFull = await fetchAuthUserById(phoneUser.userId)
+    const phoneWx = phoneFull ? wxOpenIdFromUserRecord(phoneFull) : ''
+    if (phoneWx && phoneWx !== openid) {
+      return {
+        ok: false,
+        error: 'wx_openid_already_bound',
+        message: wxLoginErrorMessage('wx_openid_already_bound'),
+      }
+    }
+    const bind = await bindErpWxOpenIdToAuthUser(phoneUser.userId, openid, profile)
+    if (!bind.ok) return { ok: false, error: bind.error, message: bind.message }
+    user = phoneUser
+  } else if (phoneUser && !wxUser) {
+    const bind = await bindErpWxOpenIdToAuthUser(phoneUser.userId, openid, profile)
+    if (!bind.ok) return { ok: false, error: bind.error, message: bind.message }
+    user = phoneUser
+  } else if (wxUser && phone && !phoneUser) {
+    await patchUserMetadata(wxUser.userId, { phone }, { phone })
+    await bindErpWxOpenIdToAuthUser(wxUser.userId, openid, profile)
+    user = wxUser
+  } else if (wxUser) {
+    if (input.wxNickName || input.wxAvatarUrl) {
+      await bindErpWxOpenIdToAuthUser(wxUser.userId, openid, profile)
+    }
+    user = wxUser
+  } else {
     const reg = await registerMerchantByWxProfile({
       openid,
+      phone,
       wxNickName: input.wxNickName,
       wxAvatarUrl: input.wxAvatarUrl,
     })
@@ -342,11 +418,10 @@ export async function signInWithWxLoginCode(input: {
     }
     user = { userId: reg.userId, email: reg.email, loginName: reg.loginName }
     isNew = true
-  } else if (input.wxNickName || input.wxAvatarUrl) {
-    await bindErpWxOpenIdToAuthUser(user.userId, openid, {
-      wxNickName: input.wxNickName,
-      wxAvatarUrl: input.wxAvatarUrl,
-    })
+  }
+
+  if (!user) {
+    return { ok: false, error: 'wx_login_failed', message: wxLoginErrorMessage('wx_login_failed') }
   }
 
   const session = await createAdminSessionForUserId(user.userId, user.email || loginNameToTenantEmail(user.loginName))

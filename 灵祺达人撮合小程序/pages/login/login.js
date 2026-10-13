@@ -17,7 +17,7 @@ const { MP_ICP_FILING, MP_PSB_FILING } = require('../../utils/siteIcp.js')
 
 const LEGAL_PROMPT_COPY = {
   wx: {
-    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。登录会读取微信绑定的手机号，用来对上已有账号。',
     agree: '同意并登录',
   },
   pwd: {
@@ -512,7 +512,25 @@ Page({
       void this.doSmsLogin(workId)
       return
     }
-    this.startWxLoginFlow(workId)
+  },
+
+  onGetPhoneNumber(e) {
+    const detail = (e && e.detail) || {}
+    const phoneCode = String(detail.code || '').trim()
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, 'talent', 'wx')
+      return
+    }
+    if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
+      this.setData({ err: '需要授权微信绑定的手机号，才能登录并对上已有账号' })
+      return
+    }
+    if (!phoneCode) {
+      this.setData({ err: '未能读取微信手机号，请再点一次「微信一键登录」' })
+      return
+    }
+    this._wxPhoneCode = phoneCode
+    this.startWxLoginFlow('talent')
   },
 
   startWxLoginFlow(workId) {
@@ -577,10 +595,16 @@ Page({
       ])
       avatar = persistedAvatar
       this.setData({ wxAvatarUrl: avatar })
+      const phoneCode = String(this._wxPhoneCode || '').trim()
+      if (!phoneCode) {
+        this.setData({ err: '请先授权微信绑定的手机号' })
+        return
+      }
       const data = await auth.wxLogin({
         wxNickName: nick,
         wxAvatarUrl: avatar,
         code,
+        phoneCode,
       })
       const account = (data && data.account) || auth.readAccount()
       await applyLoginIdentity(data)
@@ -588,6 +612,7 @@ Page({
         alreadyPersisted: true,
         skipRemote: true,
       })
+      this._wxPhoneCode = ''
       this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
       if (data.isNew || auth.needsPhoneBind(account)) {
         wx.redirectTo({ url: '/pages/subpack-signup/signup/signup?from=wx' })
@@ -599,6 +624,8 @@ Page({
       let hint = msg
       if (msg.indexOf('wx_not_configured') >= 0) {
         hint = '登录暂时失败，请稍后再试'
+      } else if (/invalid_phone_code|wx_phone_failed/i.test(msg)) {
+        hint = '未能读取微信手机号，请再点一次「微信一键登录」'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
         hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
       } else if (api.isNetReset(msg)) {

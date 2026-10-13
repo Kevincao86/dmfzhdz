@@ -98,8 +98,24 @@
   <view wx:if="{{pickedId === 'wx'}}" class="auth-card-v2 login-auth-card">
     <text class="mode-hint">使用手机号快捷登录，进入商家工作台。</text>
     <text wx:if="{{err}}" class="err-msg">{{err}}</text>
-    <button class="btn-v2 wx-login" loading="{{wxBusy}}" disabled="{{busy || wxBusy}}" bindtap="onWxLogin">
-      <text>手机号快捷登录</text>
+    <button
+      wx:if="{{!legalAgreed}}"
+      class="btn-v2 wx-login"
+      loading="{{wxBusy}}"
+      disabled="{{busy || wxBusy}}"
+      bindtap="onWxLogin"
+    >
+      <text>微信一键登录</text>
+    </button>
+    <button
+      wx:else
+      class="btn-v2 wx-login"
+      loading="{{wxBusy}}"
+      disabled="{{busy || wxBusy}}"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhoneNumber"
+    >
+      <text>微信一键登录</text>
     </button>
     <button class="btn-v2 login-cancel" disabled="{{busy || wxBusy}}" bindtap="onLeaveLogin">返回，暂不登录</button>
   </view>

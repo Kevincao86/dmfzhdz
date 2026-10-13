@@ -30,6 +30,22 @@
     </view>
 
     <block wx:if="{{regChannel === 'phone'}}">
+      <button
+        wx:if="{{!legalAgreed}}"
+        class="reg-wx-one"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+        bindtap="onWxOneTapNeedLegal"
+      >微信一键注册</button>
+      <button
+        wx:else
+        class="reg-wx-one"
+        loading="{{loading}}"
+        disabled="{{loading}}"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onWxOneTapRegister"
+      >微信一键注册</button>
+      <text class="reg-or">或手动填写手机号</text>
       <view class="reg-field">
         <text class="reg-label">手机号</text>
         <input

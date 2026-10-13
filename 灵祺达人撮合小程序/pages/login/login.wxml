@@ -55,7 +55,24 @@
         </view>
 
         <block wx:if="{{tab==='wx'}}">
-          <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onWxLogin">
+          <button
+            wx:if="{{!legalAgreed}}"
+            class="login-btn login-btn--wx"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+            bindtap="onWxLogin"
+          >
+            <text class="login-btn-icon">◎</text>
+            <text>微信一键登录</text>
+          </button>
+          <button
+            wx:else
+            class="login-btn login-btn--wx"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+            open-type="getPhoneNumber"
+            bindgetphonenumber="onGetPhoneNumber"
+          >
             <text class="login-btn-icon">◎</text>
             <text>微信一键登录</text>
           </button>
