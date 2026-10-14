@@ -169,7 +169,7 @@ Page({
       showPlanBadge: mpUi.SHOW_SUBSCRIPTION && real,
     })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 4 })
+      this.getTabBar().setData({ selected: 4, hidden: false })
     }
     if (!real) {
       this.setData({

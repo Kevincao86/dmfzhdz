@@ -1,7 +1,7 @@
 Component({
   data: {
     selected: 0,
-    hidden: true,
+    hidden: false,
     lqAccentClass: '',
     lqPageStyle: '',
     list: [
@@ -24,10 +24,13 @@ Component({
   },
   methods: {
     syncSplash() {
-      let hidden = false
+      const pages = getCurrentPages()
+      const route = pages.length ? String(pages[pages.length - 1].route || '') : ''
+      let splash = false
       try {
-        hidden = getApp().globalData.launchSplash !== false
+        splash = getApp().globalData.launchSplash === true
       } catch (_) {}
+      const hidden = route === 'pages/dashboard/dashboard' && splash
       if (hidden !== this.data.hidden) this.setData({ hidden })
     },
     switchTab(e) {

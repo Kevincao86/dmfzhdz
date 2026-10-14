@@ -1,4 +1,4 @@
-<view wx:if="{{!hidden}}" class="tab-bar {{lqAccentClass}}" style="{{lqPageStyle}}">
+<view class="tab-bar {{hidden ? 'tab-bar--hidden' : ''}} {{lqAccentClass}}" style="{{lqPageStyle}}">
   <view
     wx:for="{{list}}"
     wx:key="pagePath"
