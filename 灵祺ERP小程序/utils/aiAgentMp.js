@@ -665,11 +665,10 @@ function buildAgentImagePrompt(userLine, hasRef) {
   ].join('\n')
 }
 
-function buildChatMessages(history, userLine, imageDataUrls, userId) {
+function buildChatMessages(history, userLine, imageDataUrls, userId, intelText) {
   const messages = [{ role: 'system', content: AI_AGENT_SYSTEM_PROMPT }]
-  try {
-    messages.push({ role: 'system', content: merchantIntelMp.formatMerchantIntelContext() })
-  } catch (_) {}
+  const intel = String(intelText || '').trim()
+  if (intel) messages.push({ role: 'system', content: intel })
   try {
     const habits = habitsMp.buildAgentUserHabitsContext(userId || getCurrentUserId())
     if (habits) messages.push({ role: 'system', content: habits })
@@ -708,6 +707,16 @@ async function postAiChatRequest(opts) {
     chatModel = registry.defaultModelIdForFamily(parsed.modelFamily)
   }
   const taskType = opts.taskType || inferTaskTypeFromText(opts.userLine)
+  let intelText = ''
+  try {
+    intelText = await merchantIntelMp.loadMerchantIntelContextForChat()
+  } catch (_) {
+    try {
+      intelText = merchantIntelMp.formatMerchantIntelContext()
+    } catch (__) {
+      intelText = ''
+    }
+  }
   const body = {
     provider: parsed.provider,
     model: chatModel || undefined,
@@ -716,6 +725,7 @@ async function postAiChatRequest(opts) {
       opts.userLine,
       opts.imageDataUrls || [],
       getCurrentUserId(),
+      intelText,
     ),
     agentPickerKey: chatKey,
   }

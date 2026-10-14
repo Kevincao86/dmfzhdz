@@ -126,8 +126,9 @@ function storePathCandidates(platformId, qs) {
   return out
 }
 
-function storeQueryString(keyword, page, pageSize) {
+function storeQueryString(keyword, page, pageSize, claimScope) {
   const parts = [`page=${page || 1}`, `pageSize=${pageSize || 50}`, 'relationType=all']
+  if (claimScope === 'claimed' || claimScope === 'claiming') parts.push(`claimScope=${claimScope}`)
   const kw = keyword && String(keyword).trim()
   if (kw) parts.push(`keyword=${encodeURIComponent(kw)}`)
   return `?${parts.join('&')}`
@@ -178,7 +179,8 @@ async function fetchStoresForPlatform(platformId, keyword, opts) {
   }
   const page = opts && opts.page ? opts.page : 1
   const pageSize = opts && opts.pageSize ? opts.pageSize : 50
-  const paths = storePathCandidates(platformId, storeQueryString(keyword, page, pageSize))
+  const claimScope = opts && opts.claimScope
+  const paths = storePathCandidates(platformId, storeQueryString(keyword, page, pageSize, claimScope))
   if (!paths.length) {
     return { ok: false, message: '该平台门店接口尚未接入' }
   }
