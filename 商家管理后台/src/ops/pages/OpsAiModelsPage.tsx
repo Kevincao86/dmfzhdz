@@ -535,6 +535,13 @@ export default function OpsAiModelsPage() {
           路由元数据更新时间：{updatedAt ? new Date(updatedAt).toLocaleString('zh-CN') : '—'} · 运营接管：
           {controlled ? '是' : '否'}
         </p>
+        <p className="mt-3 text-xs text-slate-500">
+          同一厂商的主线路和两条备选在{' '}
+          <Link to="/ai-models/routes" className="text-violet-300 underline">
+            API 线路
+          </Link>
+          。
+        </p>
       </section>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">

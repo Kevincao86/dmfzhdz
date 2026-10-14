@@ -34,6 +34,7 @@ list_scopes() {
   ops_home          运营台首页看板
   ops_training_review  运营台：讲师审核与培训审核分开，驳回须填原因
   ops_ark_models    运营台火山方舟模型拉取 + Seedance 目录（不含短剧菜单）
+  ops_ai_routes     运营台 API 线路（主线路 + 两条备选，手动或自动）
   ops_short_drama   运营台「短剧AI制作」子菜单 + 即梦/Vidu/MiniMax 凭据（不含成片工坊）
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
@@ -302,6 +303,28 @@ videoModelDuration
 merchantVideoAiGateway
 merchantApiGatewayCore
 meoo-merchant-ai-ark-discover-models
+change-scope-guard
+PAT
+      ;;
+    ops_ai_routes)
+      cat <<'PAT'
+aiVendorRouteShared
+OpsAiRoutesPage
+OpsAiModelsPage
+opsRegistrySupabaseAiWrites
+opsRegistryGatewayShared
+opsRegistryGatewayCore
+merchantRegistryVendorEnv
+chatRouter
+chatStreamRouter
+merchantLlmChat
+merchantAiUpstream
+merchantVideoAiGateway
+tokenmixImageGenerate
+opsRegistryTypes
+opsRegistryApi
+opsNavConfig
+商家管理后台/src/App.tsx
 change-scope-guard
 PAT
       ;;

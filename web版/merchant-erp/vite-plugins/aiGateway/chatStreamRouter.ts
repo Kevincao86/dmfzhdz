@@ -17,6 +17,7 @@ import { openAiCompatChatStream, type OpenAiStreamDelta, AGENT_STREAM_MAX_TOKENS
 import { toOpenAiChatCompletionMessages } from './openAiChatMessages.js'
 import { streamBuiltinAgentChatFromMessages } from '../merchantAiUpstream.js'
 import { isQuotaHopableError } from '../../src/lib/vendorModelPool.js'
+import { envWithRouteKey, isAiRouteHopMessage, readRouteKeysFromEnv } from '../../src/lib/aiVendorRouteShared.js'
 
 export type AiStreamDeltaHandler = (delta: OpenAiStreamDelta) => void
 
@@ -204,6 +205,32 @@ export async function routeAiChatStream(
   onDelta: AiStreamDeltaHandler,
   signal?: AbortSignal,
 ): Promise<AIChatResponse> {
+  if (env.MERCHANT_AI_ROUTE_PIN !== '1') {
+    const keys = readRouteKeysFromEnv(env, req.provider)
+    if (keys.length > 1) {
+      let last: unknown
+      for (let i = 0; i < keys.length; i++) {
+        let emitted = false
+        const watch: AiStreamDeltaHandler = (delta) => {
+          if (delta.content || delta.reasoning) emitted = true
+          onDelta(delta)
+        }
+        try {
+          return await routeAiChatStream(
+            req,
+            envWithRouteKey(env, req.provider, keys[i]!, i < keys.length - 1),
+            watch,
+            signal,
+          )
+        } catch (e) {
+          last = e
+          const msg = e instanceof Error ? e.message : String(e)
+          if (emitted || i === keys.length - 1 || !isAiRouteHopMessage(msg)) throw e
+        }
+      }
+      throw last instanceof Error ? last : new Error(String(last ?? '线路切换失败'))
+    }
+  }
   let content = ''
   let reasoning = ''
   const wrap: AiStreamDeltaHandler = (d) => {
@@ -257,7 +284,7 @@ export async function routeAiChatStream(
         break
       } catch (e) {
         primaryErr = e instanceof Error ? e.message : String(e)
-        if (!isQuotaHopableError(primaryErr)) throw e
+        if (env.MERCHANT_AI_HOLD_CROSS_VENDOR === '1' || !isQuotaHopableError(primaryErr)) throw e
       }
       try {
         const r = await streamBuiltinAgentChatFromMessages(

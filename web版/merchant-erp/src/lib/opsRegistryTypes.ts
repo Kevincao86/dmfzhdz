@@ -1,3 +1,5 @@
+import type { RegistryAiVendorRoutes } from './aiVendorRouteShared'
+
 export type RegistryTenantSource = 'erp' | 'ops_manual' | 'supabase'
 
 /** 短视频：可灵 JWT + Seedance（方舟）接入绑定；由运营管控台维护。 */
@@ -979,6 +981,8 @@ export type RegistryFile = {
   vendorKeys: RegistryVendorKeys
   vendorKeysUpdatedAt: string
   vendorKeysWriter: 'erp' | 'ops'
+  /** 运营台「API 线路」：主线路 + 两条备选，手动或自动切换 */
+  aiVendorRoutes?: RegistryAiVendorRoutes
   /** 磁盘：仅追加型自定义厂商列表；网关 GET 会与内置目录合并写入此字段再给前端 */
   aiVendorCatalog?: AiVendorCatalogEntry[]
   /** 短视频/视频模型网关（运营台「AI模型」专区） */

@@ -5,6 +5,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared.js'
+import { AI_ROUTE_VENDORS, keysForRoute, normalizeAiVendorRoutes } from '../src/lib/aiVendorRouteShared.js'
 import { expandVendorKeysForRegistrySave } from '../src/lib/aiVendorKeysShared.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import {
@@ -245,6 +246,35 @@ export function applyRegistryVendorKeysToMerchantEnv(
   if (aimodelserver) setFromRegistry(out, 'AIMODELSERVER_API_KEY', aimodelserver)
 }
 
+const ROUTE_ENV_NAMES: Record<string, readonly string[]> = {
+  doubao: ['MERCHANT_AI_DOUBAO_KEY', 'ARK_API_KEY'],
+  qwen: ['MERCHANT_AI_QWEN_KEY', 'DASHSCOPE_API_KEY'],
+  minimax: ['MINIMAX_API_KEY', 'MERCHANT_AI_MINIMAX_KEY'],
+  deepseek: ['DEEPSEEK_API_KEY'],
+  kimi: ['MOONSHOT_API_KEY', 'MERCHANT_AI_KIMI_KEY', 'KIMI_API_KEY'],
+  tokenmix: ['TOKENMIX_API_KEY'],
+}
+
+/** 已保存的线路覆盖单 Key。没存过线路时不改环境变量。 */
+export function applyAiVendorRoutesToMerchantEnv(out: MerchantAiEnv, rawRoutes: unknown): void {
+  if (!rawRoutes || typeof rawRoutes !== 'object') return
+  const routes = normalizeAiVendorRoutes(rawRoutes)
+  const packed: Record<string, { mode: 'manual' | 'auto'; keys: string[] }> = {}
+  for (const vendor of AI_ROUTE_VENDORS) {
+    const route = routes.vendors[vendor.id]
+    if (!route) continue
+    const keys = keysForRoute(route)
+    if (!keys.length) continue
+    packed[vendor.id] = { mode: route.mode, keys }
+    for (const name of ROUTE_ENV_NAMES[vendor.id] ?? []) {
+      setFromRegistry(out, name, keys[0], vendor.id)
+    }
+  }
+  if (Object.keys(packed).length > 0) {
+    out.MERCHANT_AI_VENDOR_ROUTES = JSON.stringify(packed)
+  }
+}
+
 function mergeVendorKeysFromLocalRegistry(viteRoot: string | undefined, out: MerchantAiEnv): void {
   if (!viteRoot) return
   const registryPath = path.join(path.resolve(viteRoot, '..', '..', '.meoo-dev-sync'), 'registry.json')
@@ -252,6 +282,7 @@ function mergeVendorKeysFromLocalRegistry(viteRoot: string | undefined, out: Mer
     if (!fs.existsSync(registryPath)) return
     const reg = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as Partial<RegistryFile>
     applyRegistryVendorKeysToMerchantEnv(out, reg.vendorKeys)
+    applyAiVendorRoutesToMerchantEnv(out, reg.aiVendorRoutes)
   } catch {
     /* 本地 dev 注册表不可读时保留 .env */
   }
@@ -293,6 +324,7 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
     const expanded = expandVendorKeysForRegistrySave(normalizeVendorKeysFromDisk(data.vendorKeys))
     stripDirectLlmEnvKeysForVendors(out, expanded)
     applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
+    applyAiVendorRoutesToMerchantEnv(out, data.aiVendorRoutes)
     applyRegistryVideoAiToMerchantEnv(out, {
       videoAi: data.videoAi,
       vendorKeys: data.vendorKeys,

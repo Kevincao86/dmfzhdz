@@ -7,6 +7,7 @@
 import type { ServerResponse } from 'node:http'
 
 import { DOUBAO_CHAT_CATALOG, isArkQuotaHopableError } from '../src/lib/arkModelCatalog.js'
+import { isAiRouteHopMessage, readRouteKeysFromEnv } from '../src/lib/aiVendorRouteShared.js'
 import {
   buildArkBriefChatModelTryOrder,
   clearArkChatModelQuotaExhausted,
@@ -2192,7 +2193,7 @@ async function doubaoSeedreamUrlsOnce(
   return out
 }
 
-async function doubaoSeedreamUrls(
+async function doubaoSeedreamUrlsForKey(
   env: MerchantAiEnv,
   apiKey: string,
   payload: Record<string, unknown>,
@@ -2206,6 +2207,26 @@ async function doubaoSeedreamUrls(
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e))
       if (!isArkQuotaHopableError(lastErr.message)) throw lastErr
+    }
+  }
+  throw lastErr ?? new Error('豆包生图失败')
+}
+
+async function doubaoSeedreamUrls(
+  env: MerchantAiEnv,
+  apiKey: string,
+  payload: Record<string, unknown>,
+): Promise<string[]> {
+  const extras = readRouteKeysFromEnv(env, 'doubao').filter((key) => key && key !== apiKey)
+  const keys = [apiKey, ...extras].filter((key, index, all) => key && all.indexOf(key) === index)
+  if (keys.length <= 1) return doubaoSeedreamUrlsForKey(env, apiKey, payload)
+  let lastErr: Error | null = null
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      return await doubaoSeedreamUrlsForKey(env, keys[i]!, payload)
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+      if (i === keys.length - 1 || !isAiRouteHopMessage(lastErr.message)) throw lastErr
     }
   }
   throw lastErr ?? new Error('豆包生图失败')

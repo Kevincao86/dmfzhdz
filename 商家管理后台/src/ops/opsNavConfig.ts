@@ -6,6 +6,7 @@ import {
   Clapperboard,
   CreditCard,
   Film,
+  GitBranch,
   Headphones,
   LayoutDashboard,
   Library,
@@ -221,6 +222,7 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
         icon: Bot,
         children: [
           { kind: 'leaf', to: '/ai-models', label: '语言模型 / Key', icon: Bot, permission: 'ai_models', exact: true },
+          { kind: 'leaf', to: '/ai-models/routes', label: 'API 线路', icon: GitBranch, permission: 'ai_models' },
           { kind: 'leaf', to: '/ai-models/short-drama', label: '短剧 AI 制作', icon: Film, permission: 'ai_models' },
         ],
       },

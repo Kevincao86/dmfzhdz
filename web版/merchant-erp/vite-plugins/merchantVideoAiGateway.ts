@@ -7,7 +7,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 
-import { applyRegistryVendorKeysToMerchantEnv } from './merchantRegistryVendorEnv.js'
+import { applyAiVendorRoutesToMerchantEnv, applyRegistryVendorKeysToMerchantEnv } from './merchantRegistryVendorEnv.js'
+import { isAiRouteHopMessage, readRouteKeysFromEnv } from '../src/lib/aiVendorRouteShared.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import {
   isArkQuotaHopableError,
@@ -193,6 +194,7 @@ export function mergeVideoAiMerchantEnv(
     const reg = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as Partial<RegistryFile>
     applyRegistrySliceToVideoAiEnv(out, reg)
     applyRegistryVendorKeysToMerchantEnv(out, reg.vendorKeys)
+    applyAiVendorRoutesToMerchantEnv(out, reg.aiVendorRoutes)
   } catch {
     return out
   }
@@ -215,6 +217,7 @@ export async function mergeVideoAiMerchantEnvWithSnapshot(
     if (data) {
       applyRegistrySliceToVideoAiEnv(out, { videoAi: data.videoAi, vendorKeys: data.vendorKeys })
       applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
+      applyAiVendorRoutesToMerchantEnv(out, data.aiVendorRoutes)
     }
   } catch {
     /* 未配 Supabase / erp-api 不可达时保留 .env / 本地 registry 结果 */
@@ -981,11 +984,49 @@ async function qwenGetVideoTaskOnce(apiKey: string, taskId: string): Promise<Ark
   return parseQwenVideoTaskPoll(j)
 }
 
+async function qwenGetVideoTaskWithRoutes(env: MerchantAiEnv, taskId: string): Promise<ArkPollState> {
+  const primary = qwenBearerKey(env) ?? ''
+  const keys = [primary, ...readRouteKeysFromEnv(env, 'qwen')].filter((key, index, all) => {
+    const trimmed = key.trim()
+    return trimmed && all.findIndex((item) => item.trim() === trimmed) === index
+  })
+  if (!keys.length) throw new Error('未配置通义千问 Key。')
+  let last: Error | null = null
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      return await qwenGetVideoTaskOnce(keys[i]!, taskId)
+    } catch (e) {
+      last = e instanceof Error ? e : new Error(String(e))
+      if (i === keys.length - 1 || !isAiRouteHopMessage(last.message)) throw last
+    }
+  }
+  throw last ?? new Error('千问任务查询失败')
+}
+
 async function qwenPostVideoTask(
   env: MerchantAiEnv,
   body: Record<string, unknown>,
   viteRoot?: string,
 ): Promise<{ ok: false; msg: string } | { ok: true; taskId: string; modelUsed: string }> {
+  if (env.MERCHANT_AI_QWEN_ROUTE_PIN !== '1') {
+    const keys = readRouteKeysFromEnv(env, 'qwen')
+    if (keys.length > 1) {
+      let last: { ok: false; msg: string } = { ok: false, msg: '千问视频生成失败' }
+      for (let i = 0; i < keys.length; i++) {
+        const pinned: MerchantAiEnv = {
+          ...env,
+          MERCHANT_AI_QWEN_KEY: keys[i]!,
+          DASHSCOPE_API_KEY: keys[i]!,
+          MERCHANT_AI_QWEN_ROUTE_PIN: '1',
+        }
+        const result = await qwenPostVideoTask(pinned, body, viteRoot)
+        if (result.ok) return result
+        last = result
+        if (i === keys.length - 1 || !isAiRouteHopMessage(result.msg)) return result
+      }
+      return last
+    }
+  }
   const key = qwenBearerKey(env)
   if (!key) {
     return {
@@ -1892,6 +1933,26 @@ async function arkCreateVideoTask(
   | { ok: false; msg: string; status?: number }
   | { ok: true; taskId: string; provider?: 'ark' | 'qwen'; modelUsed?: string; raw?: unknown }
 > {
+  if (env.MERCHANT_AI_DOUBAO_ROUTE_PIN !== '1') {
+    const keys = readRouteKeysFromEnv(env, 'doubao')
+    if (keys.length > 1) {
+      let last: { ok: false; msg: string; status?: number } = { ok: false, msg: '豆包视频生成失败' }
+      for (let i = 0; i < keys.length; i++) {
+        const pinned: MerchantAiEnv = {
+          ...env,
+          MERCHANT_AI_DOUBAO_KEY: keys[i]!,
+          ARK_API_KEY: keys[i]!,
+          MERCHANT_AI_DOUBAO_ROUTE_PIN: '1',
+        }
+        const nextBody = i < keys.length - 1 ? { ...body, skip_qwen: true } : body
+        const result = await arkCreateVideoTask(pinned, nextBody, viteRoot)
+        if (result.ok) return result
+        last = result
+        if (i === keys.length - 1 || !isAiRouteHopMessage(result.msg, result.status)) return result
+      }
+      return last
+    }
+  }
   const skipQwen =
     body.skip_qwen === true || String(body.skip_qwen ?? '').trim().toLowerCase() === 'true'
   const lockModel =
@@ -2127,6 +2188,30 @@ async function arkGetVideoTask(
   env: MerchantAiEnv,
   taskId: string,
 ): Promise<{ ok: false; msg: string; status?: number } | { ok: true; state: ArkPollState }> {
+  if (env.MERCHANT_AI_DOUBAO_ROUTE_PIN !== '1') {
+    const keys = readRouteKeysFromEnv(env, 'doubao')
+    if (keys.length > 1) {
+      let last: { ok: false; msg: string; status?: number } = { ok: false, msg: '方舟查询任务失败' }
+      for (let i = 0; i < keys.length; i++) {
+        const pinned: MerchantAiEnv = {
+          ...env,
+          MERCHANT_AI_DOUBAO_KEY: keys[i]!,
+          ARK_API_KEY: keys[i]!,
+          MERCHANT_AI_DOUBAO_ROUTE_PIN: '1',
+        }
+        const result = await arkGetVideoTask(pinned, taskId)
+        if (result.ok) return result
+        last = result
+        const hop =
+          result.status === 401 ||
+          result.status === 403 ||
+          result.status === 404 ||
+          isAiRouteHopMessage(result.msg, result.status)
+        if (i === keys.length - 1 || !hop) return result
+      }
+      return last
+    }
+  }
   const key = doubaoBearerKey(env)
   if (!key) return { ok: false, msg: '未配置方舟 API Key。' }
   const root = arkApiV3Root(env)
@@ -3184,13 +3269,13 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const qk = qwenBearerKey(env)
-    if (!qk) {
+    if (!qk && readRouteKeysFromEnv(env, 'qwen').length === 0) {
       json(res, 502, { ok: false, message: '未配置通义千问 Key，无法查询口型驱动任务。' })
       return true
     }
     try {
       const rawId = stripQwenVideoTaskPrefix(taskIdDh)
-      const state = await qwenGetVideoTaskOnce(qk, rawId)
+      const state = await qwenGetVideoTaskWithRoutes(env, rawId)
       json(res, 200, { ok: true, provider: 'qwen', ...state })
       return true
     } catch (e) {
@@ -3403,12 +3488,12 @@ export async function handleMerchantAiVideoRoutes(input: {
     }
     if (isQwenVideoTaskId(taskIdSd)) {
       const qk = qwenBearerKey(env)
-      if (!qk) {
+      if (!qk && readRouteKeysFromEnv(env, 'qwen').length === 0) {
         json(res, 502, { ok: false, message: '未配置通义千问 Key，无法查询千问视频任务。' })
         return true
       }
       try {
-        const state = await qwenGetVideoTaskOnce(qk, stripQwenVideoTaskPrefix(taskIdSd))
+        const state = await qwenGetVideoTaskWithRoutes(env, stripQwenVideoTaskPrefix(taskIdSd))
         json(res, 200, { ok: true, provider: 'qwen', ...state })
         return true
       } catch (e) {

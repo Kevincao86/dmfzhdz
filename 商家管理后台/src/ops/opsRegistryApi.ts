@@ -365,6 +365,7 @@ export type RegistryFile = {
   vendorKeys: RegistryVendorKeys
   vendorKeysUpdatedAt: string
   vendorKeysWriter: 'erp' | 'ops'
+  aiVendorRoutes?: import('../meooRegistryShared/aiVendorRouteShared').RegistryAiVendorRoutes
   /** 网关 GET 会与内置目录合并后再返回 */
   aiVendorCatalog?: AiVendorCatalogEntry[]
   videoAi?: RegistryVideoAi
@@ -686,6 +687,7 @@ export async function postVendorKeys(body: {
   keys: RegistryVendorKeys
   /** 仅存自定义条目；网关会与内置目录合并后再落盘 */
   aiVendorCatalog?: AiVendorCatalogEntry[]
+  aiVendorRoutes?: import('../meooRegistryShared/aiVendorRouteShared').RegistryAiVendorRoutes
   lastWriter?: 'erp' | 'ops'
 }): Promise<void> {
   const denied = denyWrite('ai_models')

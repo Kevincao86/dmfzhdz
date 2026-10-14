@@ -7,6 +7,7 @@
  */
 
 import { isTokenmixImageHost, resolveTokenmixBaseUrl } from '../../src/services/ai/tokenmixClient.js'
+import { envWithRouteKey, isAiRouteHopMessage, readRouteKeysFromEnv } from '../../src/lib/aiVendorRouteShared.js'
 
 const TOKENMIX_HYDRATE_MAX_BYTES = 8 * 1024 * 1024
 
@@ -180,6 +181,25 @@ export async function tokenmixImagesCreate(
   prompt: string,
   opts?: { quality?: 'low' | 'medium' | 'high'; size?: string },
 ): Promise<TokenmixImageCreateResult> {
+  if (env.MERCHANT_AI_ROUTE_PIN !== '1') {
+    const { readRouteKeysFromEnv, isAiRouteHopMessage, envWithRouteKey } = await import(
+      '../../src/lib/aiVendorRouteShared.js'
+    )
+    const keys = readRouteKeysFromEnv(env, 'tokenmix')
+    if (keys.length > 1) {
+      let last: unknown
+      for (let i = 0; i < keys.length; i++) {
+        try {
+          return await tokenmixImagesCreate(envWithRouteKey(env, 'tokenmix', keys[i]!, false), modelId, prompt, opts)
+        } catch (e) {
+          last = e
+          const msg = e instanceof Error ? e.message : String(e)
+          if (i === keys.length - 1 || !isAiRouteHopMessage(msg)) throw e
+        }
+      }
+      throw last instanceof Error ? last : new Error(String(last ?? 'TokenMix 生图失败'))
+    }
+  }
   const { base, apiKey } = tokenmixBaseAndKey(env)
   const mid = modelId.trim()
   if (!mid) throw new Error('tokenmix_image_model 为空')
@@ -274,6 +294,29 @@ export async function tokenmixImagesPollOnce(
   taskId: string,
   modelUsedFallback: string,
 ): Promise<TokenmixImagePollResult> {
+  if (env.MERCHANT_AI_ROUTE_PIN !== '1') {
+    const { readRouteKeysFromEnv, isAiRouteHopMessage, envWithRouteKey } = await import(
+      '../../src/lib/aiVendorRouteShared.js'
+    )
+    const keys = readRouteKeysFromEnv(env, 'tokenmix')
+    if (keys.length > 1) {
+      let last: unknown
+      for (let i = 0; i < keys.length; i++) {
+        try {
+          return await tokenmixImagesPollOnce(
+            envWithRouteKey(env, 'tokenmix', keys[i]!, false),
+            taskId,
+            modelUsedFallback,
+          )
+        } catch (e) {
+          last = e
+          const msg = e instanceof Error ? e.message : String(e)
+          if (i === keys.length - 1 || !isAiRouteHopMessage(msg)) throw e
+        }
+      }
+      throw last instanceof Error ? last : new Error(String(last ?? 'TokenMix 任务查询失败'))
+    }
+  }
   const { base, apiKey } = tokenmixBaseAndKey(env)
   const id = taskId.trim()
   if (!id) throw new Error('task_id 为空')
@@ -404,6 +447,28 @@ export async function tokenmixImagesEdit(
   imageSrc: string,
   opts?: { quality?: 'low' | 'medium' | 'high'; size?: string },
 ): Promise<{ imageUrl: string; modelUsed: string }> {
+  if (env.MERCHANT_AI_ROUTE_PIN !== '1') {
+    const keys = readRouteKeysFromEnv(env, 'tokenmix')
+    if (keys.length > 1) {
+      let last: unknown
+      for (let i = 0; i < keys.length; i++) {
+        try {
+          return await tokenmixImagesEdit(
+            envWithRouteKey(env, 'tokenmix', keys[i]!, false),
+            modelId,
+            prompt,
+            imageSrc,
+            opts,
+          )
+        } catch (e) {
+          last = e
+          const msg = e instanceof Error ? e.message : String(e)
+          if (i === keys.length - 1 || !isAiRouteHopMessage(msg)) throw e
+        }
+      }
+      throw last instanceof Error ? last : new Error(String(last ?? 'TokenMix 修图失败'))
+    }
+  }
   const { base, apiKey } = tokenmixBaseAndKey(env)
   const mid = modelId.trim()
   if (!mid) throw new Error('tokenmix_image_model 为空')

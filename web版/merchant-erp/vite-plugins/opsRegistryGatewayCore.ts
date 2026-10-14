@@ -63,6 +63,10 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   }
   const aiVendorCatalog = mergeBuiltinAiVendorCatalog(readCustomCatalogFromDisk(parsed))
   const vendorKeys = normalizeVendorKeysFromDisk(parsed?.vendorKeys)
+  const aiVendorRoutes =
+    parsed?.aiVendorRoutes && typeof parsed.aiVendorRoutes === 'object'
+      ? parsed.aiVendorRoutes
+      : undefined
   const vendorKeysUpdatedAt =
     typeof parsed?.vendorKeysUpdatedAt === 'string' && parsed.vendorKeysUpdatedAt
       ? parsed.vendorKeysUpdatedAt
@@ -198,6 +202,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     vendorKeys,
     vendorKeysUpdatedAt,
     vendorKeysWriter,
+    ...(aiVendorRoutes ? { aiVendorRoutes } : {}),
     videoAi,
     videoAiUpdatedAt,
     videoAiWriter,

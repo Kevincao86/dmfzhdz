@@ -40,7 +40,7 @@ export async function chatQwenAgent(req: AIChatRequest, env: Record<string, stri
     }
   } catch (e) {
     qwenErr = e instanceof Error ? e.message : String(e)
-    if (!isQuotaHopableError(qwenErr)) throw e
+    if (env.MERCHANT_AI_HOLD_CROSS_VENDOR === '1' || !isQuotaHopableError(qwenErr)) throw e
   }
   try {
     const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'doubao', undefined, system, user)
@@ -86,7 +86,7 @@ export async function chatDoubaoAgent(req: AIChatRequest, env: Record<string, st
     }
   } catch (e) {
     doubaoErr = e instanceof Error ? e.message : String(e)
-    if (!isQuotaHopableError(doubaoErr)) throw e
+    if (env.MERCHANT_AI_HOLD_CROSS_VENDOR === '1' || !isQuotaHopableError(doubaoErr)) throw e
   }
   try {
     const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'qwen', undefined, system, user)

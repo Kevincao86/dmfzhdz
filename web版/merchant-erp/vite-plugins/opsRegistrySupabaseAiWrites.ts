@@ -2,6 +2,12 @@
  * 运营台注册表 AI Key / 模型 / 短视频写入（ECS erp-api 与 Vercel 共用）。
  */
 import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../src/lib/aiVendorCatalogShared.js'
+import {
+  AI_ROUTE_VENDORS,
+  effectiveVendorKey,
+  normalizeAiVendorRoutes,
+  type RegistryAiVendorRoutes,
+} from '../src/lib/aiVendorRouteShared.js'
 import { expandVendorKeysForRegistrySave } from '../src/lib/aiVendorKeysShared.js'
 import { validateRegistryVendorKey } from '../src/lib/aiVendorKeyValidate.js'
 import type {
@@ -20,12 +26,14 @@ export async function opsRegistrySupabaseSaveVendorKeys(
   let body: {
     keys?: RegistryVendorKeys
     aiVendorCatalog?: AiVendorCatalogEntry[]
+    aiVendorRoutes?: RegistryAiVendorRoutes
     lastWriter?: 'erp' | 'ops'
   }
   try {
     body = JSON.parse(bodyRaw || '{}') as {
       keys?: RegistryVendorKeys
       aiVendorCatalog?: AiVendorCatalogEntry[]
+      aiVendorRoutes?: RegistryAiVendorRoutes
       lastWriter?: 'erp' | 'ops'
     }
   } catch {
@@ -48,6 +56,28 @@ export async function opsRegistrySupabaseSaveVendorKeys(
       return { status: 400, body: { ok: false, error: 'invalid_vendor_key', vendor: id, detail: err } }
     }
     merged[id] = t
+  }
+  if (body.aiVendorRoutes !== undefined) {
+    const routes = normalizeAiVendorRoutes(body.aiVendorRoutes)
+    for (const vendor of AI_ROUTE_VENDORS) {
+      const route = routes.vendors[vendor.id]
+      if (!route) continue
+      for (const line of route.lines) {
+        if (!line.apiKey.trim()) continue
+        const err = validateRegistryVendorKey(vendor.id, line.apiKey)
+        if (err) {
+          return {
+            status: 400,
+            body: { ok: false, error: 'invalid_vendor_key', vendor: vendor.id, detail: err },
+          }
+        }
+      }
+      const effective = effectiveVendorKey(route)
+      if (effective) merged[vendor.id] = effective
+      else delete merged[vendor.id]
+    }
+    routes.updatedAt = new Date().toISOString()
+    data.aiVendorRoutes = routes
   }
   data.vendorKeys = expandVendorKeysForRegistrySave(merged)
   if (body.aiVendorCatalog !== undefined) {
