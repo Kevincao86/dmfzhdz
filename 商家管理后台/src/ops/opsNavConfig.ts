@@ -59,17 +59,17 @@ export type OpsNavGroup = {
 export const OPS_NAV_GROUPS: OpsNavGroup[] = [
   {
     id: 'overview',
-    label: '总览',
-    entries: [{ kind: 'leaf', to: '/', label: '首页看板', icon: LayoutDashboard, permission: 'home' }],
+    label: '驾驶舱',
+    entries: [{ kind: 'leaf', to: '/', label: '驾驶舱', icon: LayoutDashboard, permission: 'home' }],
   },
   {
-    id: 'withdrawals',
-    label: '提现申请',
+    id: 'money',
+    label: '钱',
     entries: [
       {
         kind: 'parent',
         id: 'withdraw-hub',
-        label: '提现申请',
+        label: '提现审批',
         icon: Wallet,
         children: [
           { kind: 'leaf', to: '/training-payouts', label: '课时费', icon: GraduationCap, permission: 'platform_decor' },
@@ -77,13 +77,6 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
           { kind: 'leaf', to: '/distribution?tab=withdraw&owner=partner', label: '分销', icon: Users, permission: 'distribution' },
         ],
       },
-    ],
-  },
-  {
-    id: 'customer',
-    label: '客户与财务',
-    entries: [
-      { kind: 'leaf', to: '/customers', label: '客户管理', icon: Building2, permission: 'customers' },
       { kind: 'leaf', to: '/payment-orders', label: '订单管理', icon: CreditCard, permission: 'payment_orders' },
       { kind: 'leaf', to: '/mp-membership-finance', label: '星选会员财务', icon: Wallet, permission: 'mp_membership_finance' },
       { kind: 'leaf', to: '/erp-finance', label: '商家ERP财务', icon: Wallet, permission: 'erp_finance' },
@@ -98,17 +91,30 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
     ],
   },
   {
-    id: 'ops',
-    label: '运营推送',
+    id: 'people',
+    label: '人',
     entries: [
-      { kind: 'leaf', to: '/announcements', label: '商家 ERP 公告', icon: Megaphone, permission: 'announcements' },
-      { kind: 'leaf', to: '/mp-announcements', label: '达人小程序公告', icon: Smartphone, permission: 'announcements' },
+      { kind: 'leaf', to: '/customers', label: '客户管理', icon: Building2, permission: 'customers' },
+      { kind: 'leaf', to: '/talent-library', label: '灵祺达人库', icon: Library, permission: 'talent_library' },
+      { kind: 'leaf', to: '/shoot-team-library', label: '拍摄团队', icon: Camera, permission: 'shoot_team_library' },
+      { kind: 'leaf', to: '/edit-team-library', label: '剪辑团队', icon: Clapperboard, permission: 'edit_team_library' },
+      { kind: 'leaf', to: '/pr-library', label: 'PR 用户库', icon: Users, permission: 'pr_library' },
     ],
   },
   {
-    id: 'marketing',
-    label: '营销中心',
+    id: 'orders',
+    label: '单',
     entries: [
+      { kind: 'leaf', to: '/recruitment-orders', label: '商家 ERP 招募', icon: UserSearch, permission: 'recruitment_orders' },
+      { kind: 'leaf', to: '/mp-recruitment-orders', label: '小程序招募', icon: Smartphone, permission: 'mp_recruitment_orders' },
+    ],
+  },
+  {
+    id: 'growth',
+    label: '增长',
+    entries: [
+      { kind: 'leaf', to: '/announcements', label: '商家 ERP 公告', icon: Megaphone, permission: 'announcements' },
+      { kind: 'leaf', to: '/mp-announcements', label: '达人小程序公告', icon: Smartphone, permission: 'announcements' },
       {
         kind: 'parent',
         id: 'marketing-hub',
@@ -131,12 +137,6 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
           },
         ],
       },
-    ],
-  },
-  {
-    id: 'platform-decor',
-    label: '平台装修',
-    entries: [
       {
         kind: 'leaf',
         to: '/platform-decor?kind=popup',
@@ -158,20 +158,14 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
         icon: PanelTop,
         permission: 'platform_decor',
       },
-      {
-        kind: 'leaf',
-        to: '/lecturer-review',
-        label: '讲师审核',
-        icon: UserRound,
-        permission: 'platform_decor',
-      },
-      {
-        kind: 'leaf',
-        to: '/training-review',
-        label: '培训审核',
-        icon: GraduationCap,
-        permission: 'platform_decor',
-      },
+    ],
+  },
+  {
+    id: 'review',
+    label: '审核',
+    entries: [
+      { kind: 'leaf', to: '/lecturer-review', label: '讲师审核', icon: UserRound, permission: 'platform_decor' },
+      { kind: 'leaf', to: '/training-review', label: '培训审核', icon: GraduationCap, permission: 'platform_decor' },
       {
         kind: 'parent',
         id: 'help-manual-hub',
@@ -184,36 +178,13 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
           { kind: 'leaf', to: '/help-manual?edition=mp', label: '小程序', icon: Smartphone, permission: 'help_manual' },
         ],
       },
-      {
-        kind: 'leaf',
-        to: '/knowledge-base',
-        label: '知识库',
-        icon: Brain,
-        permission: 'knowledge_base',
-      },
+      { kind: 'leaf', to: '/knowledge-base', label: '知识库', icon: Brain, permission: 'knowledge_base' },
+      { kind: 'leaf', to: '/team-intro', label: '团队介绍', icon: Users, permission: 'team_intro' },
     ],
   },
   {
-    id: 'recruit',
-    label: '招募订单',
-    entries: [
-      { kind: 'leaf', to: '/recruitment-orders', label: '商家 ERP 招募', icon: UserSearch, permission: 'recruitment_orders' },
-      { kind: 'leaf', to: '/mp-recruitment-orders', label: '小程序招募', icon: Smartphone, permission: 'mp_recruitment_orders' },
-    ],
-  },
-  {
-    id: 'library',
-    label: '星选会员库',
-    entries: [
-      { kind: 'leaf', to: '/talent-library', label: '灵祺达人库', icon: Library, permission: 'talent_library' },
-      { kind: 'leaf', to: '/shoot-team-library', label: '拍摄团队', icon: Camera, permission: 'shoot_team_library' },
-      { kind: 'leaf', to: '/edit-team-library', label: '剪辑团队', icon: Clapperboard, permission: 'edit_team_library' },
-      { kind: 'leaf', to: '/pr-library', label: 'PR 用户库', icon: Users, permission: 'pr_library' },
-    ],
-  },
-  {
-    id: 'system',
-    label: '系统与内容',
+    id: 'ai',
+    label: 'AI',
     entries: [
       {
         kind: 'parent',
@@ -226,6 +197,12 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
           { kind: 'leaf', to: '/ai-models/short-drama', label: '短剧 AI 制作', icon: Film, permission: 'ai_models' },
         ],
       },
+    ],
+  },
+  {
+    id: 'service',
+    label: '服务',
+    entries: [
       {
         kind: 'parent',
         id: 'support-hub',
@@ -236,7 +213,6 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
           { kind: 'leaf', to: '/support?channel=mp', label: '星选小程序', icon: Smartphone, permission: 'support_mp' },
         ],
       },
-      { kind: 'leaf', to: '/team-intro', label: '团队介绍', icon: Users, permission: 'team_intro' },
       { kind: 'leaf', to: '/accounts', label: '账号与权限', icon: Shield, permission: 'staff_admin' },
     ],
   },
@@ -312,9 +288,9 @@ export function resolveOpsPageMeta(pathname: string, search = ''): { title: stri
     }
     return { title: best.label, group }
   }
-  if (path.includes('/permissions')) return { title: '权限详情', group: '星选会员库' }
-  if (path.startsWith('/mp-membership-status')) return { title: '会员状态', group: '客户与财务' }
-  if (path.startsWith('/customers/')) return { title: '客户详情', group: '客户与财务' }
+  if (path.includes('/permissions')) return { title: '权限详情', group: '人' }
+  if (path.startsWith('/mp-membership-status')) return { title: '会员状态', group: '钱' }
+  if (path.startsWith('/customers/')) return { title: '客户详情', group: '人' }
   return { title: '运营管控台', group: '' }
 }
 

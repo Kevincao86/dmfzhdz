@@ -32,6 +32,7 @@ list_scopes() {
   ops_pr_library    运营台 PR 用户库
   ops_talent_library 运营台达人库
   ops_home          运营台首页看板
+  ops_admin_cockpit 运营台侧栏按功能分区，驾驶舱用现有数据出图
   ops_training_review  运营台：讲师审核与培训审核分开，驳回须填原因
   ops_ark_models    运营台火山方舟模型拉取 + Seedance 目录（不含短剧菜单）
   ops_ai_routes     运营台 API 线路（主线路 + 两条备选，手动或自动）
@@ -287,6 +288,14 @@ OpsHomePage
 opsDashboardCompute
 opsMpUserDashboardCompute
 opsDashboardRange
+PAT
+      ;;
+    ops_admin_cockpit)
+      cat <<'PAT'
+OpsHomePage
+opsNavConfig
+OpsAdminLayout
+change-scope-guard
 PAT
       ;;
     ops_ark_models)

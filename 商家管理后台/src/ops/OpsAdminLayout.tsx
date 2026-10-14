@@ -25,7 +25,7 @@ import {
 } from './opsStaffAuth'
 import { OpsModuleEditProvider, OpsReadOnlyBanner } from './useOpsModuleEdit'
 
-const NAV_EXPAND_STORAGE = 'ops-nav-expanded-v2'
+const NAV_EXPAND_STORAGE = 'ops-nav-expanded-v3'
 
 function navLeafVisible(session: OpsSession, item: OpsNavLeaf): boolean {
   if (item.permission === 'home') return true
