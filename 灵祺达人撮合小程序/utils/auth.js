@@ -133,6 +133,14 @@ async function smsLogin(phone, smsCode) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function phoneQuickLogin(phoneCode) {
+  const data = await authPost('phone_quick_login', {
+    phoneCode: String(phoneCode || '').trim(),
+    role: 'talent',
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 async function phoneRegister({ phone, smsCode, password, role, workIdentity }) {
   const data = await authPost('register', {
     phone: String(phone || '').trim(),
@@ -301,6 +309,7 @@ module.exports = {
   wxLogin,
   passwordLogin,
   smsLogin,
+  phoneQuickLogin,
   setLoginCredentials,
   changePasswordBySms,
   sendCloseAccountSms,

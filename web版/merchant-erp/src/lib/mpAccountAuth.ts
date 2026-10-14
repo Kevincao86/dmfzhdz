@@ -1210,6 +1210,36 @@ export async function mpAuthSmsLogin(
   return { token, account }
 }
 
+/** 手机号快捷登录：只用微信手机号凭证认手机号，不写入、不改绑 openid。 */
+export async function mpAuthPhoneQuickLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  phoneCode: string,
+  role: MpAccountRole = 'talent',
+): Promise<{ token: string; account: MpAccountRow; isNew: boolean }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const phone = await getMpBoundPhoneNumber(phoneCode)
+  const phoneNorm = normalizeMpLoginPhone(phone)
+  if (!phoneNorm) throw new Error('invalid_phone_code')
+  let account = await findAccountByPhone(rest, phoneNorm)
+  let isNew = false
+  if (!account) {
+    isNew = true
+    account = await insertAccount(rest, {
+      openid: null,
+      ...contactFields({ login_name: null, phone: null, email: null } as MpAccountRow, { phone: phoneNorm }),
+      active_role: role,
+      wx_nick_name: '',
+      wx_avatar_url: '',
+    })
+    account = await provisionRegistryForAccount(supabaseUrl, serviceRole, account, role, '', '')
+  } else {
+    account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
+  }
+  const token = await createSession(rest, account.id)
+  return { token, account, isNew }
+}
+
 export async function mpAuthSendEmailCode(email: string) {
   return sendAuthEmailCode(email)
 }

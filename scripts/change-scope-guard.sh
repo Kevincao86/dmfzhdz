@@ -426,6 +426,8 @@ mine-account-bind
 灵祺达人撮合小程序/pages/mine/mine.js
 mp_accounts_phone_email
 TalentLoginAuthPanel
+pages/login/login
+meoo-ops-mp-auth.ts
 change-scope-guard
 PAT
       ;;

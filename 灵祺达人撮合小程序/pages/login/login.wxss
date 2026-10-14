@@ -712,6 +712,18 @@
   border: none;
 }
 
+.login-btn--ghost {
+  margin-top: 20rpx;
+  background: #fff;
+  color: var(--lq-primary, #1e3a5f);
+  border: 2rpx solid var(--lq-border, #dbe3ee);
+  box-shadow: none;
+}
+
+.login-btn--ghost::after {
+  border: none;
+}
+
 .login-hint {
   display: block;
   margin-top: 16rpx;

@@ -27,6 +27,7 @@ import {
   mpAuthScanPoll,
   mpAuthSetLoginCredentials,
   mpAuthSmsLogin,
+  mpAuthPhoneQuickLogin,
   mpAuthSendEmailCode,
   mpAuthEmailLogin,
   mpAuthEmailRegister,
@@ -346,6 +347,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       )
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, token, account: payload })
+      return
+    }
+
+    if (action === 'phone_quick_login') {
+      const roleRaw = pickAuthField(req, body, 'role')
+      const { token, account, isNew } = await mpAuthPhoneQuickLogin(
+        supabaseUrl,
+        serviceRole,
+        pickAuthField(req, body, 'phoneCode'),
+        roleRaw === 'pr' ? 'pr' : 'talent',
+      )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, isNew, account: payload })
       return
     }
 

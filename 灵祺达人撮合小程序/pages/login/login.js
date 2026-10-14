@@ -17,8 +17,12 @@ const { MP_ICP_FILING, MP_PSB_FILING } = require('../../utils/siteIcp.js')
 
 const LEGAL_PROMPT_COPY = {
   wx: {
-    text: '使用手机号快捷登录前，请勾选并同意《用户协议》和《隐私政策》。登录会读取绑定的手机号，用来对上已有账号。',
+    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。将使用当前微信身份登录，不会改绑手机号。',
     agree: '同意并登录',
+  },
+  phone: {
+    text: '使用手机号快捷登录前，请勾选并同意《用户协议》和《隐私政策》。只按手机号进入账号，不会自动绑定微信。',
+    agree: '同意并继续',
   },
   pwd: {
     text: '使用账号登录前，请勾选并同意《用户协议》和《隐私政策》。',
@@ -577,13 +581,14 @@ Page({
       void this.doSmsLogin(workId)
       return
     }
+    if (action === 'phone') return
   },
 
   onGetPhoneNumber(e) {
     const detail = (e && e.detail) || {}
     const phoneCode = String(detail.code || '').trim()
     if (!this.data.legalAgreed) {
-      openLegalPrompt(this, 'talent', 'wx')
+      openLegalPrompt(this, 'talent', 'phone')
       return
     }
     if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
@@ -606,8 +611,35 @@ Page({
       this.setData({ err: '未能读取手机号，请再点一次「手机号快捷登录」' })
       return
     }
-    this._wxPhoneCode = phoneCode
-    this.startWxLoginFlow('talent')
+    void this.doPhoneQuickLogin(phoneCode)
+  },
+
+  onPhoneQuickTap() {
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, 'talent', 'phone')
+    }
+  },
+
+  async doPhoneQuickLogin(phoneCode) {
+    this.setData({ loading: true, err: '' })
+    try {
+      const data = await auth.phoneQuickLogin(phoneCode)
+      await applyLoginIdentity(data)
+      if (data && data.isNew) {
+        wx.redirectTo({ url: '/pages/subpack-signup/signup/signup?from=wx' })
+        return
+      }
+      resumeOrNavigateAfterLogin(this)
+    } catch (e) {
+      const msg = e && e.message ? e.message : '登录失败'
+      this.setData({
+        err: /invalid_phone_code|wx_phone_failed/i.test(msg)
+          ? '未能读取手机号，请再点一次「手机号快捷登录」'
+          : msg,
+      })
+    } finally {
+      this.setData({ loading: false })
+    }
   },
 
   startWxLoginFlow(workId) {
@@ -672,16 +704,10 @@ Page({
       ])
       avatar = persistedAvatar
       this.setData({ wxAvatarUrl: avatar })
-      const phoneCode = String(this._wxPhoneCode || '').trim()
-      if (!phoneCode) {
-        this.setData({ err: '请先完成手机号快捷登录' })
-        return
-      }
       const data = await auth.wxLogin({
         wxNickName: nick,
         wxAvatarUrl: avatar,
         code,
-        phoneCode,
       })
       const account = (data && data.account) || auth.readAccount()
       await applyLoginIdentity(data)
@@ -689,7 +715,6 @@ Page({
         alreadyPersisted: true,
         skipRemote: true,
       })
-      this._wxPhoneCode = ''
       this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
       if (data.isNew || auth.needsPhoneBind(account)) {
         wx.redirectTo({ url: '/pages/subpack-signup/signup/signup?from=wx' })
@@ -704,7 +729,7 @@ Page({
       } else if (/invalid_phone_code|wx_phone_failed/i.test(msg)) {
         hint = '未能读取手机号，请再点一次「手机号快捷登录」'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
-        hint = '登录码无效或已过期，请再点一次「手机号快捷登录」重试'
+        hint = '登录码无效或已过期，请再点一次「微信一键登录」重试'
       } else if (api.isNetReset(msg)) {
         hint = '网络不稳定，请稍后重试或删除小程序重新扫码'
       } else if (/admin_not_configured|not_configured/i.test(msg)) {

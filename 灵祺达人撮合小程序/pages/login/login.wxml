@@ -57,18 +57,26 @@
 
         <block wx:if="{{tab==='wx'}}">
           <button
-            wx:if="{{!legalAgreed}}"
             class="login-btn login-btn--wx"
             loading="{{loading}}"
             disabled="{{loading}}"
             bindtap="onWxLogin"
+          >
+            <text>微信一键登录</text>
+          </button>
+          <button
+            wx:if="{{!legalAgreed}}"
+            class="login-btn login-btn--ghost"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+            bindtap="onPhoneQuickTap"
           >
             <text>手机号快捷登录</text>
           </button>
           <button
             wx:elif="{{wxPrivacyPending}}"
             id="mp-privacy-agree-btn"
-            class="login-btn login-btn--wx"
+            class="login-btn login-btn--ghost"
             loading="{{loading}}"
             disabled="{{loading}}"
             open-type="agreePrivacyAuthorization"
@@ -78,7 +86,7 @@
           </button>
           <button
             wx:else
-            class="login-btn login-btn--wx"
+            class="login-btn login-btn--ghost"
             loading="{{loading}}"
             disabled="{{loading}}"
             open-type="getPhoneNumber"
@@ -86,6 +94,7 @@
           >
             <text>手机号快捷登录</text>
           </button>
+          <text class="login-hint">微信登录认微信，手机号登录认手机号。要两种都能用，登录后在账号绑定里补上另一个。</text>
           <text class="login-err" wx:if="{{err}}">{{err}}</text>
           <text class="login-hint" wx:if="{{wxPhoneDebug}}">{{wxPhoneDebug}}</text>
           <text class="login-guest-link" bindtap="onGuestMode">使用游客模式 ›</text>
