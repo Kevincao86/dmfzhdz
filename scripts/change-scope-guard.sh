@@ -126,6 +126,7 @@ list_scopes() {
   talent_audit_browse  达人小程序审核：首页可先浏览，手机号/头像/昵称改为用户自行登录时再授权
   mp_phone_quick_login 达人小程序审核：登录/注册去掉微信字样，改为手机号快捷登录与快捷注册
   mp_share_menu_contrast 达人小程序分享菜单：主题切换后菜单底色跟随卡片，避免白底白字
+  mp_main_pkg_size     达人小程序主包超 2048KB：把仅分包使用的 JS 移进对应分包
   erp_wx_phone_rebind  商家小程序快捷登录：微信与手机号各绑一家时，确认后以手机号商家为准改绑微信
   affiliate_instant    推广员一点申请即开通、专属二维码、扫码付费按后台比例入账
   merchant_payout_bind 商家钱包绑定收款账户，提现打到该账户，运营台提现名单带出户名账号开户行
@@ -1984,6 +1985,15 @@ src/lib/tenantLocalState.ts
 灵祺ERP小程序/utils/platformBindingsMp.js
 web版/merchant-erp/.env.example
 tenant_bindings_meituan
+change-scope-guard
+PAT
+      ;;
+    mp_main_pkg_size)
+      cat <<'PAT'
+shortDramaCatalogMp
+addonAiComplianceCapabilities
+mine-pr-addon-short-drama.js
+mine-pr-addon-ai-review.js
 change-scope-guard
 PAT
       ;;

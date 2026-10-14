@@ -5,7 +5,7 @@ const videoAiCompliance = require('../../../utils/recruitmentVideoAiCompliance.j
 const scriptAiCompliance = require('../../../utils/recruitmentScriptAiCompliance.js')
 const iceApi = require('../../../utils/mpAddonIceApi.js')
 const mpComplianceReviewRecords = require('../../../utils/mpComplianceReviewRecordsApi.js')
-const addonAiComplianceCapabilities = require('../../../utils/addonAiComplianceCapabilities.js')
+const addonAiComplianceCapabilities = require('./addonAiComplianceCapabilities.js')
 
 const SCRIPT_PLATFORM_OPTIONS = ['小红书', '大众点评']
 const VIDEO_PLATFORM_OPTIONS = ['抖音', '快手', '视频号']

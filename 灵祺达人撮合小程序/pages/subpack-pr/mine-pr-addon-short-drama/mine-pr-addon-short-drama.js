@@ -1,5 +1,5 @@
 const mpAddonPageGate = require('../../../utils/mpAddonPageGate.js')
-const catalog = require('../../../utils/shortDramaCatalogMp.js')
+const catalog = require('./shortDramaCatalogMp.js')
 const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
 const media = require('../../../utils/mpAddonMedia.js')
