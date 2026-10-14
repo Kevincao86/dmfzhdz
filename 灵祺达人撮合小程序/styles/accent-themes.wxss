@@ -191,9 +191,6 @@
   color: var(--lq-text-secondary, #64748b) !important;
 }
 
-.paper-page.lq-accent-on .input,
-.paper-page.lq-accent-on .wx-nick-input,
-.paper-page.lq-accent-on .apply-textarea,
 .paper-page.lq-accent-on .picker-val {
   -webkit-text-fill-color: var(--lq-text, #14181f);
 }
@@ -215,25 +212,25 @@
 .lq-accent-dark .cred-edit-btn,
 .lq-accent-dark .cred-modal-title,
 .lq-accent-dark .wx-name,
-.lq-accent-dark .wx-nick-input,
 .lq-accent-dark .type-chip-label,
 .paper-page.lq-accent-dark .section-title,
 .paper-page.lq-accent-dark .platform-head,
 .paper-page.lq-accent-dark .page-hero-title,
 .paper-page.lq-accent-dark .wx-name,
-.paper-page.lq-accent-dark .wx-nick-input,
 .paper-page.lq-accent-dark .cred-ready-text,
 .paper-page.lq-accent-dark .cred-edit-btn,
-.paper-page.lq-accent-dark .input,
 .paper-page.lq-accent-dark .picker-val,
-.paper-page.lq-accent-dark .apply-textarea,
 .paper-page.lq-accent-dark .btn-outline,
 .paper-page.lq-accent-dark text,
-.paper-page.lq-accent-dark input,
 .paper-page.lq-accent-dark button,
 .paper-page.lq-accent-dark label {
   color: #f4f4f5 !important;
   -webkit-text-fill-color: #f4f4f5 !important;
+}
+
+.lq-accent-dark input,
+.lq-accent-dark textarea {
+  color: #f4f4f5 !important;
 }
 
 .lq-accent-dark .form-label,

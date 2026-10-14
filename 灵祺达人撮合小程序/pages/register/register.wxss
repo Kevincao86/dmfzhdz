@@ -293,7 +293,6 @@
 .paper-page .wx-nick-input,
 .paper-page .wx-name {
   color: var(--lq-text, #1c1917);
-  -webkit-text-fill-color: var(--lq-text, #1c1917);
 }
 
 .paper-page .wx-avatar {
@@ -326,8 +325,6 @@
   color: var(--lq-text-secondary, #64748b) !important;
 }
 
-.paper-page.lq-accent-on .wx-nick-input,
-.paper-page.lq-accent-on .input,
 .paper-page.lq-accent-on .picker-val {
   -webkit-text-fill-color: var(--lq-text, #14181f);
 }
@@ -336,22 +333,36 @@
 .paper-page.lq-accent-dark .platform-head,
 .paper-page.lq-accent-dark .page-hero-title,
 .paper-page.lq-accent-dark .wx-name,
-.paper-page.lq-accent-dark .wx-nick-input,
 .paper-page.lq-accent-dark .cred-ready-text,
 .paper-page.lq-accent-dark .cred-edit-btn,
 .paper-page.lq-accent-dark .cred-check-label,
 .paper-page.lq-accent-dark .cred-modal-title,
-.paper-page.lq-accent-dark .input,
 .paper-page.lq-accent-dark .picker-val,
-.paper-page.lq-accent-dark .apply-textarea,
 .paper-page.lq-accent-dark .type-chip-label,
 .paper-page.lq-accent-dark .apply-recruit-val,
 .paper-page.lq-accent-dark text,
-.paper-page.lq-accent-dark input,
 .paper-page.lq-accent-dark button,
 .paper-page.lq-accent-dark label {
   color: #f4f4f5 !important;
   -webkit-text-fill-color: #f4f4f5 !important;
+}
+
+/* 安卓 input 遇到 -webkit-text-fill-color 会把字抹掉，这里只留 color。 */
+.paper-page.lq-accent-dark input,
+.paper-page.lq-accent-dark textarea,
+.paper-page.lq-accent-dark .input,
+.paper-page.lq-accent-dark .wx-nick-input,
+.paper-page.lq-accent-dark .apply-textarea {
+  color: #f4f4f5 !important;
+}
+
+.paper-page.lq-accent-dark .platform-detail-btn {
+  background: #eef2ff !important;
+}
+
+.paper-page.lq-accent-dark .platform-detail-btn text {
+  color: #4338ca !important;
+  -webkit-text-fill-color: #4338ca !important;
 }
 
 .paper-page.lq-accent-dark .page-hero-sub,

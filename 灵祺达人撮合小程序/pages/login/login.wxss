@@ -1294,7 +1294,6 @@
 .login-page.lq-accent-dark .login-chip,
 .login-page.lq-accent-dark .login-hint,
 .login-page.lq-accent-dark .login-field-label,
-.login-page.lq-accent-dark .login-input,
 .login-page.lq-accent-dark .login-guest-link,
 .login-page.lq-accent-dark .login-forgot,
 .login-page.lq-accent-dark .login-legal-txt,
@@ -1346,4 +1345,10 @@
 .login-page.lq-accent-dark .login-err {
   color: #fca5a5 !important;
   -webkit-text-fill-color: #fca5a5 !important;
+}
+
+.login-page.lq-accent-dark input,
+.login-page.lq-accent-dark textarea,
+.login-page.lq-accent-dark .login-input {
+  color: #f4f4f5 !important;
 }

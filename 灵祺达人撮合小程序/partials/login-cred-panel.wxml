@@ -25,7 +25,7 @@
   <text class="cred-modal-title">{{credentialsReady ? '修改密码' : '新建账号密码'}}</text>
   <view class="form-row">
     <text class="form-label">手机号</text>
-    <input
+    <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
       class="input"
       type="number"
       maxlength="11"
@@ -37,7 +37,7 @@
   <view class="form-row" wx:if="{{credentialsReady}}">
     <text class="form-label">验证码</text>
     <view class="cred-sms-row">
-      <input
+      <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
         class="input cred-sms-input"
         type="number"
         maxlength="6"
@@ -56,7 +56,7 @@
   </view>
   <view class="form-row">
     <text class="form-label">{{credentialsReady ? '新密码' : '登录密码'}}</text>
-    <input
+    <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
       class="input"
       password
       placeholder="{{hasPassword ? '至少 6 位新密码' : '至少 6 位'}}"

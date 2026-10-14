@@ -89,14 +89,26 @@ function viewModel() {
   const id = readId()
   const p = pack(id)
   if (!p) {
-    return { lqAccentClass: '', lqPageStyle: '', lqPageBg: '#f7f3ec', lqNavBg: '#f7f3ec', accentId: '' }
+    return {
+      lqAccentClass: '',
+      lqPageStyle: '',
+      lqPageBg: '#f7f3ec',
+      lqNavBg: '#f7f3ec',
+      accentId: '',
+      lqInputStyle: '',
+      lqPhStyle: '',
+    }
   }
+  const dark = p.mode === 'dark'
   return {
-    lqAccentClass: p.mode === 'dark' ? 'lq-accent-on lq-accent-dark' : 'lq-accent-on',
+    lqAccentClass: dark ? 'lq-accent-on lq-accent-dark' : 'lq-accent-on',
     lqPageStyle: styleOf(p),
     lqPageBg: p.t50,
     lqNavBg: p.nav,
     accentId: id,
+    /* 安卓原生 input 不吃 wxss 的 color，更不能写 -webkit-text-fill-color，否则字被抹掉。 */
+    lqInputStyle: dark ? 'color:#f4f4f5;' : '',
+    lqPhStyle: dark ? 'color:#a1a1aa;' : '',
   }
 }
 
@@ -115,7 +127,7 @@ function pin(page) {
   if (!page || typeof page.setData !== 'function') return
   const view = viewModel()
   const patch = {}
-  ;['lqAccentClass', 'lqPageStyle', 'lqPageBg', 'lqNavBg', 'accentId'].forEach((key) => {
+  ;['lqAccentClass', 'lqPageStyle', 'lqPageBg', 'lqNavBg', 'accentId', 'lqInputStyle', 'lqPhStyle'].forEach((key) => {
     if (page.data[key] !== view[key]) patch[key] = view[key]
   })
   if (view.accentId && page.data.credCheckboxColor && page.data.credCheckboxColor !== pack(view.accentId).nav) {

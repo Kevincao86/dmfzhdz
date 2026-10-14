@@ -241,7 +241,6 @@ page {
   background: transparent;
   border-color: #efe8dc;
   color: var(--lq-text, #1c1917);
-  -webkit-text-fill-color: var(--lq-text, #1c1917);
 }
 
 .paper-page .sync-card {
