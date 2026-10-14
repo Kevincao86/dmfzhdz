@@ -23,10 +23,10 @@ function normalizeEmail(raw) {
 function regNoteText(fromWx, channel) {
   if (fromWx) {
     return channel === 'email'
-      ? '微信已登录，请选定身份并绑定邮箱，选定后不可更改'
-      : '微信已登录，请选定身份。可一键读取微信绑定手机号，或手动填写。选定后不可更改'
+      ? '已登录，请选定身份并绑定邮箱，选定后不可更改'
+      : '已登录，请选定身份。可使用手机号快捷注册，或手动填写。选定后不可更改'
   }
-  return '用手机号或邮箱作为登录账号。手机号也可一键读取微信绑定号。选定后不可更改，登录后自动进入这一版'
+  return '用手机号或邮箱作为登录账号。也可使用手机号快捷注册。选定后不可更改，登录后自动进入这一版'
 }
 
 function navigateAfterRegister() {
@@ -152,11 +152,11 @@ Page({
     const detail = (e && e.detail) || {}
     const phoneCode = String(detail.code || '').trim()
     if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
-      this.setData({ err: '需要授权微信绑定的手机号才能一键注册' })
+      this.setData({ err: '需要允许获取绑定手机号才能快捷注册' })
       return
     }
     if (!phoneCode) {
-      this.setData({ err: '未能读取微信手机号，请再点一次「微信一键注册」' })
+      this.setData({ err: '未能读取手机号，请再点一次「手机号快捷注册」' })
       return
     }
     const password = String(this.data.password || '')

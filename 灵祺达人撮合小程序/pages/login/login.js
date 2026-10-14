@@ -17,7 +17,7 @@ const { MP_ICP_FILING, MP_PSB_FILING } = require('../../utils/siteIcp.js')
 
 const LEGAL_PROMPT_COPY = {
   wx: {
-    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。登录会读取微信绑定的手机号，用来对上已有账号。',
+    text: '使用手机号快捷登录前，请勾选并同意《用户协议》和《隐私政策》。登录会读取绑定的手机号，用来对上已有账号。',
     agree: '同意并登录',
   },
   pwd: {
@@ -51,13 +51,13 @@ function wxPhoneAuthFailHint(detail) {
     return '微信后台还没在《用户隐私保护指引》里声明「手机号」。请用小程序账号登录 mp.weixin.qq.com → 设置 → 服务内容声明 → 用户隐私保护指引，勾选手机号后保存，约 5 分钟后再试'
   }
   if (platform === 'devtools') {
-    return '开发者工具读不到真实手机号，请用「预览」扫到手机上再点微信一键登录'
+    return '开发者工具读不到真实手机号，请用「预览」扫到手机上再点手机号快捷登录'
   }
   if (errno === 104 || /needAuthorization/i.test(errMsg)) {
-    return '请先同意微信《隐私保护指引》，再点微信一键登录'
+    return '请先同意《隐私保护指引》，再点手机号快捷登录'
   }
   if (/deny|cancel|拒绝/i.test(errMsg)) {
-    return '需要在微信弹窗里允许获取绑定手机号'
+    return '需要在弹窗里允许获取绑定手机号'
   }
   if (/no permission|banned|jsapi/i.test(errMsg)) {
     return '当前小程序还不能读取手机号。请到微信公众平台确认已认证，并在「管理 → 付费管理」查看手机号快速验证额度'
@@ -65,7 +65,7 @@ function wxPhoneAuthFailHint(detail) {
   if (envVersion === 'develop') {
     return '真机调试有时拉不起选号窗。请用开发者工具「预览」扫码，或上传体验版后再试'
   }
-  return '未能读取微信手机号，请再点一次「微信一键登录」'
+  return '未能读取手机号，请再点一次「手机号快捷登录」'
 }
 
 function isWxPrivacyBlock(detail) {
@@ -346,7 +346,7 @@ Page({
     mpPrivacyAuthorize.resolvePrivacyAuthorization(this, mpPrivacyAuthorize.PRIVACY_AGREE_BTN_ID)
     this.setData({
       wxPrivacyPending: false,
-      err: '请再点一次「微信一键登录」，选择微信绑定的手机号',
+      err: '请再点一次「手机号快捷登录」，选择绑定的手机号',
       wxPhoneDebug: '',
     })
   },
@@ -594,7 +594,7 @@ Page({
       if (isWxPrivacyBlock(detail)) {
         this.setData({
           wxPrivacyPending: true,
-          err: '请先点「同意隐私保护指引」，再点微信一键登录',
+          err: '请先点「同意隐私保护指引」，再点手机号快捷登录',
           wxPhoneDebug: debug,
         })
         return
@@ -603,7 +603,7 @@ Page({
       return
     }
     if (!phoneCode) {
-      this.setData({ err: '未能读取微信手机号，请再点一次「微信一键登录」' })
+      this.setData({ err: '未能读取手机号，请再点一次「手机号快捷登录」' })
       return
     }
     this._wxPhoneCode = phoneCode
@@ -674,7 +674,7 @@ Page({
       this.setData({ wxAvatarUrl: avatar })
       const phoneCode = String(this._wxPhoneCode || '').trim()
       if (!phoneCode) {
-        this.setData({ err: '请先授权微信绑定的手机号' })
+        this.setData({ err: '请先完成手机号快捷登录' })
         return
       }
       const data = await auth.wxLogin({
@@ -702,9 +702,9 @@ Page({
       if (msg.indexOf('wx_not_configured') >= 0) {
         hint = '登录暂时失败，请稍后再试'
       } else if (/invalid_phone_code|wx_phone_failed/i.test(msg)) {
-        hint = '未能读取微信手机号，请再点一次「微信一键登录」'
+        hint = '未能读取手机号，请再点一次「手机号快捷登录」'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
-        hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
+        hint = '登录码无效或已过期，请再点一次「手机号快捷登录」重试'
       } else if (api.isNetReset(msg)) {
         hint = '网络不稳定，请稍后重试或删除小程序重新扫码'
       } else if (/admin_not_configured|not_configured/i.test(msg)) {
@@ -811,7 +811,7 @@ Page({
     const confirmed = await new Promise((resolve) => {
       wx.showModal({
         title: '确认手机号',
-        content: `请确认绑定手机号为 ${phone}\n绑定后微信与抖音将共用同一灵祺账号`,
+        content: `请确认绑定手机号为 ${phone}\n绑定后各端共用同一灵祺账号`,
         confirmText: '确认绑定',
         cancelText: '返回修改',
         success: (r) => resolve(!!(r && r.confirm)),
