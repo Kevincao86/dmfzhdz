@@ -1,7 +1,54 @@
 const config = require('../../utils/config.js')
 
 const SLOT_KEY = 'erp.launch.splash'
+const CACHE_KEY = 'erp.launch.splash.cache'
 let claimed = false
+
+function readCache() {
+  try {
+    const raw = wx.getStorageSync(CACHE_KEY)
+    if (!raw || !raw.imageUrl) return null
+    return raw
+  } catch (_) {
+    return null
+  }
+}
+
+function writeCache(item) {
+  try {
+    wx.setStorageSync(CACHE_KEY, {
+      imageUrl: item.imageUrl,
+      mediaType: item.mediaType || '',
+      playSeconds: item.playSeconds,
+    })
+  } catch (_) {}
+}
+
+function clearCache() {
+  try {
+    wx.removeStorageSync(CACHE_KEY)
+  } catch (_) {}
+}
+
+function screenBox() {
+  try {
+    const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+    const menu = wx.getMenuButtonBoundingClientRect()
+    const width = Number(win.screenWidth) || Number(win.windowWidth) || 375
+    const height = Number(win.screenHeight) || Number(win.windowHeight) || 812
+    const top = Math.max(8, Number(menu.top) || Number(win.statusBarHeight) || 24)
+    const right = Math.max(12, width - Number(menu.left) + 8)
+    return {
+      stageStyle: `width:${width}px;height:${height}px;`,
+      skipStyle: `top:${top}px;right:${right}px;`,
+    }
+  } catch (_) {
+    return {
+      stageStyle: 'width:100vw;height:100vh;',
+      skipStyle: 'top:48px;right:24px;',
+    }
+  }
+}
 
 function isVideoUrl(item) {
   if (!item) return false
@@ -62,74 +109,107 @@ function openLink(item) {
 
 Component({
   data: {
-    phase: 'hide',
+    phase: claimed ? 'hide' : 'cover',
     imageUrl: '',
     isVideo: false,
     remain: 3,
     skipStyle: '',
+    stageStyle: '',
   },
 
   lifetimes: {
     attached() {
       this._ended = false
+      this._showing = false
       this._item = null
-      this.placeSkip()
+      this.setData(screenBox())
       this.boot()
     },
     detached() {
       this.clearTick()
+      if (this._giveUp) {
+        clearTimeout(this._giveUp)
+        this._giveUp = null
+      }
+      if (this._ownsClaim && !this._settled) {
+        claimed = false
+        this._ownsClaim = false
+      }
     },
   },
 
   methods: {
-    placeSkip() {
-      try {
-        const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
-        const menu = wx.getMenuButtonBoundingClientRect()
-        const top = Math.max(8, Number(menu.top) || 24)
-        const right = Math.max(12, win.windowWidth - Number(menu.left) + 8)
-        this.setData({ skipStyle: `top:${top}px;right:${right}px;` })
-      } catch (_) {
-        this.setData({ skipStyle: 'top:48px;right:24px;' })
-      }
-    },
-
     boot() {
       if (claimed) {
         this.finish()
         return
       }
       claimed = true
-      const giveUp = setTimeout(() => this.finish(), 5000)
+      this._ownsClaim = true
+      const cached = readCache()
+      if (cached && cached.imageUrl) this.startShow(cached)
+      this._giveUp = setTimeout(() => {
+        if (this._showing) return
+        this._settled = true
+        this.finish()
+      }, 5000)
       fetchSplash()
         .then((item) => {
-          clearTimeout(giveUp)
-          if (this._ended || !item || !item.imageUrl) {
+          if (this._giveUp) {
+            clearTimeout(this._giveUp)
+            this._giveUp = null
+          }
+          this._settled = true
+          if (this._ended) return
+          if (!item || !item.imageUrl) {
+            clearCache()
             this.finish()
             return
           }
-          this._item = item
-          const remain = Number(item.playSeconds) === 5 ? 5 : 3
-          this.setData({
+          writeCache(item)
+          if (this._showing) {
+            this._item = item
+            return
+          }
+          this.startShow(item)
+        })
+        .catch(() => {
+          if (this._giveUp) {
+            clearTimeout(this._giveUp)
+            this._giveUp = null
+          }
+          this._settled = true
+          if (this._showing) return
+          this.finish()
+        })
+    },
+
+    startShow(item) {
+      if (this._ended || this._showing || !item || !item.imageUrl) return
+      this._showing = true
+      this._item = item
+      const remain = Number(item.playSeconds) === 5 ? 5 : 3
+      this.setData(
+        Object.assign(
+          {
             phase: 'show',
             imageUrl: item.imageUrl,
             isVideo: isVideoUrl(item),
             remain,
-          })
-          this._left = remain
-          this._tick = setInterval(() => {
-            this._left -= 1
-            if (this._left <= 0) {
-              this.finish()
-              return
-            }
-            this.setData({ remain: this._left })
-          }, 1000)
-        })
-        .catch(() => {
-          clearTimeout(giveUp)
+          },
+          screenBox(),
+        ),
+      )
+      this._left = remain
+      this.clearTick()
+      this._tick = setInterval(() => {
+        this._left -= 1
+        if (this._left <= 0) {
           this.finish()
-        })
+          return
+        }
+        this.setData({ remain: this._left })
+      }, 1000)
     },
 
     clearTick() {

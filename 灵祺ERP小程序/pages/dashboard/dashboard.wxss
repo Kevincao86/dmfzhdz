@@ -1,3 +1,13 @@
+.home-splash-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99990;
+  background: #0e1525;
+}
+
 .home-page {
   min-height: 100vh;
   box-sizing: border-box;

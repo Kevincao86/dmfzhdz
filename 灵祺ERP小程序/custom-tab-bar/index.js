@@ -1,6 +1,7 @@
 Component({
   data: {
     selected: 0,
+    hidden: true,
     lqAccentClass: '',
     lqPageStyle: '',
     list: [
@@ -11,7 +12,24 @@ Component({
       { pagePath: '/pages/mine/mine', text: '我的', icon: 'user' },
     ],
   },
+  lifetimes: {
+    attached() {
+      this.syncSplash()
+    },
+  },
+  pageLifetimes: {
+    show() {
+      this.syncSplash()
+    },
+  },
   methods: {
+    syncSplash() {
+      let hidden = false
+      try {
+        hidden = getApp().globalData.launchSplash !== false
+      } catch (_) {}
+      if (hidden !== this.data.hidden) this.setData({ hidden })
+    },
     switchTab(e) {
       const idx = Number(e.currentTarget.dataset.index)
       const item = this.data.list[idx]

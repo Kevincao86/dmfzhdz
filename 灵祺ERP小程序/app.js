@@ -52,6 +52,7 @@ App({
   },
   globalData: {
     accessToken: null,
+    launchSplash: true,
   },
   /** 与 Web 设置页云端绑定同步（抖音 / 本地推 / 聚光） */
   syncMerchantSession(opts) {

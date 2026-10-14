@@ -206,6 +206,7 @@ Page({
   data: {
     posters: FALLBACK_POSTERS,
     posterInterval: 4000,
+    splashCover: true,
     entries: ENTRIES,
     todoLoaded: false,
     todos: [],
@@ -213,9 +214,38 @@ Page({
     recruits: [],
   },
 
+  onLoad() {
+    this._splashSafety = setTimeout(() => this.onLaunchSplashDone(), 8000)
+  },
+
+  onUnload() {
+    if (this._splashSafety) {
+      clearTimeout(this._splashSafety)
+      this._splashSafety = null
+    }
+  },
+
+  onLaunchSplashDone() {
+    if (!this.data.splashCover) return
+    if (this._splashSafety) {
+      clearTimeout(this._splashSafety)
+      this._splashSafety = null
+    }
+    try {
+      getApp().globalData.launchSplash = false
+    } catch (_) {}
+    this.setData({ splashCover: false })
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ hidden: false, selected: 0 })
+    }
+  },
+
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 0 })
+      this.getTabBar().setData({
+        selected: 0,
+        hidden: Boolean(this.data.splashCover),
+      })
     }
     this.loadPosters()
     this.loadHomeFeed()

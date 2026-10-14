@@ -1,5 +1,6 @@
-<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
-<launch-splash />
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" navigation-style="{{splashCover ? 'custom' : 'default'}}" />
+<view wx:if="{{splashCover}}" class="home-splash-mask"></view>
+<launch-splash bind:done="onLaunchSplashDone" />
 <scroll-view scroll-y class="{{lqAccentClass}} home-page foot-col" enhanced show-scrollbar="{{false}}" style="{{lqPageStyle}}padding-bottom:var(--tab-bar-pad)" enable-flex>
   <swiper
     class="home-poster"
