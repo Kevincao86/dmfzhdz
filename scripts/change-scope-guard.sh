@@ -424,6 +424,8 @@ mpSession.ts
 灵祺达人撮合小程序/app.json
 mine-account-bind
 灵祺达人撮合小程序/pages/mine/mine.js
+mp_accounts_phone_email
+TalentLoginAuthPanel
 change-scope-guard
 PAT
       ;;

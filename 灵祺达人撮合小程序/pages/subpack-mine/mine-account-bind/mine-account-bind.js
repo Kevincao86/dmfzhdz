@@ -67,7 +67,7 @@ Page({
         kind: '',
         hint: this.data.ids.douyin
           ? '抖音已绑定'
-          : '请在电脑端星选登录页使用抖音扫码，并用同一手机号或邮箱完成绑定',
+          : '请在电脑端星选登录页使用抖音扫码。登录后可在这里绑定手机号或邮箱',
       })
       return
     }
@@ -164,7 +164,7 @@ Page({
         this.setData({
           busy: false,
           ids: next,
-          err: '该账号已有另一个登录名。同一手机号或邮箱会把微信、抖音并到已有账号。',
+          err: '这个手机号或邮箱已经属于另一个账号，请用那个账号登录。',
         })
         return
       }
@@ -175,7 +175,7 @@ Page({
         editing: false,
         value: '',
         code: '',
-        hint: replacing ? '已换绑' : '已绑定。同一手机号或邮箱下的微信、抖音会并成一个账号。',
+        hint: replacing ? '已换绑' : '已绑定。手机号和邮箱可以同时留在这个账号上。',
       })
     } catch (e) {
       this.setData({ busy: false, err: String((e && e.message) || '绑定失败').slice(0, 40) })

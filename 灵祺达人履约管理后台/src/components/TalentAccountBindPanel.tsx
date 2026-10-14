@@ -91,14 +91,14 @@ export default function TalentAccountBindPanel() {
       setAcc(r.account)
       const after = kind === 'phone' ? Boolean(r.account.identities?.phone) : Boolean(r.account.identities?.email)
       if (!replacing && !after && !boundNow) {
-        setErr('该账号已有另一个登录名。同一手机号或邮箱会把微信、抖音并到已有账号，新的联系方式不能再单独挂上。')
+        setErr('这个手机号或邮箱已经属于另一个账号，请用那个账号登录。')
         return
       }
       setKind(null)
       setEditing(false)
       setValue('')
       setCode('')
-      setHint(replacing ? '已换绑' : '已绑定。同一手机号或邮箱下的微信、抖音会并成一个账号。')
+      setHint(replacing ? '已换绑' : '已绑定。手机号和邮箱可以同时留在这个账号上。')
     } catch (e) {
       setErr(formatMpApiErr(e, boundNow && editing ? '换绑失败' : '绑定失败'))
     } finally {
@@ -125,7 +125,7 @@ export default function TalentAccountBindPanel() {
     <div className="surface-card rounded-xl border p-4">
       <p className="text-sm font-medium text-[var(--shell-text)]">账号绑定</p>
       <p className="mt-1 text-[11px] leading-relaxed text-[var(--shell-muted)]">
-        和商家小程序一样：手机号、邮箱用验证码绑定；同一号码会把微信和抖音并成一个账号。
+        手机号和邮箱用验证码绑定，可以同时留在这个账号上。已被其他账号占用时不会自动合并。
       </p>
       <div className="mt-3 grid grid-cols-4 gap-2">
         {items.map((it) => {
@@ -144,7 +144,7 @@ export default function TalentAccountBindPanel() {
                 }
                 if (it.id === 'douyin') {
                   setKind(null)
-                  setHint(on ? '抖音已绑定' : '请在登录页使用抖音扫码，并用同一手机号或邮箱完成绑定')
+                  setHint(on ? '抖音已绑定' : '请在登录页使用抖音扫码。登录后可在这里绑定手机号或邮箱')
                   return
                 }
                 setKind(it.id)

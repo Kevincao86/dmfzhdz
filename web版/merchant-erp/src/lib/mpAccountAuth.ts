@@ -72,6 +72,9 @@ export type MpAccountRow = {
   openid: string | null
   dy_openid?: string | null
   login_name: string | null
+  /** 与邮箱分开存放。旧数据可能只写在 login_name，读取时两边都认。 */
+  phone?: string | null
+  email?: string | null
   password_hash: string | null
   password_salt: string | null
   active_role: MpAccountRole
@@ -120,9 +123,9 @@ export function mpAccountOAuthOpenId(account: MpAccountRow): string {
   return String(account.openid || account.dy_openid || '').trim()
 }
 
-/** 微信/抖音须绑定手机号或邮箱后才算同一账号 */
+/** 微信/抖音须绑定手机号或邮箱后才算完成联系方式。两者可同时存在。 */
 export function mpAccountNeedsPhoneBind(account: MpAccountRow): boolean {
-  return !isMpContactBound(String(account.login_name || ''))
+  return !readAccountPhone(account) && !readAccountEmail(account)
 }
 
 function pepper(): string {
@@ -276,6 +279,82 @@ async function findAccountById(rest: SupabaseRest, id: string): Promise<MpAccoun
   return rows[0] ?? null
 }
 
+function readAccountPhone(account: MpAccountRow | null | undefined): string {
+  if (!account) return ''
+  return (
+    normalizeMpLoginPhone(String(account.phone || '')) ||
+    normalizeMpLoginPhone(String(account.login_name || '')) ||
+    ''
+  )
+}
+
+function readAccountEmail(account: MpAccountRow | null | undefined): string {
+  if (!account) return ''
+  const fromCol = normalizeMpLoginEmail(String(account.email || ''))
+  if (fromCol) return fromCol
+  const login = String(account.login_name || '').trim()
+  if (isValidMpLoginPhone(login)) return ''
+  return normalizeMpLoginEmail(login) || ''
+}
+
+/** 手机号优先写回 login_name，兼容仍只查登录名的旧路径。邮箱留在 email 列。 */
+function contactFields(
+  account: MpAccountRow,
+  patch: { phone?: string | null; email?: string | null },
+): { phone: string | null; email: string | null; login_name: string | null } {
+  const phone =
+    patch.phone !== undefined
+      ? normalizeMpLoginPhone(String(patch.phone || '')) || ''
+      : readAccountPhone(account)
+  const email =
+    patch.email !== undefined
+      ? normalizeMpLoginEmail(String(patch.email || '')) || ''
+      : readAccountEmail(account)
+  let login = phone || email
+  if (!login) {
+    const cur = String(account.login_name || '').trim()
+    if (cur && !isMpContactBound(cur)) login = cur
+  }
+  return { phone: phone || null, email: email || null, login_name: login || null }
+}
+
+async function findAccountByColumn(
+  rest: SupabaseRest,
+  column: 'phone' | 'email',
+  value: string,
+): Promise<MpAccountRow | null> {
+  const q = `/mp_accounts?${column}=eq.${encodeURIComponent(value)}&limit=1`
+  const res = await rest.get(q)
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`mp_accounts_query_failed:${res.status}:${t.slice(0, 120)}`)
+  }
+  const rows = (await res.json()) as MpAccountRow[]
+  return rows[0] ?? null
+}
+
+async function findAccountByPhone(rest: SupabaseRest, phone: string): Promise<MpAccountRow | null> {
+  const norm = normalizeMpLoginPhone(phone)
+  if (!norm) return null
+  return (await findAccountByColumn(rest, 'phone', norm)) || (await findAccountByLoginName(rest, norm))
+}
+
+async function findAccountByEmail(rest: SupabaseRest, email: string): Promise<MpAccountRow | null> {
+  const mail = normalizeMpLoginEmail(email)
+  if (!mail) return null
+  return (await findAccountByColumn(rest, 'email', mail)) || (await findAccountByLoginName(rest, mail))
+}
+
+async function findAccountForPassword(rest: SupabaseRest, loginName: string): Promise<MpAccountRow | null> {
+  const phone = normalizeMpLoginPhone(loginName)
+  if (phone) return findAccountByPhone(rest, phone)
+  const email = normalizeMpLoginEmail(loginName)
+  if (email) return findAccountByEmail(rest, email)
+  const name = normalizeMpLoginName(loginName)
+  if (!name) return null
+  return findAccountByLoginName(rest, name)
+}
+
 async function insertAccount(rest: SupabaseRest, row: Record<string, unknown>): Promise<MpAccountRow> {
   const res = await rest.post('/mp_accounts', row)
   if (!res.ok) {
@@ -295,6 +374,8 @@ async function updateAccount(rest: SupabaseRest, id: string, patch: Record<strin
   if (!res.ok) {
     const t = await res.text().catch(() => '')
     if (/duplicate|unique|23505/i.test(t)) {
+      if (/mp_accounts_phone|Key \(phone\)/i.test(t)) throw new Error('phone_taken')
+      if (/mp_accounts_email|Key \(email\)/i.test(t)) throw new Error('email_taken')
       if (/login_name/i.test(t)) throw new Error('login_name_taken')
       if (/dy_openid/i.test(t)) throw new Error('dy_openid_conflict')
       if (/openid/i.test(t)) throw new Error('wx_openid_already_bound')
@@ -341,11 +422,10 @@ function maskMpEmail(email: string): string {
   return `${email.slice(0, 1)}***${email.slice(at)}`
 }
 
-/** 达人/PR 账号已绑定的登录方式。手机号与邮箱共用 login_name，同一时刻只显示其中一项。 */
+/** 达人/PR 账号已绑定的登录方式。手机号与邮箱可同时绑定。 */
 export function mpAccountIdentities(account: MpAccountRow) {
-  const login = String(account.login_name || '').trim()
-  const phone = isValidMpLoginPhone(login) ? normalizeMpLoginPhone(login) || '' : ''
-  const email = phone ? '' : normalizeMpLoginEmail(login) || ''
+  const phone = readAccountPhone(account)
+  const email = readAccountEmail(account)
   return {
     wechat: Boolean(String(account.openid || '').trim()),
     douyin: Boolean(String(account.dy_openid || '').trim()),
@@ -529,9 +609,7 @@ export async function accountPayloadWithMemberExtras(
 }
 
 function accountPhoneKey(account: MpAccountRow): string {
-  return String(account.login_name || '')
-    .replace(/\D/g, '')
-    .slice(-11)
+  return readAccountPhone(account).replace(/\D/g, '').slice(-11)
 }
 
 function memberPhoneKey(m: RegistryMpTalentMember): string {
@@ -900,19 +978,12 @@ export async function mpAuthWxLogin(
   let role: MpAccountRole = requestedRole
 
   if (phone) {
-    const holder = await findAccountByLoginName(rest, phone)
+    const holder = await findAccountByPhone(rest, phone)
     if (account && holder && holder.id !== account.id) {
-      account = await mergeMpAccountIntoPhoneHolder(
-        rest,
-        supabaseUrl,
-        serviceRole,
-        account,
-        holder,
-        'wx',
-      )
+      throw new Error('phone_taken')
     } else if (holder && !account) {
       const holderWx = String(holder.openid || '').trim()
-      if (holderWx && holderWx !== openid) throw new Error('wx_openid_conflict')
+      if (holderWx && holderWx !== openid) throw new Error('phone_taken')
       if (!holderWx) {
         await updateAccount(rest, holder.id, {
           openid,
@@ -921,8 +992,8 @@ export async function mpAuthWxLogin(
         })
       }
       account = (await findAccountById(rest, holder.id))!
-    } else if (account && !isValidMpLoginPhone(String(account.login_name || ''))) {
-      await updateAccount(rest, account.id, { login_name: phone })
+    } else if (account && !readAccountPhone(account)) {
+      await updateAccount(rest, account.id, contactFields(account, { phone }))
       account = (await findAccountById(rest, account.id))!
     }
   }
@@ -931,7 +1002,10 @@ export async function mpAuthWxLogin(
     isNew = true
     account = await insertAccount(rest, {
       openid,
-      login_name: phone || null,
+      ...contactFields(
+        { login_name: null, phone: null, email: null } as MpAccountRow,
+        { phone: phone || null },
+      ),
       active_role: role,
       wx_nick_name: input.wxNickName || '',
       wx_avatar_url: input.wxAvatarUrl || '',
@@ -1060,108 +1134,25 @@ export async function mpAuthDyLogin(
   return { token, account, isNew }
 }
 
-async function mergeMpAccountIntoPhoneHolder(
-  rest: SupabaseRest,
-  supabaseUrl: string,
-  serviceRole: string,
-  source: MpAccountRow,
-  target: MpAccountRow,
-  platform: 'wx' | 'dy',
-): Promise<MpAccountRow> {
-  if (source.id === target.id) return target
-  const patch: Record<string, unknown> = {}
-  const sourceClear: Record<string, unknown> = {}
-  const srcWx = String(source.openid || '').trim()
-  const srcDy = String(source.dy_openid || '').trim() || (platform === 'dy' ? srcWx : '')
-  const tgtWx = String(target.openid || '').trim()
-  const tgtDy = String(target.dy_openid || '').trim()
-
-  if (platform === 'wx' && srcWx) {
-    if (tgtWx && tgtWx !== srcWx) throw new Error('wx_openid_conflict')
-    if (!tgtWx) {
-      patch.openid = srcWx
-      sourceClear.openid = null
-    }
-  }
-  if (platform === 'dy' && srcDy) {
-    if (tgtDy && tgtDy !== srcDy) throw new Error('dy_openid_conflict')
-    if (!tgtDy) {
-      patch.dy_openid = srcDy
-      sourceClear.dy_openid = null
-      if (!String(source.dy_openid || '').trim() && srcWx) sourceClear.openid = null
-    }
-  }
-  if (!tgtDy && srcDy && platform === 'wx' && !patch.dy_openid) {
-    patch.dy_openid = srcDy
-    sourceClear.dy_openid = null
-  }
-
-  const fill = (key: keyof MpAccountRow) => {
-    const t = target[key]
-    const s = source[key]
-    if ((t == null || t === '') && s != null && s !== '') patch[key as string] = s
-  }
-  fill('lingqi_talent_id')
-  fill('lingqi_pr_id')
-  fill('registry_member_id')
-  fill('registry_pr_id')
-  if (!String(target.wx_nick_name || '').trim() && source.wx_nick_name) {
-    patch.wx_nick_name = source.wx_nick_name
-  }
-  if (!String(target.wx_avatar_url || '').trim() && source.wx_avatar_url) {
-    patch.wx_avatar_url = source.wx_avatar_url
-  }
-  if (!target.password_hash && source.password_hash) {
-    patch.password_hash = source.password_hash
-    patch.password_salt = source.password_salt
-  }
-
-  if (Object.keys(sourceClear).length) {
-    await updateAccount(rest, source.id, sourceClear)
-  }
-  if (Object.keys(patch).length) {
-    await updateAccount(rest, target.id, patch)
-  }
-  await deleteAccountById(rest, source.id)
-  let merged = (await findAccountById(rest, target.id))!
-  const role: MpAccountRole = merged.active_role === 'pr' ? 'pr' : 'talent'
-  merged = await provisionRegistryForAccount(
-    supabaseUrl,
-    serviceRole,
-    merged,
-    role,
-    merged.wx_nick_name || '',
-    merged.wx_avatar_url || '',
-  )
-  return merged
-}
-
-/** 首次 OAuth 登录后绑定手机号（用户确认）；同号合并微信/抖音为同一 mp_accounts */
+/** 首次 OAuth 登录后绑定手机号。号码已被其他账号占用时拒绝，不合并、不删除。 */
 export async function mpAuthBindPhoneLogin(
   supabaseUrl: string,
   serviceRole: string,
   accountId: string,
   phone: string,
-  platform: 'wx' | 'dy',
+  _platform: 'wx' | 'dy',
 ): Promise<{ token: string; account: MpAccountRow }> {
+  void _platform
   const rest = restClient(supabaseUrl, serviceRole)
   const phoneNorm = normalizeMpLoginPhone(phone)
   if (!phoneNorm) throw new Error('invalid_phone')
   let current = await findAccountById(rest, accountId)
   if (!current) throw new Error('account_not_found')
 
-  const holder = await findAccountByLoginName(rest, phoneNorm)
-  if (holder && holder.id !== accountId) {
-    current = await mergeMpAccountIntoPhoneHolder(
-      rest,
-      supabaseUrl,
-      serviceRole,
-      current,
-      holder,
-      platform,
-    )
-  } else if (!isValidMpLoginPhone(String(current.login_name || ''))) {
-    await updateAccount(rest, accountId, { login_name: phoneNorm })
+  const holder = await findAccountByPhone(rest, phoneNorm)
+  if (holder && holder.id !== accountId) throw new Error('phone_taken')
+  if (!readAccountPhone(current)) {
+    await updateAccount(rest, accountId, contactFields(current, { phone: phoneNorm }))
     current = (await findAccountById(rest, accountId))!
     const role: MpAccountRole = current.active_role === 'pr' ? 'pr' : 'talent'
     current = await provisionRegistryForAccount(
@@ -1188,7 +1179,7 @@ export async function mpAuthPasswordLogin(
   const rest = restClient(supabaseUrl, serviceRole)
   const name = normalizeMpLoginName(loginName)
   if (!name || !password) throw new Error('invalid_credentials')
-  let account = await findAccountByLoginName(rest, name)
+  let account = await findAccountForPassword(rest, name)
   if (!account) throw new Error('invalid_credentials')
   if (!account.password_hash || !account.password_salt) throw new Error('account_no_password')
   if (!verifyPassword(password, account.password_hash, account.password_salt)) {
@@ -1212,7 +1203,7 @@ export async function mpAuthSmsLogin(
   const code = String(smsCode || '').trim()
   if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
   if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
-  let account = await findAccountByLoginName(rest, phoneNorm)
+  let account = await findAccountByPhone(rest, phoneNorm)
   if (!account) throw new Error('phone_not_registered')
   account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
   const token = await createSession(rest, account.id)
@@ -1236,7 +1227,7 @@ export async function mpAuthEmailLogin(
   const code = String(emailCode || '').trim()
   if (!/^\d{6}$/.test(code)) throw new Error('invalid_email_code')
   if (!verifyAuthEmailCode(mail, code)) throw new Error('email_code_invalid')
-  let account = await findAccountByLoginName(rest, mail)
+  let account = await findAccountByEmail(rest, mail)
   if (!account) throw new Error('email_not_registered')
   account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
   const token = await createSession(rest, account.id)
@@ -1262,13 +1253,13 @@ export async function mpAuthEmailRegister(
   const password = String(input.password || '')
   if (password.length < 6) throw new Error('invalid_password')
   if (!verifyAuthEmailCode(mail, emailCode)) throw new Error('email_code_invalid')
-  const existing = await findAccountByLoginName(rest, mail)
+  const existing = await findAccountByEmail(rest, mail)
   if (existing) throw new Error('email_taken')
   const role: MpAccountRole = input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent'
   const { hash, salt } = hashPassword(password)
   let account = await insertAccount(rest, {
     openid: null,
-    login_name: mail,
+    ...contactFields({ login_name: null, phone: null, email: null } as MpAccountRow, { email: mail }),
     password_hash: hash,
     password_salt: salt,
     active_role: role,
@@ -1290,15 +1281,16 @@ export async function mpAuthEmailRegister(
   return { token, account, isNew: true }
 }
 
-/** 微信/抖音登录后绑定邮箱；同邮箱合并为同一账号 */
+/** 微信/抖音登录后绑定邮箱。邮箱已被其他账号占用时拒绝，不合并、不删除。 */
 export async function mpAuthBindEmailLogin(
   supabaseUrl: string,
   serviceRole: string,
   accountId: string,
   email: string,
   emailCode: string,
-  platform: 'wx' | 'dy',
+  _platform: 'wx' | 'dy',
 ): Promise<{ token: string; account: MpAccountRow }> {
+  void _platform
   const rest = restClient(supabaseUrl, serviceRole)
   const mail = normalizeMpLoginEmail(email)
   if (!mail) throw new Error('invalid_email')
@@ -1307,11 +1299,10 @@ export async function mpAuthBindEmailLogin(
   if (!verifyAuthEmailCode(mail, code)) throw new Error('email_code_invalid')
   let current = await findAccountById(rest, accountId)
   if (!current) throw new Error('account_not_found')
-  const holder = await findAccountByLoginName(rest, mail)
-  if (holder && holder.id !== accountId) {
-    current = await mergeMpAccountIntoPhoneHolder(rest, supabaseUrl, serviceRole, current, holder, platform)
-  } else if (!isMpContactBound(String(current.login_name || ''))) {
-    await updateAccount(rest, accountId, { login_name: mail })
+  const holder = await findAccountByEmail(rest, mail)
+  if (holder && holder.id !== accountId) throw new Error('email_taken')
+  if (!readAccountEmail(current)) {
+    await updateAccount(rest, accountId, contactFields(current, { email: mail }))
     current = (await findAccountById(rest, accountId))!
   }
   if (mpAccountNeedsPhoneBind(current)) throw new Error('email_bind_failed')
@@ -1319,7 +1310,7 @@ export async function mpAuthBindEmailLogin(
   return { token, account: current }
 }
 
-/** 微信/抖音登录后用短信绑定手机号（校验验证码后再合并） */
+/** 微信/抖音登录后用短信绑定手机号。号码已被占用时拒绝。 */
 export async function mpAuthBindPhoneSms(
   supabaseUrl: string,
   serviceRole: string,
@@ -1352,12 +1343,12 @@ export async function mpAuthRebindPhoneSms(
   if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
   const current = await findAccountById(rest, accountId)
   if (!current) throw new Error('account_not_found')
-  const currentPhone = normalizeMpLoginPhone(String(current.login_name || ''))
+  const currentPhone = readAccountPhone(current)
   if (!currentPhone) throw new Error('account_phone_missing')
   if (currentPhone === phoneNorm) throw new Error('phone_unchanged')
-  const holder = await findAccountByLoginName(rest, phoneNorm)
+  const holder = await findAccountByPhone(rest, phoneNorm)
   if (holder && holder.id !== accountId) throw new Error('phone_taken')
-  await updateAccount(rest, accountId, { login_name: phoneNorm })
+  await updateAccount(rest, accountId, contactFields(current, { phone: phoneNorm }))
   const next = (await findAccountById(rest, accountId))!
   const token = await createSession(rest, next.id)
   return { token, account: next }
@@ -1379,12 +1370,12 @@ export async function mpAuthRebindEmailLogin(
   if (!verifyAuthEmailCode(mail, code)) throw new Error('email_code_invalid')
   const current = await findAccountById(rest, accountId)
   if (!current) throw new Error('account_not_found')
-  const currentMail = normalizeMpLoginEmail(String(current.login_name || ''))
+  const currentMail = readAccountEmail(current)
   if (!currentMail) throw new Error('account_email_missing')
   if (currentMail === mail) throw new Error('email_unchanged')
-  const holder = await findAccountByLoginName(rest, mail)
+  const holder = await findAccountByEmail(rest, mail)
   if (holder && holder.id !== accountId) throw new Error('email_taken')
-  await updateAccount(rest, accountId, { login_name: mail })
+  await updateAccount(rest, accountId, contactFields(current, { email: mail }))
   const next = (await findAccountById(rest, accountId))!
   const token = await createSession(rest, next.id)
   return { token, account: next }
@@ -1408,7 +1399,7 @@ export async function mpAuthChangePasswordBySms(
   if (pwd.length < 6) throw new Error('invalid_password')
   const cur = await findAccountById(rest, accountId)
   if (!cur) throw new Error('account_not_found')
-  const accountPhone = normalizeMpLoginPhone(String(cur.login_name || ''))
+  const accountPhone = readAccountPhone(cur)
   if (!accountPhone) throw new Error('account_phone_missing')
   if (phoneNorm !== accountPhone) throw new Error('phone_mismatch')
   if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
@@ -1417,7 +1408,7 @@ export async function mpAuthChangePasswordBySms(
 }
 
 function accountLoginPhone(account: MpAccountRow): string {
-  return normalizeMpLoginPhone(String(account.login_name || '')) || ''
+  return readAccountPhone(account)
 }
 
 /** 注销验证码只发到当前账号绑定的手机号。 */
@@ -1514,14 +1505,14 @@ export async function mpAuthPhoneRegister(
   if (password.length < 6) throw new Error('invalid_password')
   if (!(await verifyAuthSmsCode(phone, smsCode))) throw new Error('sms_code_invalid')
 
-  const existing = await findAccountByLoginName(rest, phone)
+  const existing = await findAccountByPhone(rest, phone)
   if (existing) throw new Error('login_name_taken')
 
   const role: MpAccountRole = input.workIdentity === 'pr' || input.role === 'pr' ? 'pr' : 'talent'
   const { hash, salt } = hashPassword(password)
   let account = await insertAccount(rest, {
     openid: null,
-    login_name: phone,
+    ...contactFields({ login_name: null, phone: null, email: null } as MpAccountRow, { phone }),
     password_hash: hash,
     password_salt: salt,
     active_role: role,
@@ -1575,23 +1566,32 @@ export async function mpAuthSetLoginCredentials(
   const name = normalizeMpLoginName(loginName)
   if (!name) throw new Error('invalid_login_name')
   const cur = await findAccountById(rest, accountId)
-  const curName = String(cur?.login_name || '').trim()
+  if (!cur) throw new Error('account_not_found')
+  const curName = String(cur.login_name || '').trim()
   if (name !== curName && !isMpContactBound(name)) throw new Error('invalid_login_name')
-  let existing = await findAccountByLoginName(rest, name)
-  if (existing && existing.id !== accountId) {
+  const asPhone = normalizeMpLoginPhone(name)
+  const asEmail = asPhone ? '' : normalizeMpLoginEmail(name) || ''
+  let existing = asPhone
+    ? await findAccountByPhone(rest, asPhone)
+    : asEmail
+      ? await findAccountByEmail(rest, asEmail)
+      : await findAccountByLoginName(rest, name)
+  if (existing && existing.id !== accountId && asPhone) {
     const reclaimed = await reclaimStaleLoginNameHolder(
       rest,
       supabaseUrl,
       serviceRole,
       existing,
-      name,
+      asPhone,
     )
-    if (reclaimed) {
-      existing = await findAccountByLoginName(rest, name)
-    }
-    if (existing && existing.id !== accountId) throw new Error('login_name_taken')
+    if (reclaimed) existing = await findAccountByPhone(rest, asPhone)
   }
-  const patch: Record<string, unknown> = { login_name: name }
+  if (existing && existing.id !== accountId) throw new Error('login_name_taken')
+  const patch: Record<string, unknown> = asPhone
+    ? contactFields(cur, { phone: asPhone })
+    : asEmail
+      ? contactFields(cur, { email: asEmail })
+      : { login_name: name }
   const pwd = String(password || '')
   if (pwd.length > 0) {
     if (pwd.length < 6) throw new Error('invalid_password')

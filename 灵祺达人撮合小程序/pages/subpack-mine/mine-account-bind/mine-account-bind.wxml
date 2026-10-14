@@ -1,6 +1,6 @@
 <page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
 <view class="{{lqAccentClass}} page foot-col" style="{{lqPageStyle}}">
-  <text class="lead">和商家小程序一样：手机号、邮箱用验证码绑定。同一号码会把微信和抖音并成一个账号。</text>
+  <text class="lead">手机号和邮箱可以同时绑定，用验证码确认。已被其他账号占用时不会自动合并，请改用那个账号登录。</text>
   <view class="grid">
     <view class="cell {{ids.wechat ? 'on' : ''}}" data-id="wechat" bindtap="onPick">
       <image class="cell-logo" src="/images/platforms/wechat.png" mode="aspectFit" />

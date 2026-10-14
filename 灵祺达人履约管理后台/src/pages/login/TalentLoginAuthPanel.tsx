@@ -288,7 +288,7 @@ export default function TalentLoginAuthPanel({
         >
           <p className="text-sm font-semibold text-slate-800">绑定手机号或邮箱</p>
           <p className="text-xs leading-relaxed text-slate-500">
-            同一手机号或邮箱下的微信、抖音会并成一个账号，之后以该号码登录。
+            绑定后手机号和邮箱都留在当前账号上。若已被其他账号占用，请改用那个账号登录。
           </p>
           <div className="flex gap-2">
             <button type="button" className={bindKind === 'phone' ? 'text-sm font-semibold text-violet-700' : 'text-sm text-slate-500'} onClick={() => setBindKind('phone')}>手机号</button>
