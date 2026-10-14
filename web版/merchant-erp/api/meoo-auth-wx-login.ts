@@ -50,6 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       wxNickName?: string
       wxAvatarUrl?: string
       phoneCode?: string
+      confirmRebind?: boolean
     }
     const out = await signInWithWxLoginCode({
       code: String(body.code ?? ''),
@@ -57,12 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       wxNickName: typeof body.wxNickName === 'string' ? body.wxNickName : undefined,
       wxAvatarUrl: typeof body.wxAvatarUrl === 'string' ? body.wxAvatarUrl : undefined,
       phoneCode: typeof body.phoneCode === 'string' ? body.phoneCode : undefined,
+      confirmRebind: body.confirmRebind === true,
     })
     if (!out.ok) {
       const status =
         out.error === 'wx_not_configured'
           ? 503
-          : out.error === 'wx_openid_already_bound'
+          : out.error === 'wx_openid_already_bound' || out.error === 'wx_rebind_confirm'
             ? 409
             : 400
       sendJson(res, status, {
@@ -70,6 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         error: out.error,
         message: out.message || wxLoginErrorMessage(out.error, out.detail),
         detail: out.detail,
+        needConfirmRebind: out.needConfirmRebind === true,
       })
       return
     }

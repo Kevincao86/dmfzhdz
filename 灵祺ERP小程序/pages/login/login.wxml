@@ -158,7 +158,7 @@
       open-type="getPhoneNumber"
       bindgetphonenumber="onGetPhoneNumber"
     >
-      <text>微信一键登录</text>
+      <text>{{confirmRebind ? '进入该商家' : '微信一键登录'}}</text>
     </button>
     <button class="btn-v2 login-cancel" disabled="{{busy || wxBusy}}" bindtap="onLeaveLogin">返回，暂不登录</button>
   </view>

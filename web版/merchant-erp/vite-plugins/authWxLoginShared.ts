@@ -10,6 +10,7 @@ import {
   createAdminSessionForUserId,
   findAuthUserByPhone,
   loginNameToTenantEmail,
+  phoneFromUserRecord,
   smsLoginErrorMessage,
 } from './authSmsAuthShared.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
@@ -28,7 +29,7 @@ export type WxLoginResult =
       isNew: boolean
       needsPhoneBind: boolean
     }
-  | { ok: false; error: string; message: string; detail?: string }
+  | { ok: false; error: string; message: string; detail?: string; needConfirmRebind?: boolean }
 
 function wxOpenIdFromUserRecord(user: Record<string, unknown>): string {
   const meta = user.user_metadata as Record<string, unknown> | undefined
@@ -234,6 +235,24 @@ function randomPassword(): string {
   return randomBytes(12).toString('base64url')
 }
 
+function accountTailHint(phone: string, loginName: string): string {
+  const digits = String(phone || '').replace(/\D/g, '')
+  const mobile = /^1\d{10}$/.test(digits)
+    ? digits
+    : /^1\d{10}$/.test(String(loginName || '').trim())
+      ? String(loginName || '').trim()
+      : ''
+  if (mobile) return `尾号 ${mobile.slice(-4)}`
+  const name = String(loginName || '').trim()
+  if (name) return `账号 ${name.slice(0, 2)}***`
+  return '另一家'
+}
+
+function wxRebindConfirmMessage(wxPhone: string, wxLoginName: string, authPhone: string, phoneHadOtherWx: boolean): string {
+  const extra = phoneHadOtherWx ? '该手机号商家上原来的微信会解开。' : ''
+  return `这个微信现在绑在商家（${accountTailHint(wxPhone, wxLoginName)}）上，你刚授权的是另一家（${accountTailHint(authPhone, authPhone)}）。进入这家后，微信会改绑过来。原来那家仍可用密码或短信登录。${extra}`
+}
+
 function loginNameFromOpenId(openid: string): string {
   const clean = openid.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
   const tail = (clean || 'user').slice(-10)
@@ -339,6 +358,8 @@ export async function signInWithWxLoginCode(input: {
   wxNickName?: string
   wxAvatarUrl?: string
   phoneCode?: string
+  /** 用户已确认：以本次授权手机号的商家为准，把当前微信从旧商家改绑过来 */
+  confirmRebind?: boolean
 }): Promise<WxLoginResult> {
   const code = String(input.code || '').trim()
   if (!code && !String(input.stableDevOpenId || '').trim()) {
@@ -382,16 +403,29 @@ export async function signInWithWxLoginCode(input: {
 
   if (phoneUser && wxUser && phoneUser.userId !== wxUser.userId) {
     const phoneFull = await fetchAuthUserById(phoneUser.userId)
+    const wxFull = await fetchAuthUserById(wxUser.userId)
     const phoneWx = phoneFull ? wxOpenIdFromUserRecord(phoneFull) : ''
-    if (phoneWx && phoneWx !== openid) {
+    const wxPhone = (wxFull ? phoneFromUserRecord(wxFull) : '') || ''
+    if (!input.confirmRebind) {
       return {
         ok: false,
-        error: 'wx_openid_already_bound',
-        message: wxLoginErrorMessage('wx_openid_already_bound'),
+        error: 'wx_rebind_confirm',
+        needConfirmRebind: true,
+        message: wxRebindConfirmMessage(wxPhone, wxUser.loginName, phone, Boolean(phoneWx && phoneWx !== openid)),
       }
     }
+    const cleared = await patchUserMetadata(wxUser.userId, {
+      [ERP_WX_OPENID_META_KEY]: '',
+      wx_openid: '',
+    })
+    if (!cleared.ok) {
+      return { ok: false, error: 'unbind_failed', message: '暂时无法改绑微信，请稍后重试' }
+    }
     const bind = await bindErpWxOpenIdToAuthUser(phoneUser.userId, openid, profile)
-    if (!bind.ok) return { ok: false, error: bind.error, message: bind.message }
+    if (!bind.ok) {
+      await bindErpWxOpenIdToAuthUser(wxUser.userId, openid, profile)
+      return { ok: false, error: bind.error, message: bind.message }
+    }
     user = phoneUser
   } else if (phoneUser && !wxUser) {
     const bind = await bindErpWxOpenIdToAuthUser(phoneUser.userId, openid, profile)

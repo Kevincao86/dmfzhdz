@@ -90,6 +90,7 @@ Page({
     logoSrc: assetUrl('logo.png'),
     pickedId: '',
     wxPrivacyPending: false,
+    confirmRebind: false,
     hasSession: false,
     navBandStyle: '',
     landingWays: LANDING_WAYS,
@@ -342,7 +343,7 @@ Page({
     } else if (id === 'reg') {
       this.setData({ pickedId: 'reg', mode: 'register' })
     } else if (id === 'wx') {
-      this.setData({ pickedId: 'wx', mode: 'login', loginMethod: 'password' })
+      this.setData({ pickedId: 'wx', mode: 'login', loginMethod: 'password', confirmRebind: false })
       this._syncModeHint()
       if (this.data.legalAgreed) this._refreshWxPrivacy()
       return
@@ -520,7 +521,7 @@ Page({
       this.setData({ err: '未能读取微信手机号，请再点一次「微信一键登录」' })
       return
     }
-    void this._doWxLogin(phoneCode)
+    void this._doWxLogin(phoneCode, this.data.confirmRebind === true)
   },
 
   onGetPhoneNumberRegister(e) {
@@ -583,7 +584,26 @@ Page({
     }
   },
 
-  async _doWxLogin(phoneCode) {
+  _askWxRebind(message) {
+    wx.showModal({
+      title: '进入该手机号商家',
+      content: message || '这个微信绑在另一家商家上。确认后将改绑到刚授权的手机号，并进入该商家。原来那家仍可用密码或短信登录。',
+      confirmText: '进入这家',
+      cancelText: '取消',
+      success: (res) => {
+        if (!res || !res.confirm) {
+          this.setData({ confirmRebind: false, err: '' })
+          return
+        }
+        this.setData({
+          confirmRebind: true,
+          err: '请再点一次登录按钮，授权手机号后进入该商家',
+        })
+      },
+    })
+  },
+
+  async _doWxLogin(phoneCode, confirmRebind) {
     if (this.data.busy || this.data.wxBusy) return
     if (!tenantAuthApi.apiRoot()) {
       this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用快捷登录' })
@@ -601,11 +621,18 @@ Page({
         code: wxSession.code,
         stableDevOpenId: wxSession.stableDevOpenId,
         phoneCode: phoneAuthCode,
+        confirmRebind: confirmRebind === true,
       })
       if (!r.ok || !r.access_token) {
+        if (r.error === 'wx_rebind_confirm' || r.needConfirmRebind) {
+          this.setData({ err: '', confirmRebind: false })
+          this._askWxRebind(r.message)
+          return
+        }
         this.setData({
           err: r.message || r.detail || '快捷登录失败',
           infoHint: r.isNew ? '' : this.data.infoHint,
+          confirmRebind: false,
         })
         return
       }
@@ -613,10 +640,11 @@ Page({
         { access_token: r.access_token, refresh_token: r.refresh_token || '' },
         r.loginName || '',
       )
+      this.setData({ confirmRebind: false })
       this._goHome()
     } catch (e) {
       const msg = e && e.message ? e.message : '快捷登录失败'
-      this.setData({ err: msg })
+      this.setData({ err: msg, confirmRebind: false })
     } finally {
       this.setData({ wxBusy: false })
     }
