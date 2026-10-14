@@ -63,7 +63,15 @@
 
 .mine-page.lq-accent-on .wb-name,
 .mine-page.lq-accent-on .wb-nick-input {
-  color: #fff;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+}
+
+/* 安卓原生 input 不吃 transparent，浅色底会把白字昵称盖住。用顶栏同色铺平。 */
+.mine-page.lq-accent-on .wb-nick-input {
+  background-color: var(--lq-primary) !important;
+  background: var(--lq-primary) !important;
+  border-color: transparent !important;
 }
 
 .mine-page.lq-accent-on .wb-sub,
@@ -134,11 +142,15 @@
 /* —— 工作台 Hero —— */
 .wb-hero {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   padding-bottom: 20rpx;
   border-radius: 0 0 36rpx 36rpx;
   box-shadow: var(--lq-shadow-header);
   background: var(--lq-gradient-header);
+}
+
+.mine-page .wb-hero.lq-hero-header {
+  overflow: visible;
 }
 
 .wb-hero-inner {
@@ -353,13 +365,18 @@
 
 .wb-profile-meta {
   flex: 1;
+  width: 0;
   min-width: 0;
 }
 
 .wb-name-row {
+  position: relative;
+  z-index: 20;
   display: flex;
   align-items: center;
+  width: 100%;
   min-width: 0;
+  overflow: visible;
   padding-right: 8rpx;
 }
 
@@ -374,15 +391,23 @@
 }
 
 .wb-nick-input {
+  display: block;
+  flex: 1 1 auto;
   width: 100%;
-  min-width: 0;
+  min-width: 160rpx;
   max-width: 100%;
-  height: 48rpx;
+  height: 80rpx;
+  min-height: 80rpx;
+  line-height: 80rpx;
   padding: 0;
+  margin: 0;
+  box-sizing: border-box;
   font-size: 34rpx;
   font-weight: 700;
   color: #fff;
   background: transparent;
+  background-color: transparent;
+  border: none;
 }
 
 .wb-tag-row {

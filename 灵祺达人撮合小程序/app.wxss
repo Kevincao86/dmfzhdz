@@ -651,3 +651,50 @@ picker {
 .rec-ai-card.is-expanded {
   visibility: hidden;
 }
+
+/* 暗黑把字刷成浅色。这些块仍是浅底，改成深底后字才分得开。 */
+.lq-accent-dark .plate,
+.lq-accent-dark .plan,
+.lq-accent-dark .plan-block,
+.lq-accent-dark .home-desk__kpi,
+.lq-accent-dark .home-desk__cta,
+.lq-accent-dark .btn-sub,
+.lq-accent-dark .fit-read {
+  background-color: #3f3f46 !important;
+}
+
+.lq-accent-dark .plan,
+.lq-accent-dark .plan-block,
+.lq-accent-dark .btn-sub,
+.lq-accent-dark .fit-read {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.lq-accent-dark .plate text,
+.lq-accent-dark .plan text,
+.lq-accent-dark .plan-block text,
+.lq-accent-dark .home-desk__kpi text,
+.lq-accent-dark .home-desk__cta,
+.lq-accent-dark .fit-read,
+.lq-accent-dark .btn-sub {
+  color: #f4f4f5 !important;
+}
+
+.lq-accent-dark .plate .plate-line,
+.lq-accent-dark .plan-block .plan-text {
+  color: #d4d4d8 !important;
+}
+
+.lq-accent-dark .plan-block .plan-tag {
+  color: #18181b !important;
+  background-color: #e4e4e7 !important;
+}
+
+/* 浅色主题把选中底改成浅卡片后，白字会融进背景 */
+.lq-accent-on:not(.lq-accent-dark) .plat--on,
+.lq-accent-on:not(.lq-accent-dark) .btn-main,
+.lq-accent-on:not(.lq-accent-dark) .btn-primary {
+  background-color: var(--lq-primary) !important;
+  border-color: var(--lq-primary) !important;
+  color: #ffffff !important;
+}
