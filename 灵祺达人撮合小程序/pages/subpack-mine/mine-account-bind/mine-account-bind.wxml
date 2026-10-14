@@ -1,6 +1,6 @@
 <page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
 <view class="{{lqAccentClass}} page foot-col" style="{{lqPageStyle}}">
-  <text class="lead">手机号和邮箱可以同时绑定，用验证码确认。已被其他账号占用时不会自动合并，请改用那个账号登录。</text>
+  <text class="lead">手机号和邮箱可以同时绑定。若该微信、手机号、抖音或邮箱下已有账号，会先请你确认是否合并；确认后验证对方那个登录方式，通过后才并入当前登录账号，对方账号隐藏。</text>
   <view class="grid">
     <view class="cell {{ids.wechat ? 'on' : ''}}" data-id="wechat" bindtap="onPick">
       <image class="cell-logo" src="/images/platforms/wechat.png" mode="aspectFit" />
@@ -37,6 +37,19 @@
       <button class="ghost" size="mini" disabled="{{cooldown > 0}}" bindtap="onSend">{{cooldown > 0 ? cooldown + 's' : '获取验证码'}}</button>
     </view>
     <button class="submit" bindtap="onSubmit" disabled="{{busy}}">{{busy ? '提交中…' : (editing ? '确定' : '绑定')}}</button>
+  </view>
+  <view class="mask" wx:if="{{mergeOpen}}">
+    <view class="dialog">
+      <text class="dialog-title">验证{{mergeLabel}}后合并</text>
+      <text class="dialog-body">当前登录账号为主账号。请验证该{{mergeLabel}}，通过后才会把对方账号的登录方式并入并隐藏。</text>
+      <input class="input" disabled value="{{value}}" />
+      <view class="code-row">
+        <input class="input code" placeholder="6 位验证码" value="{{code}}" bindinput="onCode" />
+        <button class="ghost" size="mini" disabled="{{cooldown > 0}}" bindtap="onSend">{{cooldown > 0 ? cooldown + 's' : '获取验证码'}}</button>
+      </view>
+      <button class="submit" bindtap="onSubmit" disabled="{{busy}}">{{busy ? '合并中…' : '验证并合并'}}</button>
+      <button class="submit submit--ghost" bindtap="onMergeCancel">取消</button>
+    </view>
   </view>
   <text class="err" wx:if="{{err}}">{{err}}</text>
   <site-icp-footer />

@@ -172,20 +172,29 @@ async function sendEmailCode(email) {
   return authPost('email_send', { email: String(email || '').trim() })
 }
 
-async function bindPhoneSms({ phone, smsCode, platform }) {
+async function bindConflictCheck(kind, value) {
+  return authPost('bind_conflict_check', {
+    kind: String(kind || ''),
+    value: String(value || '').trim(),
+  })
+}
+
+async function bindPhoneSms({ phone, smsCode, platform, merge }) {
   const data = await authPost('bind_phone_sms', {
     phone: String(phone || '').trim(),
     smsCode: String(smsCode || '').trim(),
     platform: platform === 'dy' ? 'dy' : 'wx',
+    merge: merge === true,
   })
   return accountMemberSync.afterAuthSuccess(data)
 }
 
-async function bindEmailLogin({ email, emailCode, platform }) {
+async function bindEmailLogin({ email, emailCode, platform, merge }) {
   const data = await authPost('bind_email_login', {
     email: String(email || '').trim(),
     emailCode: String(emailCode || '').trim(),
     platform: platform === 'dy' ? 'dy' : 'wx',
+    merge: merge === true,
   })
   return accountMemberSync.afterAuthSuccess(data)
 }
@@ -275,13 +284,14 @@ async function updateWxProfile(wxNickName, wxAvatarUrl) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
-async function bindWxOpenId() {
+async function bindWxOpenId(opts = {}) {
   const code = await new Promise((resolve, reject) => {
     wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
   })
   if (!code) throw new Error('wx_login_failed')
   const data = await authPost('bind_wx_openid', {
     code,
+    merge: opts.merge === true,
     stableDevOpenId: accountMemberSync.ensureStableDevOpenId(),
   })
   return accountMemberSync.afterAuthSuccess(data)
@@ -294,6 +304,7 @@ module.exports = {
   sendEmailCode,
   bindPhoneSms,
   bindEmailLogin,
+  bindConflictCheck,
   rebindPhoneSms,
   rebindEmailLogin,
   phoneRegister,

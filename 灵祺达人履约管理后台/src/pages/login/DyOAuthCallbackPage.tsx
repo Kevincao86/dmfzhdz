@@ -3,12 +3,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { resolveDyOAuthCallbackMode } from '@merchant/lib/dyOAuthCallbackMode'
 import { cn } from '../../cn'
 import { formatMpApiErr } from '../../lib/mpApiErrors'
-import { dyOAuthComplete } from '../../lib/mpApi'
+import { bindDyMerge, dyOAuthComplete } from '../../lib/mpApi'
 import { applyWorkIdentityAfterLogin } from '../../lib/switchWorkIdentity'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../../lib/brand'
 
-type View = 'loading' | 'whitelist_ok' | 'whitelist_warn' | 'error'
+type View = 'loading' | 'whitelist_ok' | 'whitelist_warn' | 'merge' | 'error'
 
 function parseWorkIdentity(raw: string | null | undefined): MpWorkIdentity {
   const v = String(raw || '').trim()
@@ -21,6 +21,8 @@ export default function DyOAuthCallbackPage() {
   const [params] = useSearchParams()
   const [view, setView] = useState<View>('loading')
   const [err, setErr] = useState('')
+  const [mergeTicket, setMergeTicket] = useState('')
+  const [mergeBusy, setMergeBusy] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.top && window.top !== window.self) {
@@ -46,6 +48,11 @@ export default function DyOAuthCallbackPage() {
       try {
         const r = await dyOAuthComplete(mode.code, mode.state)
         if (cancelled) return
+        if (r.mergeRequired) {
+          setMergeTicket(r.ticket)
+          setView('merge')
+          return
+        }
         const workIdentity = parseWorkIdentity(r.workIdentity)
         await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
         if (r.account.needsPhoneBind) {
@@ -104,6 +111,40 @@ export default function DyOAuthCallbackPage() {
               className="mt-6 inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
             >
               返回登录
+            </Link>
+          </>
+        ) : view === 'merge' ? (
+          <>
+            <p className="text-base font-semibold text-slate-900">该抖音已有账号</p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              请确认是否合并到当前登录账号。确认后才会合并，当前登录账号为主账号，对方抖音账号的登录方式会并入并隐藏。
+            </p>
+            <button
+              type="button"
+              disabled={mergeBusy}
+              className="mt-6 inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+              onClick={() => {
+                setMergeBusy(true)
+                void bindDyMerge(mergeTicket)
+                  .then(async (r) => {
+                    const workIdentity = parseWorkIdentity(r.account.workIdentity)
+                    await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
+                    nav('/hall', { replace: true })
+                  })
+                  .catch((e) => {
+                    setView('error')
+                    setErr(formatMpApiErr(e, '合并失败'))
+                  })
+                  .finally(() => setMergeBusy(false))
+              }}
+            >
+              {mergeBusy ? '合并中…' : '确认合并'}
+            </button>
+            <Link
+              to="/hall"
+              className="mt-3 block text-sm text-slate-500"
+            >
+              取消
             </Link>
           </>
         ) : view === 'error' ? (

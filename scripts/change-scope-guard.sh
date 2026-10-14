@@ -430,6 +430,8 @@ pages/login/login
 subpack-signup/signup/signup
 meoo-ops-mp-auth.ts
 change-scope-guard
+mpApi.ts
+DyOAuthCallbackPage
 PAT
       ;;
     ai_vision_workshop)

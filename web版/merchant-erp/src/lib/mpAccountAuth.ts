@@ -1140,13 +1140,180 @@ export async function mpAuthDyLogin(
   return { token, account, isNew }
 }
 
-/** 首次 OAuth 登录后绑定手机号。号码已被其他账号占用时拒绝，不合并、不删除。 */
+function accountWechatOpenId(account: MpAccountRow, boundDyOpenId = ''): string {
+  const oid = String(account.openid || '').trim()
+  if (!oid || oid.startsWith('dyweb_')) return ''
+  if (boundDyOpenId && oid === boundDyOpenId) return ''
+  return oid
+}
+
+function accountDouyinOpenId(account: MpAccountRow, boundDyOpenId = ''): string {
+  const dy = String(account.dy_openid || '').trim()
+  if (dy) return dy
+  const oid = String(account.openid || '').trim()
+  if (oid.startsWith('dyweb_')) return oid
+  if (boundDyOpenId && oid === boundDyOpenId) return oid
+  return ''
+}
+
+function maskBindSubject(kind: 'phone' | 'email' | 'wechat' | 'douyin', value: string): string {
+  if (kind === 'phone' && value.length >= 7) return `${value.slice(0, 3)}****${value.slice(-4)}`
+  if (kind === 'email') {
+    const at = value.indexOf('@')
+    if (at > 1) return `${value.slice(0, 1)}***${value.slice(at)}`
+  }
+  if (value.length > 6) return `${value.slice(0, 2)}***${value.slice(-2)}`
+  return value ? '已登记' : ''
+}
+
+/** 对方账号的登录方式并入当前登录账号，对方账号隐藏，不再能单独登录。 */
+async function mergeHolderIntoLoginAccount(
+  supabaseUrl: string,
+  serviceRole: string,
+  rest: SupabaseRest,
+  primaryId: string,
+  holder: MpAccountRow,
+  boundDyOpenId = '',
+): Promise<MpAccountRow> {
+  const primary = await findAccountById(rest, primaryId)
+  if (!primary) throw new Error('account_not_found')
+  if (holder.id === primary.id) return primary
+
+  const pairs = [
+    ['wechat', accountWechatOpenId(primary, boundDyOpenId), accountWechatOpenId(holder, boundDyOpenId)],
+    ['douyin', accountDouyinOpenId(primary, boundDyOpenId), accountDouyinOpenId(holder, boundDyOpenId)],
+    ['phone', readAccountPhone(primary), readAccountPhone(holder)],
+    ['email', readAccountEmail(primary), readAccountEmail(holder)],
+  ] as const
+  for (const [key, mine, theirs] of pairs) {
+    if (mine && theirs && mine !== theirs) throw new Error(`merge_subject_conflict_${key}`)
+  }
+
+  const nextPhone = readAccountPhone(primary) || readAccountPhone(holder)
+  const nextEmail = readAccountEmail(primary) || readAccountEmail(holder)
+  const nextOpenid = accountWechatOpenId(primary, boundDyOpenId) || accountWechatOpenId(holder, boundDyOpenId) || null
+  const nextDy = accountDouyinOpenId(primary, boundDyOpenId) || accountDouyinOpenId(holder, boundDyOpenId) || null
+  const adoptTalent = !String(primary.lingqi_talent_id || '').trim() && !!String(holder.lingqi_talent_id || '').trim()
+  const adoptPr = !String(primary.lingqi_pr_id || '').trim() && !!String(holder.lingqi_pr_id || '').trim()
+  const primaryPatch: Record<string, unknown> = {
+    ...contactFields(primary, { phone: nextPhone || null, email: nextEmail || null }),
+    openid: nextOpenid,
+    dy_openid: nextDy,
+  }
+  if (!primary.password_hash && holder.password_hash) {
+    primaryPatch.password_hash = holder.password_hash
+    primaryPatch.password_salt = holder.password_salt
+  }
+  if (!String(primary.wx_nick_name || '').trim() && holder.wx_nick_name) primaryPatch.wx_nick_name = holder.wx_nick_name
+  if (!String(primary.wx_avatar_url || '').trim() && holder.wx_avatar_url) primaryPatch.wx_avatar_url = holder.wx_avatar_url
+  if (adoptTalent) {
+    primaryPatch.lingqi_talent_id = holder.lingqi_talent_id
+    primaryPatch.registry_member_id = holder.registry_member_id
+  }
+  if (adoptPr) {
+    primaryPatch.lingqi_pr_id = holder.lingqi_pr_id
+    primaryPatch.registry_pr_id = holder.registry_pr_id
+  }
+
+  const movedOpenId = String(holder.openid || holder.dy_openid || '').trim()
+  await updateAccount(rest, holder.id, {
+    openid: null,
+    dy_openid: null,
+    phone: null,
+    email: null,
+    login_name: `merged:${holder.id}`,
+    password_hash: null,
+    password_salt: null,
+  })
+  await rest.delete(`/mp_auth_sessions?account_id=eq.${encodeURIComponent(holder.id)}`)
+  await updateAccount(rest, primary.id, primaryPatch)
+  const next = (await findAccountById(rest, primary.id))!
+  await hideMergedRegistrySubject(supabaseUrl, serviceRole, next, holder, adoptTalent, adoptPr, movedOpenId)
+  return next
+}
+
+/** 对方注册表身份保留，但去掉已并到主账号上的登录标识，避免下次登录被去重删掉。 */
+async function hideMergedRegistrySubject(
+  supabaseUrl: string,
+  serviceRole: string,
+  primary: MpAccountRow,
+  holder: MpAccountRow,
+  adoptTalent: boolean,
+  adoptPr: boolean,
+  movedOpenId: string,
+): Promise<void> {
+  const oid = String(movedOpenId || '').trim()
+  if (!oid) return
+  try {
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+    let changed = false
+    const primaryMemberId = String(primary.registry_member_id || '').trim()
+    const holderMemberId = String(holder.registry_member_id || '').trim()
+    for (const member of data.mpTalentMembers ?? []) {
+      if (String(member.wxOpenId || '').trim() !== oid) continue
+      if (adoptTalent && member.id === holderMemberId) {
+        const keep = String(primary.openid || primary.dy_openid || oid).trim()
+        if (member.wxOpenId !== keep) {
+          member.wxOpenId = keep
+          changed = true
+        }
+        continue
+      }
+      if (member.id === primaryMemberId) continue
+      member.wxOpenId = ''
+      changed = true
+    }
+    const primaryPrId = String(primary.registry_pr_id || '').trim()
+    const holderPrId = String(holder.registry_pr_id || '').trim()
+    for (const pr of data.mpPrUsers ?? []) {
+      if (String(pr.wxOpenId || '').trim() !== oid) continue
+      if (adoptPr && pr.id === holderPrId) continue
+      if (pr.id === primaryPrId) continue
+      pr.wxOpenId = ''
+      changed = true
+    }
+    if (changed) await io.save(data)
+  } catch {
+    /* 登录主体已合并；注册表隐藏失败时不回滚主账号 */
+  }
+}
+
+export async function mpAuthBindConflictCheck(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  kind: string,
+  value: string,
+): Promise<{ conflict: boolean; label: string; masked: string }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const current = await findAccountById(rest, accountId)
+  if (!current) throw new Error('account_not_found')
+  if (kind === 'phone') {
+    const phone = normalizeMpLoginPhone(value)
+    if (!phone) throw new Error('invalid_phone')
+    const holder = await findAccountByPhone(rest, phone)
+    const conflict = !!holder && holder.id !== accountId && readAccountPhone(current) !== phone
+    return { conflict, label: '手机号', masked: maskBindSubject('phone', phone) }
+  }
+  if (kind === 'email') {
+    const mail = normalizeMpLoginEmail(value)
+    if (!mail) throw new Error('invalid_email')
+    const holder = await findAccountByEmail(rest, mail)
+    const conflict = !!holder && holder.id !== accountId && readAccountEmail(current) !== mail
+    return { conflict, label: '邮箱', masked: maskBindSubject('email', mail) }
+  }
+  return { conflict: false, label: '', masked: '' }
+}
+
+/** 绑定手机号。号码已有账号时，须用户确认并完成短信验证后才并入当前登录账号。 */
 export async function mpAuthBindPhoneLogin(
   supabaseUrl: string,
   serviceRole: string,
   accountId: string,
   phone: string,
   _platform: 'wx' | 'dy',
+  merge = false,
 ): Promise<{ token: string; account: MpAccountRow }> {
   void _platform
   const rest = restClient(supabaseUrl, serviceRole)
@@ -1156,8 +1323,11 @@ export async function mpAuthBindPhoneLogin(
   if (!current) throw new Error('account_not_found')
 
   const holder = await findAccountByPhone(rest, phoneNorm)
-  if (holder && holder.id !== accountId) throw new Error('phone_taken')
-  if (!readAccountPhone(current)) {
+  if (holder && holder.id !== accountId) {
+    if (!merge) throw new Error('merge_confirm_phone')
+    if (readAccountPhone(current)) throw new Error('merge_subject_conflict_phone')
+    current = await mergeHolderIntoLoginAccount(supabaseUrl, serviceRole, rest, accountId, holder)
+  } else if (!readAccountPhone(current)) {
     await updateAccount(rest, accountId, contactFields(current, { phone: phoneNorm }))
     current = (await findAccountById(rest, accountId))!
     const role: MpAccountRole = current.active_role === 'pr' ? 'pr' : 'talent'
@@ -1317,7 +1487,7 @@ export async function mpAuthEmailRegister(
   return { token, account, isNew: true }
 }
 
-/** 微信/抖音登录后绑定邮箱。邮箱已被其他账号占用时拒绝，不合并、不删除。 */
+/** 绑定邮箱。邮箱已有账号时，须用户确认并完成邮箱验证码后才并入当前登录账号。 */
 export async function mpAuthBindEmailLogin(
   supabaseUrl: string,
   serviceRole: string,
@@ -1325,6 +1495,7 @@ export async function mpAuthBindEmailLogin(
   email: string,
   emailCode: string,
   _platform: 'wx' | 'dy',
+  merge = false,
 ): Promise<{ token: string; account: MpAccountRow }> {
   void _platform
   const rest = restClient(supabaseUrl, serviceRole)
@@ -1336,7 +1507,11 @@ export async function mpAuthBindEmailLogin(
   let current = await findAccountById(rest, accountId)
   if (!current) throw new Error('account_not_found')
   const holder = await findAccountByEmail(rest, mail)
-  if (holder && holder.id !== accountId) throw new Error('email_taken')
+  if (holder && holder.id !== accountId) {
+    if (!merge) throw new Error('merge_confirm_email')
+    if (readAccountEmail(current)) throw new Error('merge_subject_conflict_email')
+    current = await mergeHolderIntoLoginAccount(supabaseUrl, serviceRole, rest, accountId, holder)
+  }
   if (!readAccountEmail(current)) {
     await updateAccount(rest, accountId, contactFields(current, { email: mail }))
     current = (await findAccountById(rest, accountId))!
@@ -1346,7 +1521,7 @@ export async function mpAuthBindEmailLogin(
   return { token, account: current }
 }
 
-/** 微信/抖音登录后用短信绑定手机号。号码已被占用时拒绝。 */
+/** 短信验证通过后绑定手机号。确认合并时，验证码即对方手机号账号的验证。 */
 export async function mpAuthBindPhoneSms(
   supabaseUrl: string,
   serviceRole: string,
@@ -1354,13 +1529,14 @@ export async function mpAuthBindPhoneSms(
   phone: string,
   smsCode: string,
   platform: 'wx' | 'dy',
+  merge = false,
 ): Promise<{ token: string; account: MpAccountRow }> {
   const phoneNorm = normalizeMpLoginPhone(phone)
   if (!phoneNorm) throw new Error('invalid_phone')
   const code = String(smsCode || '').trim()
   if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
   if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
-  return mpAuthBindPhoneLogin(supabaseUrl, serviceRole, accountId, phoneNorm, platform)
+  return mpAuthBindPhoneLogin(supabaseUrl, serviceRole, accountId, phoneNorm, platform, merge)
 }
 
 /** 已绑定手机号后换成新号码。新号已被其他账号占用时不合并。 */
@@ -1676,6 +1852,7 @@ export async function mpAuthBindWxOpenId(
   accountId: string,
   code: string,
   stableDevOpenId?: string,
+  merge = false,
 ): Promise<MpAccountRow> {
   const rest = restClient(supabaseUrl, serviceRole)
   let account = await findAccountById(rest, accountId)
@@ -1685,7 +1862,10 @@ export async function mpAuthBindWxOpenId(
 
   const { openid } = await wxCodeToOpenId(code, stableDevOpenId)
   const holder = await findAccountByOpenId(rest, openid)
-  if (holder && holder.id !== accountId) throw new Error('wx_openid_already_bound')
+  if (holder && holder.id !== accountId) {
+    if (!merge) throw new Error('merge_confirm_wechat')
+    return mergeHolderIntoLoginAccount(supabaseUrl, serviceRole, rest, accountId, holder)
+  }
 
   await updateAccount(rest, accountId, { openid })
   account = (await findAccountById(rest, accountId))!
@@ -1923,16 +2103,18 @@ export async function mpAuthDyOAuthBegin(
   supabaseUrl: string,
   serviceRole: string,
   workIdentity: string,
-  opts?: { portal?: DyOAuthPortal; redirectUri?: string },
+  opts?: { portal?: DyOAuthPortal; redirectUri?: string; bindAccountId?: string },
 ): Promise<{ authorizeUrl: string; ticket: string; expiresAt: string; redirectUri: string; clientKey: string }> {
   if (!isDouyinWebOAuthConfigured()) throw new Error('dy_web_not_configured')
   const rest = restClient(supabaseUrl, serviceRole)
   const ticket = `dyoauth_${newScanTicket()}`
   const expiresAt = new Date(Date.now() + SCAN_TTL_SEC * 1000).toISOString()
+  const bindAccountId = String(opts?.bindAccountId || '').trim()
   const res = await rest.post('/mp_wx_scan_tickets', {
     ticket,
     status: 'pending',
     expires_at: expiresAt,
+    ...(bindAccountId ? { account_id: bindAccountId } : {}),
   })
   if (!res.ok) throw new Error('scan_ticket_create_failed')
   const portal: DyOAuthPortal =
@@ -1954,6 +2136,9 @@ export type MpAuthDyOAuthCompleteResult = {
   workIdentity: string
   isNew: boolean
   portal: DyOAuthPortal
+  mergeRequired?: boolean
+  ticket?: string
+  subjectLabel?: string
   erpSession?: {
     access_token: string
     refresh_token: string
@@ -2002,6 +2187,117 @@ async function tryErpSessionFromMpAccount(
   }
 }
 
+async function findDouyinHolder(rest: SupabaseRest, dyOpenId: string): Promise<MpAccountRow | null> {
+  return (await findAccountByDyOpenId(rest, dyOpenId)) || (await findAccountByOpenId(rest, dyOpenId))
+}
+
+/** 已登录账号发起的抖音扫码：空号直接绑上；已有账号则先停住，等用户确认后再合并。 */
+async function finishDouyinBindToLoginAccount(
+  supabaseUrl: string,
+  serviceRole: string,
+  rest: SupabaseRest,
+  ticket: string,
+  bindAccountId: string,
+  dyOpenId: string,
+  nickname: string,
+  avatarUrl: string,
+  workIdentity: string,
+): Promise<MpAuthDyOAuthCompleteResult> {
+  const primary = await findAccountById(rest, bindAccountId)
+  if (!primary) throw new Error('account_not_found')
+  const holder = await findDouyinHolder(rest, dyOpenId)
+  if (holder && holder.id !== primary.id) {
+    await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(ticket)}`, {
+      status: 'merge_pending',
+      openid: dyOpenId,
+      account_id: primary.id,
+    })
+    return {
+      token: '',
+      account: primary,
+      workIdentity,
+      isNew: false,
+      portal: 'xingxuan',
+      mergeRequired: true,
+      ticket,
+      subjectLabel: '抖音',
+    }
+  }
+  let account = primary
+  if (!accountDouyinOpenId(account, dyOpenId)) {
+    await updateAccount(rest, account.id, {
+      dy_openid: dyOpenId,
+      wx_nick_name: account.wx_nick_name || nickname || '',
+      wx_avatar_url: account.wx_avatar_url || avatarUrl || '',
+    })
+    account = (await findAccountById(rest, account.id))!
+    const role: MpAccountRole = account.active_role === 'pr' ? 'pr' : 'talent'
+    account = await provisionRegistryForAccount(
+      supabaseUrl,
+      serviceRole,
+      account,
+      role,
+      nickname || account.wx_nick_name || '',
+      avatarUrl || account.wx_avatar_url || '',
+    )
+  }
+  const token = await createSession(rest, account.id)
+  await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(ticket)}`, {
+    status: 'confirmed',
+    openid: dyOpenId,
+    account_id: account.id,
+    session_token: token,
+  })
+  const fixed = await fixedIdentityForAccount(supabaseUrl, serviceRole, account)
+  return { token, account, workIdentity: fixed || workIdentity, isNew: false, portal: 'xingxuan' }
+}
+
+/** 抖音扫码已证明该抖音号后，用户确认才把对方账号并入当前登录账号。 */
+export async function mpAuthConfirmDyBindMerge(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  ticket: string,
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const id = String(ticket || '').trim()
+  if (!id) throw new Error('dy_oauth_state_invalid')
+  const ticketRes = await rest.get(
+    `/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(id)}&limit=1`,
+  )
+  if (!ticketRes.ok) throw new Error('dy_oauth_ticket_lookup_failed')
+  const rows = (await ticketRes.json()) as {
+    status?: string
+    expires_at?: string
+    account_id?: string | null
+    openid?: string | null
+  }[]
+  const row = rows[0]
+  if (!row || row.status !== 'merge_pending') throw new Error('dy_oauth_ticket_expired')
+  if (!row.expires_at || new Date(row.expires_at).getTime() < Date.now()) throw new Error('dy_oauth_ticket_expired')
+  if (String(row.account_id || '').trim() !== accountId) throw new Error('dy_bind_ticket_mismatch')
+  const dyOpenId = String(row.openid || '').trim()
+  if (!dyOpenId) throw new Error('dy_oauth_ticket_expired')
+  const primary = await findAccountById(rest, accountId)
+  if (!primary) throw new Error('account_not_found')
+  const holder = await findDouyinHolder(rest, dyOpenId)
+  let account = primary
+  if (holder && holder.id !== accountId) {
+    account = await mergeHolderIntoLoginAccount(supabaseUrl, serviceRole, rest, accountId, holder, dyOpenId)
+  } else if (!accountDouyinOpenId(account, dyOpenId)) {
+    await updateAccount(rest, accountId, { dy_openid: dyOpenId })
+    account = (await findAccountById(rest, accountId))!
+  }
+  const token = await createSession(rest, account.id)
+  await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(id)}`, {
+    status: 'confirmed',
+    openid: dyOpenId,
+    account_id: account.id,
+    session_token: token,
+  })
+  return { token, account }
+}
+
 /** 抖音 OAuth 回调：code + state → 会话 token（ERP 门户额外返回 Supabase 会话） */
 export async function mpAuthDyOAuthComplete(
   supabaseUrl: string,
@@ -2031,6 +2327,20 @@ export async function mpAuthDyOAuthComplete(
   const workIdentity = isErpPortal
     ? portal
     : normalizeDyOAuthWorkIdentity(parsed.workIdentity)
+  const bindAccountId = String((ticketRow as { account_id?: string | null }).account_id || '').trim()
+  if (bindAccountId && !isErpPortal) {
+    return finishDouyinBindToLoginAccount(
+      supabaseUrl,
+      serviceRole,
+      rest,
+      parsed.ticket,
+      bindAccountId,
+      openid,
+      oauth.nickname || '',
+      oauth.avatarUrl || '',
+      workIdentity,
+    )
+  }
   let role: MpAccountRole = workIdentity === 'pr' ? 'pr' : 'talent'
 
   let account = await findAccountByOpenId(rest, openid)

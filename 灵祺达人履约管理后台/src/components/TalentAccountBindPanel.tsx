@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
+  bindConflictCheck,
   bindEmailLogin,
   bindPhoneSms,
+  dyOAuthBegin,
   fetchSession,
   rebindEmailLogin,
   rebindPhoneSms,
@@ -31,6 +33,8 @@ export default function TalentAccountBindPanel() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [hint, setHint] = useState('')
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [mergeLabel, setMergeLabel] = useState('')
 
   const ids = acc?.identities
 
@@ -75,33 +79,78 @@ export default function TalentAccountBindPanel() {
 
   const submit = async () => {
     if (!kind) return
-    setBusy(true)
     setErr('')
+    const replacing = boundNow && editing
+    if (!replacing && !mergeOpen) {
+      if (kind === 'phone' && !cnMobile(value)) {
+        setErr('请输入有效手机号')
+        return
+      }
+      if (kind === 'email' && !emailOk(value)) {
+        setErr('请输入有效邮箱')
+        return
+      }
+      try {
+        const probe = await bindConflictCheck(kind, kind === 'phone' ? value.replace(/\D/g, '') : value.trim())
+        if (probe.conflict) {
+          const label = probe.label || (kind === 'phone' ? '手机号' : '邮箱')
+          const yes = window.confirm(`该${label}已有账号，请确认是否合并到当前登录账号。`)
+          if (!yes) return
+          setMergeLabel(label)
+          setMergeOpen(true)
+          setCode('')
+          setHint(`请获取该${label}的验证码。验证通过后才会合并，当前登录账号为主账号。`)
+          return
+        }
+      } catch (e) {
+        setErr(formatMpApiErr(e, '暂时无法确认该账号'))
+        return
+      }
+    }
+    if (!/^\d{6}$/.test(code.trim())) {
+      setErr('请输入 6 位验证码')
+      return
+    }
+    setBusy(true)
     try {
-      const replacing = boundNow && editing
+      const merging = mergeOpen
       const r = replacing
         ? kind === 'phone'
           ? await rebindPhoneSms(value.replace(/\D/g, ''), code.trim())
           : await rebindEmailLogin(value.trim(), code.trim())
         : kind === 'phone'
-          ? await bindPhoneSms(value.replace(/\D/g, ''), code.trim(), platform)
-          : await bindEmailLogin(value.trim(), code.trim(), platform)
+          ? await bindPhoneSms(value.replace(/\D/g, ''), code.trim(), platform, merging)
+          : await bindEmailLogin(value.trim(), code.trim(), platform, merging)
       const token = r.token || getToken()
       if (token) setSession(token, r.account)
       setAcc(r.account)
       const after = kind === 'phone' ? Boolean(r.account.identities?.phone) : Boolean(r.account.identities?.email)
       if (!replacing && !after && !boundNow) {
-        setErr('这个手机号或邮箱已经属于另一个账号，请用那个账号登录。')
+        setErr('这个手机号或邮箱已经属于另一个账号，请确认合并或改用那个账号登录。')
         return
       }
       setKind(null)
       setEditing(false)
       setValue('')
       setCode('')
-      setHint(replacing ? '已换绑' : '已绑定。手机号和邮箱可以同时留在这个账号上。')
+      setMergeOpen(false)
+      setMergeLabel('')
+      setHint(replacing ? '已换绑' : merging ? '已合并到当前账号，对方账号已隐藏' : '已绑定。手机号和邮箱可以同时留在这个账号上。')
     } catch (e) {
       setErr(formatMpApiErr(e, boundNow && editing ? '换绑失败' : '绑定失败'))
     } finally {
+      setBusy(false)
+    }
+  }
+
+  const startDouyinBind = async () => {
+    setErr('')
+    setBusy(true)
+    try {
+      const started = await dyOAuthBegin('talent', true)
+      window.location.href = started.authorizeUrl
+    } catch (e) {
+      setErr(formatMpApiErr(e, '抖音绑定暂时无法开始'))
       setBusy(false)
     }
   }
@@ -125,7 +174,7 @@ export default function TalentAccountBindPanel() {
     <div className="surface-card rounded-xl border p-4">
       <p className="text-sm font-medium text-[var(--shell-text)]">账号绑定</p>
       <p className="mt-1 text-[11px] leading-relaxed text-[var(--shell-muted)]">
-        手机号和邮箱用验证码绑定，可以同时留在这个账号上。已被其他账号占用时不会自动合并。
+        手机号和邮箱用验证码绑定，可以同时留在这个账号上。若该登录方式下已有账号，确认并验证通过后才会合并到当前登录账号。
       </p>
       <div className="mt-3 grid grid-cols-4 gap-2">
         {items.map((it) => {
@@ -144,7 +193,11 @@ export default function TalentAccountBindPanel() {
                 }
                 if (it.id === 'douyin') {
                   setKind(null)
-                  setHint(on ? '抖音已绑定' : '请在登录页使用抖音扫码。登录后可在这里绑定手机号或邮箱')
+                  if (on) {
+                    setHint('抖音已绑定')
+                    return
+                  }
+                  void startDouyinBind()
                   return
                 }
                 setKind(it.id)
@@ -226,8 +279,13 @@ export default function TalentAccountBindPanel() {
             disabled={busy}
             className="w-full rounded-lg bg-amber-500 py-2 text-sm text-white disabled:opacity-60"
           >
-            {busy ? '提交中…' : editing ? '确定' : '绑定'}
+            {busy ? '提交中…' : editing ? '确定' : mergeOpen ? '验证并合并' : '绑定'}
           </button>
+          {mergeOpen ? (
+            <p className="text-[11px] leading-relaxed text-[var(--shell-muted)]">
+              正在验证该{mergeLabel}。通过后，对方账号的登录方式会并入当前账号并隐藏。
+            </p>
+          ) : null}
         </form>
       ) : err ? (
         <p className="mt-2 text-xs text-red-600">{err}</p>

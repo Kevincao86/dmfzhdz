@@ -208,14 +208,16 @@ async function postDyOAuth(body: Record<string, unknown>) {
   throw new Error(lastErr)
 }
 
-export async function dyOAuthBegin(workIdentity: string) {
+export async function dyOAuthBegin(workIdentity: string, bind = false) {
   const redirectUri =
     typeof window !== 'undefined' ? `${window.location.origin}/login/dy-oauth` : ''
+  const token = getToken()
   const data = await postDyOAuth({
     action: 'dy_oauth_begin',
     workIdentity,
     portal: 'xingxuan',
     redirectUri,
+    ...(bind && token ? { bind: true, sessionToken: token } : {}),
   })
   const authorizeUrl = String(data.authorizeUrl || '')
   if (!authorizeUrl) throw new Error('未获取到抖音授权链接')
@@ -234,13 +236,31 @@ export async function dyOAuthComplete(code: string, state: string) {
     code,
     state,
   })
+  if (data.mergeRequired === true) {
+    return {
+      mergeRequired: true as const,
+      ticket: String(data.ticket || ''),
+      subjectLabel: String(data.subjectLabel || '抖音'),
+      token: '',
+      workIdentity: String(data.workIdentity || 'talent'),
+      account: data.account as MpAccount,
+    }
+  }
   const token = String(data.token || '')
   if (!token) throw new Error('抖音授权成功，但未获取到登录会话')
   return {
+    mergeRequired: false as const,
+    ticket: '',
+    subjectLabel: '',
     token,
     workIdentity: String(data.workIdentity || 'talent'),
     account: data.account as MpAccount,
   }
+}
+
+export async function bindDyMerge(ticket: string) {
+  const data = await mpAuthRequest('bind_dy_merge', { ticket })
+  return { token: String(data.token), account: data.account as MpAccount }
 }
 
 export async function switchRole(role: 'talent' | 'pr') {
@@ -306,9 +326,23 @@ export async function emailRegister(input: {
   return { token: String(data.token), account: data.account as MpAccount }
 }
 
-export async function bindPhoneSms(phone: string, smsCode: string, platform: 'wx' | 'dy') {
-  const data = await mpAuthRequest('bind_phone_sms', { phone, smsCode, platform })
+export async function bindPhoneSms(
+  phone: string,
+  smsCode: string,
+  platform: 'wx' | 'dy',
+  merge = false,
+) {
+  const data = await mpAuthRequest('bind_phone_sms', { phone, smsCode, platform, merge })
   return { token: String(data.token), account: data.account as MpAccount }
+}
+
+export async function bindConflictCheck(kind: 'phone' | 'email', value: string) {
+  const data = await mpAuthRequest('bind_conflict_check', { kind, value })
+  return {
+    conflict: data.conflict === true,
+    label: String(data.label || ''),
+    masked: String(data.masked || ''),
+  }
 }
 
 export async function fetchTraining(hostId?: string) {
@@ -333,8 +367,8 @@ export async function postPrCashWallet(body: Record<string, unknown>) {
   })
 }
 
-export async function bindEmailLogin(email: string, emailCode: string, platform: 'wx' | 'dy') {
-  const data = await mpAuthRequest('bind_email_login', { email, emailCode, platform })
+export async function bindEmailLogin(email: string, emailCode: string, platform: 'wx' | 'dy', merge = false) {
+  const data = await mpAuthRequest('bind_email_login', { email, emailCode, platform, merge })
   return { token: String(data.token), account: data.account as MpAccount }
 }
 

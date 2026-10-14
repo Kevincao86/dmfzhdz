@@ -27,6 +27,8 @@ Page({
     busy: false,
     err: '',
     hint: '',
+    mergeOpen: false,
+    mergeLabel: '',
   },
 
   onShow() {
@@ -67,7 +69,7 @@ Page({
         kind: '',
         hint: this.data.ids.douyin
           ? '抖音已绑定'
-          : '请在电脑端星选登录页使用抖音扫码。登录后可在这里绑定手机号或邮箱',
+          : '请在电脑端星选「账号绑定」里扫码。若该抖音已有账号，扫码验证后会请你确认是否合并到当前账号',
       })
       return
     }
@@ -78,15 +80,31 @@ Page({
     this.setData({ editing: true, value: '', code: '', err: '', hint: '' })
   },
 
-  async bindWechat() {
-    wx.showLoading({ title: '绑定微信', mask: true })
+  async bindWechat(merge) {
+    wx.showLoading({ title: merge ? '验证微信' : '绑定微信', mask: true })
     try {
-      const data = await auth.bindWxOpenId()
+      const data = await auth.bindWxOpenId({ merge: !!merge })
       wx.hideLoading()
-      this.setData({ ids: readIds((data && data.account) || auth.readAccount()), hint: '微信已绑定' })
+      this.setData({
+        ids: readIds((data && data.account) || auth.readAccount()),
+        hint: merge ? '已合并到当前账号，对方微信账号已隐藏' : '微信已绑定',
+        err: '',
+      })
     } catch (e) {
       wx.hideLoading()
-      this.setData({ err: String((e && (e.message || e.errMsg)) || '微信绑定失败').slice(0, 40) })
+      const msg = String((e && (e.message || e.errMsg)) || '微信绑定失败')
+      if (!merge && /已有账号/.test(msg)) {
+        wx.showModal({
+          title: '合并账号',
+          content: '该微信已有账号，请确认是否合并到当前登录账号。确认后会再次验证微信，通过后才合并。',
+          confirmText: '确认合并',
+          success: (r) => {
+            if (r.confirm) void this.bindWechat(true)
+          },
+        })
+        return
+      }
+      this.setData({ err: msg.slice(0, 40) })
     }
   },
 
@@ -136,35 +154,82 @@ Page({
     }
   },
 
+  onMergeCancel() {
+    this.setData({ mergeOpen: false, mergeLabel: '', code: '', err: '' })
+  },
+
   async onSubmit() {
     if (this.data.busy) return
+    const ids = this.data.ids || {}
+    const platform = ids.douyin && !ids.wechat ? 'dy' : 'wx'
+    const replacing = !!this.data.editing
+    const kind = this.data.kind
+    if (!replacing && !this.data.mergeOpen) {
+      if (kind === 'phone' && !/^1\d{10}$/.test(this.data.value)) {
+        this.setData({ err: '请输入有效手机号' })
+        return
+      }
+      if (kind === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.data.value.trim())) {
+        this.setData({ err: '请输入有效邮箱' })
+        return
+      }
+      try {
+        const probe = await auth.bindConflictCheck(kind, kind === 'email' ? this.data.value.trim() : this.data.value)
+        if (probe && probe.conflict) {
+          const label = probe.label || (kind === 'phone' ? '手机号' : '邮箱')
+          wx.showModal({
+            title: '合并账号',
+            content: `该${label}已有账号，请确认是否合并到当前登录账号。`,
+            confirmText: '确认合并',
+            success: (r) => {
+              if (!r.confirm) return
+              this.setData({
+                mergeOpen: true,
+                mergeLabel: label,
+                code: '',
+                err: '',
+                hint: '',
+              })
+            },
+          })
+          return
+        }
+      } catch (e) {
+        this.setData({ err: String((e && e.message) || '暂时无法确认该账号').slice(0, 40) })
+        return
+      }
+    }
     if (!/^\d{6}$/.test(this.data.code)) {
       this.setData({ err: '请输入 6 位验证码' })
       return
     }
-    const ids = this.data.ids || {}
-    const platform = ids.douyin && !ids.wechat ? 'dy' : 'wx'
-    const replacing = !!this.data.editing
+    const merging = !!this.data.mergeOpen
     this.setData({ busy: true, err: '' })
     try {
       const data = replacing
-        ? this.data.kind === 'phone'
+        ? kind === 'phone'
           ? await auth.rebindPhoneSms({ phone: this.data.value, smsCode: this.data.code })
           : await auth.rebindEmailLogin({ email: this.data.value.trim(), emailCode: this.data.code })
-        : this.data.kind === 'phone'
-          ? await auth.bindPhoneSms({ phone: this.data.value, smsCode: this.data.code, platform })
+        : kind === 'phone'
+          ? await auth.bindPhoneSms({
+              phone: this.data.value,
+              smsCode: this.data.code,
+              platform,
+              merge: merging,
+            })
           : await auth.bindEmailLogin({
               email: this.data.value.trim(),
               emailCode: this.data.code,
               platform,
+              merge: merging,
             })
       const next = readIds((data && data.account) || auth.readAccount())
-      const key = this.data.kind === 'phone' ? 'phone' : 'email'
+      const key = kind === 'phone' ? 'phone' : 'email'
       if (!next[key]) {
         this.setData({
           busy: false,
           ids: next,
-          err: '这个手机号或邮箱已经属于另一个账号，请用那个账号登录。',
+          err: '这个手机号或邮箱已经属于另一个账号，请确认合并或改用那个账号登录。',
         })
         return
       }
@@ -175,7 +240,13 @@ Page({
         editing: false,
         value: '',
         code: '',
-        hint: replacing ? '已换绑' : '已绑定。手机号和邮箱可以同时留在这个账号上。',
+        mergeOpen: false,
+        mergeLabel: '',
+        hint: replacing
+          ? '已换绑'
+          : merging
+            ? '已合并到当前账号，对方账号已隐藏'
+            : '已绑定。手机号和邮箱可以同时留在这个账号上。',
       })
     } catch (e) {
       this.setData({ busy: false, err: String((e && e.message) || '绑定失败').slice(0, 40) })
