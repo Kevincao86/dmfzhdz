@@ -123,6 +123,7 @@ list_scopes() {
   talent_footer_lines 达人小程序页脚版权与备案收成两行
   talent_audit_browse  达人小程序审核：首页可先浏览，手机号/头像/昵称改为用户自行登录时再授权
   mp_phone_quick_login 达人小程序审核：登录/注册去掉微信字样，改为手机号快捷登录与快捷注册
+  mp_share_menu_contrast 达人小程序分享菜单：主题切换后菜单底色跟随卡片，避免白底白字
   affiliate_instant    推广员一点申请即开通、专属二维码、扫码付费按后台比例入账
   merchant_payout_bind 商家钱包绑定收款账户，提现打到该账户，运营台提现名单带出户名账号开户行
   merchant_payout_photo 商家收款账户绑定支持拍证件照，识别后填入姓名和证件号
@@ -1819,6 +1820,14 @@ PAT
 灵祺达人撮合小程序/pages/login/login.js
 灵祺达人撮合小程序/pages/subpack-signup/signup/signup.wxml
 灵祺达人撮合小程序/pages/subpack-signup/signup/signup.js
+change-scope-guard
+PAT
+      ;;
+    mp_share_menu_contrast)
+      cat <<'PAT'
+灵祺达人撮合小程序/components/order-expand/index.wxss
+灵祺达人撮合小程序/pages/subpack-core/detail/detail.wxss
+灵祺达人撮合小程序/styles/accent-themes.wxss
 change-scope-guard
 PAT
       ;;

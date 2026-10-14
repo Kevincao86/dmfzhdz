@@ -104,7 +104,8 @@
   min-width: 220rpx;
   padding: 8rpx 0;
   border-radius: 16rpx;
-  background: #fff;
+  background: var(--lq-card, #fff);
+  border: 1rpx solid var(--lq-border, rgba(15, 23, 42, 0.08));
   box-shadow: 0 12rpx 40rpx rgba(15, 23, 42, 0.16);
 }
 
@@ -115,8 +116,8 @@
   padding: 18rpx 28rpx;
   border: 0;
   border-radius: 0;
-  background: transparent;
-  color: #1c1917;
+  background: transparent !important;
+  color: var(--lq-text, #1c1917);
   font-size: 28rpx;
   line-height: 1.4;
   text-align: left;
@@ -129,6 +130,17 @@
 .order-expand-share-menu__item--primary {
   color: #c2410c;
   font-weight: 700;
+}
+
+.lq-accent-dark .order-expand-share-menu {
+  background: #27272a !important;
+  border-color: rgba(244, 244, 245, 0.28) !important;
+}
+
+.lq-accent-dark .order-expand-share-menu__item,
+.lq-accent-dark .order-expand-share-menu__item--primary {
+  color: #fafafa !important;
+  background: transparent !important;
 }
 
 .order-expand-poster-mask {

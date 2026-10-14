@@ -98,6 +98,25 @@
   color: #f4f4f5 !important;
 }
 
+/* 分享菜单底是浅色卡片时，暗黑会把字提成白色，这里改成深底浅字 */
+.lq-accent-dark .order-expand-share-menu,
+.lq-accent-dark .detail-share-menu {
+  background: #27272a !important;
+  border-color: rgba(244, 244, 245, 0.28) !important;
+}
+
+.lq-accent-dark .detail-share-menu::after {
+  border-color: #27272a transparent transparent !important;
+}
+
+.lq-accent-dark .order-expand-share-menu__item,
+.lq-accent-dark .order-expand-share-menu__item--primary,
+.lq-accent-dark .detail-share-menu__item,
+.lq-accent-dark .detail-share-menu__item--primary {
+  color: #fafafa !important;
+  background: transparent !important;
+}
+
 .lq-accent-dark .home-entry__sub,
 .lq-accent-dark .home-search-v2__ph,
 .lq-accent-dark .eval-tab-tx,

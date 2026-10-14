@@ -252,7 +252,8 @@
   min-width: 280rpx;
   padding: 8rpx 0;
   border-radius: 16rpx;
-  background: #fff;
+  background: var(--lq-card, #fff);
+  border: 1rpx solid var(--lq-border, rgba(15, 23, 42, 0.08));
   box-shadow: 0 12rpx 40rpx rgba(15, 23, 42, 0.16);
 }
 
@@ -263,17 +264,17 @@
   bottom: -12rpx;
   border-width: 12rpx 10rpx 0;
   border-style: solid;
-  border-color: #fff transparent transparent;
+  border-color: var(--lq-card, #fff) transparent transparent;
 }
 
 .detail-share-menu__item {
   display: block;
   padding: 22rpx 28rpx;
   font-size: 28rpx;
-  color: #334155;
+  color: var(--lq-text, #334155);
   line-height: 1.4;
   text-align: left;
-  background: #fff;
+  background: transparent !important;
   border: none;
   border-radius: 0;
 }
@@ -286,6 +287,22 @@
   color: #059669;
   font-weight: 600;
   border-bottom: 1rpx solid rgba(15, 23, 42, 0.06);
+}
+
+.lq-accent-dark .detail-share-menu {
+  background: #27272a !important;
+  border-color: rgba(244, 244, 245, 0.28) !important;
+}
+
+.lq-accent-dark .detail-share-menu::after {
+  border-color: #27272a transparent transparent !important;
+}
+
+.lq-accent-dark .detail-share-menu__item,
+.lq-accent-dark .detail-share-menu__item--primary {
+  color: #fafafa !important;
+  background: transparent !important;
+  border-bottom-color: rgba(244, 244, 245, 0.16);
 }
 
 .bottom-icon--active {
