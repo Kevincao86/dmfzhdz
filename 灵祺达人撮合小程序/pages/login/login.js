@@ -723,7 +723,7 @@ Page({
         hint = '登录暂时失败，请稍后再试'
       } else if (/invalid_phone_code|wx_phone_failed/i.test(msg)) {
         hint = '未能读取手机号，请再点一次「手机号快捷登录」'
-      } else if (/wx_not_registered/i.test(msg)) {
+      } else if (/wx_not_registered|尚未注册/i.test(msg)) {
         hint = '该微信尚未注册，请先注册或使用其他登录方式'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
         hint = '登录码无效或已过期，请再点一次「微信一键登录」重试'
@@ -732,7 +732,12 @@ Page({
       } else if (/admin_not_configured|not_configured/i.test(msg)) {
         hint = '登录暂时失败，请稍后再试'
       }
-      this.setData({ err: hint })
+      const notRegistered = hint.indexOf('尚未注册') >= 0
+      this.setData({
+        err: hint,
+        showWxAuthSheet: notRegistered ? false : this.data.showWxAuthSheet,
+        wxNickInputFocus: notRegistered ? false : this.data.wxNickInputFocus,
+      })
     } finally {
       this.setData({ loading: false })
     }
