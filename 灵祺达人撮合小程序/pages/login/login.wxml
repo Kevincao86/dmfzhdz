@@ -184,7 +184,7 @@
           </view>
         </block>
 
-        <text class="login-err" wx:if="{{err}}">{{err}}</text>
+        <text class="login-err" wx:if="{{err && tab !== 'wx'}}">{{err}}</text>
       </view>
 
       <view class="login-features">
