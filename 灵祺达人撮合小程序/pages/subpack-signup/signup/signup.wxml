@@ -24,6 +24,11 @@
         bindtap="onPickIdentity"
       >{{item.label}}</view>
     </view>
+
+    <view class="reg-channels">
+      <text class="reg-channel {{regChannel === 'phone' ? 'reg-channel--on' : ''}}" data-id="phone" bindtap="onPickChannel">手机号注册</text>
+      <text class="reg-channel {{regChannel === 'email' ? 'reg-channel--on' : ''}}" data-id="email" bindtap="onPickChannel">邮箱注册</text>
+    </view>
     <button
       wx:if="{{!legalAgreed}}"
       class="reg-wx-one"
@@ -38,11 +43,6 @@
       disabled="{{loading}}"
       bindtap="onWxIdentityRegister"
     >微信一键注册</button>
-
-    <view class="reg-channels">
-      <text class="reg-channel {{regChannel === 'phone' ? 'reg-channel--on' : ''}}" data-id="phone" bindtap="onPickChannel">手机号注册</text>
-      <text class="reg-channel {{regChannel === 'email' ? 'reg-channel--on' : ''}}" data-id="email" bindtap="onPickChannel">邮箱注册</text>
-    </view>
 
     <block wx:if="{{regChannel === 'phone'}}">
       <button
