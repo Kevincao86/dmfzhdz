@@ -1,5 +1,5 @@
-<view wx:if="{{phase === 'show'}}" class="launch-splash">
-  <view class="launch-splash__stage" style="{{stageStyle}}">
+<view wx:if="{{phase === 'show' || phase === 'cover'}}" class="launch-splash">
+  <view wx:if="{{phase === 'show'}}" class="launch-splash__stage" style="{{stageStyle}}">
     <video
       wx:if="{{isVideo}}"
       class="launch-splash__media"
@@ -21,5 +21,5 @@
       bindtap="onTapPoster"
     />
   </view>
-  <view class="launch-splash__skip" style="{{skipStyle}}" catchtap="onSkip">跳过 {{remain}}</view>
+  <view wx:if="{{phase === 'show'}}" class="launch-splash__skip" style="{{skipStyle}}" catchtap="onSkip">跳过 {{remain}}</view>
 </view>

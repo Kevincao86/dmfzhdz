@@ -1,7 +1,34 @@
 const mpPlatformDecor = require('../../utils/mpPlatformDecor.js')
 
 const SLOT_KEY = 'mp.launch.splash'
+const CACHE_KEY = 'mp.launch.splash.cache'
 let claimed = false
+
+function readCache() {
+  try {
+    const raw = wx.getStorageSync(CACHE_KEY)
+    if (!raw || !raw.imageUrl) return null
+    return raw
+  } catch (_) {
+    return null
+  }
+}
+
+function writeCache(item) {
+  try {
+    wx.setStorageSync(CACHE_KEY, {
+      imageUrl: item.imageUrl,
+      isVideo: !!item.isVideo,
+      playSeconds: item.playSeconds,
+    })
+  } catch (_) {}
+}
+
+function clearCache() {
+  try {
+    wx.removeStorageSync(CACHE_KEY)
+  } catch (_) {}
+}
 
 Component({
   data: {
@@ -61,7 +88,14 @@ Component({
       }
       claimed = true
       this._ownsClaim = true
+      const cached = readCache()
+      if (cached && cached.imageUrl) {
+        this.startShow(cached)
+      } else {
+        this.setData({ phase: 'cover' })
+      }
       this._giveUp = setTimeout(() => {
+        if (this._showing) return
         this._settled = true
         this.finish()
       }, 5000)
@@ -73,27 +107,18 @@ Component({
             this._giveUp = null
           }
           this._settled = true
-          if (this._ended || !item || !item.imageUrl) {
+          if (this._ended) return
+          if (!item || !item.imageUrl) {
+            clearCache()
             this.finish()
             return
           }
-          this._item = item
-          const remain = Number(item.playSeconds) === 5 ? 5 : 3
-          this.setData({
-            phase: 'show',
-            imageUrl: item.imageUrl,
-            isVideo: !!item.isVideo,
-            remain,
-          })
-          this._left = remain
-          this._tick = setInterval(() => {
-            this._left -= 1
-            if (this._left <= 0) {
-              this.finish()
-              return
-            }
-            this.setData({ remain: this._left })
-          }, 1000)
+          writeCache(item)
+          if (this._showing) {
+            this._item = item
+            return
+          }
+          this.startShow(item)
         })
         .catch(() => {
           if (this._giveUp) {
@@ -101,8 +126,32 @@ Component({
             this._giveUp = null
           }
           this._settled = true
+          if (this._showing) return
           this.finish()
         })
+    },
+
+    startShow(item) {
+      if (this._ended || this._showing || !item || !item.imageUrl) return
+      this._showing = true
+      this._item = item
+      const remain = Number(item.playSeconds) === 5 ? 5 : 3
+      this.setData({
+        phase: 'show',
+        imageUrl: item.imageUrl,
+        isVideo: !!item.isVideo,
+        remain,
+      })
+      this._left = remain
+      this.clearTick()
+      this._tick = setInterval(() => {
+        this._left -= 1
+        if (this._left <= 0) {
+          this.finish()
+          return
+        }
+        this.setData({ remain: this._left })
+      }, 1000)
     },
 
     clearTick() {
