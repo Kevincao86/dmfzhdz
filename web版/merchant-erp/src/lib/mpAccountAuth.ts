@@ -959,6 +959,8 @@ export type MpAuthWxLoginInput = {
   registerPr?: RegistryMpPrUser
   /** 仅新注册写入；老账号忽略 */
   workIdentity?: MpFixedWorkIdentity
+  /** 仅注册页传入。登录页未注册时不建号、不分配 ID */
+  register?: boolean
   /** 微信 getPhoneNumber 一次性 code，用于对上已有手机号账号 */
   phoneCode?: string
 }
@@ -996,6 +998,10 @@ export async function mpAuthWxLogin(
       await updateAccount(rest, account.id, contactFields(account, { phone }))
       account = (await findAccountById(rest, account.id))!
     }
+  }
+
+  if (!account && !input.register) {
+    throw new Error('wx_not_registered')
   }
 
   if (!account) {

@@ -311,6 +311,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         registerTalent: body.registerTalent as never,
         registerPr: body.registerPr as never,
         phoneCode: pickAuthField(req, body, 'phoneCode'),
+        register: body.register === true,
       })
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, token, isNew, account: payload })
@@ -1866,6 +1867,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'email_unchanged' ||
       msg === 'account_email_missing' ||
       msg === 'wx_openid_conflict' ||
+      msg === 'wx_not_registered' ||
       msg === 'invalid_phone_code' ||
       msg === 'wx_phone_failed' ||
       /^wx_phone_failed_/i.test(msg) ||
@@ -1921,6 +1923,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       email_unchanged: '新邮箱与当前绑定相同',
       account_email_missing: '当前账号未绑定邮箱',
       wx_openid_conflict: '该微信已绑定其他手机号账号',
+      wx_not_registered: '该微信尚未注册，请先注册或使用其他登录方式',
       invalid_phone_code: '请授权微信绑定的手机号后再登录',
       wx_phone_failed: '未能读取微信手机号，请再点一次授权',
       dy_openid_conflict: '该抖音已绑定其他手机号账号',

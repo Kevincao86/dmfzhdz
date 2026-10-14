@@ -709,17 +709,12 @@ Page({
         wxAvatarUrl: avatar,
         code,
       })
-      const account = (data && data.account) || auth.readAccount()
       await applyLoginIdentity(data)
       await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar, {
         alreadyPersisted: true,
         skipRemote: true,
       })
       this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
-      if (data.isNew || auth.needsPhoneBind(account)) {
-        wx.redirectTo({ url: '/pages/subpack-signup/signup/signup?from=wx' })
-        return
-      }
       resumeOrNavigateAfterLogin(this)
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
@@ -728,6 +723,8 @@ Page({
         hint = '登录暂时失败，请稍后再试'
       } else if (/invalid_phone_code|wx_phone_failed/i.test(msg)) {
         hint = '未能读取手机号，请再点一次「手机号快捷登录」'
+      } else if (/wx_not_registered/i.test(msg)) {
+        hint = '该微信尚未注册，请先注册或使用其他登录方式'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
         hint = '登录码无效或已过期，请再点一次「微信一键登录」重试'
       } else if (api.isNetReset(msg)) {

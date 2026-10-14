@@ -14,7 +14,7 @@
     </view>
     <text wx:if="{{stageLine}}" class="reg-stage__line">{{stageLine}}</text>
     <text class="reg-title">注册{{sceneLabel ? ' · ' + sceneLabel : ''}}</text>
-    <text class="reg-note">{{regNote}}</text>
+    <text class="reg-note">先选择身份，再点微信一键注册。注册完成后才能使用微信一键登录。</text>
     <view class="reg-picks">
       <view
         wx:for="{{identityOptions}}"
@@ -24,6 +24,20 @@
         bindtap="onPickIdentity"
       >{{item.label}}</view>
     </view>
+    <button
+      wx:if="{{!legalAgreed}}"
+      class="reg-wx-one"
+      loading="{{loading}}"
+      disabled="{{loading}}"
+      bindtap="onWxOneTapNeedLegal"
+    >微信一键注册</button>
+    <button
+      wx:else
+      class="reg-wx-one"
+      loading="{{loading}}"
+      disabled="{{loading}}"
+      bindtap="onWxIdentityRegister"
+    >微信一键注册</button>
 
     <view class="reg-channels">
       <text class="reg-channel {{regChannel === 'phone' ? 'reg-channel--on' : ''}}" data-id="phone" bindtap="onPickChannel">手机号注册</text>

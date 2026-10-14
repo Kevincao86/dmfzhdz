@@ -139,6 +139,40 @@ Page({
     this.setData({ err: '请先勾选并同意《用户协议》和《隐私政策》' })
   },
 
+  async onWxIdentityRegister() {
+    const workId = this.data.newIdentity
+    if (!identityTypes.isWorkIdentity(workId)) {
+      this.setData({ err: '请先选择身份，选定后不可更改' })
+      return
+    }
+    if (!this.data.legalAgreed) {
+      this.setData({ err: '请先勾选并同意《用户协议》和《隐私政策》' })
+      return
+    }
+    this.setData({ loading: true, err: '' })
+    try {
+      const role = identityTypes.accountRoleForWorkIdentity(workId)
+      const data = await auth.wxLogin({
+        role,
+        workIdentity: workId,
+        register: true,
+      })
+      if (data && data.isNew === false) {
+        auth.clearSession()
+        this.setData({ err: '该微信已注册，请返回登录页使用微信一键登录' })
+        return
+      }
+      await auth.ensureIdentity(role, workId === 'pr' ? undefined : workId)
+      const account = auth.readAccount() || (data && data.account)
+      if (account) userProfile.adoptAccountIdentity(account)
+      celebrateThenEnter(this)
+    } catch (err) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(err, '微信注册失败，请稍后重试') })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
   async onWxOneTapRegister(e) {
     const workId = this.data.newIdentity
     if (!identityTypes.isWorkIdentity(workId)) {
@@ -167,6 +201,7 @@ Page({
         phoneCode,
         role,
         workIdentity: workId,
+        register: true,
       })
       if (data && data.isNew === false) {
         auth.clearSession()

@@ -427,6 +427,7 @@ mine-account-bind
 mp_accounts_phone_email
 TalentLoginAuthPanel
 pages/login/login
+subpack-signup/signup/signup
 meoo-ops-mp-auth.ts
 change-scope-guard
 PAT

@@ -116,6 +116,7 @@ async function wxLogin(opts = {}) {
     registerTalent: opts.registerTalent,
     registerPr: opts.registerPr,
     phoneCode: String(opts.phoneCode || '').trim(),
+    register: opts.register === true,
   })
   return accountMemberSync.afterAuthSuccess(data)
 }
