@@ -666,7 +666,7 @@ function buildAgentImagePrompt(userLine, hasRef) {
 }
 
 function buildChatMessages(history, userLine, imageDataUrls, userId, intelText) {
-  const messages = [{ role: 'system', content: AI_AGENT_SYSTEM_PROMPT }]
+  const messages = []
   const intel = String(intelText || '').trim()
   if (intel) messages.push({ role: 'system', content: intel })
   try {
