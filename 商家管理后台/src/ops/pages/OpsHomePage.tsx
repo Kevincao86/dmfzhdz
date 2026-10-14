@@ -17,6 +17,7 @@ import {
 } from '../opsMpUserDashboardCompute'
 import { fetchOpsPaymentOrders, type OpsPaymentOrderRow } from '../opsPaymentOrdersApi'
 import { fetchRegistry } from '../opsRegistryApi'
+import { loadTrainingPayouts, loadTrainingReview, reviewBucket } from '../opsTrainingReviewApi'
 import { fetchSupabaseTenantsForOps } from '../supabaseTenantsApi'
 
 const PRESETS: { id: DashboardPreset; label: string }[] = [
@@ -126,6 +127,51 @@ function yuanFromCents(cents: number): string {
   return `¥${Math.round(cents / 100).toLocaleString('zh-CN')}`
 }
 
+type CockpitTodo = {
+  id: string
+  title: string
+  count: number
+  detail: string
+  to: string
+  color: string
+}
+
+function joinNames(names: string[]): string {
+  const clean = names.map((name) => name.trim()).filter(Boolean)
+  if (!clean.length) return '暂无名称'
+  const head = clean.slice(0, 3).join('、')
+  return clean.length > 3 ? `${head} 等 ${clean.length} 条` : head
+}
+
+function ShareBars({ parts }: { parts: { label: string; value: number; color: string }[] }) {
+  const total = parts.reduce((sum, part) => sum + part.value, 0)
+  return (
+    <div>
+      <div className="flex h-5 overflow-hidden rounded-full bg-slate-800">
+        {parts.map((part) => (
+          <div
+            key={part.label}
+            style={{ width: total ? `${(part.value / total) * 100}%` : '0%', background: part.color }}
+            title={`${part.label} ${part.value}`}
+          />
+        ))}
+      </div>
+      <ul className="mt-4 space-y-2">
+        {parts.map((part) => (
+          <li key={part.label} className="flex items-center justify-between gap-3 text-sm">
+            <span className="inline-flex min-w-0 items-center gap-2 text-slate-300">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: part.color }} />
+              <span className="truncate">{part.label}</span>
+            </span>
+            <span className="font-semibold tabular-nums text-white">{part.value}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-slate-500">合计 {total}</p>
+    </div>
+  )
+}
+
 function TrendChart({
   dates,
   series,
@@ -151,7 +197,7 @@ function TrendChart({
 
   return (
     <div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-56 w-full" role="img" aria-label="分日趋势">
+      <svg viewBox={`0 0 ${w} ${h}`} className="h-72 w-full" role="img" aria-label="分日趋势">
         {ticks.map((tick) => (
           <g key={tick}>
             <line
@@ -261,6 +307,7 @@ export default function OpsHomePage() {
   const [mpDaily, setMpDaily] = useState<MpUserDashboardDailyPoint[]>([])
   const [money, setMoney] = useState<{ confirmedCents: number; pendingCount: number } | null>(null)
   const [recruitCounts, setRecruitCounts] = useState<{ erp: number; mp: number } | null>(null)
+  const [todos, setTodos] = useState<CockpitTodo[]>([])
 
   const range = useMemo(
     () => buildDashboardRange(preset, customStart, customEnd),
@@ -280,6 +327,7 @@ export default function OpsHomePage() {
         setMpDaily([])
         setMoney(null)
         setRecruitCounts(null)
+        setTodos([])
         return
       }
       const tenants = sb.ok ? sb.rows : []
@@ -288,12 +336,14 @@ export default function OpsHomePage() {
       let mpOrders: Awaited<ReturnType<typeof fetchRegistry>>['mpRecruitmentOrders'] = []
       let mpTalentMembers: Awaited<ReturnType<typeof fetchRegistry>>['mpTalentMembers'] = []
       let mpPrUsers: Awaited<ReturnType<typeof fetchRegistry>>['mpPrUsers'] = []
+      let withdraws: NonNullable<Awaited<ReturnType<typeof fetchRegistry>>['distributionWithdrawRequests']> = []
       try {
         const reg = await fetchRegistry()
         recruitmentOrders = reg.recruitmentOrders ?? []
         mpOrders = reg.mpRecruitmentOrders ?? []
         mpTalentMembers = reg.mpTalentMembers ?? []
         mpPrUsers = reg.mpPrUsers ?? []
+        withdraws = reg.distributionWithdrawRequests ?? []
       } catch {
         /* 招募统计可仅用 Supabase 租户；注册表不可用时招募数为 0 */
       }
@@ -326,6 +376,118 @@ export default function OpsHomePage() {
         if (order?.createdAt && timestampInRange(order.createdAt, r)) mp += 1
       }
       setRecruitCounts({ erp, mp })
+
+      const nextTodos: CockpitTodo[] = []
+      const pushTodo = (item: CockpitTodo) => {
+        if (item.count > 0) nextTodos.push(item)
+      }
+      const affiliateReview = withdraws.filter(
+        (row) => row.ownerType === 'individual_affiliate' && row.status === 'pending_review',
+      )
+      const partnerReview = withdraws.filter(
+        (row) => row.ownerType === 'partner_tenant' && row.status === 'pending_review',
+      )
+      const approvedPay = withdraws.filter((row) => row.status === 'approved')
+      pushTodo({
+        id: 'affiliate-review',
+        title: '推广员提现待审',
+        count: affiliateReview.length,
+        detail: `${joinNames(affiliateReview.map((row) => row.ownerLabel))} · ${yuanFromCents(affiliateReview.reduce((sum, row) => sum + row.amountCents, 0))}`,
+        to: '/distribution?tab=withdraw&owner=affiliate',
+        color: '#fbbf24',
+      })
+      pushTodo({
+        id: 'partner-review',
+        title: '分销提现待审',
+        count: partnerReview.length,
+        detail: `${joinNames(partnerReview.map((row) => row.ownerLabel))} · ${yuanFromCents(partnerReview.reduce((sum, row) => sum + row.amountCents, 0))}`,
+        to: '/distribution?tab=withdraw&owner=partner',
+        color: '#fb923c',
+      })
+      pushTodo({
+        id: 'withdraw-pay',
+        title: '提现已通过待打款',
+        count: approvedPay.length,
+        detail: `${joinNames(approvedPay.map((row) => row.ownerLabel))} · ${yuanFromCents(approvedPay.reduce((sum, row) => sum + row.amountCents, 0))}`,
+        to: '/distribution?tab=withdraw',
+        color: '#f97316',
+      })
+      const payPending = paymentOrders.filter((order) => order.status === 'pending' || order.status === 'amount_verified')
+      pushTodo({
+        id: 'pay-orders',
+        title: '商家订单待确认',
+        count: payPending.length,
+        detail: `${joinNames(payPending.map((order) => order.merchant_name || order.tenant_login_name || ''))} · ${yuanFromCents(payPending.reduce((sum, order) => sum + (order.verified_amount_cents ?? order.amount_cents ?? 0), 0))}`,
+        to: '/payment-orders',
+        color: '#34d399',
+      })
+      const erpPending = (recruitmentOrders ?? []).filter((order) => order.status === 'pending')
+      pushTodo({
+        id: 'erp-recruit',
+        title: '商家招募待处理',
+        count: erpPending.length,
+        detail: joinNames(erpPending.map((order) => order.customerName || order.storeName || '')),
+        to: '/recruitment-orders',
+        color: '#a78bfa',
+      })
+      const mpOpen = (mpOrders ?? []).filter(
+        (order) => order.status === 'open' || order.status === 'collecting' || order.status === 'pending_settlement',
+      )
+      pushTodo({
+        id: 'mp-recruit',
+        title: '小程序招募进行中',
+        count: mpOpen.length,
+        detail: joinNames(mpOpen.map((order) => order.title || order.storeName || order.customerName || '')),
+        to: '/mp-recruitment-orders',
+        color: '#818cf8',
+      })
+      const confirmApplicants = (mpOrders ?? []).flatMap((order) =>
+        (order.applicants ?? []).filter((person) => person.taskStatus === 'pending_confirm' || person.taskStatus === 'applied'),
+      )
+      pushTodo({
+        id: 'applicants',
+        title: '达人报名待确认',
+        count: confirmApplicants.length,
+        detail: joinNames(confirmApplicants.map((person) => person.name || person.platformNickname || '')),
+        to: '/mp-recruitment-orders',
+        color: '#22d3ee',
+      })
+      try {
+        const [review, payouts] = await Promise.all([loadTrainingReview(), loadTrainingPayouts()])
+        const lecturers = review.lecturers.filter(
+          (row) => row.lecturerStatus && row.lecturerStatus !== 'none' && reviewBucket(row.lecturerStatus) === 'pending',
+        )
+        const courses = review.courses.filter((row) => reviewBucket(row.reviewStatus) === 'pending')
+        const unpaid = payouts.filter((row) => row.status === 'pending')
+        pushTodo({
+          id: 'lecturer',
+          title: '讲师待审核',
+          count: lecturers.length,
+          detail: joinNames(lecturers.map((row) => row.name || '')),
+          to: '/lecturer-review',
+          color: '#f472b6',
+        })
+        pushTodo({
+          id: 'course',
+          title: '培训课程待审核',
+          count: courses.length,
+          detail: joinNames(courses.map((row) => row.title || row.hostName || '')),
+          to: '/training-review',
+          color: '#e879f9',
+        })
+        pushTodo({
+          id: 'lesson-pay',
+          title: '课时费待打款',
+          count: unpaid.length,
+          detail: `${joinNames(unpaid.map((row) => row.name))} · ${yuanFromCents(unpaid.reduce((sum, row) => sum + Math.round(row.net * 100), 0))}`,
+          to: '/training-payouts',
+          color: '#facc15',
+        })
+      } catch {
+        /* 培训接口不可用时，其余待办仍显示 */
+      }
+      nextTodos.sort((a, b) => b.count - a.count)
+      setTodos(nextTodos)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setStats(null)
@@ -334,6 +496,7 @@ export default function OpsHomePage() {
       setMpDaily([])
       setMoney(null)
       setRecruitCounts(null)
+      setTodos([])
     } finally {
       setLoading(false)
     }
@@ -411,6 +574,54 @@ export default function OpsHomePage() {
         </div>
       ) : stats ? (
         <>
+          <section className="ops-card p-5">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-white">待办</h2>
+                <p className="mt-1 text-xs text-slate-500">只列出还没处理完的事项，点进去就是原来的处理页</p>
+              </div>
+              <p className="text-3xl font-semibold tabular-nums text-amber-300">{todos.reduce((sum, item) => sum + item.count, 0)}</p>
+            </div>
+            {todos.length ? (
+              <>
+                <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-slate-800">
+                  {todos.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        width: `${(item.count / todos.reduce((sum, row) => sum + row.count, 0)) * 100}%`,
+                        background: item.color,
+                      }}
+                      title={`${item.title} ${item.count}`}
+                    />
+                  ))}
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {todos.map((item) => (
+                    <Link
+                      key={item.id}
+                      to={item.to}
+                      className="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 hover:border-amber-400/40"
+                    >
+                      <span className="w-14 text-center text-3xl font-semibold tabular-nums text-white">{item.count}</span>
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2 text-sm font-medium text-slate-100">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
+                          {item.title}
+                        </span>
+                        <span className="mt-1 block truncate text-xs text-slate-400">{item.detail}</span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-6 text-sm text-emerald-200">
+                当前没有待办。提现、审核、招募和待确认订单都已清空。
+              </p>
+            )}
+          </section>
+
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatCard
               icon={UserPlus}
@@ -490,16 +701,51 @@ export default function OpsHomePage() {
             </Link>
           </div>
 
+          <section className="grid gap-4 lg:grid-cols-5">
+            <div className="ops-card p-5 lg:col-span-3">
+              <h2 className="text-sm font-semibold text-slate-100">商户趋势</h2>
+              <p className="mt-1 text-xs text-slate-500">新注册、活跃、发起招募的商户，按天叠在一起看</p>
+              <div className="mt-3">
+                <TrendChart
+                  dates={daily.map((row) => row.date)}
+                  series={[
+                    { label: '新注册', color: '#34d399', values: daily.map((row) => row.registered) },
+                    { label: '活跃', color: '#38bdf8', values: daily.map((row) => row.active) },
+                    { label: '招募商户', color: '#a78bfa', values: daily.map((row) => row.recruitmentMerchants) },
+                  ]}
+                />
+              </div>
+            </div>
+            <div className="ops-card p-5 lg:col-span-2">
+              <h2 className="text-sm font-semibold text-slate-100">这一周期的构成</h2>
+              <p className="mt-1 text-xs text-slate-500">色块越长，这项人数越多</p>
+              <div className="mt-4">
+                <ShareBars
+                  parts={[
+                    { label: '新注册商家', value: stats.registeredUsers, color: '#34d399' },
+                    { label: '活跃商家', value: stats.activeUsers, color: '#38bdf8' },
+                    { label: '招募商户', value: stats.recruitmentMerchants, color: '#a78bfa' },
+                    { label: '会员版', value: stats.memberSubscribeUsers, color: '#fbbf24' },
+                    { label: '会员 Plus', value: stats.memberPlusSubscribeUsers, color: '#e879f9' },
+                    { label: '达人新增', value: mpStats?.talentRegistered ?? 0, color: '#22d3ee' },
+                    { label: 'PR 新增', value: mpStats?.prRegistered ?? 0, color: '#fb7185' },
+                  ]}
+                />
+              </div>
+            </div>
+          </section>
+
           <section className="ops-card p-5">
-            <h2 className="text-sm font-semibold text-slate-100">商户趋势</h2>
-            <p className="mt-1 text-xs text-slate-500">新注册、活跃、发起招募的商户，按天叠在一起看</p>
+            <h2 className="text-sm font-semibold text-slate-100">订阅开通</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              会员版 {stats.memberSubscribeUsers} · 会员 Plus {stats.memberPlusSubscribeUsers}
+            </p>
             <div className="mt-3">
               <TrendChart
                 dates={daily.map((row) => row.date)}
                 series={[
-                  { label: '新注册', color: '#34d399', values: daily.map((row) => row.registered) },
-                  { label: '活跃', color: '#38bdf8', values: daily.map((row) => row.active) },
-                  { label: '招募商户', color: '#a78bfa', values: daily.map((row) => row.recruitmentMerchants) },
+                  { label: '会员版', color: '#fbbf24', values: daily.map((row) => row.memberSubscribe) },
+                  { label: '会员 Plus', color: '#e879f9', values: daily.map((row) => row.memberPlusSubscribe) },
                 ]}
               />
             </div>
