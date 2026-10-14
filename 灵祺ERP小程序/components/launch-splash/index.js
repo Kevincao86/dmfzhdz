@@ -39,12 +39,12 @@ function screenBox() {
     const top = Math.max(8, Number(menu.top) || Number(win.statusBarHeight) || 24)
     const right = Math.max(12, width - Number(menu.left) + 8)
     return {
-      stageStyle: `width:${width}px;height:${height}px;`,
+      stageStyle: `position:fixed;left:0;top:0;width:${width}px;height:${height}px;`,
       skipStyle: `top:${top}px;right:${right}px;`,
     }
   } catch (_) {
     return {
-      stageStyle: 'width:100vw;height:100vh;',
+      stageStyle: 'position:fixed;left:0;top:0;width:100%;height:100%;',
       skipStyle: 'top:48px;right:24px;',
     }
   }

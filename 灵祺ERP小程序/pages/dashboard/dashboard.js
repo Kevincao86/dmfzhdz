@@ -207,6 +207,7 @@ Page({
     posters: FALLBACK_POSTERS,
     posterInterval: 4000,
     splashCover: true,
+    statusBarHeight: 20,
     entries: ENTRIES,
     todoLoaded: false,
     todos: [],
@@ -215,6 +216,12 @@ Page({
   },
 
   onLoad() {
+    let statusBarHeight = 20
+    try {
+      const info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+      statusBarHeight = Number(info.statusBarHeight) || 20
+    } catch (_) {}
+    this.setData({ statusBarHeight })
     this._splashSafety = setTimeout(() => this.onLaunchSplashDone(), 8000)
   },
 
