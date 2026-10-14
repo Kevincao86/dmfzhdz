@@ -331,3 +331,33 @@
 .paper-page.lq-accent-on .picker-val {
   -webkit-text-fill-color: var(--lq-text, #14181f);
 }
+
+.paper-page.lq-accent-dark .section-title,
+.paper-page.lq-accent-dark .platform-head,
+.paper-page.lq-accent-dark .page-hero-title,
+.paper-page.lq-accent-dark .wx-name,
+.paper-page.lq-accent-dark .wx-nick-input,
+.paper-page.lq-accent-dark .cred-ready-text,
+.paper-page.lq-accent-dark .cred-edit-btn,
+.paper-page.lq-accent-dark .cred-check-label,
+.paper-page.lq-accent-dark .cred-modal-title,
+.paper-page.lq-accent-dark .input,
+.paper-page.lq-accent-dark .picker-val,
+.paper-page.lq-accent-dark .apply-textarea,
+.paper-page.lq-accent-dark .type-chip-label,
+.paper-page.lq-accent-dark .apply-recruit-val,
+.paper-page.lq-accent-dark text,
+.paper-page.lq-accent-dark input,
+.paper-page.lq-accent-dark button,
+.paper-page.lq-accent-dark label {
+  color: #f4f4f5 !important;
+  -webkit-text-fill-color: #f4f4f5 !important;
+}
+
+.paper-page.lq-accent-dark .page-hero-sub,
+.paper-page.lq-accent-dark .form-label,
+.paper-page.lq-accent-dark .hint,
+.paper-page.lq-accent-dark .platform-card-summary {
+  color: #d4d4d8 !important;
+  -webkit-text-fill-color: #d4d4d8 !important;
+}

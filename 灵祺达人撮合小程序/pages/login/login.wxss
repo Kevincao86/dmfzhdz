@@ -1267,3 +1267,83 @@
 .login-sms-btn::after {
   border: none;
 }
+
+/* 登录页自己写了一套米色变量，暗黑下 --lq-primary 会变成近黑，字就贴进卡片。这里改写死浅色。 */
+.login-page.lq-accent-dark {
+  background: #09090b !important;
+  --lq-primary: #e4e4e7;
+  --lq-primary-dark: #fafafa;
+  --lq-primary-deep: #fafafa;
+  --lq-text: #fafafa;
+  --lq-text-secondary: #d4d4d8;
+  --lq-bg: #09090b;
+  --lq-card: #27272a;
+  --lq-surface: #27272a;
+  --lq-primary-50: #27272a;
+  --lq-primary-100: #3f3f46;
+  --lq-gradient-tab: linear-gradient(180deg, #3f3f46 0%, #27272a 100%);
+  --lq-gradient-tab-track: #18181b;
+}
+
+.login-page.lq-accent-dark .login-hero__overlay {
+  background: linear-gradient(180deg, rgba(9, 9, 11, 0.55) 0%, rgba(9, 9, 11, 0.28) 42%, rgba(9, 9, 11, 0.82) 100%);
+}
+
+.login-page.lq-accent-dark .login-hero__title,
+.login-page.lq-accent-dark .login-hero__sub,
+.login-page.lq-accent-dark .login-chip,
+.login-page.lq-accent-dark .login-hint,
+.login-page.lq-accent-dark .login-field-label,
+.login-page.lq-accent-dark .login-input,
+.login-page.lq-accent-dark .login-guest-link,
+.login-page.lq-accent-dark .login-forgot,
+.login-page.lq-accent-dark .login-legal-txt,
+.login-page.lq-accent-dark .login-legal-link,
+.login-page.lq-accent-dark .login-icp-text,
+.login-page.lq-accent-dark .login-talent-title,
+.login-page.lq-accent-dark .login-id-badge__text,
+.login-page.lq-accent-dark .login-feature__tag,
+.login-page.lq-accent-dark .login-feature__sub,
+.login-page.lq-accent-dark .login-privacy-contract-link,
+.login-page.lq-accent-dark .login-sms-btn,
+.login-page.lq-accent-dark .login-id-sheet-title,
+.login-page.lq-accent-dark .login-id-sheet-hint,
+.login-page.lq-accent-dark .login-id-sheet-name,
+.login-page.lq-accent-dark .login-identity-value-text,
+.login-page.lq-accent-dark .login-wx-nick-display__text,
+.login-page.lq-accent-dark .login-wx-avatar-tip,
+.login-page.lq-accent-dark .lq-gradient-tabs__item,
+.login-page.lq-accent-dark .login-btn--ghost,
+.login-page.lq-accent-dark .login-btn--ghost text {
+  color: #f4f4f5 !important;
+  -webkit-text-fill-color: #f4f4f5 !important;
+}
+
+.login-page.lq-accent-dark .lq-gradient-tabs__item--on,
+.login-page.lq-accent-dark .login-btn--wx,
+.login-page.lq-accent-dark .login-btn--wx text {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.login-page.lq-accent-dark .login-hero__sub,
+.login-page.lq-accent-dark .login-chip {
+  background: rgba(0, 0, 0, 0.45) !important;
+  border-color: rgba(244, 244, 245, 0.28) !important;
+}
+
+.login-page.lq-accent-dark .login-shell,
+.login-page.lq-accent-dark .login-input,
+.login-page.lq-accent-dark .login-id-sheet,
+.login-page.lq-accent-dark .login-legal-modal,
+.login-page.lq-accent-dark .login-wx-nick-display,
+.login-page.lq-accent-dark .login-btn--ghost,
+.login-page.lq-accent-dark .login-legal-foot {
+  background: #27272a !important;
+  border-color: rgba(244, 244, 245, 0.28) !important;
+}
+
+.login-page.lq-accent-dark .login-err {
+  color: #fca5a5 !important;
+  -webkit-text-fill-color: #fca5a5 !important;
+}

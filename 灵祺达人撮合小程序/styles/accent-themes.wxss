@@ -205,3 +205,44 @@
   background-color: var(--lq-primary) !important;
   border-color: transparent !important;
 }
+
+/* 暗黑不用变量回退色。变量没传到子节点时，回退色是近黑，会再次贴住底板。 */
+.lq-accent-dark .section-title,
+.lq-accent-dark .platform-head,
+.lq-accent-dark .wb-section-title,
+.lq-accent-dark .page-hero-title,
+.lq-accent-dark .cred-ready-text,
+.lq-accent-dark .cred-edit-btn,
+.lq-accent-dark .cred-modal-title,
+.lq-accent-dark .wx-name,
+.lq-accent-dark .wx-nick-input,
+.lq-accent-dark .type-chip-label,
+.paper-page.lq-accent-dark .section-title,
+.paper-page.lq-accent-dark .platform-head,
+.paper-page.lq-accent-dark .page-hero-title,
+.paper-page.lq-accent-dark .wx-name,
+.paper-page.lq-accent-dark .wx-nick-input,
+.paper-page.lq-accent-dark .cred-ready-text,
+.paper-page.lq-accent-dark .cred-edit-btn,
+.paper-page.lq-accent-dark .input,
+.paper-page.lq-accent-dark .picker-val,
+.paper-page.lq-accent-dark .apply-textarea,
+.paper-page.lq-accent-dark .btn-outline,
+.paper-page.lq-accent-dark text,
+.paper-page.lq-accent-dark input,
+.paper-page.lq-accent-dark button,
+.paper-page.lq-accent-dark label {
+  color: #f4f4f5 !important;
+  -webkit-text-fill-color: #f4f4f5 !important;
+}
+
+.lq-accent-dark .form-label,
+.lq-accent-dark .hint,
+.lq-accent-dark .page-hero-sub,
+.paper-page.lq-accent-dark .form-label,
+.paper-page.lq-accent-dark .hint,
+.paper-page.lq-accent-dark .page-hero-sub,
+.paper-page.lq-accent-dark .platform-card-summary {
+  color: #d4d4d8 !important;
+  -webkit-text-fill-color: #d4d4d8 !important;
+}

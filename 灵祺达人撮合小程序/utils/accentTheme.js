@@ -54,6 +54,9 @@ function styleOf(p) {
   const solid = `linear-gradient(180deg,${p.nav} 0%,${p.nav} 100%)`
   const deep = `linear-gradient(180deg,${p.dark} 0%,${p.nav} 100%)`
   return [
+    `--lq-text:${p.text || INK}`,
+    `--lq-text-secondary:${p.textSecondary || INK_SOFT}`,
+    `--lq-on-primary:#ffffff`,
     `--lq-primary:${p.nav}`,
     `--lq-primary-dark:${p.dark}`,
     `--lq-primary-deep:${p.dark}`,
@@ -74,14 +77,11 @@ function styleOf(p) {
     `--lq-home-banner:${solid}`,
     `--lq-card:${p.t100}`,
     `--lq-surface:${p.t100}`,
-    `--lq-on-primary:#ffffff`,
     `--lq-border:rgba(${p.rgb},0.28)`,
     `--lq-shadow-soft:0 8rpx 28rpx rgba(${p.rgb},0.12)`,
     `--lq-chip-on-bg:${p.t100}`,
     `--lq-chip-on-border:${p.soft}`,
     `--lq-active-tint:rgba(${p.rgb},0.16)`,
-    p.text ? `--lq-text:${p.text}` : '',
-    p.textSecondary ? `--lq-text-secondary:${p.textSecondary}` : '',
   ].filter(Boolean).join(';') + ';'
 }
 

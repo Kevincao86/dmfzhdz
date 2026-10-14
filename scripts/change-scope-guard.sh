@@ -1874,6 +1874,7 @@ PAT
 灵祺达人撮合小程序/pages/apply/apply.wxss
 灵祺达人撮合小程序/pages/mine/mine.wxss
 灵祺达人撮合小程序/pages/mine/mine.wxml
+灵祺达人撮合小程序/pages/login/login.wxss
 change-scope-guard
 PAT
       ;;
