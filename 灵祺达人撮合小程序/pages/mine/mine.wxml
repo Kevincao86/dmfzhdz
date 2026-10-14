@@ -40,6 +40,8 @@
                 class="wb-nick-input"
                 type="nickname"
                 placeholder="点击输入昵称"
+                placeholder-style="{{accentId ? 'color:rgba(255,255,255,0.72)' : 'color:#a8a29e'}}"
+                style="{{accentId ? 'color:#ffffff;-webkit-text-fill-color:#ffffff;background-color:var(--lq-primary);background:var(--lq-primary);' : ''}}"
                 value="{{profileNick}}"
                 bindinput="onProfileNickInput"
                 bindblur="onProfileNickBlur"

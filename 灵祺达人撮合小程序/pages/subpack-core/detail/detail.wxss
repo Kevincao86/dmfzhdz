@@ -196,7 +196,7 @@
   gap: 12rpx;
   font-size: 28rpx;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--lq-text, #0f172a);
   margin-bottom: 8rpx;
 }
 

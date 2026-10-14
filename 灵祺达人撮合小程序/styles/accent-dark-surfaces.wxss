@@ -11,7 +11,7 @@
 }
 
 .lq-accent-on [class*='card'],
-.lq-accent-on [class*='input'],
+.lq-accent-on [class*='input']:not(.wb-nick-input),
 .lq-accent-on [class*='sheet'],
 .lq-accent-on [class*='panel'],
 .lq-accent-on [class*='modal'],
@@ -26,7 +26,7 @@
 .lq-accent-on .home-kpi__pill,
 .lq-accent-on .home-desk,
 .lq-accent-on .mine-accent-row,
-.lq-accent-on input,
+.lq-accent-on input:not(.wb-nick-input),
 .lq-accent-on textarea {
   background-color: var(--lq-card) !important;
   border-color: var(--lq-border) !important;

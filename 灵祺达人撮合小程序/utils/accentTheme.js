@@ -4,13 +4,15 @@
 const KEY = 'mineAccentId'
 const LEGACY_ON = 'mineThemeColorOn'
 
+const INK = '#14181f'
+const INK_SOFT = '#64748b'
 const PALETTE = {
-  violet: { nav: '#7c4dff', dark: '#5b3fd4', soft: '#a78bfa', t50: '#f3eeff', t100: '#e4d9ff', rgb: '124, 77, 255' },
-  blue: { nav: '#2563eb', dark: '#1d4ed8', soft: '#93c5fd', t50: '#eff6ff', t100: '#dbeafe', rgb: '37, 99, 235' },
-  teal: { nav: '#0f766e', dark: '#115e59', soft: '#5eead4', t50: '#f0fdfa', t100: '#ccfbf1', rgb: '15, 118, 110' },
-  orange: { nav: '#ea580c', dark: '#c2410c', soft: '#fdba74', t50: '#fff7ed', t100: '#ffedd5', rgb: '234, 88, 12' },
-  rose: { nav: '#e11d48', dark: '#be123c', soft: '#fda4af', t50: '#fff1f2', t100: '#ffe4e6', rgb: '225, 29, 72' },
-  green: { nav: '#059669', dark: '#047857', soft: '#6ee7b7', t50: '#ecfdf5', t100: '#d1fae5', rgb: '5, 150, 105' },
+  violet: { nav: '#7c4dff', dark: '#5b3fd4', soft: '#a78bfa', t50: '#f3eeff', t100: '#e4d9ff', rgb: '124, 77, 255', text: INK, textSecondary: INK_SOFT },
+  blue: { nav: '#2563eb', dark: '#1d4ed8', soft: '#93c5fd', t50: '#eff6ff', t100: '#dbeafe', rgb: '37, 99, 235', text: INK, textSecondary: INK_SOFT },
+  teal: { nav: '#0f766e', dark: '#115e59', soft: '#5eead4', t50: '#f0fdfa', t100: '#ccfbf1', rgb: '15, 118, 110', text: INK, textSecondary: INK_SOFT },
+  orange: { nav: '#ea580c', dark: '#c2410c', soft: '#fdba74', t50: '#fff7ed', t100: '#ffedd5', rgb: '234, 88, 12', text: INK, textSecondary: INK_SOFT },
+  rose: { nav: '#e11d48', dark: '#be123c', soft: '#fda4af', t50: '#fff1f2', t100: '#ffe4e6', rgb: '225, 29, 72', text: INK, textSecondary: INK_SOFT },
+  green: { nav: '#059669', dark: '#047857', soft: '#6ee7b7', t50: '#ecfdf5', t100: '#d1fae5', rgb: '5, 150, 105', text: INK, textSecondary: INK_SOFT },
   dark: {
     nav: '#18181b',
     dark: '#fafafa',
@@ -72,6 +74,7 @@ function styleOf(p) {
     `--lq-home-banner:${solid}`,
     `--lq-card:${p.t100}`,
     `--lq-surface:${p.t100}`,
+    `--lq-on-primary:#ffffff`,
     `--lq-border:rgba(${p.rgb},0.28)`,
     `--lq-shadow-soft:0 8rpx 28rpx rgba(${p.rgb},0.12)`,
     `--lq-chip-on-bg:${p.t100}`,

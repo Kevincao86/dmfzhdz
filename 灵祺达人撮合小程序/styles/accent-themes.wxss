@@ -157,9 +157,51 @@
   border-color: #71717a !important;
 }
 
-.lq-accent-on .wb-nick-input,
 .lq-accent-on .home-search-v2__input,
 .lq-accent-on .home-search-v2__icon {
   background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+/* 卡片和页面上的标题、资料头、输入用正文色。主题色只铺底板和按钮，避免字和底板同色。 */
+.lq-accent-on .section-title,
+.lq-accent-on .platform-head,
+.lq-accent-on .wb-section-title,
+.lq-accent-on .cred-ready-text,
+.lq-accent-on .wx-name,
+.lq-accent-on .wx-nick-input,
+.lq-accent-on .cred-modal-title,
+.paper-page.lq-accent-on .section-title,
+.paper-page.lq-accent-on .platform-head,
+.paper-page.lq-accent-on .wx-name,
+.paper-page.lq-accent-on .wx-nick-input,
+.paper-page.lq-accent-on .input,
+.paper-page.lq-accent-on .picker-val,
+.paper-page.lq-accent-on .apply-textarea,
+.paper-page.lq-accent-on .btn-outline,
+.mine-page.lq-accent-on .wb-section-title,
+.mine-page.lq-accent-on .wb-stat-num {
+  color: var(--lq-text, #14181f) !important;
+}
+
+.lq-accent-on .form-label,
+.paper-page.lq-accent-on .form-label,
+.paper-page.lq-accent-on .hint,
+.paper-page.lq-accent-on .platform-card-summary {
+  color: var(--lq-text-secondary, #64748b) !important;
+}
+
+.paper-page.lq-accent-on .input,
+.paper-page.lq-accent-on .wx-nick-input,
+.paper-page.lq-accent-on .apply-textarea,
+.paper-page.lq-accent-on .picker-val {
+  -webkit-text-fill-color: var(--lq-text, #14181f);
+}
+
+.mine-page.lq-accent-on .wb-nick-input {
+  color: var(--lq-on-primary, #ffffff) !important;
+  -webkit-text-fill-color: var(--lq-on-primary, #ffffff) !important;
+  background: var(--lq-primary) !important;
+  background-color: var(--lq-primary) !important;
   border-color: transparent !important;
 }

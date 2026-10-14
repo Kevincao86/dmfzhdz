@@ -62,13 +62,13 @@
 }
 
 .mine-page.lq-accent-on .wb-name,
-.mine-page.lq-accent-on .wb-nick-input {
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff;
+.mine-page.lq-accent-on .wb-profile-meta .wb-nick-input {
+  color: var(--lq-on-primary, #ffffff) !important;
+  -webkit-text-fill-color: var(--lq-on-primary, #ffffff) !important;
 }
 
 /* 安卓原生 input 不吃 transparent，浅色底会把白字昵称盖住。用顶栏同色铺平。 */
-.mine-page.lq-accent-on .wb-nick-input {
+.mine-page.lq-accent-on .wb-profile-meta .wb-nick-input {
   background-color: var(--lq-primary) !important;
   background: var(--lq-primary) !important;
   border-color: transparent !important;
@@ -116,7 +116,7 @@
 }
 
 .mine-page.lq-accent-on .wb-section-title {
-  color: var(--lq-primary-dark);
+  color: var(--lq-text, #14181f);
 }
 
 .mine-page .wb-membership-panel,
@@ -210,7 +210,7 @@
 }
 
 .mine-accent-hit.is-on .mine-accent-cap {
-  color: var(--lq-primary-dark, #5b3fd4);
+  color: var(--lq-text, #14181f);
   font-weight: 700;
 }
 
@@ -537,7 +537,7 @@
   display: block;
   font-size: 36rpx;
   font-weight: 800;
-  color: var(--lq-primary-dark);
+  color: var(--lq-text, #14181f);
   line-height: 1.2;
 }
 

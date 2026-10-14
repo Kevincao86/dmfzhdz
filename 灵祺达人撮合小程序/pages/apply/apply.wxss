@@ -196,12 +196,12 @@ page {
 .paper-page .page-hero-title {
   font-size: 56rpx;
   font-weight: 800;
-  color: #1c1917;
+  color: var(--lq-text, #1c1917);
 }
 
 .paper-page .page-hero-sub {
   margin-top: 10rpx;
-  color: #78716c;
+  color: var(--lq-text-secondary, #78716c);
 }
 
 .paper-page .card {
@@ -223,7 +223,7 @@ page {
 }
 
 .paper-page .btn-outline {
-  color: var(--lq-primary, #6d28d9);
+  color: var(--lq-text, #14181f);
   background: var(--lq-card, #fffdf8);
   border: 1rpx solid var(--lq-chip-on-border, #ddd6fe);
   border-radius: 999rpx;
@@ -232,7 +232,7 @@ page {
 
 .paper-page .apply-form .form-label,
 .paper-page .hint {
-  color: #78716c;
+  color: var(--lq-text-secondary, #78716c);
 }
 
 .paper-page .input,
@@ -240,7 +240,8 @@ page {
 .paper-page .picker-val {
   background: transparent;
   border-color: #efe8dc;
-  color: #1c1917;
+  color: var(--lq-text, #1c1917);
+  -webkit-text-fill-color: var(--lq-text, #1c1917);
 }
 
 .paper-page .sync-card {

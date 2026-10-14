@@ -1868,6 +1868,12 @@ PAT
 灵祺达人撮合小程序/components/order-expand/index.wxss
 灵祺达人撮合小程序/pages/subpack-core/detail/detail.wxss
 灵祺达人撮合小程序/styles/accent-themes.wxss
+灵祺达人撮合小程序/styles/accent-dark-surfaces.wxss
+灵祺达人撮合小程序/utils/accentTheme.js
+灵祺达人撮合小程序/pages/register/register.wxss
+灵祺达人撮合小程序/pages/apply/apply.wxss
+灵祺达人撮合小程序/pages/mine/mine.wxss
+灵祺达人撮合小程序/pages/mine/mine.wxml
 change-scope-guard
 PAT
       ;;
