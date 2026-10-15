@@ -79,8 +79,6 @@ import {
   buildUpcomingTodos,
   buildWeekCells,
   calendarPageSubtitleForWork,
-  CALENDAR_REMIND_OPTIONS,
-  computeRemindAtMs,
   countActiveTodos,
   dayEventSummary,
   eventTone,
@@ -152,6 +150,27 @@ function eventLink(role: string, evt: OrderCalendarEvent): string {
   return `/recruitment/${encodeURIComponent(evt.mpOrderId)}`
 }
 
+function defaultRemindInput(dateKey: string, timeLabel?: string) {
+  const match = String(timeLabel || '').match(/(\d{1,2}):(\d{2})/)
+  const hh = match ? match[1].padStart(2, '0') : '09'
+  const mm = match ? match[2] : '00'
+  return `${dateKey}T${hh}:${mm}`
+}
+
+function remindInputToMs(value: string) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (!match) return 0
+  const ms = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    0,
+  ).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
 function dotClass(phase: OrderCalendarDayPhase | null, selected: boolean): string {
   if (selected) return 'bg-white'
   if (phase === 'active') return 'bg-emerald-500'
@@ -198,6 +217,7 @@ export default function OrderCalendarPage() {
   const [err, setErr] = useState('')
   const [pendingRemindEventIds, setPendingRemindEventIds] = useState<Set<string>>(new Set())
   const [remindTarget, setRemindTarget] = useState<OrderCalendarEvent | null>(null)
+  const [remindAtInput, setRemindAtInput] = useState('')
   const [remindBusy, setRemindBusy] = useState(false)
   const [labelTarget, setLabelTarget] = useState<OrderCalendarEvent | null>(null)
   const [labelBusy, setLabelBusy] = useState(false)
@@ -431,12 +451,17 @@ export default function OrderCalendarPage() {
     }
   }
 
-  async function onConfirmReminder(preset: MpCalendarReminderLeadPreset, source?: OrderCalendarEvent) {
-    const evt = source || remindTarget
+  function openReminder(evt: OrderCalendarEvent) {
+    setRemindTarget({ ...evt, mpOrderId: evt.mpOrderId || evt.id })
+    setRemindAtInput(defaultRemindInput(evt.dateKey, evt.timeLabel))
+  }
+
+  async function onConfirmReminder() {
+    const evt = remindTarget
     if (!evt || remindBusy) return
-    const remindAtMs = computeRemindAtMs(evt.dateKey, preset)
+    const remindAtMs = remindInputToMs(remindAtInput)
     if (!remindAtMs || remindAtMs <= Date.now()) {
-      setToast('提醒时间已过，请选更早的提醒')
+      setToast('请选择一个还没到的提醒时间')
       return
     }
     setRemindBusy(true)
@@ -448,7 +473,7 @@ export default function OrderCalendarPage() {
         eventDateKey: evt.dateKey,
         eventTitle: evt.orderTitle,
         storeName: evt.storeName,
-        leadPreset: preset,
+        leadPreset: 'at' as MpCalendarReminderLeadPreset,
         remindAt: new Date(remindAtMs).toISOString(),
         channels: ['subscribe', 'oa'],
       })
@@ -948,7 +973,7 @@ export default function OrderCalendarPage() {
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => setRemindTarget({ ...evt, mpOrderId: evt.mpOrderId || evt.id })}
+                                    onClick={() => openReminder(evt)}
                                     className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
                                       remindSet
                                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
@@ -983,7 +1008,7 @@ export default function OrderCalendarPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setRemindTarget(evt)}
+                                onClick={() => openReminder(evt)}
                                 className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
                                   remindSet
                                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
@@ -1033,21 +1058,23 @@ export default function OrderCalendarPage() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <ul className="space-y-2">
-              {CALENDAR_REMIND_OPTIONS.map((opt) => (
-                <li key={opt.id}>
-                  <button
-                    type="button"
-                    disabled={remindBusy}
-                    onClick={() => onConfirmReminder(opt.id)}
-                    className="flex w-full items-center justify-between rounded-xl border border-violet-100 px-4 py-3 text-left text-sm font-medium text-slate-800 transition hover:border-violet-300 hover:bg-violet-50 disabled:opacity-60"
-                  >
-                    {opt.label}
-                    {remindBusy ? <Loader2 className="h-4 w-4 animate-spin text-violet-500" /> : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <label className="block text-xs text-slate-500">
+              提醒时间
+              <input
+                type="datetime-local"
+                value={remindAtInput}
+                onChange={(e) => setRemindAtInput(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={remindBusy}
+              onClick={() => void onConfirmReminder()}
+              className="mt-4 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
+            >
+              {remindBusy ? '保存中…' : '确定'}
+            </button>
             <p className="mt-3 text-center text-[11px] text-slate-400">
               到点通过服务号或订阅消息推送。确认后会下载日历文件，用手机打开即可写入系统日历。小程序里确认提醒会直接写入手机日历。
             </p>
@@ -1192,38 +1219,28 @@ export default function OrderCalendarPage() {
               />
             </label>
             {manualForm.id ? (
-              <div className="mt-4">
-                <p className="text-xs font-medium text-slate-700">设置提醒</p>
-                <div className="mt-2 space-y-2">
-                  {CALENDAR_REMIND_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      disabled={remindBusy}
-                      onClick={() =>
-                        void onConfirmReminder(opt.id, {
-                          id: manualForm.id,
-                          dateKey: manualForm.dateKey,
-                          dayMs: 0,
-                          kind: 'manual',
-                          mpOrderId: manualForm.id,
-                          orderTitle: manualForm.title.trim() || '自己的行程',
-                          storeName: '',
-                          timeLabel: manualForm.timeLabel,
-                          statusLabel: '自己的行程',
-                          note: manualForm.note,
-                        })
-                      }
-                      className="flex w-full items-center justify-between rounded-xl border border-violet-100 px-3 py-2 text-left text-sm text-slate-800 transition hover:border-violet-300 hover:bg-violet-50 disabled:opacity-60"
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-[11px] text-slate-400">选一个时间就会记下提醒，并下载日历文件。用手机打开文件即可写入系统日历。</p>
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  openReminder({
+                    id: manualForm.id,
+                    dateKey: manualForm.dateKey,
+                    dayMs: 0,
+                    kind: 'manual',
+                    mpOrderId: manualForm.id,
+                    orderTitle: manualForm.title.trim() || '自己的行程',
+                    storeName: '',
+                    timeLabel: manualForm.timeLabel,
+                    statusLabel: '自己的行程',
+                    note: manualForm.note,
+                  })
+                }
+                className="mt-4 w-full rounded-xl border border-violet-200 bg-violet-50 py-2.5 text-sm font-medium text-violet-700 transition hover:bg-violet-100"
+              >
+                设置提醒
+              </button>
             ) : (
-              <p className="mt-3 text-[11px] text-slate-400">保存这条行程后，可以设置到点提醒。</p>
+              <p className="mt-3 text-[11px] text-slate-400">保存这条行程后，可以自己选择提醒时间。</p>
             )}
             <button
               type="button"

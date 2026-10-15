@@ -164,6 +164,7 @@
             data-date-key="{{item.dateKey}}"
             data-title="{{item.orderTitle}}"
             data-store="{{item.storeName}}"
+            data-time="{{item.timeLabel}}"
             catchtap="onSetReminder"
           >{{item.remindSet ? '已设提醒' : '设置提醒'}}</view>
         </view>
@@ -204,16 +205,13 @@
       <view class="cal-label-save {{eventBusy ? 'cal-label-save--busy' : ''}}" catchtap="onSaveManualEvent">保存</view>
       <view wx:if="{{eventSheetId}}" class="cal-remind-sheet">
         <text class="cal-remind-sheet-title">设置提醒</text>
-        <view
-          wx:for="{{remindOptions}}"
-          wx:key="id"
-          class="cal-remind-sheet-opt"
-          data-preset="{{item.id}}"
-          data-event-id="{{eventSheetId}}"
-          data-date-key="{{eventDateKey}}"
-          data-title="{{eventTitle}}"
-          catchtap="onRemindManualFromSheet"
-        >{{item.label}}</view>
+        <picker mode="date" value="{{remindPickDate || eventDateKey}}" bindchange="onRemindDateChange">
+          <view class="cal-label-input">提醒日期 {{remindPickDate || eventDateKey}}</view>
+        </picker>
+        <picker mode="time" value="{{remindPickTime || '09:00'}}" bindchange="onRemindTimeChange">
+          <view class="cal-label-input">提醒时间 {{remindPickTime || '09:00'}}</view>
+        </picker>
+        <view class="cal-remind-sheet-opt" catchtap="onRemindManualFromSheet">记下这个提醒</view>
       </view>
       <view wx:else class="cal-label-hint">保存这条行程后，可以设置到点提醒。</view>
       <view
@@ -260,6 +258,26 @@
         catchtap="onClearLabel"
       >清除标签</view>
       <text class="cal-label-hint">标签会按你现在的身份保存，和电脑上的商单日历是同一份</text>
+    </view>
+  </view>
+
+  <view wx:if="{{remindSheetOpen}}" class="cal-label-mask" catchtouchmove="onRemindSheetNoop" catchtap="onCloseRemindSheet">
+    <view class="cal-label-sheet" catchtap="onRemindSheetNoop">
+      <view class="cal-label-sheet-head">
+        <view class="cal-label-sheet-titles">
+          <text class="cal-label-sheet-title">设置提醒</text>
+          <text class="cal-label-sheet-sub">{{remindTitle}}</text>
+        </view>
+        <view class="cal-label-sheet-close" catchtap="onCloseRemindSheet">×</view>
+      </view>
+      <picker mode="date" value="{{remindPickDate}}" bindchange="onRemindDateChange">
+        <view class="cal-label-input">提醒日期 {{remindPickDate}}</view>
+      </picker>
+      <picker mode="time" value="{{remindPickTime}}" bindchange="onRemindTimeChange">
+        <view class="cal-label-input">提醒时间 {{remindPickTime}}</view>
+      </picker>
+      <view class="cal-label-save" catchtap="onConfirmCustomReminder">确定</view>
+      <text class="cal-label-hint">自己选择提醒时间。确认后会写入手机日历，到点也会通过服务号或订阅消息推送。</text>
     </view>
   </view>
   <site-icp-footer />

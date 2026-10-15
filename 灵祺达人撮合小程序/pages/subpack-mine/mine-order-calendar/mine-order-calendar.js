@@ -12,11 +12,19 @@ const orderLabelApi = require('../../../utils/mpOrderCustomLabelApi.js')
 const customEventApi = require('../../../utils/mpCalendarCustomEventApi.js')
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六']
-const REMIND_OPTIONS = [
-  { id: 'day8', label: '当天早上 8:00' },
-  { id: 'day_before_20', label: '前一日晚上 8:00' },
-  { id: 'days2_before', label: '前两日晚上 8:00' },
-]
+function parseRemindMs(dateKey, timeLabel) {
+  const day = String(dateKey || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const time = String(timeLabel || '').match(/^(\d{1,2}):(\d{2})/)
+  if (!day || !time) return 0
+  const ms = new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]), Number(time[1]), Number(time[2]), 0).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
+function clockOf(timeLabel) {
+  const time = String(timeLabel || '').match(/(\d{1,2}):(\d{2})/)
+  if (!time) return '09:00'
+  return `${time[1].padStart(2, '0')}:${time[2]}`
+}
 
 function addPhoneCalendar(title, store, remindAtMs) {
   if (!wx.addPhoneCalendar) return Promise.resolve(false)
@@ -75,7 +83,6 @@ Page({
     todayKey: '',
     upcomingTodos: [],
     activeTodoCount: 0,
-    remindOptions: REMIND_OPTIONS,
     myReminders: [],
     orderLabels: [],
     navLabel: '',
@@ -93,6 +100,14 @@ Page({
     eventTimeLabel: '',
     eventNote: '',
     eventBusy: false,
+    remindSheetOpen: false,
+    remindPickDate: '',
+    remindPickTime: '09:00',
+    remindEventId: '',
+    remindMpOrderId: '',
+    remindKind: '',
+    remindTitle: '',
+    remindStore: '',
   },
 
   async onLoad() {
@@ -438,6 +453,8 @@ Page({
       eventTimeLabel: String((row && row.timeLabel) || '').trim(),
       eventNote: String((row && row.note) || '').trim(),
       eventBusy: false,
+      remindPickDate: String((row && row.dateKey) || selected).trim(),
+      remindPickTime: clockOf(row && row.timeLabel),
     })
   },
 
@@ -567,111 +584,103 @@ Page({
   async onSetReminder(e) {
     const dataset = e.currentTarget.dataset || {}
     const eventId = String(dataset.eventId || '').trim()
-    const mpOrderId = String(dataset.mpOrderId || '').trim()
+    const mpOrderId = String(dataset.mpOrderId || eventId || '').trim()
     const eventKind = String(dataset.kind || '').trim()
     const dateKey = String(dataset.dateKey || '').trim()
     const title = String(dataset.title || '').trim()
     const store = String(dataset.store || '').trim()
+    const timeLabel = String(dataset.time || '').trim()
     if (!eventId || !mpOrderId || !dateKey) {
       wx.showToast({ title: '这条商单缺少时间，暂时不能设提醒', icon: 'none' })
       return
     }
-
-    const presets = REMIND_OPTIONS.map((o) => o.label)
-    let picked = null
-    try {
-      picked = await new Promise((resolve, reject) => {
-        wx.showActionSheet({
-          itemList: presets,
-          success: (res) => {
-            const presetIdx = Number(res.tapIndex)
-            const preset = REMIND_OPTIONS[presetIdx]
-            if (!preset) {
-              resolve(null)
-              return
-            }
-            const remindAtMs = orderCalendar.computeRemindAtMs(dateKey, preset.id)
-            const phonePromise =
-              remindAtMs && remindAtMs > Date.now()
-                ? addPhoneCalendar(title, store, remindAtMs)
-                : Promise.resolve(false)
-            resolve({ preset: preset.id, remindAtMs, phonePromise })
-          },
-          fail: reject,
-        })
-      })
-    } catch (_) {
-      return
-    }
-    if (!picked || !picked.preset) return
-
-    const remindAtMs = picked.remindAtMs
-    if (!remindAtMs || remindAtMs <= Date.now()) {
-      wx.showToast({ title: '提醒时间已过，请选更早的提醒', icon: 'none' })
-      return
-    }
-
-    await mpSubscribe.requestForCalendarReminder()
-    try {
-      await calReminder.createReminder({
-        eventId,
-        mpOrderId,
-        eventKind,
-        eventDateKey: dateKey,
-        eventTitle: title,
-        storeName: store,
-        leadPreset: picked.preset,
-        remindAt: new Date(remindAtMs).toISOString(),
-        identity: this.data.identity,
-        channels: ['subscribe', 'oa'],
-      })
-      const wrotePhone = await picked.phonePromise
-      wx.showToast({
-        title: wrotePhone ? '已写入手机日历' : '提醒已设置',
-        icon: 'success',
-      })
-      await this.reload()
-    } catch (err) {
-      wx.showToast({ title: (err && err.message) || '设置失败', icon: 'none' })
-    }
+    this.setData({
+      remindSheetOpen: true,
+      remindEventId: eventId,
+      remindMpOrderId: mpOrderId,
+      remindKind: eventKind || 'visit',
+      remindPickDate: dateKey,
+      remindPickTime: clockOf(timeLabel),
+      remindTitle: title,
+      remindStore: store,
+    })
   },
 
-  async onRemindManualFromSheet(e) {
-    const dataset = (e && e.currentTarget && e.currentTarget.dataset) || {}
-    const presetId = String(dataset.preset || '').trim()
-    const eventId = String(dataset.eventId || '').trim()
-    const dateKey = String(dataset.dateKey || '').trim()
-    const title = String(dataset.title || this.data.eventTitle || '').trim() || '自己的行程'
-    if (!eventId || !dateKey || !presetId) {
-      wx.showToast({ title: '请先保存行程', icon: 'none' })
-      return
-    }
-    const remindAtMs = orderCalendar.computeRemindAtMs(dateKey, presetId)
+  onCloseRemindSheet() {
+    this.setData({ remindSheetOpen: false })
+  },
+
+  onRemindSheetNoop() {},
+
+  onRemindDateChange(e) {
+    this.setData({ remindPickDate: String((e.detail && e.detail.value) || '').trim() })
+  },
+
+  onRemindTimeChange(e) {
+    this.setData({ remindPickTime: clockOf(e.detail && e.detail.value) })
+  },
+
+  async saveCustomReminder(input) {
+    const remindAtMs = parseRemindMs(input.dateKey, input.timeLabel)
     if (!remindAtMs || remindAtMs <= Date.now()) {
-      wx.showToast({ title: '提醒时间已过，请选更早的提醒', icon: 'none' })
+      wx.showToast({ title: '请选择一个还没到的提醒时间', icon: 'none' })
       return
     }
-    const phonePromise = addPhoneCalendar(title, '', remindAtMs)
+    const phonePromise = addPhoneCalendar(input.title, input.store, remindAtMs)
     await mpSubscribe.requestForCalendarReminder()
     try {
       await calReminder.createReminder({
-        eventId,
-        mpOrderId: eventId,
-        eventKind: 'manual',
-        eventDateKey: dateKey,
-        eventTitle: title,
-        storeName: '',
-        leadPreset: presetId,
+        eventId: input.eventId,
+        mpOrderId: input.mpOrderId,
+        eventKind: input.eventKind,
+        eventDateKey: input.eventDateKey,
+        eventTitle: input.title,
+        storeName: input.store,
+        leadPreset: 'at',
         remindAt: new Date(remindAtMs).toISOString(),
         identity: this.data.identity,
         channels: ['subscribe', 'oa'],
       })
       const wrotePhone = await phonePromise
       wx.showToast({ title: wrotePhone ? '已写入手机日历' : '提醒已设置', icon: 'success' })
+      this.setData({ remindSheetOpen: false })
       await this.reload()
     } catch (err) {
       wx.showToast({ title: (err && err.message) || '设置失败', icon: 'none' })
     }
+  },
+
+  onConfirmCustomReminder() {
+    return this.saveCustomReminder({
+      eventId: this.data.remindEventId,
+      mpOrderId: this.data.remindMpOrderId,
+      eventKind: this.data.remindKind || 'visit',
+      eventDateKey: this.data.remindPickDate,
+      title: this.data.remindTitle || '商单提醒',
+      store: this.data.remindStore || '',
+      dateKey: this.data.remindPickDate,
+      timeLabel: this.data.remindPickTime,
+    })
+  },
+
+  onRemindManualFromSheet() {
+    const eventId = String(this.data.eventSheetId || '').trim()
+    const eventDateKey = String(this.data.eventDateKey || '').trim()
+    const title = String(this.data.eventTitle || '').trim() || '自己的行程'
+    if (!eventId) {
+      wx.showToast({ title: '请先保存行程', icon: 'none' })
+      return
+    }
+    return this.saveCustomReminder({
+      eventId,
+      mpOrderId: eventId,
+      eventKind: 'manual',
+      eventDateKey,
+      title,
+      store: '',
+      dateKey: this.data.remindPickDate || eventDateKey,
+      timeLabel: this.data.remindPickTime,
+    })
   },
 
   onSetLabel(e) {
