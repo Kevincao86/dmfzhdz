@@ -61,7 +61,7 @@ function wxPhoneAuthFailHint(detail) {
     return '请先同意《隐私保护指引》，再点手机号快捷登录'
   }
   if (/deny|cancel|拒绝/i.test(errMsg)) {
-    return '需要在弹窗里允许获取绑定手机号'
+    return '已取消手机号授权。可以先浏览，或改用账号、验证码登录'
   }
   if (/no permission|banned|jsapi/i.test(errMsg)) {
     return '当前小程序还不能读取手机号。请到微信公众平台确认已认证，并在「管理 → 付费管理」查看手机号快速验证额度'
@@ -134,26 +134,55 @@ function navigateAfterLogin(page) {
   wx.switchTab({ url: '/pages/index/index' })
 }
 
+const PHONE_BIND_SKIP_KEY = 'mp_phone_bind_skipped_v1'
+
 function accountNeedsPhoneBind() {
   return auth.needsPhoneBind()
 }
 
-function resumeOrNavigateAfterLogin(page) {
-  if (accountNeedsPhoneBind()) {
-    const workId =
-      (page.data && page.data.pendingWorkIdForBind) ||
-      (page.data && page.data.pendingWorkId) ||
-      (identityTypes.isWorkIdentity(page.data.loginIdentity)
-        ? page.data.loginIdentity
-        : userProfile.readIdentity())
-    page.setData({
-      showPhoneBindSheet: true,
-      pendingWorkIdForBind: workId,
-      err: '',
-    })
+function phoneBindAccountKey() {
+  const acct = auth.readAccount() || {}
+  return String(
+    acct.id || acct.accountId || acct.userId || acct.openid || acct.loginName || acct.phone || 'current',
+  )
+}
+
+function phoneBindWasSkipped() {
+  try {
+    return wx.getStorageSync(PHONE_BIND_SKIP_KEY) === phoneBindAccountKey()
+  } catch (_) {
+    return false
+  }
+}
+
+function markPhoneBindSkipped() {
+  try {
+    wx.setStorageSync(PHONE_BIND_SKIP_KEY, phoneBindAccountKey())
+  } catch (_) {}
+}
+
+function clearPhoneBindSkipped() {
+  try {
+    wx.removeStorageSync(PHONE_BIND_SKIP_KEY)
+  } catch (_) {}
+}
+
+function offerPhoneBindOrEnter(page) {
+  if (!accountNeedsPhoneBind() || phoneBindWasSkipped()) {
+    void navigateAfterLogin(page)
     return
   }
-  void navigateAfterLogin(page)
+  const workId =
+    (page.data && page.data.pendingWorkIdForBind) ||
+    (page.data && page.data.pendingWorkId) ||
+    (identityTypes.isWorkIdentity(page.data.loginIdentity)
+      ? page.data.loginIdentity
+      : userProfile.readIdentity())
+  page.setData({
+    showPhoneBindSheet: true,
+    pendingWorkIdForBind: workId,
+    err: '',
+  })
 }
 
 function wxNickFromDetail(detail) {
@@ -286,14 +315,7 @@ Page({
     syncLoginIdentityFromProfile(this)
     if (this.data.legalAgreed) this.primeWxPrivacy()
     if (auth.isLoggedIn()) {
-      if (accountNeedsPhoneBind()) {
-        this.setData({
-          showPhoneBindSheet: true,
-          pendingWorkIdForBind: userProfile.readIdentity(),
-        })
-        return
-      }
-      void navigateAfterLogin(this)
+      offerPhoneBindOrEnter(this)
     }
   },
 
@@ -629,7 +651,7 @@ Page({
         wx.redirectTo({ url: '/pages/subpack-signup/signup/signup?from=wx' })
         return
       }
-      resumeOrNavigateAfterLogin(this)
+      offerPhoneBindOrEnter(this)
     } catch (e) {
       const msg = e && e.message ? e.message : '登录失败'
       this.setData({
@@ -715,7 +737,7 @@ Page({
         skipRemote: true,
       })
       this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
-      resumeOrNavigateAfterLogin(this)
+      offerPhoneBindOrEnter(this)
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       let hint = msg
@@ -828,6 +850,12 @@ Page({
     this.setData({ bindPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value), err: '' })
   },
 
+  onSkipPhoneBind() {
+    markPhoneBindSkipped()
+    this.setData({ showPhoneBindSheet: false, bindPhone: '', err: '' })
+    void navigateAfterLogin(this)
+  },
+
   async onConfirmPhoneBind() {
     const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.bindPhone)
     if (phoneErr) {
@@ -855,6 +883,7 @@ Page({
         platform: 'wx',
       })
       await applyLoginIdentity(data)
+      clearPhoneBindSkipped()
       this.setData({
         showPhoneBindSheet: false,
         bindPhone: '',

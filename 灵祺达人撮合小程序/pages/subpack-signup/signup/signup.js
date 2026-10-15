@@ -186,7 +186,7 @@ Page({
     const detail = (e && e.detail) || {}
     const phoneCode = String(detail.code || '').trim()
     if (detail.errMsg && String(detail.errMsg).indexOf('ok') < 0) {
-      this.setData({ err: '需要允许获取绑定手机号才能快捷注册' })
+      this.setData({ err: '已取消手机号授权。可以手动填写手机号注册，或返回继续浏览' })
       return
     }
     if (!phoneCode) {

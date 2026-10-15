@@ -97,7 +97,7 @@
           <text class="login-hint">微信登录认微信，手机号登录认手机号。要两种都能用，登录后在账号绑定里补上另一个。</text>
           <text class="login-err" wx:if="{{err}}">{{err}}</text>
           <text class="login-hint" wx:if="{{wxPhoneDebug}}">{{wxPhoneDebug}}</text>
-          <text class="login-guest-link" bindtap="onGuestMode">使用游客模式 ›</text>
+          <button class="login-btn login-btn--ghost" bindtap="onGuestMode">暂不登录</button>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
@@ -133,6 +133,7 @@
           </view>
           <text class="login-forgot" bindtap="onForgotPassword">忘记密码？切换手机验证码登录 ›</text>
           <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onPwdLogin">登录</button>
+          <button class="login-btn login-btn--ghost" bindtap="onGuestMode">暂不登录</button>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
@@ -173,6 +174,7 @@
             >{{smsCooldown > 0 ? smsCooldown + 's' : '获取验证码'}}</button>
           </view>
           <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onSmsLogin">验证码登录</button>
+          <button class="login-btn login-btn--ghost" bindtap="onGuestMode">暂不登录</button>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
@@ -255,6 +257,7 @@
             bindagreeprivacyauthorization="onPrivacyAuthorizeAgree"
           >同意隐私协议并继续</button>
           <text class="login-privacy-contract-link" bindtap="onOpenPrivacyContract">查看《隐私保护指引》</text>
+          <button class="login-btn login-btn--ghost login-btn--sheet" bindtap="onCloseWxAuthSheet">取消</button>
         </view>
       </block>
       <block wx:elif="{{wxAuthStep === 'avatar'}}">
@@ -275,6 +278,7 @@
             />
           </button>
           <text class="login-wx-avatar-tip" wx:if="{{!wxAvatarUrl}}">点击授权头像</text>
+          <button class="login-btn login-btn--ghost login-btn--sheet" bindtap="onCloseWxAuthSheet">取消</button>
         </view>
       </block>
       <block wx:else>
@@ -303,6 +307,7 @@
           <text class="login-wx-nick-display__edit">更换</text>
         </view>
         <button class="login-btn login-btn--wx login-btn--sheet" loading="{{loading}}" bindtap="onConfirmWxNickStep">完成登录</button>
+        <button class="login-btn login-btn--ghost login-btn--sheet" bindtap="onCloseWxAuthSheet">取消</button>
         </view>
       </block>
     </view>
@@ -316,8 +321,9 @@
     <view class="login-id-sheet login-id-sheet--center" catchtap="noopSheetTap">
       <view class="login-id-sheet-head">
         <text class="login-id-sheet-title">绑定手机号</text>
+        <text class="login-id-sheet-close" bindtap="onSkipPhoneBind">×</text>
       </view>
-      <text class="login-id-sheet-hint">首次登录须绑定手机号，绑定后各端共用同一灵祺账号</text>
+      <text class="login-id-sheet-hint">绑定后各端可共用同一账号。也可以先去看看，稍后在「我的 - 账号绑定」里补充。</text>
       <view class="login-field">
         <text class="login-field-label">手机号</text>
         <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
@@ -329,7 +335,8 @@
           bindinput="onBindPhone"
         />
       </view>
-      <button class="login-btn login-btn--wx login-btn--sheet" loading="{{loading}}" disabled="{{loading}}" bindtap="onConfirmPhoneBind">下一步</button>
+      <button class="login-btn login-btn--wx login-btn--sheet" loading="{{loading}}" disabled="{{loading}}" bindtap="onConfirmPhoneBind">确认绑定</button>
+      <button class="login-btn login-btn--ghost login-btn--sheet" bindtap="onSkipPhoneBind">取消，先去看看</button>
       <text class="login-err" wx:if="{{err}}">{{err}}</text>
     </view>
   </view>
