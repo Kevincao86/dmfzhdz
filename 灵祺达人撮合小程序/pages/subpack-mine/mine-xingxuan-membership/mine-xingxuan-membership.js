@@ -11,6 +11,37 @@ const { prepareMineSubPage } = require('../../../utils/pageIdentityChrome.js')
 const guestRoutes = require('../../../utils/mpGuestRoutes.js')
 const mpCdnAssets = require('../../../utils/mpCdnAssets.js')
 
+const BASIC_GIFT_POINTS = 100
+const GIFT_AI_COST_SHARE = 0.4
+const GIFT_POINT_COST_YUAN = 0.01
+
+function formatPoints(n) {
+  const s = String(Math.max(0, Math.floor(Number(n) || 0)))
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+function roundGiftPoints(raw) {
+  const n = Math.max(0, Math.floor(Number(raw) || 0))
+  if (n <= 0) return BASIC_GIFT_POINTS
+  if (n < 500) return n
+  return Math.round(n / 1000) * 1000
+}
+
+function giftPointsForPlan(plan) {
+  const explicit = plan && plan.giftPointsMonthly
+  if (explicit != null && explicit !== '' && Number.isFinite(Number(explicit)) && Number(explicit) >= 0) {
+    return Math.floor(Number(explicit))
+  }
+  const price = Number(plan && plan.priceMonthlyYuan)
+  if (!Number.isFinite(price) || price <= 0) return BASIC_GIFT_POINTS
+  const budget = price * GIFT_AI_COST_SHARE
+  return roundGiftPoints(Math.max(BASIC_GIFT_POINTS, Math.floor(budget / GIFT_POINT_COST_YUAN)))
+}
+
+function giftPointsLabel(plan) {
+  return `${formatPoints(giftPointsForPlan(plan))} 积分/月`
+}
+
 const PLAN_TAB_ORDER = ['basic', 'pro', 'flagship', 'enterprise']
 const PLAN_TAB_SHORT = {
   basic: '基础版',
@@ -118,20 +149,26 @@ function buildActiveBenefitCards(role, plan) {
       title: lead.label,
       desc: descParts.join('；') || g.title,
     })
-    if (cards.length >= 4) break
+    if (cards.length >= 3) break
   }
-  if (cards.length >= 4) return cards
-  const extras = mpFeatures.listEnabledFeatures(role, merged)
-  for (const item of extras) {
-    if (cards.some((c) => c.key === item.key)) continue
-    cards.push({
-      key: item.key,
-      title: item.label,
-      desc: item.detail ? `${item.detail}` : item.group || '',
-    })
-    if (cards.length >= 4) break
+  if (cards.length < 3) {
+    const extras = mpFeatures.listEnabledFeatures(role, merged)
+    for (const item of extras) {
+      if (cards.some((c) => c.key === item.key)) continue
+      cards.push({
+        key: item.key,
+        title: item.label,
+        desc: item.detail ? `${item.detail}` : item.group || '',
+      })
+      if (cards.length >= 3) break
+    }
   }
-  return cards
+  cards.unshift({
+    key: 'gift-points',
+    title: '每月赠送积分',
+    desc: giftPointsLabel(plan),
+  })
+  return cards.slice(0, 4)
 }
 
 function mapPlanRow(plan, role, billing, nowMs) {
@@ -152,6 +189,7 @@ function mapPlanRow(plan, role, billing, nowMs) {
     isRecommended: id === 'pro',
     priceMonthlyYuan: plan.priceMonthlyYuan,
     priceYearlyYuan: plan.priceYearlyYuan,
+    giftPointsLabel: giftPointsLabel(plan),
     _raw: plan,
     featureGroups: enrichFeatureGroups(role, mpFeatures.buildPlanFeatureGroups(role, mergedPlan)),
   }
@@ -240,6 +278,7 @@ Page({
         planId === 'basic'
           ? '永久免费'
           : mpMembershipUi.formatExpiryLabel(planId, expiresAt) || '未记录',
+      currentGiftPointsLabel: '',
     })
     try {
       const versions = await mpMembershipApi.fetchMembershipPlanVersions(role)
@@ -261,6 +300,7 @@ Page({
         selectedPlanId,
         selectedPlan,
         activeBenefitCards,
+        currentGiftPointsLabel: currentPlan ? giftPointsLabel(currentPlan) : '',
         loading: false,
       })
       this.startPromoTimer()

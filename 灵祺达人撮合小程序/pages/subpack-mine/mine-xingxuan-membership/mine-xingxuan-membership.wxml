@@ -33,6 +33,7 @@
           </view>
           <text class="xx-status-val">{{currentPlanLabel}}</text>
           <text class="xx-status-hint">升级会员，享受更多专属权益</text>
+          <text wx:if="{{currentGiftPointsLabel}}" class="xx-status-exp">每月赠送 {{currentGiftPointsLabel}}</text>
           <text wx:if="{{currentExpiryLabel}}" class="xx-status-exp">{{currentExpiryLabel}}</text>
         </view>
         <text class="xx-compare-link" bindtap="onCompareBenefits">权益对比 ›</text>
@@ -90,6 +91,10 @@
       </view>
 
       <view class="xx-card-body">
+        <view wx:if="{{selectedPlan.giftPointsLabel}}" class="xx-gift">
+          <text class="xx-gift-label">每月赠送积分</text>
+          <text class="xx-gift-val">{{selectedPlan.giftPointsLabel}}</text>
+        </view>
         <view wx:for="{{selectedPlan.featureGroups}}" wx:for-item="group" wx:for-index="gi" wx:key="gi" class="xx-feat-group">
           <view class="xx-feat-group-head">
             <view class="xx-feat-block xx-feat-block--{{group.tone}}">

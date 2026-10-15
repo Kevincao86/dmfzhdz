@@ -49,7 +49,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
-import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
+import { MP_POINTS_SHORTVIDEO_PER_SEC } from '../lib/mpPointsEconomics'
 import { MembershipMediaLockedBanner, useMembership } from '../context/MembershipContext'
 import { fetchImageBlob } from '../lib/aiImageDelivery'
 import { compressPortraitDataUrlForLibrary, processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
@@ -4239,12 +4239,20 @@ export default function ShortDramaPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="erp-page-title">AI短剧</h1>
-          <MpAddonPointsRateBadge kind="shortvideo" className="mt-2" />
+          <p className="mt-2 text-xs font-medium text-violet-800">
+            AI短剧 {MP_POINTS_SHORTVIDEO_PER_SEC} 积分/秒
+            {durationSelected
+              ? ` · 约 ${Math.max(1, Math.ceil(durationSec))} 秒预计 ${
+                  Math.max(1, Math.ceil(durationSec)) * MP_POINTS_SHORTVIDEO_PER_SEC
+                } 积分`
+              : ''}
+            · 套餐赠送积分优先
+          </p>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
             {world.blurb}
             {readMpSessionToken() ? (
               <span className="mt-1 block text-xs text-cyan-800">
-                星选账号：成片成功后按秒扣积分；套餐次数优先，用尽后扣积分余额。
+                星选账号：成片成功后按 {MP_POINTS_SHORTVIDEO_PER_SEC} 积分/秒扣；套餐赠送积分优先，不足再扣充值积分。
               </span>
             ) : null}
           </p>
@@ -5319,8 +5327,14 @@ export default function ShortDramaPage() {
                       : '请先选择成片时长，再生成故事或短剧。'}
               </p>
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
-                成片会记入上方「成片记录」，刷新后仍可回看。生成提交后在云端继续，中途断网或刷新会自动拉回。远程地址可能过期，建议再点一次下载备份。长片按秒扣积分，15
-                分钟成本很高，请先确认试镜。
+                成片会记入上方「成片记录」，刷新后仍可回看。生成提交后在云端继续，中途断网或刷新会自动拉回。远程地址可能过期，建议再点一次下载备份。长片按{' '}
+                {MP_POINTS_SHORTVIDEO_PER_SEC} 积分/秒扣
+                {durationSelected
+                  ? `，当前约 ${Math.max(1, Math.ceil(durationSec))} 秒预计 ${
+                      Math.max(1, Math.ceil(durationSec)) * MP_POINTS_SHORTVIDEO_PER_SEC
+                    } 积分`
+                  : ''}
+                。15 分钟成本很高，请先确认试镜。
               </p>
               {works.length ? (
                 <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">

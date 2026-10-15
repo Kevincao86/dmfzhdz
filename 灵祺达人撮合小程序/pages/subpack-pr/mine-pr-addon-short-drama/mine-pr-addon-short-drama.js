@@ -2,6 +2,7 @@ const mpAddonPageGate = require('../../../utils/mpAddonPageGate.js')
 const catalog = require('./shortDramaCatalogMp.js')
 const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
+const pointsHints = require('../../../utils/mpAddonPointsHints.js')
 const media = require('../../../utils/mpAddonMedia.js')
 const castStore = require('../../../utils/shortDramaCastMp.js')
 const ecs = require('../../../utils/ecs.js')
@@ -11,6 +12,15 @@ const QUALITIES = [
   { id: '720p', label: '720p' },
   { id: '1080p', label: '1080p' },
 ]
+
+function dramaPointsHint(durationSec) {
+  const perSec = Number(pointsHints.RATES.shortvideo && pointsHints.RATES.shortvideo.perSec) || 104
+  const sec = Math.max(1, Math.ceil(Number(durationSec) || 15))
+  const clip = catalog.snapSeedanceClipSec(sec)
+  const est = clip * perSec
+  const scope = sec > clip ? `手机端先出 ${clip} 秒试镜` : `本次约 ${clip} 秒`
+  return `AI短剧 ${perSec} 积分/秒，${scope}，预计 ${est} 积分。套餐赠送积分优先。`
+}
 
 function needProxyDownload(message) {
   return /domain list|not in domain|downloadFile:fail/i.test(String(message || ''))
@@ -170,6 +180,7 @@ Page({
     resultUrl: '',
     promptPreview: '',
     clipHint: '',
+    pointsHint: '',
   },
 
   onLoad() {
@@ -223,7 +234,7 @@ Page({
       sec > 15
         ? `故事按 ${sec} 秒来写。手机端先出 ${clip} 秒试镜；完整长片在星选网页「AI短剧」里生成。`
         : `这一段按 ${clip} 秒直出。`
-    this.setData({ durationHint: hint, clipHint })
+    this.setData({ durationHint: hint, clipHint, pointsHint: dramaPointsHint(sec) })
   },
 
   currentPrompt() {

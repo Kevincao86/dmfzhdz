@@ -3,6 +3,7 @@
   <view class="op-hero">
     <text class="op-title">AI 短剧</text>
     <text class="op-sub">和商家端同一套四步：先选场景，再写故事和角色，最后出片。</text>
+    <text class="op-points" wx:if="{{pointsHint}}">{{pointsHint}}</text>
   </view>
 
   <view class="op-steps">
@@ -145,6 +146,7 @@
   <view class="op-card" wx:elif="{{dramaStep === 4}}">
     <text class="op-label">出片</text>
     <text class="op-body muted">{{clipHint}}</text>
+    <text class="op-points" wx:if="{{pointsHint}}">{{pointsHint}}</text>
     <text class="op-body">{{promptPreview}}</text>
     <button class="op-btn" loading="{{busy}}" bindtap="onGenerate">{{busy ? '正在出片' : '生成短剧'}}</button>
     <text wx:if="{{progress}}" class="op-meta">{{progress}}</text>
