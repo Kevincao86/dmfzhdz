@@ -1,4 +1,11 @@
-/** 「我的」页菜单：方案 A 柔和 3D 图标（/images/mine-icons） */
+/** 「我的」页菜单图标在 OSS，不打进主包。 */
+const MINE_ICON_OSS = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/mine-icons'
+const MINE_ICON_VER = '20261015a'
+
+function mineIcon(file) {
+  return `${MINE_ICON_OSS}/${file}?v=${MINE_ICON_VER}`
+}
+
 const ICON_GLYPH = {
   info: '◫',
   list: '☰',
@@ -13,48 +20,48 @@ const ICON_GLYPH = {
 }
 
 const MENU_KEY_ICON = {
-  profile: '/images/mine-icons/info.png',
-  prProfile: '/images/mine-icons/pr-profile.png',
-  accountBind: '/images/mine-icons/account-bind.png',
-  wechatOaBind: '/images/mine-icons/wechat-oa.png',
-  applications: '/images/mine-icons/list.png',
-  targetedInvites: '/images/mine-icons/invite.png',
-  orderCalendar: '/images/mine-icons/calendar.png',
-  favorites: '/images/mine-icons/star.png',
-  talentCredit: '/images/mine-icons/credit.png',
-  prQuotes: '/images/mine-icons/quote.png',
-  subscriptions: '/images/mine-icons/subscribe.png',
-  wallet: '/images/mine-icons/wallet.png',
-  myOrders: '/images/mine-icons/orders.png',
-  prOrders: '/images/mine-icons/pr-orders.png',
-  affiliatePortal: '/images/mine-icons/affiliate.png',
-  affiliateApply: '/images/mine-icons/affiliate.png',
-  training: '/images/mine-icons/training.png',
-  briefGen: '/images/mine-icons/brief-gen.png',
-  aiReview: '/images/mine-icons/ai-review.png',
-  addonsHub: '/images/mine-icons/addons.png',
-  myCourses: '/images/mine-icons/courses.png',
-  analytics: '/images/mine-icons/chart.png',
-  templates: '/images/mine-icons/tpl.png',
-  briefTemplates: '/images/mine-icons/brief.png',
-  cooperation: '/images/mine-icons/cooperation.png',
-  talentWatchlist: '/images/mine-icons/watchlist.png',
-  formRelay: '/images/mine-icons/relay.png',
-  funnel: '/images/mine-icons/funnel.png',
-  manual: '/images/mine-icons/manual.png',
-  support: '/images/mine-icons/support.png',
+  profile: mineIcon('info.png'),
+  prProfile: mineIcon('pr-profile.png'),
+  accountBind: mineIcon('account-bind.png'),
+  wechatOaBind: mineIcon('wechat-oa.png'),
+  applications: mineIcon('list.png'),
+  targetedInvites: mineIcon('invite.png'),
+  orderCalendar: mineIcon('calendar.png'),
+  favorites: mineIcon('star.png'),
+  talentCredit: mineIcon('credit.png'),
+  prQuotes: mineIcon('quote.png'),
+  subscriptions: mineIcon('subscribe.png'),
+  wallet: mineIcon('wallet.png'),
+  myOrders: mineIcon('orders.png'),
+  prOrders: mineIcon('pr-orders.png'),
+  affiliatePortal: mineIcon('affiliate.png'),
+  affiliateApply: mineIcon('affiliate.png'),
+  training: mineIcon('training.png'),
+  briefGen: mineIcon('brief-gen.png'),
+  aiReview: mineIcon('ai-review.png'),
+  addonsHub: mineIcon('addons.png'),
+  myCourses: mineIcon('courses.png'),
+  analytics: mineIcon('chart.png'),
+  templates: mineIcon('tpl.png'),
+  briefTemplates: mineIcon('brief.png'),
+  cooperation: mineIcon('cooperation.png'),
+  talentWatchlist: mineIcon('watchlist.png'),
+  formRelay: mineIcon('relay.png'),
+  funnel: mineIcon('funnel.png'),
+  manual: mineIcon('manual.png'),
+  support: mineIcon('support.png'),
 }
 
 const ICON_TYPE_ICON = {
-  info: '/images/mine-icons/info.png',
-  list: '/images/mine-icons/list.png',
-  star: '/images/mine-icons/star.png',
-  chart: '/images/mine-icons/chart.png',
-  support: '/images/mine-icons/support.png',
-  tpl: '/images/mine-icons/tpl.png',
-  manual: '/images/mine-icons/manual.png',
-  quote: '/images/mine-icons/quote.png',
-  bell: '/images/mine-icons/subscribe.png',
+  info: mineIcon('info.png'),
+  list: mineIcon('list.png'),
+  star: mineIcon('star.png'),
+  chart: mineIcon('chart.png'),
+  support: mineIcon('support.png'),
+  tpl: mineIcon('tpl.png'),
+  manual: mineIcon('manual.png'),
+  quote: mineIcon('quote.png'),
+  bell: mineIcon('subscribe.png'),
 }
 
 function menuGlyph(icon) {

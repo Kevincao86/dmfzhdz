@@ -124,6 +124,10 @@
         "type": "glob"
       },
       {
+        "value": "images/mine-icons/**",
+        "type": "glob"
+      },
+      {
         "value": "pages/addon-ai-content/**",
         "type": "glob"
       },

@@ -1719,6 +1719,7 @@ PAT
       cat <<'PAT'
 灵祺达人撮合小程序/images/mine-icons/
 灵祺达人撮合小程序/utils/mineMenuIcons.js
+灵祺达人撮合小程序/project.config.json
 change-scope-guard
 PAT
       ;;
