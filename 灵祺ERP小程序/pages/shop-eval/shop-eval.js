@@ -200,6 +200,26 @@ async function askText(system, user, opts) {
   return content
 }
 
+function withTimeout(work, ms, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms)
+    Promise.resolve(work).then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}
+
+function askTextForAdvice(system, user) {
+  return withTimeout(askText(system, user), 75000, '分析超时')
+}
+
 Page({
   data: {
     platforms: platformRows(),
@@ -1191,35 +1211,53 @@ Page({
     this.setData({ advising: true, err: '' })
     let failed = null
     try {
-      await billing.checkErpPointsAffordable({ kind: 'shop_eval_advice' })
+      await withTimeout(billing.checkErpPointsAffordable({ kind: 'shop_eval_advice' }), 15000, '积分校验超时，请再点一次')
       const base = Object.assign({}, this._input || { platformId: this.data.platformId, storeName: this.data.storeName })
       const range = shopAnalysis.defaultRange()
-      const packed = await shopAnalysis.fetchShopAnalysisSummary({
-        platform: this.data.platformId,
-        startDate: range.startDate,
-        endDate: range.endDate,
-        poiId: base.evalFocus === 'store' ? base.storeId : '',
-      })
-      base.backendFacts = evalApi.describeShopBackend(
-        packed.summary,
-        packed.adviceFacts,
-        range.startDate + ' 至 ' + range.endDate,
-      )
+      const rangeLabel = range.startDate + ' 至 ' + range.endDate
+      base.backendFacts = '统计区间：' + rangeLabel + '。这次没有读到商家后台明细，按已有六维短板写改法。'
+      try {
+        const packed = await withTimeout(
+          shopAnalysis.fetchShopAnalysisSummary({
+            platform: this.data.platformId,
+            startDate: range.startDate,
+            endDate: range.endDate,
+            poiId: base.evalFocus === 'store' ? base.storeId : '',
+          }),
+          20000,
+          '后台数据读取超时',
+        )
+        base.backendFacts = evalApi.describeShopBackend(packed.summary, packed.adviceFacts, rangeLabel)
+      } catch (e) {
+        /* 后台接口卡住时仍按评分出方案 */
+      }
       const advice = await evalApi.adviseShop(base, this._score, {
         force: true,
         storage,
-        askText,
-      })
-      await billing.spendErpPointsForUsage({
-        kind: 'shop_eval_advice',
-        idempotencyKey: 'shop-eval-advice-' + Date.now(),
-        note: '门店分析提升',
+        askText: askTextForAdvice,
       })
       this.setData({
         advising: false,
         adviceReady: true,
         sections: advice.sections,
+        err: advice.fromModel ? '' : '模型这次没有返回完整方案，已按当前六维评分写出改法，未扣积分。',
       })
+      if (advice.fromModel) {
+        try {
+          await withTimeout(
+            billing.spendErpPointsForUsage({
+              kind: 'shop_eval_advice',
+              idempotencyKey: 'shop-eval-advice-' + Date.now(),
+              note: '门店分析提升',
+            }),
+            15000,
+            '积分扣除超时',
+          )
+        } catch (spendErr) {
+          const spendMsg = String(spendErr && spendErr.message ? spendErr.message : '积分扣除失败')
+          this.setData({ err: '方案已生成。' + spendMsg })
+        }
+      }
     } catch (e) {
       failed = e
     }

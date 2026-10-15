@@ -134,6 +134,7 @@ export type ShopEvalScore = {
 export type ShopEvalAdvice = {
   lift: number
   sections: ShopEvalSuggestion[]
+  fromModel?: boolean
 }
 
 type ScoreBlock = { name: string; weight: number }
@@ -530,6 +531,57 @@ function alignAdviceSections(sections: ShopEvalSuggestion[], names: string[]) {
     aligned.push({ ...sections[idx], name })
   }
   return aligned
+}
+
+function adviceModule(name: string) {
+  if (/套餐|价格|内卷/.test(name)) return '商品与套餐'
+  if (/口碑|舆情/.test(name)) return '评价管理'
+  if (/内容|达人/.test(name)) return '达人招募'
+  if (/流量/.test(name)) return '店铺分析与投流'
+  if (/运营|标准化|执行/.test(name)) return '活动中心'
+  return '店铺装修'
+}
+
+function fallbackAdviceSection(indicator: { name: string; score: number; weight: number; comment?: string }): ShopEvalSuggestion {
+  const moduleName = adviceModule(indicator.name)
+  const comment = String(indicator.comment || '').trim()
+  const finding = clipText(
+    comment
+      ? `${indicator.name}现在是 ${indicator.score}/${indicator.weight}。${comment}`
+      : `${indicator.name}现在是 ${indicator.score}/${indicator.weight}。按商家后台这段时间的成交、退款和评价来补这一项。`,
+    140,
+  )
+  const adjust = clipText(
+    `去「${moduleName}」里改和这项短板对应的一处设置。改完两周内回到店铺分析，看成交或评价有没有变化。`,
+    180,
+  )
+  const soon = '1. 打开对应功能核对这项。\n2. 改一处能直接看到的设置。\n3. 两周后回来看数字。'
+  return { name: indicator.name, module: moduleName, finding, adjust, soon, next: adjust }
+}
+
+function completeAdviceSections(sections: ShopEvalSuggestion[], indicators: ShopEvalIndicator[]) {
+  const names = indicators.map((item) => item.name)
+  const aligned = alignAdviceSections(sections, names)
+  if (aligned.length === names.length) return aligned
+  const used = new Set<number>()
+  return names.map((name, index) => {
+    const idx = sections.findIndex(
+      (row, i) => !used.has(i) && (row.name === name || name.startsWith(row.name) || row.name.startsWith(name.slice(0, 4))),
+    )
+    if (idx >= 0) {
+      used.add(idx)
+      const row = sections[idx]
+      return {
+        ...row,
+        name,
+        finding: row.finding || fallbackAdviceSection(indicators[index]).finding,
+        adjust: row.adjust || fallbackAdviceSection(indicators[index]).adjust,
+        soon: row.soon || fallbackAdviceSection(indicators[index]).soon,
+        module: row.module || adviceModule(name),
+      }
+    }
+    return fallbackAdviceSection(indicators[index])
+  })
 }
 
 function ownerId() {
@@ -1372,24 +1424,39 @@ export async function adviseShop(
   const listed = (score.indicators || []).map((item) => `${item.name} ${item.score}/${item.weight}`).join('、')
   const lines = (score.indicators || []).map((item) => `${item.name} ${item.score}/${item.weight}：${item.comment}`).join('\n')
   const user = `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n公网六维：\n${lines}\n商家后台：\n${backend}\n六维都要各写一套方案，顺序不能变，一项都不能少：${listed}。`
-  let j = await askJson(opts.askText, erpAdviceSystem(row.evalFocus), user)
-  let sections = alignAdviceSections(mapSuggestions(j.sections), names)
-  if (sections.length !== names.length) {
-    j = await askJson(
-      opts.askText,
-      erpAdviceSystem(row.evalFocus),
-      `${user}\n上次没有覆盖全部六维。sections 必须正好 6 项，name 逐字是：${names.join('、')}。`,
-    )
-    sections = alignAdviceSections(mapSuggestions(j.sections), names)
+  const indicators = score.indicators || []
+  let parsed: Record<string, unknown> | null = null
+  let sections: ShopEvalSuggestion[] = []
+  try {
+    parsed = await askJson(opts.askText, erpAdviceSystem(row.evalFocus), user)
+    sections = alignAdviceSections(mapSuggestions(parsed?.sections), names)
+  } catch {
+    parsed = null
   }
+  if (parsed && sections.length !== names.length) {
+    try {
+      const retry = await askJson(
+        opts.askText,
+        erpAdviceSystem(row.evalFocus),
+        `${user}\n上次没有覆盖全部六维。sections 必须正好 6 项，name 逐字是：${names.join('、')}。`,
+      )
+      const retrySections = alignAdviceSections(mapSuggestions(retry?.sections), names)
+      if (retrySections.length === names.length) {
+        parsed = retry
+        sections = retrySections
+      }
+    } catch {
+      /* 用第一次结果补齐 */
+    }
+  }
+  sections = completeAdviceSections(sections.length === names.length ? sections : mapSuggestions(parsed?.sections), indicators)
   const advice: ShopEvalAdvice = {
-    lift: clampLift(j.lift),
+    lift: clampLift(parsed?.lift),
     sections,
   }
-  if (advice.sections.length !== names.length) throw new Error('提升方案不完整，请再点一次')
   writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
   void publishShopEval(opts.storage, key, slotId(row))
-  return advice
+  return { ...advice, fromModel: Boolean(parsed) }
 }
 
 export function shopEvalGainTargets(score: ShopEvalScore, input: ShopEvalInput) {

@@ -93,21 +93,47 @@ const storage = {
   },
 }
 
-async function askText(system: string, user: string, opts?: { webSearch?: boolean }) {
-  const data = await postAiChat({
-    provider: 'doubao',
-    stream: false,
-    temperature: 0,
-    ...(opts?.webSearch ? { webSearch: true } : {}),
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-  })
+async function askText(system: string, user: string, opts?: { webSearch?: boolean; signal?: AbortSignal }) {
+  const data = await postAiChat(
+    {
+      provider: 'doubao',
+      stream: false,
+      temperature: 0,
+      ...(opts?.webSearch ? { webSearch: true } : {}),
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    },
+    { signal: opts?.signal },
+  )
   if (String(data.provider || '') !== 'doubao') throw new Error('豆包暂不可用，请稍后再试')
   const content = String(data.content || '').trim()
   if (!content) throw new Error('豆包未返回内容')
   return content
+}
+
+function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), ms)
+    work.then(
+      (value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        window.clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}
+
+function askTextBounded(system: string, user: string, opts?: { webSearch?: boolean }) {
+  const ms = opts?.webSearch ? 120000 : 70000
+  const ctrl = new AbortController()
+  const timer = window.setTimeout(() => ctrl.abort(), ms)
+  return askText(system, user, { ...opts, signal: ctrl.signal }).finally(() => window.clearTimeout(timer))
 }
 
 function readBoundEvalPlatforms(): ShopEvalPlatformId[] {
@@ -717,25 +743,51 @@ export default function MerchantShopEvalPanel() {
       }
       const startDate = ymd(start)
       const endDate = ymd(end)
-      const packed = await fetchShopAnalysis({
-        startDate,
-        endDate,
-        platform: platformId,
-        poiId: input.evalFocus === 'store' ? input.storeId : undefined,
-      })
-      const backendFacts = describeShopBackend(
-        packed.summary as unknown as Record<string, unknown>,
-        packed.adviceFacts,
-        `${startDate} 至 ${endDate}`,
-      )
-      await checkErpPointsAffordable({ kind: adviceKind })
-      const advice = await adviseShop({ ...input, platformId, backendFacts }, score, { force: true, storage, askText })
-      await spendErpPointsForUsage({
-        kind: adviceKind,
-        idempotencyKey: `shop-eval-advice-${Date.now()}`,
-        note: '门店分析提升',
+      const rangeLabel = `${startDate} 至 ${endDate}`
+      let backendFacts = `统计区间：${rangeLabel}。这次没有读到商家后台明细，按已有六维短板写改法。`
+      try {
+        const packed = await withTimeout(
+          fetchShopAnalysis({
+            startDate,
+            endDate,
+            platform: platformId,
+            poiId: input.evalFocus === 'store' ? input.storeId : undefined,
+          }),
+          20000,
+          '后台数据读取超时',
+        )
+        backendFacts = describeShopBackend(
+          packed.summary as unknown as Record<string, unknown>,
+          packed.adviceFacts,
+          rangeLabel,
+        )
+      } catch {
+        /* 后台接口卡住时仍按评分出方案 */
+      }
+      await withTimeout(checkErpPointsAffordable({ kind: adviceKind }), 15000, '积分校验超时，请再点一次')
+      const advice = await adviseShop({ ...input, platformId, backendFacts }, score, {
+        force: true,
+        storage,
+        askText: askTextBounded,
       })
       setAdvice(advice)
+      if (advice.fromModel) {
+        try {
+          await withTimeout(
+            spendErpPointsForUsage({
+              kind: adviceKind,
+              idempotencyKey: `shop-eval-advice-${Date.now()}`,
+              note: '门店分析提升',
+            }),
+            15000,
+            '积分扣除超时',
+          )
+        } catch (spendErr) {
+          setErr(`方案已生成。${spendErr instanceof Error ? spendErr.message : '积分扣除失败'}`)
+        }
+      } else {
+        setErr('模型这次没有返回完整方案，已按当前六维评分写出改法，未扣积分。')
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
