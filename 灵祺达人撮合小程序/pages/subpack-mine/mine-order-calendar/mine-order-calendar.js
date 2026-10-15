@@ -636,6 +636,44 @@ Page({
     }
   },
 
+  async onRemindManualFromSheet(e) {
+    const dataset = (e && e.currentTarget && e.currentTarget.dataset) || {}
+    const presetId = String(dataset.preset || '').trim()
+    const eventId = String(dataset.eventId || '').trim()
+    const dateKey = String(dataset.dateKey || '').trim()
+    const title = String(dataset.title || this.data.eventTitle || '').trim() || '自己的行程'
+    if (!eventId || !dateKey || !presetId) {
+      wx.showToast({ title: '请先保存行程', icon: 'none' })
+      return
+    }
+    const remindAtMs = orderCalendar.computeRemindAtMs(dateKey, presetId)
+    if (!remindAtMs || remindAtMs <= Date.now()) {
+      wx.showToast({ title: '提醒时间已过，请选更早的提醒', icon: 'none' })
+      return
+    }
+    const phonePromise = addPhoneCalendar(title, '', remindAtMs)
+    await mpSubscribe.requestForCalendarReminder()
+    try {
+      await calReminder.createReminder({
+        eventId,
+        mpOrderId: eventId,
+        eventKind: 'manual',
+        eventDateKey: dateKey,
+        eventTitle: title,
+        storeName: '',
+        leadPreset: presetId,
+        remindAt: new Date(remindAtMs).toISOString(),
+        identity: this.data.identity,
+        channels: ['subscribe', 'oa'],
+      })
+      const wrotePhone = await phonePromise
+      wx.showToast({ title: wrotePhone ? '已写入手机日历' : '提醒已设置', icon: 'success' })
+      await this.reload()
+    } catch (err) {
+      wx.showToast({ title: (err && err.message) || '设置失败', icon: 'none' })
+    }
+  },
+
   onSetLabel(e) {
     const dataset = (e && e.currentTarget && e.currentTarget.dataset) || {}
     const mpOrderId = String(dataset.mpOrderId || '').trim()

@@ -431,8 +431,8 @@ export default function OrderCalendarPage() {
     }
   }
 
-  async function onConfirmReminder(preset: MpCalendarReminderLeadPreset) {
-    const evt = remindTarget
+  async function onConfirmReminder(preset: MpCalendarReminderLeadPreset, source?: OrderCalendarEvent) {
+    const evt = source || remindTarget
     if (!evt || remindBusy) return
     const remindAtMs = computeRemindAtMs(evt.dateKey, preset)
     if (!remindAtMs || remindAtMs <= Date.now()) {
@@ -443,7 +443,7 @@ export default function OrderCalendarPage() {
     try {
       await createCalendarReminder({
         eventId: evt.id,
-        mpOrderId: evt.mpOrderId,
+        mpOrderId: evt.mpOrderId || evt.id,
         eventKind: evt.kind,
         eventDateKey: evt.dateKey,
         eventTitle: evt.orderTitle,
@@ -945,13 +945,27 @@ export default function OrderCalendarPage() {
                             </Link>
                             <div className="m-2 flex shrink-0 flex-col gap-1.5">
                               {evt.kind === 'manual' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => onDeleteManualEvent(evt.id)}
-                                  className="flex flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50"
-                                >
-                                  删除
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRemindTarget({ ...evt, mpOrderId: evt.mpOrderId || evt.id })}
+                                    className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
+                                      remindSet
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                                    }`}
+                                  >
+                                    <Bell className="h-3.5 w-3.5" />
+                                    {remindSet ? '已设提醒' : '设置提醒'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteManualEvent(evt.id)}
+                                    className="flex flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50"
+                                  >
+                                    删除
+                                  </button>
+                                </>
                               ) : null}
                               {evt.kind !== 'manual' ? (
                               <>
@@ -1120,7 +1134,7 @@ export default function OrderCalendarPage() {
           aria-modal="true"
           aria-labelledby="manual-event-title"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-violet-100 bg-white p-5 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-violet-100 bg-white p-5 shadow-xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h3 id="manual-event-title" className="text-base font-semibold text-slate-900">
@@ -1177,6 +1191,40 @@ export default function OrderCalendarPage() {
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
               />
             </label>
+            {manualForm.id ? (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-slate-700">设置提醒</p>
+                <div className="mt-2 space-y-2">
+                  {CALENDAR_REMIND_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={remindBusy}
+                      onClick={() =>
+                        void onConfirmReminder(opt.id, {
+                          id: manualForm.id,
+                          dateKey: manualForm.dateKey,
+                          dayMs: 0,
+                          kind: 'manual',
+                          mpOrderId: manualForm.id,
+                          orderTitle: manualForm.title.trim() || '自己的行程',
+                          storeName: '',
+                          timeLabel: manualForm.timeLabel,
+                          statusLabel: '自己的行程',
+                          note: manualForm.note,
+                        })
+                      }
+                      className="flex w-full items-center justify-between rounded-xl border border-violet-100 px-3 py-2 text-left text-sm text-slate-800 transition hover:border-violet-300 hover:bg-violet-50 disabled:opacity-60"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-slate-400">选一个时间就会记下提醒，并下载日历文件。用手机打开文件即可写入系统日历。</p>
+              </div>
+            ) : (
+              <p className="mt-3 text-[11px] text-slate-400">保存这条行程后，可以设置到点提醒。</p>
+            )}
             <button
               type="button"
               disabled={manualBusy}

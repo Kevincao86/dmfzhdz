@@ -157,10 +157,9 @@
             catchtap="onSetLabel"
           >{{item.customLabelText || '设标签'}}</button>
           <view
-            wx:if="{{item.kind !== 'manual'}}"
             class="cal-remind-btn {{item.remindSet ? 'cal-remind-btn--set' : ''}}"
             data-event-id="{{item.id}}"
-            data-mp-order-id="{{item.mpOrderId}}"
+            data-mp-order-id="{{item.kind === 'manual' ? item.id : item.mpOrderId}}"
             data-kind="{{item.kind}}"
             data-date-key="{{item.dateKey}}"
             data-title="{{item.orderTitle}}"
@@ -203,6 +202,20 @@
         bindinput="onEventNoteInput"
       />
       <view class="cal-label-save {{eventBusy ? 'cal-label-save--busy' : ''}}" catchtap="onSaveManualEvent">保存</view>
+      <view wx:if="{{eventSheetId}}" class="cal-remind-sheet">
+        <text class="cal-remind-sheet-title">设置提醒</text>
+        <view
+          wx:for="{{remindOptions}}"
+          wx:key="id"
+          class="cal-remind-sheet-opt"
+          data-preset="{{item.id}}"
+          data-event-id="{{eventSheetId}}"
+          data-date-key="{{eventDateKey}}"
+          data-title="{{eventTitle}}"
+          catchtap="onRemindManualFromSheet"
+        >{{item.label}}</view>
+      </view>
+      <view wx:else class="cal-label-hint">保存这条行程后，可以设置到点提醒。</view>
       <view
         wx:if="{{eventSheetId}}"
         class="cal-label-clear {{eventBusy ? 'cal-label-save--busy' : ''}}"

@@ -518,6 +518,28 @@
   background: #f1f5f9;
 }
 
+.cal-remind-sheet {
+  margin-top: 16rpx;
+}
+
+.cal-remind-sheet-title {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #5b21b6;
+}
+
+.cal-remind-sheet-opt {
+  margin-bottom: 12rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #ddd6fe;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-size: 26rpx;
+}
+
 .cal-label-btn--hover {
   opacity: 0.85;
 }
