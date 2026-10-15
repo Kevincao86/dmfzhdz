@@ -498,21 +498,24 @@
 
 .cal-remind-btn {
   flex-shrink: 0;
-  margin: 0 !important;
-  padding: 0 16rpx !important;
-  font-size: 22rpx !important;
-  color: #7c3aed !important;
-  background: #f5f3ff !important;
-  border: none !important;
-  line-height: 2 !important;
+  min-width: 132rpx;
+  min-height: 52rpx;
+  margin: 0;
+  padding: 0 16rpx;
+  font-size: 22rpx;
+  color: #7c3aed;
+  background: #f5f3ff;
+  border-radius: 8rpx;
+  line-height: 52rpx;
+  text-align: center;
   align-self: center;
 }
 
 .cal-remind-btn::after { border: none; }
 
 .cal-remind-btn--set {
-  color: #64748b !important;
-  background: #f1f5f9 !important;
+  color: #64748b;
+  background: #f1f5f9;
 }
 
 .cal-label-btn--hover {

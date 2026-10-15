@@ -105,6 +105,7 @@ list_scopes() {
   video_rule_links      达人小程序与星选短视频审核增加平台官方规则链接页
   talent_local_life_eval 达人小程序与星选：抖音本地生活信息评估（豆包预估分、下月带货等级、整改）
   merchant_shop_eval     商家 ERP 总览 + 商家小程序：门店多维评估与提升方案
+  calendar_phone_remind  星选与达人小程序：商单日历设置提醒，并写入手机日历
   xingxuan_mine_ui      星选：AI审核进我的、增值服务加AI短剧；网页壳层与我的页本地重排
   xingxuan_pr_orders_hot 星选与达人小程序：账号绑定标志、招募订单瘦身、专业版一键分析、火热角标
   xingxuan_open_loop_qr 开环群码：招募大厅详情不展示，审核通过后在达人报名详情展示
@@ -1695,6 +1696,14 @@ HomeDashboard.tsx
 灵祺ERP小程序/custom-tab-bar/
 灵祺ERP小程序/pages/ai-agent/ai-agent.js
 灵祺ERP小程序/pages/mine/mine.js
+change-scope-guard
+PAT
+      ;;
+    calendar_phone_remind)
+      cat <<'PAT'
+OrderCalendarPage
+mine-order-calendar
+灵祺达人撮合小程序/app.json
 change-scope-guard
 PAT
       ;;

@@ -130,7 +130,8 @@
   ],
   "requiredPrivateInfos": [
     "chooseLocation",
-    "getFuzzyLocation"
+    "getFuzzyLocation",
+    "addPhoneCalendar"
   ],
   "permission": {
     "scope.album": {

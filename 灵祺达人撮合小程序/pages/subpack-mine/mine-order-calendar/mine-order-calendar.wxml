@@ -156,10 +156,9 @@
             data-title="{{item.orderTitle}}"
             catchtap="onSetLabel"
           >{{item.customLabelText || '设标签'}}</button>
-          <button
+          <view
             wx:if="{{item.kind !== 'manual'}}"
             class="cal-remind-btn {{item.remindSet ? 'cal-remind-btn--set' : ''}}"
-            size="mini"
             data-event-id="{{item.id}}"
             data-mp-order-id="{{item.mpOrderId}}"
             data-kind="{{item.kind}}"
@@ -167,7 +166,7 @@
             data-title="{{item.orderTitle}}"
             data-store="{{item.storeName}}"
             catchtap="onSetReminder"
-          >{{item.remindSet ? '已设提醒' : '设提醒'}}</button>
+          >{{item.remindSet ? '已设提醒' : '设置提醒'}}</view>
         </view>
       </view>
     </view>

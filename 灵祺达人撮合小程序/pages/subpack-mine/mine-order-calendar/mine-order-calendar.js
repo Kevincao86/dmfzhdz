@@ -18,6 +18,24 @@ const REMIND_OPTIONS = [
   { id: 'days2_before', label: '前两日晚上 8:00' },
 ]
 
+function addPhoneCalendar(title, store, remindAtMs) {
+  if (!wx.addPhoneCalendar) return Promise.resolve(false)
+  const startTime = Math.floor(Number(remindAtMs) / 1000)
+  if (!startTime) return Promise.resolve(false)
+  return new Promise((resolve) => {
+    wx.addPhoneCalendar({
+      title: title || '商单提醒',
+      startTime,
+      endTime: startTime + 3600,
+      description: store ? `${store} · 灵祺星选商单提醒` : '灵祺星选商单提醒',
+      alarm: true,
+      alarmOffset: 0,
+      success: () => resolve(true),
+      fail: () => resolve(false),
+    })
+  })
+}
+
 function monthTitle(year, month) {
   return `${year}年${month + 1}月`
 }
@@ -554,26 +572,40 @@ Page({
     const dateKey = String(dataset.dateKey || '').trim()
     const title = String(dataset.title || '').trim()
     const store = String(dataset.store || '').trim()
-    if (!eventId || !mpOrderId || !dateKey) return
-
-    const presets = REMIND_OPTIONS.map((o) => o.label)
-    let presetIdx = 0
-    try {
-      const pick = await new Promise((resolve, reject) => {
-        wx.showActionSheet({
-          itemList: presets,
-          success: (res) => resolve(res.tapIndex),
-          fail: reject,
-        })
-      })
-      presetIdx = Number(pick)
-      if (!Number.isFinite(presetIdx) || presetIdx < 0) return
-    } catch (_) {
+    if (!eventId || !mpOrderId || !dateKey) {
+      wx.showToast({ title: '这条商单缺少时间，暂时不能设提醒', icon: 'none' })
       return
     }
 
-    const preset = REMIND_OPTIONS[presetIdx].id
-    const remindAtMs = orderCalendar.computeRemindAtMs(dateKey, preset)
+    const presets = REMIND_OPTIONS.map((o) => o.label)
+    let picked = null
+    try {
+      picked = await new Promise((resolve, reject) => {
+        wx.showActionSheet({
+          itemList: presets,
+          success: (res) => {
+            const presetIdx = Number(res.tapIndex)
+            const preset = REMIND_OPTIONS[presetIdx]
+            if (!preset) {
+              resolve(null)
+              return
+            }
+            const remindAtMs = orderCalendar.computeRemindAtMs(dateKey, preset.id)
+            const phonePromise =
+              remindAtMs && remindAtMs > Date.now()
+                ? addPhoneCalendar(title, store, remindAtMs)
+                : Promise.resolve(false)
+            resolve({ preset: preset.id, remindAtMs, phonePromise })
+          },
+          fail: reject,
+        })
+      })
+    } catch (_) {
+      return
+    }
+    if (!picked || !picked.preset) return
+
+    const remindAtMs = picked.remindAtMs
     if (!remindAtMs || remindAtMs <= Date.now()) {
       wx.showToast({ title: '提醒时间已过，请选更早的提醒', icon: 'none' })
       return
@@ -588,12 +620,16 @@ Page({
         eventDateKey: dateKey,
         eventTitle: title,
         storeName: store,
-        leadPreset: preset,
+        leadPreset: picked.preset,
         remindAt: new Date(remindAtMs).toISOString(),
         identity: this.data.identity,
         channels: ['subscribe', 'oa'],
       })
-      wx.showToast({ title: '提醒已设置', icon: 'success' })
+      const wrotePhone = await picked.phonePromise
+      wx.showToast({
+        title: wrotePhone ? '已写入手机日历' : '提醒已设置',
+        icon: 'success',
+      })
       await this.reload()
     } catch (err) {
       wx.showToast({ title: (err && err.message) || '设置失败', icon: 'none' })

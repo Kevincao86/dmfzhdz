@@ -38,6 +38,40 @@ import { getAccount, getActiveRole } from '../lib/mpSession'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
 import { readApplications } from '../lib/mpSync/applicationsStore'
+
+function downloadPhoneCalendar(title: string, remindAtMs: number, storeName: string) {
+  const stamp = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  const esc = (value: string) => value.replace(/[\\,;]/g, (ch) => `\\${ch}`).replace(/\n/g, '\\n')
+  const body = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Lingqi Xingxuan//Order Calendar//CN',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${Date.now()}@lingqi-xingxuan`,
+    `DTSTAMP:${stamp(Date.now())}`,
+    `DTSTART:${stamp(remindAtMs)}`,
+    `DTEND:${stamp(remindAtMs + 60 * 60 * 1000)}`,
+    `SUMMARY:${esc(title || '商单提醒')}`,
+    `DESCRIPTION:${esc(storeName ? `${storeName} · 灵祺星选商单提醒` : '灵祺星选商单提醒')}`,
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:商单提醒',
+    'TRIGGER:PT0S',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+  const blob = new Blob([body], { type: 'text/calendar;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = '商单提醒.ics'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 import {
   aggregatePrOrderCalendarEvents,
   aggregateTalentOrderCalendarEvents,
@@ -418,7 +452,8 @@ export default function OrderCalendarPage() {
         remindAt: new Date(remindAtMs).toISOString(),
         channels: ['subscribe', 'oa'],
       })
-      setToast('提醒已设置，已与小程序同步')
+      downloadPhoneCalendar(evt.orderTitle, remindAtMs, evt.storeName)
+      setToast('提醒已设置，已下载日历文件。用手机打开即可写入系统日历')
       setRemindTarget(null)
       await refreshReminders()
     } catch (e) {
@@ -942,7 +977,7 @@ export default function OrderCalendarPage() {
                                 }`}
                               >
                                 <Bell className="h-3.5 w-3.5" />
-                                {remindSet ? '已设提醒' : '设提醒'}
+                                {remindSet ? '已设提醒' : '设置提醒'}
                               </button>
                               </>
                               ) : null}
@@ -1000,7 +1035,7 @@ export default function OrderCalendarPage() {
               ))}
             </ul>
             <p className="mt-3 text-center text-[11px] text-slate-400">
-              提醒数据与小程序共用，到点将通过服务号/订阅消息推送
+              到点通过服务号或订阅消息推送。确认后会下载日历文件，用手机打开即可写入系统日历。小程序里确认提醒会直接写入手机日历。
             </p>
           </div>
         </div>
