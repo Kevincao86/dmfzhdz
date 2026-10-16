@@ -81,8 +81,9 @@ Page({
   onLoad(options) {
     const fromWx =
       (options && options.from === 'wx') || (auth.isLoggedIn() && auth.needsPhoneBind())
+    loginLegalAgree.writeAgreed(false)
     this.setData({
-      legalAgreed: loginLegalAgree.readAgreed(),
+      legalAgreed: false,
       fromWx,
       regNote: regNoteText(fromWx, this.data.regChannel),
     })

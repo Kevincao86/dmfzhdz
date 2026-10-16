@@ -15,24 +15,7 @@ const mpShare = require('../../utils/mpShare.js')
 const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
 const { MP_ICP_FILING, MP_PSB_FILING } = require('../../utils/siteIcp.js')
 
-const LEGAL_PROMPT_COPY = {
-  wx: {
-    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。将使用当前微信身份登录，不会改绑手机号。',
-    agree: '同意并登录',
-  },
-  phone: {
-    text: '使用手机号快捷登录前，请勾选并同意《用户协议》和《隐私政策》。只按手机号进入账号，不会自动绑定微信。',
-    agree: '同意并继续',
-  },
-  pwd: {
-    text: '使用账号登录前，请勾选并同意《用户协议》和《隐私政策》。',
-    agree: '同意并登录',
-  },
-  sms: {
-    text: '使用手机验证码登录前，请勾选并同意《用户协议》和《隐私政策》。',
-    agree: '同意并登录',
-  },
-}
+const LEGAL_NEED_CHECK = '请先阅读并勾选《用户协议》和《隐私政策》'
 
 function isWxPrivacyUndeclared(detail) {
   const errMsg = String((detail && detail.errMsg) || '')
@@ -79,15 +62,12 @@ function isWxPrivacyBlock(detail) {
   return errno === 104 || /needAuthorization/i.test(errMsg)
 }
 
-function openLegalPrompt(page, workId, action) {
-  const copy = LEGAL_PROMPT_COPY[action] || LEGAL_PROMPT_COPY.wx
+function openLegalPrompt(page) {
   page.setData({
-    showLegalPrompt: true,
-    legalPromptWorkId: workId,
-    legalPromptAction: action,
-    legalPromptText: copy.text,
-    legalPromptAgreeLabel: copy.agree,
-    err: '',
+    showLegalPrompt: false,
+    legalPromptWorkId: '',
+    legalPromptAction: 'wx',
+    err: LEGAL_NEED_CHECK,
   })
 }
 
@@ -286,8 +266,8 @@ Page({
     showLegalPrompt: false,
     legalPromptWorkId: '',
     legalPromptAction: 'wx',
-    legalPromptText: LEGAL_PROMPT_COPY.wx.text,
-    legalPromptAgreeLabel: LEGAL_PROMPT_COPY.wx.agree,
+    legalPromptText: LEGAL_NEED_CHECK,
+    legalPromptAgreeLabel: '去勾选',
     icpFiling: MP_ICP_FILING,
     psbFiling: MP_PSB_FILING,
     showPhoneBindSheet: false,
@@ -305,15 +285,15 @@ Page({
     const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
     const cache = wxProfileDisplay.readWxProfileCache()
     const local = wxAccount.readWxAccount()
+    loginLegalAgree.writeAgreed(false)
     this.setData({
       err: '',
       redirect,
-      legalAgreed: loginLegalAgree.readAgreed(),
+      legalAgreed: false,
       wxNickName: wxProfileDisplay.pickWxNick(cache && cache.wxNickName, local && local.wxNickName),
       wxAvatarUrl: wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, local && local.wxAvatarUrl),
     })
     syncLoginIdentityFromProfile(this)
-    if (this.data.legalAgreed) this.primeWxPrivacy()
     if (auth.isLoggedIn()) {
       offerPhoneBindOrEnter(this)
     }
@@ -580,30 +560,12 @@ Page({
   },
 
   onLegalAgreeLogin() {
-    const workId = this.data.legalPromptWorkId
-    const action = this.data.legalPromptAction || 'wx'
-    if (!workId) {
-      this.setData({ showLegalPrompt: false })
-      return
-    }
-    loginLegalAgree.writeAgreed(true)
     this.setData({
-      legalAgreed: true,
       showLegalPrompt: false,
       legalPromptWorkId: '',
       legalPromptAction: 'wx',
-      err: '',
+      err: LEGAL_NEED_CHECK,
     })
-    if (action === 'wx') this.primeWxPrivacy()
-    if (action === 'pwd') {
-      void this.doPwdLogin(workId)
-      return
-    }
-    if (action === 'sms') {
-      void this.doSmsLogin(workId)
-      return
-    }
-    if (action === 'phone') return
   },
 
   onGetPhoneNumber(e) {
@@ -668,9 +630,6 @@ Page({
     if (!this.data.legalAgreed) {
       openLegalPrompt(this, workId, 'wx')
       return
-    }
-    if (!loginLegalAgree.readAgreed()) {
-      loginLegalAgree.writeAgreed(true)
     }
     void mpPrivacyAuthorize.queryNeedAuthorization().then((needPrivacy) => {
       if (needPrivacy) {
