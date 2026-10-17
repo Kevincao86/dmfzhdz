@@ -9,6 +9,10 @@ import {
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
 import { buildNoviceAllocationFromTalentLibrary } from '../src/lib/talentLibraryTierPricing.js'
+import {
+  parseTalentPlanRecommendRequest,
+  recommendTalentPlan,
+} from '../src/lib/talentPlanRecommend.js'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -65,6 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     let body: {
+      mode?: string
       city?: string
       budgetYuan?: number
       targetHeadcount?: number
@@ -76,6 +81,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       body = JSON.parse(rawBody(req) || '{}') as typeof body
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
+      return
+    }
+
+    if (body.mode === 'talent_recommend') {
+      const parsed = parseTalentPlanRecommendRequest(body)
+      if (!parsed.ok) {
+        sendOpsJson(res, 400, { ok: false, error: parsed.error })
+        return
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await loadRegistrySnapshotForGet(io)
+      const filled = recommendTalentPlan({
+        entries: data.talentLibraryEntries ?? [],
+        ...parsed.value,
+      })
+      sendOpsJson(res, 200, { ok: true, ...filled })
       return
     }
 

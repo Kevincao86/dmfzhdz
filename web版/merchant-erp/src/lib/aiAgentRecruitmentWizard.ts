@@ -129,6 +129,7 @@ export function buildRecruitWizardSeed(
     tags: [],
     briefText: '',
     wizardStep: 1,
+    talentPath: 'pending',
     wizardScope: scope,
     wizardBudget: budget,
     wizardBudgetStatus: 'idle',

@@ -204,6 +204,8 @@ export type AiRecruitmentBriefPreview = {
   wizardBudgetStatus?: 'idle' | 'loading' | 'ready' | 'error'
   wizardShoot?: RecruitWizardShoot
   wizardShootStatus?: 'idle' | 'loading' | 'ready' | 'error'
+  /** 未选时先问「给我推荐 / 我要招募」；recruit 才进入原招募步骤 */
+  talentPath?: 'pending' | 'recommend' | 'recruit'
 }
 
 export type AiTaskPreviewPayload = {

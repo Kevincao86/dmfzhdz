@@ -21,6 +21,7 @@ import {
   summarizeRecruitWizardScope,
 } from '../lib/aiAgentRecruitmentWizard'
 import { LOCAL_LIFE_KOL_COMMISSION_MAX_PCT, LOCAL_LIFE_KOL_COMMISSION_MIN_PCT } from '../lib/localLifeKolCommission'
+import { TalentPlanChoice } from './TalentPlanChoice'
 
 export function AiAgentRecruitmentVisualPreview({
   brief,
@@ -43,7 +44,45 @@ export function AiAgentRecruitmentVisualPreview({
     } as const)
   const budget = brief.wizardBudget
   const shoot = brief.wizardShoot
+  const talentPath = brief.talentPath
   const [cityPickerOpen, setCityPickerOpen] = useState(false)
+  if (talentPath === 'pending' || talentPath === 'recommend') {
+    return (
+      <div className="mt-4">
+        <TalentPlanChoice
+          key={talentPath}
+          city={scope.city}
+          platform={primaryRecruitWizardPlatform(recruitWizardPlatformList(scope))}
+          talentType={scope.mainProductName}
+          seats={[]}
+          budgetYuan={budget?.budgetYuan ?? 0}
+          headcount={budget?.headcount ?? 0}
+          initialMode={talentPath === 'recommend' ? 'recommend' : 'choose'}
+          onRecruit={() =>
+            patchRecruitWizard(
+              previewMessageId,
+              { talentPath: 'recruit' },
+              '第 1 步：核对主推和投放范围。',
+            )
+          }
+          onRecommend={() =>
+            patchRecruitWizard(
+              previewMessageId,
+              { talentPath: 'recommend' },
+              '按方案人数推荐达人，不符合可以替换。',
+            )
+          }
+          onChoose={() =>
+            patchRecruitWizard(
+              previewMessageId,
+              { talentPath: 'pending' },
+              '请先选择：给我推荐，或我要招募。',
+            )
+          }
+        />
+      </div>
+    )
+  }
   const cityState = scope.city.trim()
     ? parseRegionToCityState(scope.city)
     : { cityNational: false, selectedCities: [] }

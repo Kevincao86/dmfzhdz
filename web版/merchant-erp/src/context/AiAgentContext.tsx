@@ -439,7 +439,11 @@ type AiAgentContextValue = {
   submitPendingTaskToPlatforms: (previewMessageId: string) => void
   cancelPendingTask: (previewMessageId: string) => void
   modifyPendingTask: (previewMessageId: string) => void
-  patchRecruitWizard: (previewMessageId: string, patch: Partial<AiRecruitmentBriefPreview>) => void
+  patchRecruitWizard: (
+    previewMessageId: string,
+    patch: Partial<AiRecruitmentBriefPreview>,
+    content?: string,
+  ) => void
   advanceRecruitWizard: (previewMessageId: string) => void
   backRecruitWizard: (previewMessageId: string) => void
   /** @deprecated 使用 isPreviewConfirming(id) */
@@ -1359,7 +1363,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const pushRecruitInfluencerPreview = useCallback(
     (userBrief: string, pageLabel?: string, assistantContent?: string) => {
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
-      const intro = `【达人招募】${intelLine ? `${intelLine}。` : ''}请一步确认：先核对主推和投放范围，确认后再看预算。`
+      const intro = `【达人招募】${intelLine ? `${intelLine}。` : ''}请先选择：给我推荐，或我要招募。`
       const preview = buildPreviewForTask('recruit_influencer', pageLabel)
       const seed = buildRecruitWizardSeed(userBrief, assistantContent)
       const msg = createAgentMessage('task_preview', intro, {
@@ -1380,8 +1384,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   )
 
   const patchRecruitWizard = useCallback(
-    (previewMessageId: string, patch: Partial<AiRecruitmentBriefPreview>) => {
-      patchPreviewRecruitmentBrief(previewMessageId, patch)
+    (previewMessageId: string, patch: Partial<AiRecruitmentBriefPreview>, content?: string) => {
+      patchPreviewRecruitmentBrief(previewMessageId, patch, content)
     },
     [patchPreviewRecruitmentBrief],
   )

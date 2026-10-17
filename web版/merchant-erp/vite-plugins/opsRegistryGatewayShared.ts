@@ -77,6 +77,10 @@ import {
 import { applyToMpRecruitmentOrderInSnapshot } from '../src/lib/mpRecruitmentApplyCore.js'
 import { syncSupplierTeamLibraries, type SupplierTeamRole } from '../src/lib/supplierTeamLibrarySync.js'
 import { buildNoviceAllocationFromTalentLibrary } from '../src/lib/talentLibraryTierPricing.js'
+import {
+  parseTalentPlanRecommendRequest,
+  recommendTalentPlan,
+} from '../src/lib/talentPlanRecommend.js'
 import { requireMerchantRegistryAuthFromHeaders } from '../src/lib/merchantRegistryAuth.js'
 import {
   appendRecruitmentOrderForTenant,
@@ -1046,11 +1050,25 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             }
             const raw = await readBody(req)
             const body = JSON.parse(raw || '{}') as {
+              mode?: string
               city?: string
               budgetYuan?: number
               targetHeadcount?: number
               feeType?: 'tier' | 'fixed'
               platform?: string
+            }
+            if (body.mode === 'talent_recommend') {
+              const parsed = parseTalentPlanRecommendRequest(body)
+              if (!parsed.ok) {
+                json(res, 400, { ok: false, error: parsed.error })
+                return
+              }
+              const filled = recommendTalentPlan({
+                entries: ensureRegistry(viteRoot).talentLibraryEntries ?? [],
+                ...parsed.value,
+              })
+              json(res, 200, { ok: true, ...filled })
+              return
             }
             const city = String(body.city ?? '').trim()
             const budgetYuan = Number(body.budgetYuan)

@@ -28,6 +28,8 @@ import {
 } from 'react'
 import { Link } from 'react-router-dom'
 import RecruitmentPlatformPicker from '../components/recruitment/RecruitmentPlatformPicker'
+import { TalentPlanChoice } from '../components/TalentPlanChoice'
+import { seatsFromTalentBudget } from '../lib/talentPlanRecommend'
 import { usePartnerClients } from '../context/PartnerClientContext'
 import { isPartnerEdition } from '../lib/appEdition'
 import { readMerchantSession } from '../lib/merchantSession'
@@ -1528,6 +1530,18 @@ function SimplePlanGallery({ plan }: { plan: AiOpsPlanResult }) {
           {modal.body}
         </DetailModal>
       ) : null}
+      <TalentPlanChoice
+        city={plan.talentBudget.libraryInsight?.filterCity || ''}
+        platform={
+          plan.talentBudget.libraryInsight?.platform ||
+          plan.talentBudget.talentRows[0]?.platform ||
+          '抖音'
+        }
+        talentType={plan.talentBudget.talentRows[0]?.talentType || plan.opsPlan.positioning || ''}
+        seats={seatsFromTalentBudget(plan.talentBudget)}
+        budgetYuan={plan.marketingBudget.totalBudget || 0}
+        headcount={0}
+      />
     </div>
   )
 }
@@ -1995,7 +2009,19 @@ function ResultPanel({
     const rows = plan.talentBudget.talentRows || []
     const lib = plan.talentBudget.libraryInsight
     if (!lines.length && !rows.length && !lib) {
-      return <p className="text-sm text-gray-500">暂无预算分配明细</p>
+      return (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500">暂无预算分配明细</p>
+          <TalentPlanChoice
+            city=""
+            platform="抖音"
+            talentType=""
+            seats={[]}
+            budgetYuan={plan.marketingBudget.totalBudget || 0}
+            headcount={0}
+          />
+        </div>
+      )
     }
     return (
       <div className="space-y-5">
@@ -2077,6 +2103,14 @@ function ResultPanel({
             </TableShell>
           </div>
         ) : null}
+        <TalentPlanChoice
+          city={lib?.filterCity || ''}
+          platform={lib?.platform || rows[0]?.platform || lines[0]?.platform || '抖音'}
+          talentType={rows[0]?.talentType || lines.find((r) => /达人/.test(r.category) && !/投流|本地推/.test(r.category))?.category || ''}
+          seats={seatsFromTalentBudget(plan.talentBudget)}
+          budgetYuan={plan.marketingBudget.totalBudget || 0}
+          headcount={0}
+        />
       </div>
     )
   }

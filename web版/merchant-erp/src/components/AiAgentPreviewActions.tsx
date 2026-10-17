@@ -38,6 +38,8 @@ export function AiAgentPreviewActions({
   const confirming = isPreviewConfirming(previewMessageId)
   const isProduct = taskType === 'create_product'
   const isRecruit = taskType === 'recruit_influencer'
+  const talentPath = previewMsg?.preview?.recruitmentBrief?.talentPath
+  const talentGate = talentPath === 'pending' || talentPath === 'recommend'
   const recruitStep = recruitWizardStepOf(previewMsg?.preview?.recruitmentBrief)
   const recruitBusy =
     previewMsg?.preview?.recruitmentBrief?.wizardBudgetStatus === 'loading' ||
@@ -95,7 +97,7 @@ export function AiAgentPreviewActions({
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {isRecruit ? (
+        {isRecruit && talentGate ? null : isRecruit ? (
           <>
             {recruitStep > 1 ? (
               <button
@@ -174,6 +176,7 @@ export function AiAgentPreviewActions({
             {confirmLabel}
           </button>
         )}
+        {talentGate ? null : (
         <button
           type="button"
           onClick={() => modifyPendingTask(previewMessageId)}
@@ -181,6 +184,7 @@ export function AiAgentPreviewActions({
         >
           修改方案
         </button>
+        )}
         <button
           type="button"
           onClick={() => cancelPendingTask(previewMessageId)}
