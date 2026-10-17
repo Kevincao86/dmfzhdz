@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const feat = require('../../utils/merchantFeatureApisMp.js')
 const erpNav = require('../../utils/erpNavMp.js')
 const { decodeJwtSub } = require('../../utils/jwtDecode.js')
 const { assetUrl } = require('../../utils/mpStaticAssets.js')
@@ -748,6 +749,68 @@ Page({
       id,
       Object.assign({}, msg, { preview: Object.assign({}, msg.preview, { recruitmentBrief: nextBrief }) }),
     )
+  },
+
+  patchRecruitBrief(id, briefPatch, content) {
+    const msg = this.findPreview(id)
+    const brief = msg && msg.preview && msg.preview.recruitmentBrief
+    if (!brief) return null
+    const nextBrief = Object.assign({}, brief, briefPatch)
+    const next = Object.assign({}, msg, {
+      preview: Object.assign({}, msg.preview, { recruitmentBrief: nextBrief }),
+    })
+    if (content) next.content = content
+    this.replacePreview(id, next)
+    return next
+  },
+
+  onTalentRecruit(e) {
+    const id = e.currentTarget.dataset.id
+    this.patchRecruitBrief(id, { talentPath: 'recruit' }, '第 1 步：核对主推和投放范围。')
+  },
+
+  async onTalentRecommend(e) {
+    const id = e.currentTarget.dataset.id
+    const replaceId = String(e.currentTarget.dataset.talent || '')
+    const msg = this.findPreview(id)
+    const brief = msg && msg.preview && msg.preview.recruitmentBrief
+    if (!brief || !feat || this.data.sending) return
+    const scope = brief.wizardScope || {}
+    const budget = brief.wizardBudget || {}
+    const refreshing = !replaceId
+    const cards = refreshing ? [] : Array.isArray(brief.talentCards) ? brief.talentCards : []
+    const excluded = refreshing ? [] : Array.isArray(brief.excludedIds) ? brief.excludedIds.slice() : []
+    if (replaceId) excluded.push(replaceId)
+    const seats = cards.length ? feat.seatsForTalentReplace(cards, replaceId) : []
+    this.setData({ sending: true })
+    const r = await feat.requestTalentRecommend({
+      city: scope.city || '',
+      platform: scope.platformDouyin === false && scope.platformXhs ? '小红书' : '抖音',
+      talentType: scope.mainProductName || brief.mainProductName || '',
+      budgetYuan: Number(budget.budgetYuan) || 0,
+      headcount: Number(budget.headcount) || 0,
+      seats,
+      excludedIds: excluded,
+    })
+    this.setData({ sending: false })
+    if (!r.ok) {
+      this.patchRecruitBrief(id, { talentPath: 'recommend', talentNote: r.message || '推荐名单暂时取不到' })
+      return
+    }
+    this.patchRecruitBrief(
+      id,
+      {
+        talentPath: 'recommend',
+        talentCards: r.cards || [],
+        talentNote: r.cityNote || '已按预算人数推荐，不符合可以替换。',
+        excludedIds: excluded,
+      },
+      '按方案人数推荐达人，不符合可以替换。',
+    )
+  },
+
+  onTalentReplace(e) {
+    void this.onTalentRecommend(e)
   },
 
   async onRecruitNext(e) {

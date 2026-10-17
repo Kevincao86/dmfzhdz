@@ -120,5 +120,53 @@
       <view wx:for="{{plan.risks}}" wx:key="*this" class="op-li">· {{item}}</view>
     </view>
   </block>
+
+  <block wx:if="{{plan && !simple}}">
+    <view wx:if="{{plan.monthlyThemes.length}}" class="op-card">
+      <text class="op-card-title">节点主题</text>
+      <view wx:for="{{plan.monthlyThemes}}" wx:key="*this" class="op-li">· {{item}}</view>
+    </view>
+    <view wx:if="{{plan.platformLines.length}}" class="op-card">
+      <text class="op-card-title">分平台策略</text>
+      <view wx:for="{{plan.platformLines}}" wx:key="*this" class="op-li">· {{item}}</view>
+    </view>
+    <view wx:if="{{plan.phases.length || plan.weekly.length}}" class="op-card">
+      <text class="op-card-title">执行</text>
+      <view wx:for="{{plan.phases}}" wx:key="*this" class="op-li">· {{item}}</view>
+      <view wx:for="{{plan.weekly}}" wx:key="*this" class="op-li">· {{item}}</view>
+    </view>
+    <view wx:if="{{plan.channels.length || plan.roiRows.length}}" class="op-card">
+      <text class="op-card-title">预算明细</text>
+      <view wx:for="{{plan.channels}}" wx:key="*this" class="op-li">· {{item}}</view>
+      <view wx:for="{{plan.roiRows}}" wx:key="*this" class="op-li">· {{item}}</view>
+    </view>
+    <view wx:if="{{plan.milestones.length}}" class="op-card">
+      <text class="op-card-title">日历</text>
+      <view wx:for="{{plan.milestones}}" wx:key="*this" class="op-li">· {{item}}</view>
+    </view>
+    <view wx:if="{{plan.libraryNote || plan.budgetLineTexts.length || plan.talentRowTexts.length}}" class="op-card">
+      <text class="op-card-title">达人预算</text>
+      <text wx:if="{{plan.libraryNote}}" class="op-body" user-select>{{plan.libraryNote}}</text>
+      <view wx:for="{{plan.budgetLineTexts}}" wx:key="*this" class="op-li">· {{item}}</view>
+      <view wx:for="{{plan.talentRowTexts}}" wx:key="*this" class="op-li">· {{item}}</view>
+    </view>
+    <view wx:if="{{plan.combos.length}}" class="op-card">
+      <text class="op-card-title">货盘</text>
+      <view wx:for="{{plan.combos}}" wx:key="*this" class="op-li">· {{item}}</view>
+    </view>
+  </block>
+
+  <view wx:if="{{plan}}" class="op-card">
+    <text class="op-card-title">达人名单</text>
+    <text class="op-body muted">先选：给我推荐，或我要招募。推荐只换点到的这一位，不会自动发招募。</text>
+    <button class="op-btn" loading="{{talentBusy}}" disabled="{{talentBusy}}" bindtap="onTalentRecommend">给我推荐</button>
+    <button class="op-btn" bindtap="onTalentRecruit">我要招募</button>
+    <text wx:if="{{talentNote}}" class="op-meta">{{talentNote}}</text>
+    <view wx:for="{{talentCards}}" wx:key="seatId" class="op-li">
+      <text class="op-body">{{item.line}}</text>
+      <text wx:if="{{item.reason}}" class="op-body muted">{{item.reason}}</text>
+      <button wx:if="{{!item.empty}}" class="op-btn" data-id="{{item.talentId}}" bindtap="onTalentReplace">替换</button>
+    </view>
+  </view>
 <site-icp-footer />
 </scroll-view>

@@ -83,6 +83,7 @@ list_scopes() {
   merchant_ai_agent_tax  商家 ERP：AI智能体意图/工具门禁 + 近三月日期 + 一键报税佣金（含构建类型补齐）
   merchant_ai_agent_data 商家 ERP：AI智能体跨页只读取数（评价/线索/投流/订单等摘要注入）
   merchant_talent_choice 商家 ERP：达人方案「给我推荐 / 我要招募」
+  merchant_erp_mp_align  商家 ERP 与商家小程序：短剧先角色后故事，运营方案六表与达人选择对齐
   merchant_free_media    商家 ERP：免费版生图/生视频可浏览，点击使用提示升级
   competitor_industry    商家 ERP：竞争对手分析经营类目读取/门店毛利配置联动
   competitor_baidu_map   商家 ERP：竞品分析接入百度地图周边 POI（服务端 AK）
@@ -1346,6 +1347,19 @@ aiAgentRecruitmentWizard
 AiAgentRecruitmentVisualPreview
 AiAgentPreviewActions
 AiAgentContext
+change-scope-guard
+PAT
+      ;;
+    merchant_erp_mp_align)
+      cat <<'PAT'
+ShortDramaPage
+short-drama.js
+short-drama.wxml
+merchantFeatureApisMp
+pages/ai-ops-plan/
+pages/ai-agent/ai-agent.js
+pages/ai-agent/ai-agent.wxml
+aiAgentPreviewMp
 change-scope-guard
 PAT
       ;;

@@ -291,11 +291,120 @@ async function synthesizeDigitalHumanTts(body) {
   }
 }
 
+function tierKeyFromLabel(tier) {
+  const s = String(tier || '').trim()
+  if (/5\+|V5\+|以上/.test(s)) return 'v5plus'
+  if (/头|V5|^5|五级/.test(s)) return 'v5'
+  if (/腰|V4|^4|四级/.test(s)) return 'v4'
+  return 'v3'
+}
+
+function seatsFromTalentBudget(budget, fallbackPlatform) {
+  const seats = []
+  const rows = budget && Array.isArray(budget.talentRows) ? budget.talentRows : []
+  const lines = budget && Array.isArray(budget.budgetLines) ? budget.budgetLines : []
+  const push = (row, kind) => {
+    const count = Math.max(0, Math.floor(Number(row.headcount) || 0))
+    if (count < 1) return
+    const tierLabel = String(row.tier || '').trim()
+    const platform = String(row.platform || fallbackPlatform || '抖音').trim() || '抖音'
+    const talentType = String(row.talentType || row.category || kind || '').trim()
+    for (let i = 0; i < count && seats.length < 24; i += 1) {
+      seats.push({
+        seatId: `${kind}-${seats.length + 1}`,
+        tierKey: tierKeyFromLabel(tierLabel),
+        tierLabel: tierLabel || tierKeyFromLabel(tierLabel),
+        unitBudgetYuan: Math.max(0, Math.round(Number(row.unitBudgetYuan) || 0)),
+        talentType,
+        platform,
+      })
+    }
+  }
+  rows.forEach((row) => {
+    if (/投流/.test(`${row.contentForm || ''}${row.talentType || ''}`)) return
+    push(row, 'row')
+  })
+  if (!seats.length) {
+    lines.forEach((line) => {
+      const category = String(line.category || '')
+      if (/投流|本地推/.test(category) || !/达人/.test(category)) return
+      push(Object.assign({}, line, { talentType: category }), 'line')
+    })
+  }
+  return seats
+}
+
+function textLines(list, mapFn) {
+  if (!Array.isArray(list)) return []
+  return list.map(mapFn).map((s) => String(s || '').trim()).filter(Boolean)
+}
+
+function decorateTalentCards(cards, seats) {
+  const byId = {}
+  ;(seats || []).forEach((s) => {
+    if (s && s.seatId) byId[s.seatId] = s
+  })
+  return (cards || []).map((c) => {
+    const seat = byId[c.seatId] || {}
+    const nickname = String(c.nickname || '').trim()
+    const empty = !!c.empty || !c.talentId
+    return {
+      seatId: String(c.seatId || ''),
+      talentId: String(c.talentId || ''),
+      tierKey: seat.tierKey || c.tierKey || tierKeyFromLabel(c.tierLabel),
+      tierLabel: String(c.tierLabel || seat.tierLabel || ''),
+      unitBudgetYuan: Number(c.unitBudgetYuan || seat.unitBudgetYuan || 0),
+      talentType: String(c.talentType || seat.talentType || ''),
+      platform: String(c.platform || seat.platform || '抖音'),
+      line: empty
+        ? `${c.tierLabel || '这一档'} · 库内暂无下一位`
+        : [
+            nickname || '达人',
+            c.city || '',
+            c.platform || '',
+            `${Number(c.followers) || 0}粉`,
+            c.quoteYuan != null && c.quoteYuan !== '' ? `¥${c.quoteYuan}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · '),
+      reason: String(c.reason || ''),
+      empty,
+    }
+  })
+}
+
+function seatsForTalentReplace(cards, replaceId) {
+  return (cards || []).map((c) => {
+    const seat = {
+      seatId: c.seatId,
+      tierKey: c.tierKey || tierKeyFromLabel(c.tierLabel),
+      tierLabel: c.tierLabel || '',
+      unitBudgetYuan: Number(c.unitBudgetYuan) || 0,
+      talentType: c.talentType || '',
+      platform: c.platform || '抖音',
+    }
+    if (c.talentId && c.talentId !== replaceId) seat.lockedTalentId = c.talentId
+    return seat
+  })
+}
+
 function normalizeOpsPlan(plan) {
   if (!plan || typeof plan !== 'object') return null
   const ops = plan.opsPlan || {}
   const exec = plan.executionPlan || {}
   const budget = plan.marketingBudget || {}
+  const talent = plan.talentBudget || {}
+  const insight = talent.libraryInsight && typeof talent.libraryInsight === 'object' ? talent.libraryInsight : null
+  const talentRows = Array.isArray(talent.talentRows) ? talent.talentRows : []
+  const budgetLines = Array.isArray(talent.budgetLines) ? talent.budgetLines : []
+  const platform =
+    (insight && insight.platform) ||
+    (talentRows[0] && talentRows[0].platform) ||
+    (budgetLines[0] && budgetLines[0].platform) ||
+    '抖音'
+  const peopleLine = budgetLines.find(
+    (r) => r && /达人/.test(String(r.category || '')) && !/投流|本地推/.test(String(r.category || '')),
+  )
   return {
     planEdition: String(plan.planEdition || '').trim() || 'standard',
     simplePlan: plan.simplePlan && typeof plan.simplePlan === 'object' ? plan.simplePlan : null,
@@ -309,10 +418,82 @@ function normalizeOpsPlan(plan) {
     contentPillars: Array.isArray(ops.contentPillars)
       ? ops.contentPillars.map((x) => String(x)).filter(Boolean)
       : [],
+    monthlyThemes: Array.isArray(ops.monthlyThemes)
+      ? ops.monthlyThemes.map((x) => String(x)).filter(Boolean)
+      : [],
+    platformLines: textLines(ops.platformStrategy, (p) =>
+      p && p.platform ? `${p.platform}：${p.approach || ''} ${p.publishFreq || ''} ${p.kpi || ''}`.trim() : '',
+    ),
     overview: String(exec.overview || '').trim(),
+    phases: textLines(exec.phases, (p) =>
+      p && (p.phase || p.actions) ? `${p.phase || '阶段'}${p.dateRange ? `（${p.dateRange}）` : ''}：${p.actions || ''}` : '',
+    ),
+    weekly: textLines(exec.weeklyActions, (w) =>
+      w && (w.week || w.focus) ? `${w.week || ''} ${w.dateRange || ''}：${w.focus || ''} ${w.tasks || ''}`.trim() : '',
+    ),
     totalBudget: typeof budget.totalBudget === 'number' ? budget.totalBudget : 0,
     roiSummary: String(budget.roiSummary || '').trim(),
     assumptions: String(budget.assumptions || '').trim(),
+    channels: textLines(budget.channels, (c) =>
+      c && c.channel
+        ? `${c.channel}${c.month ? ` ${c.month}` : ''} ¥${Number(c.amountYuan) || 0}（${Number(c.ratioPct) || 0}%）${c.note ? ` ${c.note}` : ''}`
+        : '',
+    ),
+    roiRows: textLines(budget.roiAnalysis, (r) =>
+      r && r.channel
+        ? `${r.channel} 投入¥${Number(r.investYuan) || 0} 预计GMV¥${Number(r.expectedGmvYuan) || 0} ROI ${r.roi || '—'}`
+        : '',
+    ),
+    milestones: textLines(plan.calendar && plan.calendar.milestones, (m) =>
+      m && (m.item || m.date) ? `${m.date || ''} ${m.time || ''} ${m.item || ''}`.trim() : '',
+    ),
+    budgetLineTexts: textLines(budgetLines, (l) =>
+      l && l.category
+        ? `${l.category} ${l.platform || ''} ${l.tier || ''} ${Number(l.headcount) || 0}人 单人¥${Number(l.unitBudgetYuan) || 0} 小计¥${Number(l.subtotalYuan) || 0}`
+        : '',
+    ),
+    talentRowTexts: textLines(talentRows, (t) =>
+      t && (t.platform || t.talentType)
+        ? `${t.platform || ''} ${t.tier || ''} ${t.talentType || ''} ${Number(t.headcount) || 0}人 单场¥${Number(t.unitBudgetYuan) || 0}`
+        : '',
+    ),
+    libraryNote: insight
+      ? [
+          insight.sourceLabel || '',
+          insight.tierAvgSummary || '',
+          insight.headSamples && insight.headSamples.length ? `头部：${insight.headSamples.join('、')}` : '',
+          insight.midTailSamples && insight.midTailSamples.length ? `腰尾：${insight.midTailSamples.join('、')}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : '',
+    combos: textLines(plan.productBoard && plan.productBoard.combos, (c) =>
+      c && c.name ? `${c.name} ¥${Number(c.priceYuan) || 0}${c.sellingPoint ? ` ${c.sellingPoint}` : ''}` : '',
+    ),
+    talentSeats: seatsFromTalentBudget(talent, platform),
+    talentCity: insight && insight.filterCity ? String(insight.filterCity) : '',
+    talentPlatform: String(platform || '抖音'),
+    talentType: String(
+      (talentRows[0] && talentRows[0].talentType) || (peopleLine && peopleLine.category) || ops.positioning || '',
+    ),
+  }
+}
+
+async function requestTalentRecommend(body) {
+  try {
+    const r = await postJson('/api/meoo-ops-novice-kol-allocation', Object.assign({ mode: 'talent_recommend' }, body || {}))
+    if (r && r.ok) {
+      const seats = Array.isArray(r.seats) ? r.seats : []
+      return {
+        ok: true,
+        cards: decorateTalentCards(Array.isArray(r.cards) ? r.cards : [], seats),
+        seats,
+        cityNote: String(r.cityNote || ''),
+      }
+    }
+    return { ok: false, message: String((r && (r.error || r.message || r.detail)) || '推荐名单暂时取不到') }
+  } catch (e) {
+    return { ok: false, message: (e && e.message) || '推荐名单暂时取不到' }
   }
 }
 
@@ -389,4 +570,6 @@ module.exports = {
   transcribeOralAudio,
   generateAiOpsPlan,
   runSiteSelection,
+  requestTalentRecommend,
+  seatsForTalentReplace,
 }

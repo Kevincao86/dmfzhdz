@@ -10,6 +10,27 @@ const castStore = require('../../utils/shortDramaCastMp.js')
 
 const SEEDANCE_MODEL = labels.SEEDANCE_1_5_PRO_MODEL_ID
 
+function castIsReady(cast) {
+  return (cast || []).some((m) => {
+    const name = String((m && m.name) || '').trim()
+    const named = name && !/^角色\d+$/.test(name)
+    return named || String((m && m.desc) || '').trim() || (m && (m.confirmed || m.previewPath))
+  })
+}
+
+function castStoryLines(cast) {
+  const named = (cast || []).filter(
+    (m) => String(m.name || '').trim() || String(m.desc || '').trim() || m.confirmed || m.previewPath,
+  )
+  const lead = named[0]
+  const leadName = (lead && String(lead.name || '').trim().replace(/^角色\d+$/, '')) || '主角'
+  const support = named
+    .slice(1)
+    .map((m) => String(m.name || '').trim() || '配角')
+    .filter(Boolean)
+  return { leadName: leadName || '主角', support }
+}
+
 function needProxyDownload(message) {
   return /domain list|not in domain|downloadFile:fail/i.test(String(message || ''))
 }
@@ -223,10 +244,20 @@ Page({
 
   onDramaStep(e) {
     const n = Number(e.currentTarget.dataset.step)
-    if (n >= 1 && n <= 4) this.setData({ dramaStep: n, err: '' })
+    if (!(n >= 1 && n <= 4)) return
+    if (n >= 3 && !castIsReady(this.data.cast)) {
+      wx.showToast({ title: '请先选择或填写角色', icon: 'none' })
+      return
+    }
+    this.setData({ dramaStep: n, err: '' })
   },
   onDramaNext() {
-    this.setData({ dramaStep: Math.min(4, this.data.dramaStep + 1), err: '' })
+    const step = this.data.dramaStep
+    if (step === 2 && !castIsReady(this.data.cast)) {
+      wx.showToast({ title: '请先选择或填写角色', icon: 'none' })
+      return
+    }
+    this.setData({ dramaStep: Math.min(4, step + 1), err: '' })
   },
   onDramaPrev() {
     this.setData({ dramaStep: Math.max(1, this.data.dramaStep - 1), err: '' })
@@ -685,6 +716,12 @@ Page({
       wx.showToast({ title: '请先选择成片时长', icon: 'none' })
       return
     }
+    if (!castIsReady(this.data.cast)) {
+      wx.showToast({ title: '请先选择或填写角色', icon: 'none' })
+      this.setData({ dramaStep: 2 })
+      return
+    }
+    const castBrief = castStoryLines(this.data.cast)
     const world = catalog.worldOf(this.data.worldId)
     const scene = catalog.sceneOf(this.data.sceneId, {
       name: this.data.customSceneName,
@@ -700,7 +737,7 @@ Page({
           {
             role: 'system',
             content:
-              '你是竖屏商家短剧编剧。只输出剧情正文，不要标题。篇幅必须严格等于用户选的成片时长：8～15 秒写短钩子，30 秒及以上按标注秒数把剧情写满，禁止不论时长都写成一两句。前 3 秒要有钩子。',
+              '你是竖屏商家短剧编剧。先分清主次角色，再写故事。画面主角是动作主语，客人只作配角。只输出剧情正文，不要标题。篇幅必须严格等于用户选的成片时长：8～15 秒写短钩子，30 秒及以上按标注秒数把剧情写满，禁止不论时长都写成一两句。前 3 秒要有钩子。',
           },
           {
             role: 'user',
@@ -709,6 +746,10 @@ Page({
               `店名/主题：${shop.storeName}，卖点：${shop.offerName}，价格：${shop.price}，位置：${shop.area}`,
               `成片时长：${durOpt.label}，共 ${dur} 秒。`,
               `【篇幅锁定】${guide}`,
+              `画面主角：${castBrief.leadName}。故事必须以这个人做动作主语。`,
+              castBrief.support.length
+                ? `配角：${castBrief.support.join('、')}。必须写到对手戏，禁止一个人独行。`
+                : '配角：客人只作推动冲突的配角。',
               '按这个时长写能拍满的竖屏短剧剧情。短的不要注水，长的必须按时间轴写满。',
             ].join('\n'),
           },

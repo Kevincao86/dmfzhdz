@@ -2,14 +2,14 @@
 <scroll-view scroll-y class="{{lqAccentClass}} op-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="op-hero">
     <text class="op-title">AI 短剧</text>
-    <text class="op-sub">和电脑端同一套：场景、故事、角色（可保存、可按参考图二选一）、再出片。分四步，每步只做一件事。</text>
+    <text class="op-sub">和电脑端同一套：先选场景，再定角色，然后按角色写故事，最后出片。分四步，每步只做一件事。</text>
     <text class="op-meta">{{rateLabel}}</text>
   </view>
 
   <view class="op-steps">
     <text class="op-step {{dramaStep === 1 ? 'on' : ''}}" data-step="1" bindtap="onDramaStep">1 场景</text>
-    <text class="op-step {{dramaStep === 2 ? 'on' : ''}}" data-step="2" bindtap="onDramaStep">2 故事</text>
-    <text class="op-step {{dramaStep === 3 ? 'on' : ''}}" data-step="3" bindtap="onDramaStep">3 角色</text>
+    <text class="op-step {{dramaStep === 2 ? 'on' : ''}}" data-step="2" bindtap="onDramaStep">2 角色</text>
+    <text class="op-step {{dramaStep === 3 ? 'on' : ''}}" data-step="3" bindtap="onDramaStep">3 故事</text>
     <text class="op-step {{dramaStep === 4 ? 'on' : ''}}" data-step="4" bindtap="onDramaStep">4 出片</text>
   </view>
 
@@ -44,10 +44,10 @@
       <text class="op-label">画面里必须出现</text>
       <input class="op-input" placeholder="例如：卷帘门、剩汤、路灯" value="{{customSceneMustSee}}" bindinput="onCustomSceneMust" />
     </block>
-    <button class="op-btn" bindtap="onDramaNext">下一步：写故事</button>
+    <button class="op-btn" bindtap="onDramaNext">下一步：选角色</button>
   </view>
 
-  <view class="op-card" wx:elif="{{dramaStep === 2}}">
+  <view class="op-card" wx:elif="{{dramaStep === 3}}">
     <text class="op-label">成片时长</text>
     <picker mode="selector" range="{{durationOptions}}" range-key="label" value="{{durationIdx}}" bindchange="onDuration">
       <view class="op-picker">{{durationOptions[durationIdx].label}}</view>
@@ -66,16 +66,16 @@
       <input class="op-input" data-key="{{item.key}}" placeholder="{{item.placeholder}}" value="{{item.value}}" bindinput="onField" />
     </block>
     <text class="op-label">一句话故事</text>
-    <text class="op-body muted">先选时长。8～15 秒写一个钩子，30 秒起按时间轴把剧情写满。</text>
-    <textarea class="op-area" maxlength="2000" placeholder="先选时长，再点 AI生成故事" value="{{story}}" bindinput="onStory" />
+    <text class="op-body muted">故事按上一步的角色来写。先选时长。8～15 秒写一个钩子，30 秒起按时间轴把剧情写满。</text>
+    <textarea class="op-area" maxlength="2000" placeholder="先确认角色和时长，再点 AI生成故事" value="{{story}}" bindinput="onStory" />
     <button class="op-btn-ghost" loading="{{storyBusy}}" bindtap="onAiStory">{{storyBusy ? '正在写故事' : 'AI生成故事'}}</button>
     <view class="op-pair">
       <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
-      <button class="op-btn" bindtap="onDramaNext">下一步：角色</button>
+      <button class="op-btn" bindtap="onDramaNext">下一步：出片</button>
     </view>
   </view>
 
-  <view class="op-card" wx:elif="{{dramaStep === 3}}">
+  <view class="op-card" wx:elif="{{dramaStep === 2}}">
     <text class="op-label">角色形象</text>
     <text class="op-body muted">每位角色二选一：写文字形象，或上传参考图。上传后还要再选：按图美化生成，或识别成文字。不能两路一起用。</text>
     <view class="op-row">
@@ -147,13 +147,13 @@
 
     <view class="op-pair">
       <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
-      <button class="op-btn" bindtap="onDramaNext">下一步：出片</button>
+      <button class="op-btn" bindtap="onDramaNext">下一步：写故事</button>
     </view>
   </view>
 
   <view class="op-card" wx:elif="{{dramaStep === 4}}">
     <text class="op-label">参考画面（可不传，最多 3 张）</text>
-    <text class="op-body muted">传了则按这些画面的背景出片；不传则按故事匹配场景。角色脸用上一步已确认的图。</text>
+    <text class="op-body muted">传了则按这些画面的背景出片；不传则按故事匹配场景。角色脸用第 2 步已确认的图。</text>
     <button class="op-btn-ghost" bindtap="onPickRefs">上传参考图</button>
     <button wx:if="{{refPaths.length}}" class="op-btn-ghost" bindtap="clearRefs">去掉参考图</button>
     <view wx:if="{{refPaths.length}}" class="op-chips">

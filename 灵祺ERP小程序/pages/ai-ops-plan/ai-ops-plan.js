@@ -95,6 +95,9 @@ Page({
     plan: null,
     simple: null,
     pointsHint: '',
+    talentBusy: false,
+    talentCards: [],
+    talentNote: '',
     opsPoints: economics.MP_POINTS_OPS_PLAN_PER_USE,
     editionTip: '简易版：白话步骤 + 图文卡片，默认推荐中小商家。',
   },
@@ -173,7 +176,8 @@ Page({
       wx.showToast({ title: '请填写有效预算', icon: 'none' })
       return
     }
-    this.setData({ busy: true, err: '', plan: null, simple: null, pointsHint: '' })
+    this._excludedIds = []
+    this.setData({ busy: true, err: '', plan: null, simple: null, pointsHint: '', talentCards: [], talentNote: '' })
     void (async () => {
       const menu = feat.readStoreMenu()
       const r = await feat.generateAiOpsPlan({
@@ -202,7 +206,53 @@ Page({
         plan: r.plan,
         simple: flattenSimple(r.plan && r.plan.simplePlan),
         pointsHint,
+        talentCards: [],
+        talentNote: '',
       })
     })()
+  },
+
+  async loadTalents(replaceId) {
+    if (this.data.talentBusy) return
+    const plan = this.data.plan || {}
+    const cards = this.data.talentCards || []
+    const excluded = (this._excludedIds || []).slice()
+    if (replaceId) excluded.push(replaceId)
+    this._excludedIds = excluded
+    const seats = cards.length ? feat.seatsForTalentReplace(cards, replaceId || '') : plan.talentSeats || []
+    this.setData({ talentBusy: true })
+    const r = await feat.requestTalentRecommend({
+      city: plan.talentCity || '',
+      platform: plan.talentPlatform || '抖音',
+      talentType: plan.talentType || '',
+      budgetYuan: Number(plan.totalBudget) || Number(this.data.budgetYuan) || 0,
+      headcount: 0,
+      seats,
+      excludedIds: excluded,
+    })
+    if (!r.ok) {
+      this.setData({ talentBusy: false, talentNote: r.message || '推荐名单暂时取不到' })
+      return
+    }
+    this.setData({
+      talentBusy: false,
+      talentCards: r.cards || [],
+      talentNote: r.cityNote || '已按方案人数推荐，不符合可以替换。',
+    })
+  },
+
+  onTalentRecommend() {
+    this._excludedIds = []
+    void this.loadTalents('')
+  },
+
+  onTalentReplace(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    void this.loadTalents(id)
+  },
+
+  onTalentRecruit() {
+    wx.navigateTo({ url: '/pages/recruit-hub/recruit-hub' })
   },
 })

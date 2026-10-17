@@ -2649,6 +2649,15 @@ export default function ShortDramaPage() {
       setErr('请先选择成片时长')
       return
     }
+    const namedCast = cast.filter(
+      (m) =>
+        (m.name.trim() && !/^角色\d+$/.test(m.name.trim())) || m.desc.trim() || Boolean(m.preview),
+    )
+    if (!namedCast.length) {
+      setErr('请先选择或填写角色，再生成故事')
+      setHint(null)
+      return
+    }
     setErr(null)
     setHint(null)
     setStoryBusy(true)
@@ -4515,7 +4524,7 @@ export default function ShortDramaPage() {
                       </div>
                     </div>
                     <p className="text-[11px] leading-snug text-slate-500">
-                      下方「角色 / 对白 / 冲突 / 一句话故事」也可自由改，会直接进生成提示词。
+                      下方可改角色、对白、冲突。先确认角色形象，再生成一句话故事。
                     </p>
                   </div>
                 ) : null}
@@ -4658,119 +4667,9 @@ export default function ShortDramaPage() {
                   }}
                 />
               </label>
-              <div className="space-y-1.5">
-                <span className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-slate-800">一句话故事</span>
-                  <button
-                    type="button"
-                    disabled={busy || storyBusy}
-                    onClick={() => void generateAiStory()}
-                    className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {storyBusy ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Wand2 className="h-3.5 w-3.5" />
-                    )}
-                    {storyBusy ? '正在写故事' : 'AI生成故事'}
-                  </button>
-                </span>
-                <p className="text-[11px] leading-relaxed text-slate-500">
-                  按上方所选时长生成：短时长写一个钩子，长时长按秒数把剧情写满。可再微调。
-                </p>
-                <textarea
-                  className={cn(fieldCls, 'min-h-[84px] resize-y')}
-                  disabled={busy || storyBusy}
-                  value={story}
-                  onChange={(e) => {
-                    clearTrial()
-                    setStory(e.target.value)
-                  }}
-                  placeholder="先填上方提示，再点「AI生成故事」"
-                />
-                {err && storyWriteGate && err === storyWriteGate ? (
-                  <span className="block text-xs text-rose-600">{err}</span>
-                ) : null}
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-slate-800">参考画面</p>
-                    <span className="text-[11px] text-slate-500">
-                      {refItems.length}/{DRAMA_REF_MAX} · 图或视频
-                    </span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-slate-500">
-                    可以不传。传了则成片背景必须按这些画面出；不传则按已确认的一句话故事匹配场景。
-                  </p>
-                  <input
-                    ref={refInputRef}
-                    type="file"
-                    multiple
-                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v"
-                    className="hidden"
-                    disabled={busy || storyBusy || mediaBusy}
-                    onChange={(e) => {
-                      void addDramaRefFiles(e.target.files)
-                      e.target.value = ''
-                    }}
-                  />
-                  {refItems.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
-                      {refItems.map((item, idx) => (
-                        <div key={item.id} className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-                          <span className="absolute left-1 top-1 z-10 rounded bg-black/55 px-1 py-0.5 text-[10px] text-white">
-                            {idx + 1}
-                            {item.kind === 'video' ? ' 视频' : ''}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={busy || mediaBusy}
-                            aria-label={`移除参考 ${idx + 1}`}
-                            onClick={() => {
-                              revokeDramaRef(item)
-                              setRefItems((prev) => prev.filter((x) => x.id !== item.id))
-                              clearTrial()
-                            }}
-                            className="absolute right-1 top-1 z-10 rounded-full bg-black/55 p-0.5 text-white opacity-0 group-hover:opacity-100 disabled:opacity-40"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                          {item.kind === 'video' ? (
-                            <video src={item.previewUrl} muted playsInline className="aspect-square w-full object-cover" />
-                          ) : (
-                            <img src={item.previewUrl} alt="" className="aspect-square w-full object-cover" />
-                          )}
-                        </div>
-                      ))}
-                      {refItems.length < DRAMA_REF_MAX ? (
-                        <button
-                          type="button"
-                          disabled={busy || storyBusy || mediaBusy}
-                          onClick={() => refInputRef.current?.click()}
-                          className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-                        >
-                          {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : '继续添加'}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={busy || storyBusy || mediaBusy}
-                      onClick={() => refInputRef.current?.click()}
-                      className="flex h-24 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-300 bg-white text-sm text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                      上传图片或视频
-                    </button>
-                  )}
-                </div>
-
                 <div className="space-y-2">
                   <span className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-slate-800">角色形象</p>
+                    <p className="text-sm font-medium text-slate-800">角色形象<span className="ml-2 text-[11px] font-normal text-slate-500">先确认角色，再生成故事</span></p>
                     <span className="flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
@@ -5256,6 +5155,116 @@ export default function ShortDramaPage() {
                     </div>
                   )}
                 </div>
+              <div className="space-y-1.5">
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-800">一句话故事</span>
+                  <button
+                    type="button"
+                    disabled={busy || storyBusy}
+                    onClick={() => void generateAiStory()}
+                    className="inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {storyBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-3.5 w-3.5" />
+                    )}
+                    {storyBusy ? '正在写故事' : 'AI生成故事'}
+                  </button>
+                </span>
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  按上方所选时长生成：短时长写一个钩子，长时长按秒数把剧情写满。可再微调。
+                </p>
+                <textarea
+                  className={cn(fieldCls, 'min-h-[84px] resize-y')}
+                  disabled={busy || storyBusy}
+                  value={story}
+                  onChange={(e) => {
+                    clearTrial()
+                    setStory(e.target.value)
+                  }}
+                  placeholder="先确认上方角色，再点「AI生成故事」"
+                />
+                {err && storyWriteGate && err === storyWriteGate ? (
+                  <span className="block text-xs text-rose-600">{err}</span>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-800">参考画面</p>
+                    <span className="text-[11px] text-slate-500">
+                      {refItems.length}/{DRAMA_REF_MAX} · 图或视频
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-slate-500">
+                    可以不传。传了则成片背景必须按这些画面出；不传则按已确认的一句话故事匹配场景。
+                  </p>
+                  <input
+                    ref={refInputRef}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v"
+                    className="hidden"
+                    disabled={busy || storyBusy || mediaBusy}
+                    onChange={(e) => {
+                      void addDramaRefFiles(e.target.files)
+                      e.target.value = ''
+                    }}
+                  />
+                  {refItems.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {refItems.map((item, idx) => (
+                        <div key={item.id} className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                          <span className="absolute left-1 top-1 z-10 rounded bg-black/55 px-1 py-0.5 text-[10px] text-white">
+                            {idx + 1}
+                            {item.kind === 'video' ? ' 视频' : ''}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={busy || mediaBusy}
+                            aria-label={`移除参考 ${idx + 1}`}
+                            onClick={() => {
+                              revokeDramaRef(item)
+                              setRefItems((prev) => prev.filter((x) => x.id !== item.id))
+                              clearTrial()
+                            }}
+                            className="absolute right-1 top-1 z-10 rounded-full bg-black/55 p-0.5 text-white opacity-0 group-hover:opacity-100 disabled:opacity-40"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                          {item.kind === 'video' ? (
+                            <video src={item.previewUrl} muted playsInline className="aspect-square w-full object-cover" />
+                          ) : (
+                            <img src={item.previewUrl} alt="" className="aspect-square w-full object-cover" />
+                          )}
+                        </div>
+                      ))}
+                      {refItems.length < DRAMA_REF_MAX ? (
+                        <button
+                          type="button"
+                          disabled={busy || storyBusy || mediaBusy}
+                          onClick={() => refInputRef.current?.click()}
+                          className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-xs text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                          {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : '继续添加'}
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy || storyBusy || mediaBusy}
+                      onClick={() => refInputRef.current?.click()}
+                      className="flex h-24 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-300 bg-white text-sm text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {mediaBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                      上传图片或视频
+                    </button>
+                  )}
+                </div>
+
               </div>
             </section>
 

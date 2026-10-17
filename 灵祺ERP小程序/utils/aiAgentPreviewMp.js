@@ -59,7 +59,7 @@ function createProductPreviewMessage(userBrief, assistantContent) {
 function createRecruitPreviewMessage(userBrief, assistantContent) {
   const intelLine = intelSnap.statusLine()
   const snap = intelSnap.loadSnapshot()
-  const intro = `【达人招募 · 独立预览】${intelLine}。按网页同样四步确认后再发布。`
+  const intro = `【达人招募 · 独立预览】${intelLine}。请先选择：给我推荐，或我要招募。`
   const mainName = String(
     (snap.menuSummary && snap.menuSummary.split('\n')[0]) || snap.industryPath || '主推商品',
   ).slice(0, 48)
@@ -71,7 +71,7 @@ function createRecruitPreviewMessage(userBrief, assistantContent) {
   return {
     id: newId('preview-recruit'),
     role: 'task_preview',
-    content: `${intro}\n\n第 1/4 步 · 发什么、发给谁。核对主推品、平台和城市后再看预算。`,
+    content: `${intro}\n\n请先选择：给我推荐，或我要招募。`,
     previewStatus: 'pending',
     preview: Object.assign(buildPreviewShell('recruit_influencer', '招募达人'), {
       recruitmentBrief: {
@@ -84,6 +84,10 @@ function createRecruitPreviewMessage(userBrief, assistantContent) {
         previews: [],
         enrichStatus: 'ready',
         wizardStep: 1,
+        talentPath: 'pending',
+        talentCards: [],
+        talentNote: '',
+        excludedIds: [],
         wizardScope: {
           platform: '抖音',
           platforms: ['抖音'],
