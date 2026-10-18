@@ -125,6 +125,8 @@ list_scopes() {
   pr_cash_campaign     营销中心现金红包：星选/商家ERP活动模版，PR 发单入钱包
   mp_home_banner_identity 达人小程序首页海报轮播：运营台可选展示身份（达人 / PR / 全部）
   mp_login_identity_close 登录身份：达人库已删除则进 PR；我的信息短信注销账号
+  mp_login_email_account 达人小程序：验证码登录增加邮箱；账号密码不限制为纯数字
+  mp_login_email_account 达人小程序：验证码登录增加邮箱；账号密码不限制为纯数字
   payout_id_fields     达人小程序与星选：绑定收款账户增加姓名、身份证号，人像面识别自动填入
   site_copyright       星选与商家网页页脚宁波墨典版权；商家小程序页脚温州灵祺版权
   mp_four_fixes        商家经营分析顾客数据；达人我的单据缓存；转单原表打开；达人客服 AI 回复
@@ -1852,6 +1854,24 @@ HomeDashboard.tsx
 灵祺ERP小程序/pages/dashboard/dashboard.wxml
 灵祺ERP小程序/pages/dashboard/dashboard.wxss
 灵祺ERP小程序/pages/biz-overview/
+change-scope-guard
+PAT
+      ;;
+    mp_login_email_account)
+      cat <<'PAT'
+灵祺达人撮合小程序/pages/login/login.js
+灵祺达人撮合小程序/pages/login/login.wxml
+灵祺达人撮合小程序/pages/login/login.wxss
+灵祺达人撮合小程序/utils/auth.js
+change-scope-guard
+PAT
+      ;;
+    mp_login_email_account)
+      cat <<'PAT'
+灵祺达人撮合小程序/pages/login/login.js
+灵祺达人撮合小程序/pages/login/login.wxml
+灵祺达人撮合小程序/pages/login/login.wxss
+灵祺达人撮合小程序/utils/auth.js
 change-scope-guard
 PAT
       ;;
