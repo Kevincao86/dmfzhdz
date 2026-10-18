@@ -1,6 +1,21 @@
 import { Crown, Sparkles, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { MEMBERSHIP_UPGRADE_HREF, type MembershipPlan } from '../lib/membershipPlan'
+import { resolveEffectiveMembershipTier } from '../lib/mpMembershipCatalog'
+
+/** 星选嵌入页的会员在 lingqi_mp_account，不走商家 tenants.membership_plan。 */
+function xingxuanPaidTierActive(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  try {
+    const raw = localStorage.getItem('lingqi_mp_account')
+    if (!raw) return false
+    const acc = JSON.parse(raw) as { mpMembershipPlan?: string; mpMembershipExpiresAt?: string }
+    if (!acc || typeof acc !== 'object' || !acc.mpMembershipPlan) return false
+    return resolveEffectiveMembershipTier(acc.mpMembershipPlan, acc.mpMembershipExpiresAt) !== 'basic'
+  } catch {
+    return false
+  }
+}
 
 export type MembershipMediaKind = 'image' | 'video'
 
@@ -86,7 +101,7 @@ export function MembershipMediaLockedBanner({
   plan: MembershipPlan
   onUpgradeClick: () => void
 }) {
-  if (plan !== 'free') return null
+  if (plan !== 'free' || xingxuanPaidTierActive()) return null
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950"
