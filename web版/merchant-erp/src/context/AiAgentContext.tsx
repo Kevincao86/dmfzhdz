@@ -107,6 +107,7 @@ import {
   composeRecruitWizardUserBrief,
   recruitWizardPlatformList,
   recruitWizardPlatformsLabel,
+  cityMentionedInText,
   recruitWizardStepOf,
 } from '../lib/aiAgentRecruitmentWizard'
 import {
@@ -504,6 +505,33 @@ function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPr
 
 function intentText(text: string): string {
   return text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+}
+
+function quoteAndOwn(text: string): { quote: string; own: string } | null {
+  const m = text.match(/^\[引用[\s\S]*?\n\n/)
+  if (!m) return null
+  return { quote: m[0], own: text.slice(m[0].length).trim() }
+}
+
+/** 引用段落只要按预算列达人，用户自己的话也没有改口去创建商品。 */
+function quoteAsksTalentDetail(text: string): { quote: string; city: string; budgetYuan: number; headcount: number } | null {
+  const parts = quoteAndOwn(text)
+  if (!parts) return null
+  const { quote, own } = parts
+  if (!/达人|招募|KOL|KOC|车马费|达人明细|预算分配/.test(quote)) return null
+  if (/创建商品|上架商品|组品|商品图|生成商品|团购商品|请上传商品/.test(`${quote}\n${own}`)) return null
+  if (own && !/确认执行|按方案执行|就按这个|按这个|给出|明细|达人|预算|名单/.test(own)) return null
+  const flat = quote.replace(/,/g, '')
+  const budgetMatch = flat.match(/(\d{3,6})\s*元\s*预算|预算\s*[:：]?\s*(\d{3,6})/)
+  const headMatch = flat.match(/(\d{1,3})\s*位\s*达人/)
+  const budgetYuan = Number(budgetMatch?.[1] || budgetMatch?.[2] || 0)
+  const headcount = Number(headMatch?.[1] || 0)
+  return {
+    quote,
+    city: cityMentionedInText(quote),
+    budgetYuan: budgetYuan >= 100 ? budgetYuan : 0,
+    headcount: headcount > 0 ? headcount : 0,
+  }
 }
 
 /** 「推荐金华的达人」这类话，不是经营数据问答。 */
@@ -1532,15 +1560,34 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   )
 
   const pushRecruitInfluencerPreview = useCallback(
-    (userBrief: string, pageLabel?: string, assistantContent?: string) => {
+    (
+      userBrief: string,
+      pageLabel?: string,
+      assistantContent?: string,
+      briefPatch?: Partial<AiRecruitmentBriefPreview>,
+    ) => {
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
-      const intro = `【达人招募】${intelLine ? `${intelLine}。` : ''}请先选择：给我推荐，或我要招募。`
+      const intro = briefPatch?.talentPath === 'recommend'
+        ? '按你引用的预算和人数，给出达人明细。'
+        : `【达人招募】${intelLine ? `${intelLine}。` : ''}请先选择：给我推荐，或我要招募。`
       const preview = buildPreviewForTask('recruit_influencer', pageLabel)
       const seed = buildRecruitWizardSeed(userBrief, assistantContent)
+      const recruitmentBrief: AiRecruitmentBriefPreview = briefPatch
+        ? {
+            ...seed,
+            ...briefPatch,
+            wizardScope: briefPatch.wizardScope
+              ? { ...seed.wizardScope!, ...briefPatch.wizardScope }
+              : seed.wizardScope,
+            wizardBudget: briefPatch.wizardBudget
+              ? { ...seed.wizardBudget!, ...briefPatch.wizardBudget }
+              : seed.wizardBudget,
+          }
+        : seed
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
           ...preview,
-          recruitmentBrief: seed,
+          recruitmentBrief,
         },
         previewStatus: 'pending',
       })
@@ -1840,6 +1887,61 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const tryHandleExecutionFlow = useCallback(
     (strippedLine: string, visionUrls: string[], pageLabel?: string): boolean => {
+      const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
+      const talentQuote = quoteAsksTalentDetail(lastUser?.content ?? '')
+      if (talentQuote && /确认执行|按方案执行|就按这个|按这个|明细|名单/.test(strippedLine || talentQuote.quote)) {
+        executionStateRef.current = markPreviewsActive({
+          stage: 'awaiting_execute_confirm',
+          plan: {
+            userBrief: strippedLine || '按引用的预算给出达人明细',
+            assistantContent: talentQuote.quote,
+            taskTypes: ['recruit_influencer'],
+          },
+        })
+        const pending = messagesRef.current.find(
+          (m) => isPendingPreviewMessage(m) && m.preview?.taskType === 'recruit_influencer',
+        )
+        const briefPatch: Partial<AiRecruitmentBriefPreview> = {
+          talentPath: 'recommend',
+          ...(talentQuote.city
+            ? { wizardScope: { city: talentQuote.city } as AiRecruitmentBriefPreview['wizardScope'] }
+            : {}),
+          ...(talentQuote.budgetYuan || talentQuote.headcount
+            ? {
+                wizardBudget: {
+                  ...(talentQuote.budgetYuan ? { budgetYuan: talentQuote.budgetYuan } : {}),
+                  ...(talentQuote.headcount ? { headcount: talentQuote.headcount } : {}),
+                } as AiRecruitmentBriefPreview['wizardBudget'],
+              }
+            : {}),
+        }
+        if (pending) {
+          const cur = pending.preview?.recruitmentBrief
+          patchPreviewRecruitmentBrief(
+            pending.id,
+            {
+              talentPath: 'recommend',
+              ...(cur?.wizardScope && talentQuote.city
+                ? { wizardScope: { ...cur.wizardScope, city: talentQuote.city } }
+                : {}),
+              ...(cur?.wizardBudget && (talentQuote.budgetYuan || talentQuote.headcount)
+                ? {
+                    wizardBudget: {
+                      ...cur.wizardBudget,
+                      ...(talentQuote.budgetYuan ? { budgetYuan: talentQuote.budgetYuan } : {}),
+                      ...(talentQuote.headcount ? { headcount: talentQuote.headcount } : {}),
+                    },
+                  }
+                : {}),
+            },
+            '按你引用的预算和人数，给出达人明细。',
+          )
+        } else {
+          pushRecruitInfluencerPreview(talentQuote.quote, pageLabel, talentQuote.quote, briefPatch)
+        }
+        appendAssistantLine('按你引用的预算和人数，给出达人明细。')
+        return true
+      }
       const result = resolveExecutionUserMessage(
         executionStateRef.current,
         messagesRef.current,
@@ -1889,7 +1991,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           return false
       }
     },
-    [appendAssistantLine, triggerParallelPreviews, patchPreviewRecruitmentBrief, advanceRecruitWizard],
+    [appendAssistantLine, triggerParallelPreviews, patchPreviewRecruitmentBrief, advanceRecruitWizard, pushRecruitInfluencerPreview],
   )
 
   const scheduleTaskPreview = useCallback(
