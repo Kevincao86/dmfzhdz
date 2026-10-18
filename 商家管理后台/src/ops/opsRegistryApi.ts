@@ -324,6 +324,10 @@ export type RegistryVideoAi = {
   jimengAccessKeyId?: string
   jimengSecretAccessKey?: string
   jimengRegion?: string
+  /** 0 主线路，1 备选 */
+  jimengRouteActive?: string
+  jimengBackupAccessKeyId?: string
+  jimengBackupSecretAccessKey?: string
   viduApiToken?: string
   viduApiBase?: string
   minimaxVideoApiKey?: string

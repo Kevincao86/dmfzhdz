@@ -85,9 +85,19 @@ export function applyRegistryVideoAiToMerchantEnv(
     out.MERCHANT_AI_QWEN_VIDEO_MODELS = envQwenModels
   }
 
-  fill('JIMENG_ACCESS_KEY_ID', vx.jimengAccessKeyId)
-  fill('JIMENG_SECRET_ACCESS_KEY', vx.jimengSecretAccessKey)
-  fill('JIMENG_REGION', vx.jimengRegion)
+  const backupReady = Boolean(vx.jimengBackupAccessKeyId && vx.jimengBackupSecretAccessKey)
+  const useBackup = vx.jimengRouteActive === '1' && backupReady
+  const jimengAk = useBackup ? vx.jimengBackupAccessKeyId : vx.jimengAccessKeyId
+  const jimengSk = useBackup ? vx.jimengBackupSecretAccessKey : vx.jimengSecretAccessKey
+  if (jimengAk && jimengSk) {
+    setFromRegistry('JIMENG_ACCESS_KEY_ID', jimengAk)
+    setFromRegistry('JIMENG_SECRET_ACCESS_KEY', jimengSk)
+    setFromRegistry('JIMENG_REGION', vx.jimengRegion || 'cn-north-1')
+  } else {
+    fill('JIMENG_ACCESS_KEY_ID', vx.jimengAccessKeyId)
+    fill('JIMENG_SECRET_ACCESS_KEY', vx.jimengSecretAccessKey)
+    fill('JIMENG_REGION', vx.jimengRegion)
+  }
   fill('VIDU_API_TOKEN', vx.viduApiToken)
   fill('VIDU_API_BASE', vx.viduApiBase)
   fill('MINIMAX_VIDEO_API_KEY', vx.minimaxVideoApiKey)

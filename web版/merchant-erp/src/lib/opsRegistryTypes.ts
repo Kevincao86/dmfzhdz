@@ -38,11 +38,16 @@ export type RegistryVideoAi = {
   iceSmartBatchTemplateIds?: string
   /** 千问视频：逗号分隔「显示名|模型ID」→ MERCHANT_AI_QWEN_VIDEO_MODELS */
   qwenVideoModels?: string
-  /** 即梦 / 小云雀 Agent：视觉云 Access Key（HMAC，文档 85621） */
+  /** 即梦 / 小云雀 Agent：视觉云 Access Key（HMAC，文档 85621）。主线路。 */
   jimengAccessKeyId?: string
   jimengSecretAccessKey?: string
   /** 默认 cn-north-1 */
   jimengRegion?: string
+  /** 0 主线路，1 备选。备选 AK/SK 不完整时生成仍走主线路。 */
+  jimengRouteActive?: string
+  /** 即梦 / 小云雀备选 1 */
+  jimengBackupAccessKeyId?: string
+  jimengBackupSecretAccessKey?: string
   /** Vidu 企业 API Token */
   viduApiToken?: string
   /** 如 https://api.vidu.cn ，留空用默认 */

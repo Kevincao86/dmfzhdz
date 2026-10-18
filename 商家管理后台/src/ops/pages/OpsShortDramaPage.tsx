@@ -153,7 +153,12 @@ export default function OpsShortDramaPage() {
   const klingOk = configured(videoAi.klingAccessKey) && configured(videoAi.klingSecretKey)
   const seedanceOk = configured(videoAi.arkVideoEndpoints)
   const qwenOk = configured(videoAi.qwenVideoModels)
-  const jimengOk = configured(videoAi.jimengAccessKeyId) && configured(videoAi.jimengSecretAccessKey)
+  const jimengPrimaryOk = configured(videoAi.jimengAccessKeyId) && configured(videoAi.jimengSecretAccessKey)
+  const jimengBackupOk =
+    configured(videoAi.jimengBackupAccessKeyId) && configured(videoAi.jimengBackupSecretAccessKey)
+  const jimengSelectedBackup = videoAi.jimengRouteActive === '1'
+  const jimengOnBackup = jimengSelectedBackup && jimengBackupOk
+  const jimengOk = jimengOnBackup || jimengPrimaryOk
   const viduOk = configured(videoAi.viduApiToken)
   const minimaxOk = configured(videoAi.minimaxVideoApiKey)
 
@@ -341,59 +346,99 @@ export default function OpsShortDramaPage() {
         <p className="mb-4 text-xs leading-relaxed text-slate-500">
           官方入口 <span className="font-mono text-slate-400">visual.volcengineapi.com</span>，
           Action=<span className="font-mono text-slate-400">CVSync2AsyncSubmitTask</span>
-          。与方舟 Bearer Key 不是同一套。填 AK/SK 后才能在后续工坊调用智能生视频 / 短剧漫剧 Agent。
+          。与方舟 Bearer Key 不是同一套。主线路和备选 1 各存一对 AK/SK，手动切换后保存才生效。备选没填完整时，生成仍走主线路。
         </p>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">视觉云 Access Key ID</label>
-            <SecretInput
-              autoComplete="off"
-              readOnly={!editing}
-              disabled={loading}
-              value={editing ? (videoAi.jimengAccessKeyId ?? '') : ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, jimengAccessKeyId: e.target.value }))}
-              placeholder={
-                configured(videoAi.jimengAccessKeyId) && !editing ? '已保存 · 请点击「编辑」修改' : 'AK'
-              }
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
-                !editing && 'cursor-default opacity-80',
+        <div className="mb-4 text-xs text-slate-400">
+          当前线路：{jimengOnBackup ? '备选 1' : '主线路'}
+          {videoAi.jimengRouteActive === '1' && !jimengBackupOk ? '（备选未填完整，实际仍用主线路）' : ''}
+        </div>
+        {(
+          [
+            {
+              title: '主线路',
+              active: !jimengSelectedBackup,
+              akKey: 'jimengAccessKeyId' as const,
+              skKey: 'jimengSecretAccessKey' as const,
+              akPlaceholder: '主线路 AK',
+              skPlaceholder: '主线路 SK',
+              select: '0',
+            },
+            {
+              title: '备选 1',
+              active: jimengSelectedBackup,
+              akKey: 'jimengBackupAccessKeyId' as const,
+              skKey: 'jimengBackupSecretAccessKey' as const,
+              akPlaceholder: '备选 AK，可留空',
+              skPlaceholder: '备选 SK，可留空',
+              select: '1',
+            },
+          ] as const
+        ).map((line) => (
+          <div key={line.title} className="mb-4 rounded-lg border border-slate-800 p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-slate-300">{line.title}</span>
+              {line.active ? (
+                <span className="rounded-full border border-emerald-800/80 bg-emerald-950/50 px-2 py-0.5 text-[11px] text-emerald-200">
+                  当前线路
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!editing || loading || saving}
+                  onClick={() => setVideoAi((p) => ({ ...p, jimengRouteActive: line.select }))}
+                  className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                >
+                  改用这条
+                </button>
               )}
-            />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <SecretInput
+                autoComplete="off"
+                readOnly={!editing}
+                disabled={loading}
+                value={editing ? (videoAi[line.akKey] ?? '') : ''}
+                onChange={(e) => setVideoAi((p) => ({ ...p, [line.akKey]: e.target.value }))}
+                placeholder={
+                  configured(videoAi[line.akKey]) && !editing ? '已保存 · 请点击「编辑」修改' : line.akPlaceholder
+                }
+                className={cn(
+                  'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
+                  !editing && 'cursor-default opacity-80',
+                )}
+              />
+              <SecretInput
+                autoComplete="off"
+                readOnly={!editing}
+                disabled={loading}
+                value={editing ? (videoAi[line.skKey] ?? '') : ''}
+                onChange={(e) => setVideoAi((p) => ({ ...p, [line.skKey]: e.target.value }))}
+                placeholder={
+                  configured(videoAi[line.skKey]) && !editing ? '已保存 · 请点击「编辑」修改' : line.skPlaceholder
+                }
+                className={cn(
+                  'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
+                  !editing && 'cursor-default opacity-80',
+                )}
+              />
+            </div>
           </div>
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">视觉云 Secret Access Key</label>
-            <SecretInput
-              autoComplete="off"
-              readOnly={!editing}
-              disabled={loading}
-              value={editing ? (videoAi.jimengSecretAccessKey ?? '') : ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, jimengSecretAccessKey: e.target.value }))}
-              placeholder={
-                configured(videoAi.jimengSecretAccessKey) && !editing ? '已保存 · 请点击「编辑」修改' : 'SK'
-              }
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
-                !editing && 'cursor-default opacity-80',
-              )}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs text-slate-400">地域（默认 cn-north-1）</label>
-            <input
-              type="text"
-              autoComplete="off"
-              readOnly={!editing}
-              disabled={loading}
-              value={videoAi.jimengRegion ?? ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, jimengRegion: e.target.value }))}
-              placeholder="cn-north-1"
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
-                !editing && 'cursor-default opacity-80',
-              )}
-            />
-          </div>
+        ))}
+        <div>
+          <label className="mb-1 block text-xs text-slate-400">地域（默认 cn-north-1，两条线路共用）</label>
+          <input
+            type="text"
+            autoComplete="off"
+            readOnly={!editing}
+            disabled={loading}
+            value={videoAi.jimengRegion ?? ''}
+            onChange={(e) => setVideoAi((p) => ({ ...p, jimengRegion: e.target.value }))}
+            placeholder="cn-north-1"
+            className={cn(
+              'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
+              !editing && 'cursor-default opacity-80',
+            )}
+          />
         </div>
       </section>
 
