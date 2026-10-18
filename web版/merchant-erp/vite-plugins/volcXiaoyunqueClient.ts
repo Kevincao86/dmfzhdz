@@ -412,6 +412,63 @@ function collectImagePayloads(rawList: unknown, cap: number): { urls: string[]; 
   return { urls, binaries }
 }
 
+function sniffImageBytes(buffer: Buffer): { contentType: string; ext: string } {
+  if (buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50) {
+    return { contentType: 'image/png', ext: 'png' }
+  }
+  if (buffer.length >= 12 && buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
+    return { contentType: 'image/webp', ext: 'webp' }
+  }
+  return { contentType: 'image/jpeg', ext: 'jpg' }
+}
+
+/**
+ * 小云雀 with_vinput 只读 img_url_list 里的公网链接。
+ * 浏览器里的角色服饰图和背景图若只放 binary_data_base64，接口会忽略，成片就没有这些画面。
+ */
+async function publishDramaRefImages(
+  env: MerchantAiEnv,
+  binaries: string[],
+): Promise<{ ok: true; urls: string[] } | { ok: false; message: string }> {
+  if (!binaries.length) return { ok: true, urls: [] }
+  const { loadIceGatewayConfig } = await import('./aliyunIceGateway.js')
+  const { putIceSourceObject } = await import('./aliyunOssIceUpload.js')
+  const cfg = await loadIceGatewayConfig(process.cwd(), env as Record<string, string | undefined>)
+  if (!cfg) {
+    return {
+      ok: false,
+      message: '角色图和背景图需要公网链接才能进片，但云剪 OSS 未配置。请到运营台「短视频 API」填写 OSS 前缀后再生成。',
+    }
+  }
+  const urls: string[] = []
+  for (const b64 of binaries) {
+    const buffer = Buffer.from(b64, 'base64')
+    if (!buffer.length) {
+      return { ok: false, message: '角色图或背景图是空的，已停止生成。' }
+    }
+    const kind = sniffImageBytes(buffer)
+    const put = await putIceSourceObject(cfg, env as Record<string, string | undefined>, {
+      fileName: `drama-ref-${Date.now()}-${urls.length}.${kind.ext}`,
+      contentType: kind.contentType,
+      buffer,
+    })
+    const mediaUrl = put.ok ? put.mediaUrl.trim() : ''
+    if (!put.ok || !/^https:\/\//i.test(mediaUrl)) {
+      return {
+        ok: false,
+        message: put.ok
+          ? '角色图或背景图上传后没有公网地址，已停止生成。'
+          : `角色图或背景图上传公网失败：${put.message}`,
+      }
+    }
+    urls.push(mediaUrl)
+  }
+  if (urls.length !== binaries.length) {
+    return { ok: false, message: '角色图或背景图没有全部上传成功，已停止生成。' }
+  }
+  return { ok: true, urls }
+}
+
 function clipPromptKeepIdentity(prompt: string, max: number): string {
   const p = String(prompt ?? '').trim()
   if (p.length <= max) return p
@@ -483,7 +540,6 @@ function buildXiaoyunqueSubmitBody(opts: {
   aspectRatio: string
   imageUrls: string[]
   videoUrls: string[]
-  binaries: string[]
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     req_key: opts.reqKey,
@@ -493,9 +549,8 @@ function buildXiaoyunqueSubmitBody(opts: {
     language: 'Chinese',
     enable_watermark: false,
   }
-  /** 槽位 1=角色（或尾帧）。有第 2 张时才是参考背景，成片必须按该背景出。无第 2 张则按故事配景。 */
+  /** 槽位 1=角色服饰。有第 2 张才是参考背景。只提交公网链接，二进制字段接口不读。 */
   if (opts.imageUrls.length) body.img_url_list = opts.imageUrls.slice(0, 2)
-  if (opts.binaries.length) body.binary_data_base64 = opts.binaries.slice(0, 2)
   if (opts.videoUrls.length) body.video_url_list = opts.videoUrls.slice(0, 50)
   return body
 }
@@ -524,7 +579,9 @@ export async function volcSubmitXiaoyunqueTask(
   const durationSec = clampDurationSec(opts.durationSec)
   const aspectRatio = (opts.aspectRatio || '9:16').trim() || '9:16'
   const mixed = collectImagePayloads([...(opts.imageUrls ?? []), ...(opts.imageBase64 ?? [])], 2)
-  const imageUrls = mixed.urls
+  const published = await publishDramaRefImages(env, mixed.binaries)
+  if (!published.ok) return published
+  const imageUrls = [...mixed.urls, ...published.urls].filter((u) => /^https:\/\//i.test(u)).slice(0, 2)
   const binaries = mixed.binaries
   const videoUrls = publicHttpUrls(opts.videoUrls, 50)
   const hasVideoRef = videoUrls.length > 0
@@ -534,6 +591,12 @@ export async function volcSubmitXiaoyunqueTask(
     return {
       ok: false,
       message: '短剧需要角色形象图，已拒绝纯文案生成。参考画面可以不传。',
+    }
+  }
+  if (imageUrls.length < 1) {
+    return {
+      ok: false,
+      message: '角色图或背景图没有变成公网链接，已拒绝出片，以免成片丢掉服饰和背景。',
     }
   }
 
@@ -561,7 +624,6 @@ export async function volcSubmitXiaoyunqueTask(
             aspectRatio,
             imageUrls,
             videoUrls,
-            binaries,
           })
       const r = await postVolcVisualWithRetry(creds, attempt.action, attempt.version, body)
       if (!r.ok) {
