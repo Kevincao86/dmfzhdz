@@ -3,134 +3,50 @@
 const WORLDS = [
   {
     id: 'catering',
-    label: '餐饮',
-    blurb: '火锅、烧烤、茶饮到日料西餐。钩子围着菜单、价格和第一口。',
+    label: '餐饮探店',
+    blurb: '火锅、烧烤、茶饮、正餐。达人亲自尝，钩子落在第一口和价格。',
     promptKind: 'shop',
     fields: [
       { key: 'storeName', label: '店名', placeholder: '例：老街铜锅' },
-      { key: 'offerName', label: '招牌 / 卖点', placeholder: '例：牛油锅底' },
+      { key: 'offerName', label: '套餐 / 项目', placeholder: '例：双人套餐' },
       { key: 'price', label: '价格记忆点', placeholder: '例：人均 88' },
-      { key: 'area', label: '商圈位置', placeholder: '例：中山路地铁口' },
+      { key: 'area', label: '使用场景', placeholder: '例：约会、下班犒劳、朋友局' },
     ],
   },
   {
     id: 'leisure',
-    label: '休闲娱乐',
-    blurb: '美业、健身、亲子、酒旅、娱乐。钩子围着体验反差和预约。',
+    label: '休闲探店',
+    blurb: '美业、健身、亲子、酒旅。达人亲自体验，钩子落在前后反差。',
     promptKind: 'shop',
     fields: [
       { key: 'storeName', label: '店名', placeholder: '例：南风造型' },
-      { key: 'offerName', label: '体验项目', placeholder: '例：锁骨发 / 体验课' },
+      { key: 'offerName', label: '套餐 / 项目', placeholder: '例：锁骨发 / 体验课' },
       { key: 'price', label: '价格记忆点', placeholder: '例：体验 99' },
-      { key: 'area', label: '位置', placeholder: '例：万达 3 楼' },
-    ],
-  },
-  {
-    id: 'travel',
-    label: '旅游',
-    blurb: '景点打卡、酒店入住、攻略翻车。钩子围着第一眼和值不值。',
-    promptKind: 'shop',
-    fields: [
-      { key: 'storeName', label: '目的地 / 线路', placeholder: '例：大理古城三日' },
-      { key: 'offerName', label: '必打卡点', placeholder: '例：苍山索道日出' },
-      { key: 'price', label: '预算记忆点', placeholder: '例：人均 800' },
-      { key: 'area', label: '季节 / 时段', placeholder: '例：清明小长假' },
-    ],
-  },
-  {
-    id: 'vlog',
-    label: 'Vlog',
-    blurb: '一日跟拍、搬家、探店日记。手持生活感，前三秒就要人设。',
-    promptKind: 'vlog',
-    fields: [
-      { key: 'storeName', label: '主题', placeholder: '例：搬进新合租' },
-      { key: 'offerName', label: '主角人设', placeholder: '例：北漂打工人' },
-      { key: 'price', label: '今日目标', placeholder: '例：把衣柜装完' },
-      { key: 'area', label: '城市 / 空间', placeholder: '例：上海合租' },
+      { key: 'area', label: '使用场景', placeholder: '例：约会、下班犒劳、带家人' },
     ],
   },
   {
     id: 'retail',
     label: '零售探店',
-    blurb: '服饰、美妆、潮玩、超市开箱。钩子围着试穿试色。',
+    blurb: '服饰、美妆、潮玩。达人亲自试，钩子落在上身或拆开那一秒。',
     promptKind: 'shop',
     fields: [
       { key: 'storeName', label: '门店 / 品牌', placeholder: '例：某集合店' },
-      { key: 'offerName', label: '主推单品', placeholder: '例：春款风衣' },
+      { key: 'offerName', label: '套餐 / 项目', placeholder: '例：春款风衣' },
       { key: 'price', label: '价格记忆点', placeholder: '例：299 起' },
-      { key: 'area', label: '商场楼层', placeholder: '例：万象城 B1' },
-    ],
-  },
-  {
-    id: 'auto',
-    label: '汽车',
-    blurb: '试驾、提车、车内场景。钩子围着关门声和第一脚油。',
-    promptKind: 'product',
-    fields: [
-      { key: 'storeName', label: '车型 / 品牌', placeholder: '例：某新能源 SUV' },
-      { key: 'offerName', label: '核心卖点', placeholder: '例：智驾辅助' },
-      { key: 'price', label: '价格档', placeholder: '例：15 万档' },
-      { key: 'area', label: '试驾路段', placeholder: '例：环城快速路' },
-    ],
-  },
-  {
-    id: 'home',
-    label: '家装房产',
-    blurb: '看房、收房、改造前后。钩子围着推开门那一帧。',
-    promptKind: 'shop',
-    fields: [
-      { key: 'storeName', label: '楼盘 / 项目', placeholder: '例：江景样板间' },
-      { key: 'offerName', label: '空间卖点', placeholder: '例：全景落地窗' },
-      { key: 'price', label: '总价 / 套餐', placeholder: '例：装修套餐 9.9 万' },
-      { key: 'area', label: '区位', placeholder: '例：滨江核心盘' },
+      { key: 'area', label: '使用场景', placeholder: '例：约会、朋友局、一个人也值' },
     ],
   },
   {
     id: 'edu',
-    label: '知识教培',
-    blurb: '兴趣课、考证、干货口播短剧化。钩子围着学会那一秒。',
+    label: '体验课探店',
+    blurb: '兴趣课、体验课。达人到店上手或陪看，钩子落在学会那一秒。',
     promptKind: 'shop',
     fields: [
       { key: 'storeName', label: '机构 / 课程', placeholder: '例：少儿编程体验课' },
-      { key: 'offerName', label: '学会什么', placeholder: '例：做出第一个小游戏' },
-      { key: 'price', label: '体验价', placeholder: '例：体验 1 元' },
-      { key: 'area', label: '校区位置', placeholder: '例：学区旁校区' },
-    ],
-  },
-  {
-    id: 'tech',
-    label: '科技',
-    blurb: '数码开箱、家居联动、软件演示。钩子围着功能打脸。',
-    promptKind: 'product',
-    fields: [
-      { key: 'storeName', label: '品牌 / 产品', placeholder: '例：某品牌降噪耳机' },
-      { key: 'offerName', label: '核心卖点', placeholder: '例：通勤降噪 40dB' },
-      { key: 'price', label: '价格档', placeholder: '例：399 档' },
-      { key: 'area', label: '使用场景', placeholder: '例：地铁通勤' },
-    ],
-  },
-  {
-    id: 'drama',
-    label: '短剧',
-    blurb: '职场、情感、重生、豪门。人物关系驱动；手机端建议 8–15 秒竖屏。',
-    promptKind: 'drama',
-    fields: [
-      { key: 'storeName', label: '剧名 / 主题', placeholder: '例：合同碎了吗' },
-      { key: 'offerName', label: '人设反差', placeholder: '例：助理 vs 老板' },
-      { key: 'price', label: '悬念', placeholder: '例：她还有一份备份' },
-      { key: 'area', label: '时代 / 城市', placeholder: '例：当代一线城市' },
-    ],
-  },
-  {
-    id: 'comic',
-    label: '漫画',
-    blurb: '校园、古风、条漫、战斗。二维分格，不要拍成真人探店。',
-    promptKind: 'comic',
-    fields: [
-      { key: 'storeName', label: '作品名', placeholder: '例：放学后的秘密' },
-      { key: 'offerName', label: '主角人设', placeholder: '例：黑发高中生' },
-      { key: 'price', label: '分格风格', placeholder: '例：竖屏条漫' },
-      { key: 'area', label: '世界观', placeholder: '例：现代校园' },
+      { key: 'offerName', label: '套餐 / 项目', placeholder: '例：做出第一个小游戏' },
+      { key: 'price', label: '价格记忆点', placeholder: '例：体验 1 元' },
+      { key: 'area', label: '使用场景', placeholder: '例：带家人、第一次到店' },
     ],
   },
 ]
@@ -381,20 +297,8 @@ function fillTokens(template, scene, shop) {
     .split('{位置}').join(area)
 }
 
-function kindLine(promptKind) {
-  if (promptKind === 'comic') {
-    return '二维漫画/动画竖屏短剧，分格阅读感，禁止真人实拍质感，禁止餐饮探店。'
-  }
-  if (promptKind === 'drama') {
-    return '真人写实都市短剧，前 3 秒必须冲突或反转。禁止二维漫画，禁止探店空镜堆砌。'
-  }
-  if (promptKind === 'product') {
-    return '科技/汽车产品短剧，产品特写必须可读。禁止仙侠，禁止纯餐饮烟雾。'
-  }
-  if (promptKind === 'vlog') {
-    return '竖屏生活短剧，手持纪实感，前 3 秒亮人设。禁止电影片头片尾，禁止精修广告片。'
-  }
-  return '本地生活真人写实竖屏短剧，前 3 秒必须冲突或反转。禁止办公室网文，禁止仙侠古装。'
+function kindLine() {
+  return '探店达人真人出镜竖屏短剧。主角是到店体验的达人，不是老板独白，不是客人躺平。前 3 秒先亮人设或预期反差，接着门头进店，再亲自体验并给真实反应，最后说清适不适合谁。使用场景只写约会、下班犒劳、朋友局、带家人、一个人也值、第一次到店。禁止职场豪门重生，禁止漫画分格，禁止产品参数广告片，禁止仙侠古装。'
 }
 
 function buildPrompt(world, scene, shop, story, dialogue, style, hasSceneRefs) {

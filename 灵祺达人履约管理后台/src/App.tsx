@@ -69,7 +69,15 @@ const DigitalHumanAddonPage = lazy(() => import('@merchant/pages/DigitalHumanBro
 const AiScriptReviewAddonPage = lazy(() => import('@merchant/pages/AiScriptReviewAddonPage'))
 const PlatformVideoReviewRulesPage = lazy(() => import('@merchant/pages/PlatformVideoReviewRulesPage'))
 const PlatformScriptReviewRulesPage = lazy(() => import('@merchant/pages/PlatformScriptReviewRulesPage'))
-const ShortDramaAddonPage = lazy(() => import('@merchant/pages/ShortDramaPage'))
+const ShortDramaAddonPage = lazy(async () => {
+  const mod = await import('@merchant/pages/ShortDramaPage')
+  const Page = mod.default
+  return {
+    default: function XingxuanShortDramaPage() {
+      return <Page framework="talent-visit" />
+    },
+  }
+})
 const AiImageAddonPage = lazy(() => import('@merchant/pages/AiImageStudioPage'))
 
 function AddonPageFallback() {

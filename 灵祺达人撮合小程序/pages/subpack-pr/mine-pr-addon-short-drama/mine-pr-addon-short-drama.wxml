@@ -2,7 +2,7 @@
 <scroll-view scroll-y class="{{lqAccentClass}} op-page foot-col" enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="op-hero">
     <text class="op-title">AI 短剧</text>
-    <text class="op-sub">和商家端同一套四步：先选场景，再写故事和角色，最后出片。</text>
+    <text class="op-sub">按探店达人来拍：剧情只走亮人设、到店核验、亲自体验、到店结论。</text>
     <text class="op-points" wx:if="{{pointsHint}}">{{pointsHint}}</text>
   </view>
 
@@ -14,7 +14,7 @@
   </view>
 
   <view class="op-card" wx:if="{{dramaStep === 1}}">
-    <text class="op-label">世界观</text>
+    <text class="op-label">探店品类</text>
     <view class="op-chips">
       <text
         wx:for="{{worlds}}"
@@ -66,7 +66,7 @@
       <input class="op-input" data-key="{{item.key}}" placeholder="{{item.placeholder}}" value="{{item.value}}" bindinput="onField" />
     </block>
     <text class="op-label">一句话故事</text>
-    <text class="op-body muted">先选时长。8～15 秒写一个钩子，30 秒起按时间轴把剧情写满。</text>
+    <text class="op-body muted">主角是出镜探店的达人。8～15 秒写一个到店钩子，30 秒起按亮人设、到店、体验、结论写满。</text>
     <textarea class="op-area" maxlength="2000" placeholder="先选时长，再点 AI生成故事" value="{{story}}" bindinput="onStory" />
     <button class="op-btn-ghost" loading="{{storyBusy}}" bindtap="onAiStory">{{storyBusy ? '正在写故事' : 'AI生成故事'}}</button>
     <view class="op-pair">

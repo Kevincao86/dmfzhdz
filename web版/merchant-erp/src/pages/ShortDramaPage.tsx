@@ -1326,6 +1326,58 @@ const STYLES: { id: StyleId; worlds: WorldId[]; name: string; visual: string }[]
 function worldOf(id: WorldId) {
   return WORLDS.find((w) => w.id === id) ?? WORLDS[0]!
 }
+
+/** 星选 / 达人小程序：只做探店达人短剧。商家端不传此框架，目录保持原样。 */
+export type ShortDramaFramework = 'merchant' | 'talent-visit'
+
+const TALENT_VISIT_WORLD_IDS = ['catering', 'leisure', 'retail', 'edu'] as const
+
+const TALENT_VISIT_WORLD_COPY: Record<
+  (typeof TALENT_VISIT_WORLD_IDS)[number],
+  { label: string; blurb: string }
+> = {
+  catering: {
+    label: '餐饮探店',
+    blurb: '火锅、烧烤、茶饮、正餐。达人亲自尝，钩子落在第一口和价格。',
+  },
+  leisure: {
+    label: '休闲探店',
+    blurb: '美业、健身、亲子、酒旅。达人亲自体验，钩子落在前后反差。',
+  },
+  retail: {
+    label: '零售探店',
+    blurb: '服饰、美妆、潮玩。达人亲自试，钩子落在上身或拆开那一秒。',
+  },
+  edu: {
+    label: '体验课探店',
+    blurb: '兴趣课、体验课。达人到店上手或陪看，钩子落在学会那一秒。',
+  },
+}
+
+const TALENT_VISIT_FIELDS: Array<{ key: FieldKey; label: string; placeholder: string }> = [
+  { key: 'storeName', label: '店名', placeholder: '例：老街铜锅' },
+  { key: 'offerName', label: '套餐 / 项目', placeholder: '例：双人套餐' },
+  { key: 'price', label: '价格记忆点', placeholder: '例：人均 88' },
+  { key: 'area', label: '使用场景', placeholder: '例：约会、下班犒劳、朋友局、带家人' },
+]
+
+const TALENT_VISIT_KIND =
+  '探店达人真人出镜竖屏短剧。主角是到店体验的达人，不是老板独白，不是客人躺平。前 3 秒先亮人设或预期反差，接着门头进店，再亲自体验并给真实反应，最后说清适不适合谁。使用场景只写约会、下班犒劳、朋友局、带家人、一个人也值、第一次到店。禁止职场豪门重生，禁止漫画分格，禁止产品参数广告片，禁止仙侠古装。'
+
+const TALENT_VISIT_BEATS = ['亮人设', '到店核验', '体验打脸', '到店结论'] as const
+
+function presentWorld(world: (typeof WORLDS)[number], talentVisit: boolean) {
+  if (!talentVisit) return world
+  const copy = TALENT_VISIT_WORLD_COPY[world.id as (typeof TALENT_VISIT_WORLD_IDS)[number]]
+  if (!copy) return world
+  return {
+    ...world,
+    label: copy.label,
+    blurb: copy.blurb,
+    promptKind: 'shop' as const,
+    fields: TALENT_VISIT_FIELDS,
+  }
+}
 /** 每个大类场景列表末尾都有这一张，不进预设表 */
 const CUSTOM_SCENE_ID = 'custom_scene'
 
@@ -1455,6 +1507,7 @@ function buildBasePromptMeta(input: {
   roles: string
   conflict: string
   dialogue: string
+  talentVisit?: boolean
 }): string {
   const dialogue = input.dialogue.trim()
   const quoted = dialogue ? `对白钩子：${dialogue.includes('"') ? dialogue : `"${dialogue}"`}。` : ''
@@ -1465,8 +1518,9 @@ function buildBasePromptMeta(input: {
     })
     .filter(Boolean)
     .join('，')
-  const kindLine =
-    input.world.promptKind === 'comic'
+  const kindLine = input.talentVisit
+    ? TALENT_VISIT_KIND
+    : input.world.promptKind === 'comic'
       ? '二维漫画/动画竖屏短剧，分格阅读感，禁止真人实拍质感，禁止餐饮探店。'
       : input.world.promptKind === 'drama'
         ? '真人写实都市短剧，前 3 秒必须冲突或反转。禁止二维漫画，禁止探店空镜堆砌。'
@@ -1498,6 +1552,7 @@ function buildSegmentPrompt(input: {
   total: number
   durationSec: number
   continueFromPrev: boolean
+  talentVisit?: boolean
 }): string {
   return [
     input.meta,
@@ -1505,8 +1560,14 @@ function buildSegmentPrompt(input: {
     `本段戏剧任务：${input.beat}。`,
     input.continueFromPrev
       ? '必须从上一段尾帧自然接戏：同一角色、同一场景光影连续，禁止硬切换人换景，禁止重开片头。'
-      : '本段为开场：前 2 秒必须冲突或反转，直接进入故事。',
-    input.index === input.total - 1 ? '本段收尾：留下记忆点或行动号召，不要突然黑屏演职员表。' : '本段结尾停在可续写的动作或表情，便于下一段接戏。',
+      : input.talentVisit
+        ? '本段为开场：前 3 秒亮出探店达人人设或预期反差，接着看到店。'
+        : '本段为开场：前 2 秒必须冲突或反转，直接进入故事。',
+    input.index === input.total - 1
+      ? input.talentVisit
+        ? '本段收尾：说清使用场景和适不适合谁，给到店理由，不要演职员表。'
+        : '本段收尾：留下记忆点或行动号召，不要突然黑屏演职员表。'
+      : '本段结尾停在可续写的动作或表情，便于下一段接戏。',
   ].join('\n')
 }
 
@@ -2506,8 +2567,16 @@ async function resolveDramaPortraitDataUrl(src: string): Promise<string | null> 
   return asData.startsWith('data:image/') ? asData : null
 }
 
-/** 商家 CS：AI 创作 · AI短剧 */
-export default function ShortDramaPage() {
+/** 商家 CS：AI 创作 · AI短剧。星选传入 talent-visit，只走探店达人框架。 */
+export default function ShortDramaPage({
+  framework = 'merchant',
+}: {
+  framework?: ShortDramaFramework
+} = {}) {
+  const talentVisit = framework === 'talent-visit'
+  const catalogWorlds = talentVisit
+    ? WORLDS.filter((w) => (TALENT_VISIT_WORLD_IDS as readonly string[]).includes(w.id))
+    : WORLDS
   const { plan, requireAiVideoGen, openMembershipUpgrade } = useMembership()
   const [mainTab, setMainTab] = useState<MainTab>('create')
   const [worldId, setWorldId] = useState<WorldId>('catering')
@@ -2562,7 +2631,7 @@ export default function ShortDramaPage() {
   const initedRef = useRef(false)
   const fusedSceneFrameCacheRef = useRef<{ key: string; dataUrl: string } | null>(null)
 
-  const world = worldOf(worldId)
+  const world = presentWorld(worldOf(worldId), talentVisit)
   const visibleScenes = scenesOf(worldId)
   const visibleFormulas = formulasOf(sceneId)
   const visibleStyles = stylesOf(worldId)
@@ -2581,8 +2650,9 @@ export default function ShortDramaPage() {
         )
       : FORMULAS.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!
   const style = STYLES.find((s) => s.id === styleId) ?? visibleStyles[0] ?? STYLES[0]!
-  const hookLabel =
-    worldId === 'comic'
+  const hookLabel = talentVisit
+    ? '探店剧情'
+    : worldId === 'comic'
       ? '分格钩子'
       : worldId === 'tech' || worldId === 'auto'
         ? '产品钩子'
@@ -2684,6 +2754,9 @@ export default function ShortDramaPage() {
       story.trim()
         ? `已有故事草稿（若把客人写成主语，必须改写成「${castBrief.leadName}」视角，禁止照抄客人躺平）：${story.trim()}`
         : '',
+      talentVisit
+        ? '【探店规范】四拍只许这一条：亮人设 → 到店核验 → 亲自体验 → 到店结论。使用场景写进故事，只能是约会、下班犒劳、朋友局、带家人、一个人也值、第一次到店。禁止写成职场、豪门、漫画或产品广告。'
+        : '',
       `根据以上文案，按「篇幅锁定」写出刚好能拍满 ${durOpt.sec} 秒的剧情：口语、有冲突、有记忆点；主语必须是「${castBrief.leadName}」。短时长不要注水，长时长必须按时间轴写满，禁止不论时长都写成一两句。${
         cast.filter((m) => m.preview || m.name.trim()).length >= 2
           ? `必须写到每位已确认角色（${cast
@@ -2697,8 +2770,9 @@ export default function ShortDramaPage() {
     ]
       .filter(Boolean)
       .join('\n')
-    const system =
-      '你是竖屏商家短剧编剧。先读懂钩子、四拍、对白、冲突和商家字段，再按主次角色写剧情：画面主角是动作主语和镜头中心，客人/顾客只作配角。故事篇幅必须严格等于用户选的成片时长：8～15 秒写短钩子，30 秒及以上按标注秒数把剧情写满，禁止一律写成一两句。前 3 秒仍要有钩子。禁止写成客人躺平加时的视角。不要写技术参数，不要出现字幕/Logo/演职员表。'
+    const system = talentVisit
+      ? '你是探店达人竖屏短剧编剧。主角必须是出镜探店的达人，店员和同行只作配角。剧情只走亮人设、到店核验、亲自体验、到店结论。使用场景只写约会、下班犒劳、朋友局、带家人、一个人也值、第一次到店。禁止职场打脸、重生豪门、漫画分格、产品参数广告、仙侠古装、客人躺平视角。篇幅必须严格等于成片时长：8～15 秒写短钩子，30 秒及以上按标注秒数写满。不要写技术参数，不要出现字幕/Logo/演职员表。'
+      : '你是竖屏商家短剧编剧。先读懂钩子、四拍、对白、冲突和商家字段，再按主次角色写剧情：画面主角是动作主语和镜头中心，客人/顾客只作配角。故事篇幅必须严格等于用户选的成片时长：8～15 秒写短钩子，30 秒及以上按标注秒数把剧情写满，禁止一律写成一两句。前 3 秒仍要有钩子。禁止写成客人躺平加时的视角。不要写技术参数，不要出现字幕/Logo/演职员表。'
     try {
       let lastErr = '生成故事失败，请稍后重试'
       const storyProviders = ['doubao', 'qwen', 'deepseek'] as const
@@ -3549,8 +3623,9 @@ export default function ShortDramaPage() {
         roles,
         conflict,
         dialogue,
+        talentVisit,
       }),
-    [world, scene, formula, style, shop, story, roles, conflict, dialogue],
+    [world, scene, formula, style, shop, story, roles, conflict, dialogue, talentVisit],
   )
 
   const actionPlaybook = useMemo(
@@ -3940,6 +4015,7 @@ export default function ShortDramaPage() {
         total: plan.length,
         durationSec: segDur,
         continueFromPrev: i > 0,
+        talentVisit,
       })
       const r = await runOneClip({
         prompt,
@@ -4065,6 +4141,7 @@ export default function ShortDramaPage() {
         total: longPlan.length,
         durationSec: PREVIEW_SEC,
         continueFromPrev: false,
+        talentVisit,
       })
       const r = await runOneClip({
         prompt: previewPrompt,
@@ -4258,7 +4335,9 @@ export default function ShortDramaPage() {
             · 套餐赠送积分优先
           </p>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            {world.blurb}
+            {talentVisit
+              ? `按探店达人来拍。剧情只走亮人设、到店核验、亲自体验、到店结论。${world.blurb}`
+              : world.blurb}
             {readMpSessionToken() ? (
               <span className="mt-1 block text-xs text-cyan-800">
                 星选账号：成片成功后按 {MP_POINTS_SHORTVIDEO_PER_SEC} 积分/秒扣；套餐赠送积分优先，不足再扣充值积分。
@@ -4301,7 +4380,9 @@ export default function ShortDramaPage() {
         <div className="short-drama-create space-y-5">
           <div className="short-drama-create__scenes">
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {WORLDS.map((w) => (
+            {catalogWorlds.map((raw) => {
+              const w = presentWorld(raw, talentVisit)
+              return (
               <button
                 key={w.id}
                 type="button"
@@ -4316,7 +4397,8 @@ export default function ShortDramaPage() {
               >
                 {w.label}
               </button>
-            ))}
+              )
+            })}
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -4499,9 +4581,13 @@ export default function ShortDramaPage() {
                       </label>
                     </div>
                     <div>
-                      <p className="mb-1.5 text-xs font-medium text-slate-700">四拍结构（开场 → 升级 → 反转 → 收尾）</p>
+                      <p className="mb-1.5 text-xs font-medium text-slate-700">
+                        {talentVisit
+                          ? '四拍结构（亮人设 → 到店核验 → 体验打脸 → 到店结论）'
+                          : '四拍结构（开场 → 升级 → 反转 → 收尾）'}
+                      </p>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {(['开场', '升级', '反转', '收尾'] as const).map((label, i) => (
+                        {(talentVisit ? TALENT_VISIT_BEATS : (['开场', '升级', '反转', '收尾'] as const)).map((label, i) => (
                           <label key={label} className="space-y-1">
                             <span className="text-[10px] font-medium text-cyan-800">{i + 1}. {label}</span>
                             <input
