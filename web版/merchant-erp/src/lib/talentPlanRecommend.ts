@@ -55,7 +55,8 @@ export type TalentBudgetSeatSource = {
   }>
 }
 
-const MAX_SEATS = 24
+/** 与招募向导人数上限一致，避免方案要 36 人时名单被截成 24 人 */
+const MAX_SEATS = 80
 
 function asPlatform(raw: string): RegistryTalentLibraryEntry['platform'] {
   if (raw === '小红书' || raw === '大众点评' || raw === '快手' || raw === '微信视频号') return raw

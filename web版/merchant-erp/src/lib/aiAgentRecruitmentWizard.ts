@@ -7,6 +7,8 @@ import type {
   RecruitWizardStep,
 } from './aiAgentTypes'
 import { parseRecruitmentIntentFromText } from './aiAgentRecruitmentParse'
+import { allCitiesFlat } from './chinaRegion'
+import { parseRegionToCityState } from './recruitmentCityPicker'
 import type { RecruitmentPlatform } from './recruitmentPlatformOptions'
 import {
   LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT,
@@ -85,6 +87,34 @@ function isoDatePlusDays(days: number): string {
   return `${y}-${m}-${day}`
 }
 
+/** 只接受行政区里的城市。「在各卡片内单独确认」这类句子不当成城市。 */
+export function recognizedRecruitCity(raw: string): string {
+  const text = String(raw || '').trim()
+  if (!text) return ''
+  const state = parseRegionToCityState(text)
+  if (state.cityNational && /全国|不限/.test(text)) return '全国'
+  return state.selectedCities.join('、')
+}
+
+/** 方案正文里出现的地级市，如「温州」→「温州市」。取文中最先出现的一座。 */
+export function cityMentionedInText(text: string): string {
+  const body = String(text || '')
+  if (!body.trim()) return ''
+  let best: { index: number; city: string; len: number } | null = null
+  for (const city of allCitiesFlat()) {
+    const short = city.replace(/市$/, '')
+    const fullAt = body.indexOf(city)
+    const shortAt = short.length >= 2 ? body.indexOf(short) : -1
+    const index = fullAt >= 0 ? fullAt : shortAt
+    if (index < 0) continue
+    const len = fullAt >= 0 ? city.length : short.length
+    if (!best || index < best.index || (index === best.index && len > best.len)) {
+      best = { index, city, len }
+    }
+  }
+  return best?.city || ''
+}
+
 export function recruitWizardStepOf(brief: AiRecruitmentBriefPreview | undefined): RecruitWizardStep {
   const step = brief?.wizardStep
   if (step === 2 || step === 3 || step === 4) return step
@@ -109,7 +139,7 @@ export function buildRecruitWizardSeed(
   const scope: RecruitWizardScope = {
     platform: intent.platform,
     platforms,
-    city: intent.city,
+    city: recognizedRecruitCity(intent.city) || cityMentionedInText(hint),
     storeName: ctx.storeName?.trim() || '',
     mainProductName: main.name,
     contentForm,

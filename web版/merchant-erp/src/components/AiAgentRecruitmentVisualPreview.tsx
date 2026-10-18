@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useAiAgent } from '../context/AiAgentContext'
 import type { AiRecruitmentBriefPreview, RecruitContentForm } from '../lib/aiAgentTypes'
 import RecruitmentCityPickerModal, {
@@ -17,9 +17,11 @@ import {
   recruitContentFormLabel,
   recruitWizardPlatformList,
   recruitWizardStepOf,
+  recognizedRecruitCity,
   summarizeRecruitWizardBudget,
   summarizeRecruitWizardScope,
 } from '../lib/aiAgentRecruitmentWizard'
+import { resolveStoreCityFromMerchantStores } from '../services/aiAgentRecruitmentAllocation'
 import { LOCAL_LIFE_KOL_COMMISSION_MAX_PCT, LOCAL_LIFE_KOL_COMMISSION_MIN_PCT } from '../lib/localLifeKolCommission'
 import { TalentPlanChoice } from './TalentPlanChoice'
 
@@ -46,12 +48,35 @@ export function AiAgentRecruitmentVisualPreview({
   const shoot = brief.wizardShoot
   const talentPath = brief.talentPath
   const [cityPickerOpen, setCityPickerOpen] = useState(false)
+  const explicitCity = recognizedRecruitCity(scope.city)
+  const [storeCity, setStoreCity] = useState('')
+  const [resolvingCity, setResolvingCity] = useState(!explicitCity)
+  useEffect(() => {
+    if (explicitCity) {
+      setResolvingCity(false)
+      return
+    }
+    let cancelled = false
+    setResolvingCity(true)
+    void resolveStoreCityFromMerchantStores().then((city) => {
+      if (cancelled) return
+      setStoreCity(recognizedRecruitCity(city))
+      setResolvingCity(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [explicitCity])
+  const recommendCity = explicitCity || storeCity
   if (talentPath === 'pending' || talentPath === 'recommend') {
+    if (!explicitCity && resolvingCity) {
+      return <p className="mt-4 text-xs text-slate-500">正在按门店城市配人…</p>
+    }
     return (
       <div className="mt-4">
         <TalentPlanChoice
-          key={talentPath}
-          city={scope.city}
+          key={`${talentPath}-${recommendCity}`}
+          city={recommendCity}
           platform={primaryRecruitWizardPlatform(recruitWizardPlatformList(scope))}
           talentType={scope.mainProductName}
           seats={[]}
