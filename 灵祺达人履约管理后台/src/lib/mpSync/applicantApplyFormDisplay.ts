@@ -11,7 +11,20 @@ const SKIP_GRID_ROLES = new Set([
   'contact',
 ])
 
-export type ApplyFormDisplayRow = { label: string; value: string }
+export type ApplyFormDisplayRow = { label: string; value: string; imageUrl?: string }
+
+function imageUrlOf(value: string): string {
+  const s = String(value || '').trim()
+  if (/^data:image\//i.test(s)) return s
+  if (!/^https?:\/\//i.test(s)) return ''
+  const path = s.split('?')[0]?.split('#')[0] || ''
+  return /\.(jpe?g|png|webp|gif|bmp)$/i.test(path) ? s : ''
+}
+
+function pushDisplayRow(rows: ApplyFormDisplayRow[], label: string, value: string) {
+  const imageUrl = imageUrlOf(value)
+  rows.push(imageUrl ? { label, value, imageUrl } : { label, value })
+}
 
 function formatFollowers(n: unknown): string {
   const num = Number(n)
@@ -91,12 +104,12 @@ export function buildApplicantApplyFormDisplayRows(
         const value = resolveApplicantFieldValue(applicant, row as Record<string, unknown>)
         if (!value) continue
         visitShown = true
-        rows.push({ label: '探店时间', value })
+        pushDisplayRow(rows, '探店时间', value)
         continue
       }
       const value = resolveApplicantFieldValue(applicant, row as Record<string, unknown>)
       if (!value) continue
-      rows.push({ label: String(row.displayLabel || row.label || '报名项'), value })
+      pushDisplayRow(rows, String(row.displayLabel || row.label || '报名项'), value)
     }
     return rows
   }
@@ -104,7 +117,7 @@ export function buildApplicantApplyFormDisplayRows(
   const cf = (applicant.customFields || {}) as Record<string, unknown>
   for (const [label, value] of Object.entries(cf)) {
     const s = String(value ?? '').trim()
-    if (s) rows.push({ label: String(label), value: s })
+    if (s) pushDisplayRow(rows, String(label), s)
   }
   return rows
 }

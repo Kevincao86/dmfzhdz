@@ -253,7 +253,15 @@
       >
         <view class="applicant-card-v2__cell applicant-card-v2__cell--wide">
           <text>{{fieldRow.label}}</text>
-          <text class="applicant-card-v2__cell-val">{{fieldRow.value}}</text>
+          <image
+            wx:if="{{fieldRow.imageUrl}}"
+            class="applicant-shot-thumb"
+            src="{{fieldRow.imageUrl}}"
+            mode="aspectFill"
+            data-url="{{fieldRow.imageUrl}}"
+            catchtap="onPreviewApplyShot"
+          />
+          <text wx:else class="applicant-card-v2__cell-val">{{fieldRow.value}}</text>
         </view>
         <template wx:if="{{fieldRow.showFitAfter}}" is="applicantFitPanels" data="{{fitScore: item.fitScore, fitMatch: item.fitMatch, fitProfile: item.fitProfile, fitMatchRead: item.fitMatchRead}}" />
       </block>

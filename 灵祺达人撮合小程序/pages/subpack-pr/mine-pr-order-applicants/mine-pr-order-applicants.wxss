@@ -587,6 +587,14 @@
   background: #fef3c7;
 }
 
+.applicant-shot-thumb {
+  width: 168rpx;
+  height: 224rpx;
+  margin-top: 8rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+}
+
 .applicant-card-v2__cell-val--warn {
   color: #b45309;
 }

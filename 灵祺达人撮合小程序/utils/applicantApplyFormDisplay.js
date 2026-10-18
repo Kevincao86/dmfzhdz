@@ -61,6 +61,20 @@ function resolveApplicantFieldValue(applicant, row) {
   }
 }
 
+function imageUrlOf(value) {
+  const s = String(value || '').trim()
+  if (/^data:image\//i.test(s)) return s
+  if (!/^https?:\/\//i.test(s)) return ''
+  const path = s.split('?')[0].split('#')[0]
+  return /\.(jpe?g|png|webp|gif|bmp)$/i.test(path) ? s : ''
+}
+
+function pushDisplayRow(rows, label, value) {
+  const imageUrl = imageUrlOf(value)
+  if (imageUrl) rows.push({ label, value, imageUrl })
+  else rows.push({ label, value })
+}
+
 function resolveApplyFormConfig(mpOrder) {
   if (!mpOrder) return null
   const meta =
@@ -85,12 +99,12 @@ function buildApplicantApplyFormDisplayRows(applicant, mpOrder) {
         const value = resolveApplicantFieldValue(applicant, row)
         if (!value) continue
         visitShown = true
-        rows.push({ label: '探店时间', value })
+        pushDisplayRow(rows, '探店时间', value)
         continue
       }
       const value = resolveApplicantFieldValue(applicant, row)
       if (!value) continue
-      rows.push({ label: row.displayLabel || row.label || '报名项', value })
+      pushDisplayRow(rows, row.displayLabel || row.label || '报名项', value)
     }
     return rows
   }
@@ -100,7 +114,7 @@ function buildApplicantApplyFormDisplayRows(applicant, mpOrder) {
     : {}
   for (const [label, value] of Object.entries(cf)) {
     const s = String(value == null ? '' : value).trim()
-    if (s) rows.push({ label: String(label), value: s })
+    if (s) pushDisplayRow(rows, String(label), s)
   }
   return rows
 }

@@ -227,6 +227,7 @@ export default function PrOrderApplicantsPage() {
   const [groupQrExpired, setGroupQrExpired] = useState(false)
   const [groupQrUploading, setGroupQrUploading] = useState(false)
   const [showGroupQrPreview, setShowGroupQrPreview] = useState(false)
+  const [applyShotPreview, setApplyShotPreview] = useState('')
   const [notifying, setNotifying] = useState(false)
   const [savingSelect, setSavingSelect] = useState(false)
   const [checkedIds, setCheckedIds] = useState<string[]>([])
@@ -1314,7 +1315,21 @@ export default function PrOrderApplicantsPage() {
                   <Fragment key={`${fieldRow.label}-${fieldIdx}`}>
                     <div className="col-span-2 sm:col-span-3">
                       <span className="text-[var(--shell-muted)]">{fieldRow.label} </span>
-                      {fieldRow.value}
+                      {fieldRow.imageUrl ? (
+                        <button
+                          type="button"
+                          className="mt-1 block"
+                          onClick={() => setApplyShotPreview(fieldRow.imageUrl || '')}
+                        >
+                          <img
+                            src={fieldRow.imageUrl}
+                            alt={fieldRow.label}
+                            className="h-28 w-20 rounded-lg border object-cover object-top"
+                          />
+                        </button>
+                      ) : (
+                        fieldRow.value
+                      )}
                     </div>
                     {showFit && fit ? <TalentFitNote row={fit} /> : null}
                   </Fragment>
@@ -1724,6 +1739,15 @@ export default function PrOrderApplicantsPage() {
           order={shareSheet.order}
           onClose={() => setShareSheet(null)}
         />
+      ) : null}
+      {applyShotPreview ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+          onClick={() => setApplyShotPreview('')}
+        >
+          <img src={applyShotPreview} alt="报名截图" className="max-h-[90vh] max-w-full rounded-lg" />
+        </button>
       ) : null}
     </div>
   )

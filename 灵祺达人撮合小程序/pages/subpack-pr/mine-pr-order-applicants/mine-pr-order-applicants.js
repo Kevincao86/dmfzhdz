@@ -1196,6 +1196,11 @@ Page({
     }
   },
   noop() {},
+  onPreviewApplyShot(e) {
+    const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
   onCopyApplicant(e) {
     const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     if (!a) return
