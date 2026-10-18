@@ -145,6 +145,7 @@ function uiSections(profiles, douyinLevelIndex) {
       enabled: !!prof.enabled,
       profile: prof,
       tagGrid: buildAccountTagGrid(prof.accountTags),
+      selectedTags: Array.isArray(prof.accountTags) ? prof.accountTags : [],
       labels: lb,
       profileLinkPlaceholder: profileLinkPlaceholder(p.name),
       showSalesLevel: lb.showSalesLevel,

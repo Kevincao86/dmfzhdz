@@ -70,6 +70,7 @@ function TalentProfileForm() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [autofillLoading, setAutofillLoading] = useState(false)
+  const [shotPreview, setShotPreview] = useState('')
   const { lockForm, unlockForm, fieldFocusProps, lockedRef: formLockedRef } = useProtectedForm()
   const remoteHydratedRef = useRef(false)
 
@@ -451,12 +452,18 @@ function TalentProfileForm() {
             <p className="text-xs text-slate-500 mt-1">
               打开抖音或快手「数据中心 → 数据概览 → 交易分析 → 近30日」，截这一屏。不上传也可以保存。
             </p>
-            <img
-              src="/trade-screenshot-example.jpg"
-              alt="抖音数据中心交易分析示例"
-              className="mt-2 w-full max-w-sm rounded-lg border"
-            />
-            <p className="text-xs text-slate-500 mt-1">上图是抖音数据中心示例，快手截同样的交易数据页即可。</p>
+            <button
+              type="button"
+              className="mt-2 block"
+              onClick={() => setShotPreview('/trade-screenshot-example.jpg')}
+            >
+              <img
+                src="/trade-screenshot-example.jpg"
+                alt="抖音数据中心交易分析示例"
+                className="h-28 w-20 rounded-lg border object-cover object-top"
+              />
+            </button>
+            <p className="text-xs text-slate-500 mt-1">点击小图可放大。上图是抖音数据中心示例，快手截同样的交易数据页即可。</p>
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
@@ -471,7 +478,13 @@ function TalentProfileForm() {
               }}
             />
             {prof.recentTradeScreenshot ? (
-              <img src={prof.recentTradeScreenshot} alt="近期交易截图" className="mt-2 w-full max-w-sm rounded-lg border" />
+              <button
+                type="button"
+                className="mt-2 block"
+                onClick={() => setShotPreview(prof.recentTradeScreenshot)}
+              >
+                <img src={prof.recentTradeScreenshot} alt="近期交易截图" className="h-28 w-20 rounded-lg border object-cover object-top" />
+              </button>
             ) : null}
           </div>
         ) : null}
@@ -541,6 +554,15 @@ function TalentProfileForm() {
       >
         {saving ? '保存中…' : '保存资料'}
       </button>
+      {shotPreview ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+          onClick={() => setShotPreview('')}
+        >
+          <img src={shotPreview} alt="交易截图放大" className="max-h-[90vh] max-w-full rounded-lg" />
+        </button>
+      ) : null}
     </div>
   )
 }

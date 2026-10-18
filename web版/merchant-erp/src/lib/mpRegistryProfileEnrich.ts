@@ -29,6 +29,8 @@ type LooseProfile = {
   quotePrice?: string
   alipayAccount?: string
   accountTags?: string[]
+  talentGrade?: string
+  recentTradeScreenshot?: string
 }
 
 function accountPhoneKey(account: MpAccountRow): string {
@@ -62,6 +64,18 @@ function profileRichness(raw: LooseProfile | undefined): number {
   return score
 }
 
+function tagList(raw: LooseProfile | undefined): string[] {
+  if (!raw || !Array.isArray(raw.accountTags)) return []
+  return raw.accountTags.map((t) => String(t || '').trim()).filter(Boolean)
+}
+
+function keepText(primary: unknown, fallback: unknown): string {
+  const a = String(primary || '').trim()
+  if (a) return a
+  return String(fallback || '').trim()
+}
+
+/** 达人库行更完整时只补账号/粉丝等字段，账号标签和交易截图仍留在会员资料上 */
 function pickRicherProfile(
   current: LooseProfile | undefined,
   candidate: LooseProfile | undefined,
@@ -71,8 +85,23 @@ function pickRicherProfile(
   const nick = String(candidate.platformNickname || '').trim()
   if (!account && !nick) return current
   const next: LooseProfile = { ...candidate, enabled: true }
-  if (!current) return next
-  return profileRichness(next) > profileRichness(current) ? next : current
+  if (!current) {
+    const tags = tagList(next)
+    return tags.length ? { ...next, accountTags: tags } : next
+  }
+  const richer = profileRichness(next) > profileRichness(current) ? next : current
+  const other = richer === next ? current : next
+  const tags = [...new Set([...tagList(richer), ...tagList(other)])]
+  const talentGrade = keepText(richer.talentGrade, other.talentGrade)
+  const recentTradeScreenshot = keepText(richer.recentTradeScreenshot, other.recentTradeScreenshot)
+  return {
+    ...other,
+    ...richer,
+    enabled: true,
+    accountTags: tags.length ? tags : undefined,
+    talentGrade: talentGrade || undefined,
+    recentTradeScreenshot: recentTradeScreenshot || undefined,
+  }
 }
 
 function assignRicherProfile(
@@ -111,6 +140,9 @@ function libraryEntryToLooseProfile(e: RegistryTalentLibraryEntry): LooseProfile
     douyinSalesLevel: e.douyinSalesLevel ? String(e.douyinSalesLevel).trim() : undefined,
     quotePrice: String(e.quotePrice || '').trim(),
     alipayAccount: e.alipayAccount ? String(e.alipayAccount).trim() : undefined,
+    accountTags: Array.isArray(e.accountTags)
+      ? e.accountTags.map((t) => String(t || '').trim()).filter(Boolean)
+      : undefined,
   }
 }
 

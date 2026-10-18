@@ -383,10 +383,18 @@
 
 .trade-shot-example,
 .trade-shot-preview {
-  width: 100%;
+  width: 168rpx;
+  height: 224rpx;
   margin-top: 12rpx;
   border-radius: 16rpx;
   background: #f8fafc;
+}
+
+.platform-tag-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
 }
 
 .trade-shot-actions {
