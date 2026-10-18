@@ -26,6 +26,7 @@ function mapPlatformProfile(
     talentGrade: String((raw as { talentGrade?: string }).talentGrade || '').trim(),
     quotePrice: String(raw.quotePrice || '').trim(),
     accountTags: Array.isArray(raw.accountTags) ? raw.accountTags.map(String) : [],
+    recentTradeScreenshot: String((raw as { recentTradeScreenshot?: string }).recentTradeScreenshot || '').trim(),
   }
 }
 

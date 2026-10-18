@@ -29,6 +29,7 @@ function emptyProfile() {
     talentGrade: '',
     quotePrice: '',
     accountTags: [],
+    recentTradeScreenshot: '',
   }
 }
 
@@ -147,6 +148,7 @@ function uiSections(profiles, douyinLevelIndex) {
       labels: lb,
       profileLinkPlaceholder: profileLinkPlaceholder(p.name),
       showSalesLevel: lb.showSalesLevel,
+      showTradeShot: p.id === 'douyin' || p.id === 'kuaishou',
       showTalentGrade: lb.showTalentGrade,
       showReviewCount: lb.showReviewCount,
       headClass:

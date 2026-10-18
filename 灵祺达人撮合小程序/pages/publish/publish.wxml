@@ -212,14 +212,16 @@
               <switch class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
             </view>
             <view class="tpl-row" wx:for="{{customPublishFields}}" wx:key="id">
-              <text class="tpl-row__name">{{item.label}}</text>
+              <text class="tpl-row__name">{{item.label}} · {{item.formatLabel || '文字'}}</text>
               <text class="tpl-row__del" data-id="{{item.id}}" bindtap="onRemoveCustomPublishField">删除</text>
             </view>
           </view>
         </block>
       </scroll-view>
       <view class="tpl-dock" wx:if="{{step === 'tplCustom'}}">
-        <view class="tpl-dock__add" bindtap="onPromptCustomField">新增自定义字段</view>
+        <view class="tpl-dock__add" data-format="text" bindtap="onPromptCustomField">文字</view>
+        <view class="tpl-dock__add" data-format="image" bindtap="onPromptCustomField">图片</view>
+        <view class="tpl-dock__add" data-format="video" bindtap="onPromptCustomField">视频</view>
         <view class="tpl-dock__go" bindtap="onCustomTemplateDone">开始填写</view>
       </view>
     </view>
@@ -771,8 +773,16 @@
           <view class="pub-field" wx:if="{{publishTemplateMode === 'custom' && customPublishFields.length}}">
             <text class="pub-label">自定义字段</text>
             <view wx:for="{{customPublishFields}}" wx:key="id" class="pub-field">
-              <text class="pub-label">{{item.label}}</text>
-              <input class="pub-input" placeholder="请填写" value="{{item.value}}" data-id="{{item.id}}" bindinput="onCustomPublishValue" />
+              <text class="pub-label">{{item.label}} · {{item.formatLabel || '文字'}}</text>
+              <input wx:if="{{item.format !== 'image' && item.format !== 'video'}}" class="pub-input" placeholder="请填写" value="{{item.value}}" data-id="{{item.id}}" bindinput="onCustomPublishValue" />
+              <block wx:elif="{{item.format === 'image'}}">
+                <button class="pub-cover-btn" data-id="{{item.id}}" data-format="image" bindtap="onUploadCustomMedia">{{item.value ? '重新上传图片' : '上传图片'}}</button>
+                <image wx:if="{{item.value}}" class="pub-cover-preview" src="{{item.value}}" mode="aspectFill" />
+              </block>
+              <block wx:else>
+                <button class="pub-cover-btn" data-id="{{item.id}}" data-format="video" bindtap="onUploadCustomMedia">{{item.value ? '重新上传视频' : '上传视频'}}</button>
+                <video wx:if="{{item.value}}" class="pub-cover-preview" src="{{item.value}}" controls />
+              </block>
             </view>
           </view>
           <view class="pub-field" id="field-apply-form" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.apply}}">

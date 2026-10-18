@@ -27,6 +27,7 @@ export type PlatformProfile = {
   talentGrade: string
   quotePrice: string
   accountTags: string[]
+  recentTradeScreenshot: string
 }
 
 export type TalentPrExclusiveQuote = {
@@ -50,6 +51,7 @@ export function emptyProfile(): PlatformProfile {
     talentGrade: '',
     quotePrice: '',
     accountTags: [],
+    recentTradeScreenshot: '',
   }
 }
 

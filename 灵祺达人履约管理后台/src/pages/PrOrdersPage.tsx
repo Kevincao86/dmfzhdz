@@ -266,6 +266,7 @@ export default function PrOrdersPage() {
             recruitTarget: enriched.recruitTarget as 'talent' | 'shoot' | 'edit',
             mp: mp || null,
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
+            syncUncertain: Boolean(enriched.syncUncertain),
             isDeleted: Boolean(enriched.isDeleted),
             deletedAt: item.deletedAt,
             pendingVideoCount,
@@ -283,7 +284,7 @@ export default function PrOrdersPage() {
       const fallback = readPublishedOrders()
       setRows(
         fallback.map((item) => {
-          const enriched = listFilters.enrichMpOrderListItem(null, item)
+          const enriched = listFilters.enrichMpOrderListItem(null, item, { lookupFailed: true })
           return {
             ...enriched,
             mpOrderId: item.mpOrderId,
@@ -294,6 +295,7 @@ export default function PrOrdersPage() {
             recruitTarget: 'talent' as const,
             mp: null,
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
+            syncUncertain: true,
             isDeleted: Boolean(enriched.isDeleted),
             deletedAt: item.deletedAt,
             pendingVideoCount: 0,
@@ -830,7 +832,7 @@ export default function PrOrdersPage() {
                     viewCount={Number(row.mp?.viewCount || 0)}
                     favoriteCount={Number(row.mp?.favoriteCount || 0)}
                     actions={
-                      !row.isRemovedFromRegistry ? (
+                      !row.isRemovedFromRegistry && !row.syncUncertain ? (
                         tab === 'pending_schedule' ? (
                           <>
                             <Link
@@ -954,7 +956,11 @@ export default function PrOrdersPage() {
                           </>
                         )
                       ) : (
-                        <p className="pr-orders-muted">该发单未同步，仅保留历史记录</p>
+                        <p className="pr-orders-muted">
+                          {row.syncUncertain
+                            ? '登录或网络异常，单还在。刷新后再看，不会因为这次失败被删掉。'
+                            : '该发单未同步，仅保留历史记录'}
+                        </p>
                       )
                     }
                   />

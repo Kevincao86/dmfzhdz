@@ -24,6 +24,7 @@ import {
   type PublishForm,
 } from '../../lib/mpSync/publishOrder'
 import { clampNonNegativeInput } from '../../lib/mpSync/publishNumeric'
+import { uploadContentImage, uploadContentVideo } from '../../lib/mpContentUpload'
 import {
   DELIVERY_WINDOWS,
   newFansTier,
@@ -151,7 +152,10 @@ export default function PublishWizard() {
     apply: true,
     cover: true,
   })
-  const [customPublishFields, setCustomPublishFields] = useState<{ id: string; label: string; value: string }[]>([])
+  const [customPublishFields, setCustomPublishFields] = useState<
+    { id: string; label: string; value: string; format: 'text' | 'image' | 'video' }[]
+  >([])
+  const [customFieldFormat, setCustomFieldFormat] = useState<'text' | 'image' | 'video'>('text')
   const [customFieldDraft, setCustomFieldDraft] = useState('')
   const [recruitChannel, setRecruitChannel] = useState('')
   const [isTargetedRecruit, setIsTargetedRecruit] = useState(false)
@@ -288,12 +292,13 @@ export default function PublishWizard() {
     }
     if (Array.isArray(meta.customPublishFields)) {
       setCustomPublishFields(
-        (meta.customPublishFields as { id?: string; label?: string; value?: string }[])
+        (meta.customPublishFields as { id?: string; label?: string; value?: string; format?: string }[])
           .filter((row) => String(row?.label || '').trim())
           .map((row, i) => ({
             id: String(row.id || `c-${i}`),
             label: String(row.label || '').trim(),
             value: String(row.value || ''),
+            format: row.format === 'image' || row.format === 'video' ? row.format : 'text',
           })),
       )
     }
@@ -720,11 +725,22 @@ export default function PublishWizard() {
             ))}
             {customPublishFields.map((row) => (
               <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span>{row.label}</span>
+                <span>
+                  {row.label} · {row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字'}
+                </span>
                 <button type="button" className="text-xs text-slate-400" onClick={() => setCustomPublishFields((list) => list.filter((x) => x.id !== row.id))}>删除</button>
               </div>
             ))}
             <div className="flex items-center gap-2 px-4 py-2.5">
+              <select
+                className="rounded-lg panel-input border px-2 py-1.5 text-sm"
+                value={customFieldFormat}
+                onChange={(e) => setCustomFieldFormat(e.target.value as 'text' | 'image' | 'video')}
+              >
+                <option value="text">文字</option>
+                <option value="image">图片</option>
+                <option value="video">视频</option>
+              </select>
               <input
                 className="flex-1 rounded-lg panel-input border px-3 py-1.5 text-sm"
                 placeholder="新增字段，如到店时间"
@@ -741,7 +757,9 @@ export default function PublishWizard() {
                     return
                   }
                   setErr('')
-                  setCustomPublishFields((list) => list.concat([{ id: `c-${Date.now()}`, label, value: '' }]))
+                  setCustomPublishFields((list) =>
+                    list.concat([{ id: `c-${Date.now()}`, label, value: '', format: customFieldFormat }]),
+                  )
                   setCustomFieldDraft('')
                 }}
               >
@@ -1594,17 +1612,48 @@ export default function PublishWizard() {
           <div className="space-y-2">
             {customPublishFields.map((row) => (
               <div key={row.id}>
-                <PubLabel>{row.label}</PubLabel>
-                <input
-                  className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
-                  placeholder="请填写"
-                  value={row.value}
-                  onChange={(e) =>
-                    setCustomPublishFields((list) =>
-                      list.map((x) => (x.id === row.id ? { ...x, value: e.target.value } : x)),
-                    )
-                  }
-                />
+                <PubLabel>
+                  {row.label} · {row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字'}
+                </PubLabel>
+                {row.format === 'text' ? (
+                  <input
+                    className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                    placeholder="请填写"
+                    value={row.value}
+                    onChange={(e) =>
+                      setCustomPublishFields((list) =>
+                        list.map((x) => (x.id === row.id ? { ...x, value: e.target.value } : x)),
+                      )
+                    }
+                  />
+                ) : (
+                  <div className="mt-1 space-y-2">
+                    <input
+                      type="file"
+                      accept={row.format === 'image' ? 'image/png,image/jpeg,image/webp' : 'video/mp4,video/quicktime'}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        e.target.value = ''
+                        if (!file) return
+                        const upload = row.format === 'image' ? uploadContentImage(file) : uploadContentVideo(file)
+                        void upload
+                          .then((url) =>
+                            setCustomPublishFields((list) =>
+                              list.map((x) => (x.id === row.id ? { ...x, value: url } : x)),
+                            ),
+                          )
+                          .catch((err) => setErr(err instanceof Error ? err.message : '上传失败'))
+                      }}
+                    />
+                    {row.value ? (
+                      row.format === 'image' ? (
+                        <img src={row.value} alt="" className="max-h-40 rounded-lg border" />
+                      ) : (
+                        <video src={row.value} controls className="max-h-40 rounded-lg border" />
+                      )
+                    ) : null}
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -480,6 +480,7 @@ export type RegistryMpTalentPlatformProfile = {
   quotePrice: string
   alipayAccount: string
   accountTags?: string[]
+  recentTradeScreenshot?: string
 }
 
 /** 拍摄/剪辑团队扩展资料（小程序与履约 Web 共用） */

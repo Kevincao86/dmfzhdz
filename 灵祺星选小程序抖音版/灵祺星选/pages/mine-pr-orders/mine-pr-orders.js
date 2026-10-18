@@ -62,7 +62,7 @@ function buildMetaLine(row) {
   return [region, category, row.signupLabel || '—', row.deadlineDaysText || '—'].join(' · ')
 }
 
-function mapRow(item, mp) {
+function mapRow(item, mp, opts) {
   if (mp) {
     applicationsStore.touchPublishedOrderSnapshot(item.mpOrderId, {
       title: String(mp.title || mp.customerName || item.title || item.mpOrderId),
@@ -70,7 +70,7 @@ function mapRow(item, mp) {
       hall: mp.hall === 'urgent' || mp.urgent ? 'urgent' : mp.hall === 'ice' || mp.orderKind === 'ice' ? 'ice' : 'normal',
     })
   }
-  const enriched = listFilters.enrichMpOrderListItem(mp, item)
+  const enriched = listFilters.enrichMpOrderListItem(mp, item, opts)
   const pendingVideoCount = prOrderFilters.countPendingVideos(mp)
   const videoCount = prOrderFilters.countVideos(mp)
   const target = recruitTarget.recruitTargetFromMp(mp)
@@ -491,7 +491,7 @@ Page({
         this.refreshFiltered([])
         return
       }
-      const rows = local.map((item) => mapRow(item, null))
+      const rows = local.map((item) => mapRow(item, null, { lookupFailed: true }))
       this.setData({
         rows,
         loading: false,
@@ -551,7 +551,7 @@ Page({
       this.refreshFiltered(rowsFinal)
     } catch (e) {
       const fallbackLocal = applicationsStore.readPublishedOrders()
-      const rows = fallbackLocal.map((item) => mapRow(item, null))
+      const rows = fallbackLocal.map((item) => mapRow(item, null, { lookupFailed: true }))
       this.setData({
         rows,
         loading: false,

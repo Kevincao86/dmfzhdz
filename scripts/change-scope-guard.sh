@@ -806,6 +806,29 @@ publishedOrders
 change-scope-guard
 PAT
       ;;
+    pr_swallow_profile_custom)
+      cat <<'PAT'
+registrySnapshotIoFetch
+registrySnapshotPgAppend
+meoo-ops-mp-recruitment-orders-append
+opsRegistryTypes
+registryMemberClientMap
+opsRegistryTalentMp
+recruitmentListFilters
+mine-pr-orders
+pages/publish/publish
+pages/register/register
+talentPlatformProfiles
+mpRecruitment/listFilters
+PrOrdersPage
+TalentProfilePage
+PublishWizard
+mpContentUpload
+publishOrder
+trade-screenshot-example
+change-scope-guard
+PAT
+      ;;
     mp_recruit_no_drop)
       cat <<'PAT'
 meoo-ops-mp-recruitment-orders-append

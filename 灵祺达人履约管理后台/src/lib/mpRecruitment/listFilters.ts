@@ -600,6 +600,7 @@ function enrichDeletedMpOrderListItem(
     recruitTarget: mp ? recruitTargetFromMp(mp) : ('talent' as const),
     hallLabel: hallLabelFromLocal(localItem),
     isRemovedFromRegistry: false,
+    syncUncertain: false,
     isDeleted: true,
   }
 }
@@ -613,17 +614,19 @@ export function enrichMpOrderListItem(
     deletedAt?: string
     lastStatus?: string
   },
+  opts?: { lookupFailed?: boolean },
 ) {
   if (localItem.deletedAt) {
     return enrichDeletedMpOrderListItem(mp, localItem)
   }
 
   if (!mp) {
+    const lookupFailed = opts?.lookupFailed === true
     return {
       ...localItem,
       title: localItem.title || String(localItem.mpOrderId || '历史发单'),
-      status: 'unsynced',
-      statusLabel: '未同步',
+      status: lookupFailed ? 'sync_uncertain' : 'unsynced',
+      statusLabel: lookupFailed ? '待刷新' : '未同步',
       recruiting: false,
       canToggleRecruit: false,
       toggleActionLabel: '',
@@ -631,12 +634,13 @@ export function enrichMpOrderListItem(
       applicantCount: 0,
       recruitCount: 0,
       signupLabel: '—',
-      deadlineDaysText: '未同步',
+      deadlineDaysText: lookupFailed ? '待刷新' : '未同步',
       deadlineMs: 0,
       platform: '—',
       recruitTarget: 'talent' as const,
       hallLabel: hallLabelFromLocal(localItem),
-      isRemovedFromRegistry: true,
+      isRemovedFromRegistry: !lookupFailed,
+      syncUncertain: lookupFailed,
       isDeleted: false,
     }
   }
@@ -672,6 +676,7 @@ export function enrichMpOrderListItem(
           ? '云剪任务'
           : '招募大厅',
     isRemovedFromRegistry: false,
+    syncUncertain: false,
     isDeleted: false,
   }
 }

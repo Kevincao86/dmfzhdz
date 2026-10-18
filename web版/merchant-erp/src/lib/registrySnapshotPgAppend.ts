@@ -25,6 +25,76 @@ export function readRegistryPgConnectionString(): string | null {
   return `postgres://postgres:${encodeURIComponent(password)}@127.0.0.1:5433/postgres?sslmode=disable`
 }
 
+function mpOrderIdOf(row: unknown): string {
+  if (!row || typeof row !== 'object') return ''
+  return String((row as { id?: string }).id || '').trim()
+}
+
+/**
+ * 整表保存时保住「加载之后才写入」的招募单。
+ * 加载时见过、这次快照里没有的 id 视为本人删除；库里新出现、这份快照没见过的 id 必须保留。
+ */
+export function mergeMpOrdersPreservingConcurrent(
+  incoming: unknown[],
+  current: unknown[],
+  loadedIds: Set<string> | null,
+): unknown[] {
+  const incomingIds = new Set(incoming.map(mpOrderIdOf).filter(Boolean))
+  const preserve: unknown[] = []
+  for (const row of current) {
+    const id = mpOrderIdOf(row)
+    if (!id || incomingIds.has(id)) continue
+    if (loadedIds && loadedIds.has(id)) continue
+    preserve.push(row)
+  }
+  return preserve.length ? [...preserve, ...incoming] : incoming
+}
+
+/** 行锁后合并 mpRecruitmentOrders 再写整表，避免高峰并发把刚发的单盖掉。无 PG 连接时返回 false。 */
+export async function saveRegistryMergingMpOrders(
+  persist: Record<string, unknown>,
+  loadedIds: Set<string> | null,
+): Promise<boolean> {
+  const cs = readRegistryPgConnectionString()
+  if (!cs) return false
+  const client = new Client({ connectionString: cs })
+  await client.connect()
+  try {
+    await client.query('BEGIN')
+    const cur = await client.query<{ orders: unknown }>(
+      `SELECT COALESCE(registry->'mpRecruitmentOrders', '[]'::jsonb) AS orders
+       FROM ops_registry_snapshot WHERE id = 1 FOR UPDATE`,
+    )
+    if (!cur.rows.length) {
+      await client.query('ROLLBACK')
+      return false
+    }
+    const current = Array.isArray(cur.rows[0]?.orders) ? (cur.rows[0].orders as unknown[]) : []
+    const incoming = Array.isArray(persist.mpRecruitmentOrders)
+      ? (persist.mpRecruitmentOrders as unknown[])
+      : []
+    const merged = mergeMpOrdersPreservingConcurrent(incoming, current, loadedIds)
+    const next = { ...persist, mpRecruitmentOrders: merged }
+    const updated = await client.query(
+      `UPDATE ops_registry_snapshot
+       SET registry = $1::jsonb, updated_at = $2
+       WHERE id = 1`,
+      [JSON.stringify(next), new Date().toISOString()],
+    )
+    if (!updated.rowCount) {
+      await client.query('ROLLBACK')
+      return false
+    }
+    await client.query('COMMIT')
+    return true
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined)
+    throw error
+  } finally {
+    await client.end()
+  }
+}
+
 function readGroupQrFromOrder(order: RegistryMpRecruitmentOrder): string {
   const meta =
     order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
@@ -89,6 +159,8 @@ export async function appendMpRecruitmentOrderViaPg(
   const client = new Client({ connectionString: cs })
   await client.connect()
   try {
+    await client.query('BEGIN')
+    await client.query(`SELECT id FROM ops_registry_snapshot WHERE id = 1 FOR UPDATE`)
     const dup = await client.query<{ existing_id: string | null }>(
       `SELECT o->>'id' AS existing_id
        FROM ops_registry_snapshot s,
@@ -99,10 +171,12 @@ export async function appendMpRecruitmentOrderViaPg(
     )
     const existingId = String(dup.rows[0]?.existing_id || '').trim()
     if (existingId) {
+      await client.query('COMMIT')
+      if (existingId === String(order.id)) {
+        return { ok: true, groupQrSaved: false }
+      }
       return { ok: false, error: 'duplicate_merchant_order', status: 409, existingId }
     }
-
-    await client.query('BEGIN')
 
     // 只 prepend，禁止再 LIMIT/slice 截断——否则新发单会永久挤掉旧单
     await client.query(

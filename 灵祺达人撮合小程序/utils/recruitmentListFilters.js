@@ -331,17 +331,18 @@ function enrichDeletedMpOrderListItem(mp, localItem) {
   }
 }
 
-function enrichMpOrderListItem(mp, localItem) {
+function enrichMpOrderListItem(mp, localItem, opts) {
   if (localItem && localItem.deletedAt) {
     return enrichDeletedMpOrderListItem(mp, localItem)
   }
 
   if (!mp) {
+    const lookupFailed = !!(opts && opts.lookupFailed)
     return {
       ...localItem,
       title: (localItem && localItem.title) || (localItem && localItem.mpOrderId) || '历史发单',
-      status: 'unsynced',
-      statusLabel: '未同步',
+      status: lookupFailed ? 'sync_uncertain' : 'unsynced',
+      statusLabel: lookupFailed ? '待刷新' : '未同步',
       recruiting: false,
       canToggleRecruit: false,
       toggleActionLabel: '',
@@ -349,9 +350,10 @@ function enrichMpOrderListItem(mp, localItem) {
       applicantCount: 0,
       recruitCount: 0,
       signupLabel: '—',
-      deadlineDaysText: '未同步',
+      deadlineDaysText: lookupFailed ? '待刷新' : '未同步',
       deadlineMs: 0,
-      isRemovedFromRegistry: true,
+      isRemovedFromRegistry: !lookupFailed,
+      syncUncertain: lookupFailed,
       isDeleted: false,
       hallLabel: hallLabelFromLocal(localItem),
     }

@@ -10,6 +10,25 @@ import type { RegistryFile } from './opsRegistryTypes.js'
 
 const SNAPSHOT_FETCH_TIMEOUT_MS = 22_000
 
+/** 这次 load 当时库里已有的招募单 id。保存时用来区分「本人删的」和「保存期间新发的」。 */
+const loadedMpOrderIds = new WeakMap<RegistryFile, Set<string>>()
+
+function collectMpOrderIds(orders: unknown): Set<string> {
+  const ids = new Set<string>()
+  if (!Array.isArray(orders)) return ids
+  for (const row of orders) {
+    if (!row || typeof row !== 'object') continue
+    const id = String((row as { id?: string }).id || '').trim()
+    if (id) ids.add(id)
+  }
+  return ids
+}
+
+function rememberLoadedMpOrders(file: RegistryFile): RegistryFile {
+  loadedMpOrderIds.set(file, collectMpOrderIds(file.mpRecruitmentOrders))
+  return file
+}
+
 function fetchTimeoutSignal(ms: number): AbortSignal {
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
   if (typeof AS.timeout === 'function') return AS.timeout(ms)
@@ -61,18 +80,18 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
       const parsed = (rows[0]?.registry ?? null) as Partial<RegistryFile> | null
       const { normalizeRegistryFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
       try {
-        return normalizeRegistryFile(parsed)
+        return rememberLoadedMpOrders(normalizeRegistryFile(parsed))
       } catch (normalizeErr) {
         const hint = normalizeErr instanceof Error ? normalizeErr.message : String(normalizeErr)
         console.error('[registrySnapshotIoFetch] normalizeRegistryFile failed:', hint.slice(0, 400))
-        return normalizeRegistryFile({
+        return rememberLoadedMpOrders(normalizeRegistryFile({
           mpRecruitmentOrders: Array.isArray(parsed?.mpRecruitmentOrders) ? parsed!.mpRecruitmentOrders : [],
           recruitmentOrders: Array.isArray(parsed?.recruitmentOrders) ? parsed!.recruitmentOrders : [],
           mpTalentMembers: Array.isArray(parsed?.mpTalentMembers) ? parsed!.mpTalentMembers : [],
           mpPrUsers: Array.isArray(parsed?.mpPrUsers) ? parsed!.mpPrUsers : [],
           mpTalentInbox: Array.isArray(parsed?.mpTalentInbox) ? parsed!.mpTalentInbox : [],
           mpOrderGroupChats: Array.isArray(parsed?.mpOrderGroupChats) ? parsed!.mpOrderGroupChats : [],
-        })
+        }))
       }
     },
 
@@ -83,7 +102,34 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
         throw new Error('registry_snapshot_unsafe_to_persist')
       }
       const { registryForPersistentFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
-      const persist = registryForPersistentFile(data)
+      let persist = registryForPersistentFile(data) as RegistryFile
+      const baseline = loadedMpOrderIds.get(data) ?? null
+      const { mergeMpOrdersPreservingConcurrent, saveRegistryMergingMpOrders } = await import(
+        './registrySnapshotPgAppend.js'
+      )
+      if (await saveRegistryMergingMpOrders(persist as unknown as Record<string, unknown>, baseline)) return
+      const ordersUrl = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=${encodeURIComponent('mpRecruitmentOrders:registry->mpRecruitmentOrders')}`
+      const ordersRes = await erpAwareFetch(ordersUrl, { headers: srHeaders(key), signal: snapSignal() })
+      const ordersText = await ordersRes.text()
+      if (!ordersRes.ok) {
+        if (baseline) throw new Error(`registry_orders_reread_failed:${ordersText.slice(0, 160)}`)
+      } else {
+        let orderRows: { mpRecruitmentOrders?: unknown }[] = []
+        try {
+          orderRows = JSON.parse(ordersText || '[]') as { mpRecruitmentOrders?: unknown }[]
+        } catch {
+          if (baseline) throw new Error('registry_orders_reread_failed:parse')
+        }
+        const current = Array.isArray(orderRows[0]?.mpRecruitmentOrders) ? orderRows[0].mpRecruitmentOrders : []
+        persist = {
+          ...persist,
+          mpRecruitmentOrders: mergeMpOrdersPreservingConcurrent(
+            persist.mpRecruitmentOrders || [],
+            current,
+            baseline,
+          ) as RegistryFile['mpRecruitmentOrders'],
+        }
+      }
       const nowIso = new Date().toISOString()
       const patchBody = JSON.stringify({
         registry: persist as unknown as Record<string, unknown>,

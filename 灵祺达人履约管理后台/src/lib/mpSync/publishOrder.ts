@@ -471,7 +471,7 @@ export function buildPublishOrder(
     isTargetedRecruit?: boolean
     publishTemplateMode?: 'system' | 'custom'
     publishFieldOn?: Record<string, boolean>
-    customPublishFields?: { id: string; label: string; value: string }[]
+    customPublishFields?: { id: string; label: string; value: string; format?: 'text' | 'image' | 'video' }[]
   },
 ) {
   const mode = modeById(recruitModeId)

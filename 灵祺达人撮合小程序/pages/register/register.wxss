@@ -372,3 +372,25 @@
   color: #d4d4d8 !important;
   -webkit-text-fill-color: #d4d4d8 !important;
 }
+
+.trade-shot-hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.trade-shot-example,
+.trade-shot-preview {
+  width: 100%;
+  margin-top: 12rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+}
+
+.trade-shot-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 12rpx;
+}

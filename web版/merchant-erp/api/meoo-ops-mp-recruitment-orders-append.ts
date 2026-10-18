@@ -53,6 +53,7 @@ async function appendViaRegistryIo(
   const sid = String(order.sourceMerchantOrderId || '').trim()
   const dup = list.find((o) => o && String(o.sourceMerchantOrderId || '').trim() === sid)
   if (dup) {
+    if (String(dup.id) === String(order.id)) return
     const err = new Error('duplicate_merchant_order')
     ;(err as Error & { existingId?: string; status?: number }).existingId = dup.id
     ;(err as Error & { status?: number }).status = 409

@@ -647,20 +647,33 @@ async function confirmIceTask(mpOrderId, applicantId, action) {
   throw lastErr || new Error('云剪确认接口不可用')
 }
 
+function isRetryablePublishError(msg) {
+  return /timeout|timed out|超时|abort|network|ECONN|502|503|504|\b500\b|fetch failed|request:fail/i.test(String(msg || ''))
+}
+
 async function appendMpRecruitmentOrder(order) {
   const paths = [
     '/api/meoo-ops-mp-recruitment-orders-append',
     '/api/ops-sync/mp-recruitment-orders/append',
   ]
   let lastErr
-  for (const path of paths) {
-    try {
-      return await api.post(path, { order })
-    } catch (e) {
-      lastErr = e
-      const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let retry = false
+    for (const path of paths) {
+      try {
+        return await api.post(path, { order })
+      } catch (e) {
+        lastErr = e
+        const msg = String(e && e.message ? e.message : e)
+        if (/404|not_found/i.test(msg)) continue
+        if (attempt === 0 && isRetryablePublishError(msg)) {
+          retry = true
+          break
+        }
+        throw e
+      }
     }
+    if (!retry) break
   }
   throw lastErr || new Error('发单接口不可用')
 }

@@ -18,6 +18,7 @@ import { inferLegacyMemberType } from '../lib/mpSync/talentPlatformProfiles'
 import { TALENT_TAGS } from '../lib/mpSync/publishFormOptions'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
 import { validateRegion } from '../lib/mpSync/regionPicker'
+import { uploadContentImage } from '../lib/mpContentUpload'
 import { readWxAccount, writeWxAccount } from '../lib/mpSync/wxAccount'
 
 function memberFromStorage(): TalentMember | null {
@@ -444,6 +445,36 @@ function TalentProfileForm() {
             onChange={(e) => patchProfile({ followers: e.target.value })}
           />
         </label>
+        {activePlatform === 'douyin' || activePlatform === 'kuaishou' ? (
+          <div>
+            <span className="text-slate-400">近期交易截图（选填）</span>
+            <p className="text-xs text-slate-500 mt-1">
+              打开抖音或快手「数据中心 → 数据概览 → 交易分析 → 近30日」，截这一屏。不上传也可以保存。
+            </p>
+            <img
+              src="/trade-screenshot-example.jpg"
+              alt="抖音数据中心交易分析示例"
+              className="mt-2 w-full max-w-sm rounded-lg border"
+            />
+            <p className="text-xs text-slate-500 mt-1">上图是抖音数据中心示例，快手截同样的交易数据页即可。</p>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="mt-2 block text-sm"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (!file) return
+                void uploadContentImage(file)
+                  .then((url) => patchProfile({ recentTradeScreenshot: url }))
+                  .catch((err) => setMsg(err instanceof Error ? err.message : '上传失败'))
+              }}
+            />
+            {prof.recentTradeScreenshot ? (
+              <img src={prof.recentTradeScreenshot} alt="近期交易截图" className="mt-2 w-full max-w-sm rounded-lg border" />
+            ) : null}
+          </div>
+        ) : null}
         {lb.showSalesLevel ? (
           <label className="block">
             <span className="text-slate-400">抖音带货等级</span>

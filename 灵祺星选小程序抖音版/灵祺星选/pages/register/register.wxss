@@ -289,3 +289,25 @@
   border-color: #93c5fd;
   font-weight: 600;
 }
+
+.trade-shot-hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.trade-shot-example,
+.trade-shot-preview {
+  width: 100%;
+  margin-top: 12rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+}
+
+.trade-shot-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 12rpx;
+}

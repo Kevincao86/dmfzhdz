@@ -194,7 +194,8 @@
     >
       <view class="pr-order-tags">
         <text class="pr-tag pr-tag--hall">{{item.hallLabel}}</text>
-        <text wx:if="{{item.isRemovedFromRegistry}}" class="pr-tag pr-tag--warn">未同步</text>
+        <text wx:if="{{item.syncUncertain}}" class="pr-tag pr-tag--warn">待刷新</text>
+        <text wx:elif="{{item.isRemovedFromRegistry}}" class="pr-tag pr-tag--warn">未同步</text>
         <text class="pr-tag">{{item.recruitTargetLabel}}</text>
         <text wx:if="{{item.platform && item.platform !== '—'}}" class="pr-tag">{{item.platform}}</text>
       </view>
@@ -204,7 +205,7 @@
       </view>
       <text class="pr-order-meta-line">{{item.metaLine}}</text>
 
-      <view wx:if="{{!item.isDeleted && !item.deletedAt && !item.isRemovedFromRegistry}}" class="pr-order-actions">
+      <view wx:if="{{!item.isDeleted && !item.deletedAt && !item.isRemovedFromRegistry && !item.syncUncertain}}" class="pr-order-actions">
         <block wx:if="{{tab === 'pending_schedule'}}">
           <view class="pr-btn pr-btn--primary" catchtap="goSchedule" data-id="{{item.mpOrderId}}">进入排期</view>
           <view class="pr-btn pr-btn--outline" catchtap="onSkipSchedule" data-id="{{item.mpOrderId}}">不排期</view>
@@ -243,6 +244,7 @@
         <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>
         </block>
       </view>
+      <text wx:elif="{{item.syncUncertain}}" class="pr-order-archived-hint">登录或网络异常，单还在。下拉刷新后再看，不会因为这次失败被删掉。</text>
       <text wx:else class="pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
     </view>
   </block>

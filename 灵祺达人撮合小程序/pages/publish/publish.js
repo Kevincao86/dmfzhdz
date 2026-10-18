@@ -997,7 +997,16 @@ Page({
           meta.publishFieldOn && typeof meta.publishFieldOn === 'object'
             ? { ...this.data.fieldOn, ...meta.publishFieldOn }
             : this.data.fieldOn,
-        customPublishFields: Array.isArray(meta.customPublishFields) ? meta.customPublishFields : [],
+        customPublishFields: Array.isArray(meta.customPublishFields)
+          ? meta.customPublishFields.map((row) => {
+              const format = row && (row.format === 'image' || row.format === 'video') ? row.format : 'text'
+              return {
+                ...row,
+                format,
+                formatLabel: format === 'image' ? '图片' : format === 'video' ? '视频' : '文字',
+              }
+            })
+          : [],
       }, () => this.syncDeliveryDeadlineFromParts())
       if (isSupplier) this.syncSupplierPublishGrids(restored.patch)
       this.syncDisplayFields()
@@ -1207,20 +1216,22 @@ Page({
   onCustomFieldDraft(e) {
     this.setData({ customFieldDraft: e.detail.value })
   },
-  onPromptCustomField() {
+  onPromptCustomField(e) {
+    const format = String((e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.format) || 'text')
+    const formatLabel = format === 'image' ? '图片' : format === 'video' ? '视频' : '文字'
     wx.showModal({
-      title: '新增自定义字段',
+      title: `新增${formatLabel}内容`,
       editable: true,
-      placeholderText: '如：到店时间',
+      placeholderText: '内容名称，如：到店时间',
       success: (res) => {
         if (!res.confirm) return
         const label = String(res.content || '').trim()
         if (!label) {
-          wx.showToast({ title: '请填写字段名称', icon: 'none' })
+          wx.showToast({ title: '请填写内容名称', icon: 'none' })
           return
         }
         const list = (this.data.customPublishFields || []).concat([
-          { id: `c-${Date.now()}`, label, value: '' },
+          { id: `c-${Date.now()}`, label, value: '', format, formatLabel },
         ])
         this.setData({ customPublishFields: list })
       },
@@ -1233,7 +1244,7 @@ Page({
       return
     }
     const list = (this.data.customPublishFields || []).concat([
-      { id: `c-${Date.now()}`, label, value: '' },
+      { id: `c-${Date.now()}`, label, value: '', format: 'text', formatLabel: '文字' },
     ])
     this.setData({ customPublishFields: list, customFieldDraft: '' })
   },
@@ -1248,6 +1259,65 @@ Page({
     const value = e.detail.value
     const list = (this.data.customPublishFields || []).map((x) => (x.id === id ? { ...x, value } : x))
     this.setData({ customPublishFields: list })
+  },
+  onUploadCustomMedia(e) {
+    const id = e.currentTarget.dataset.id
+    const format = String(e.currentTarget.dataset.format || '')
+    if (!id || (format !== 'image' && format !== 'video')) return
+    const applyValue = (value) => {
+      const list = (this.data.customPublishFields || []).map((x) => (x.id === id ? { ...x, value } : x))
+      this.setData({ customPublishFields: list })
+    }
+    if (format === 'image') {
+      wx.chooseMedia({
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+        success: async (res) => {
+          const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+          if (!path) return
+          wx.showLoading({ title: '上传中', mask: true })
+          try {
+            const imageOss = require('../../utils/mpImageOssUpload.js')
+            const url = await imageOss.uploadImageFileToOss(path, {
+              purpose: 'cover',
+              fileName: `custom-${Date.now()}.jpg`,
+            })
+            applyValue(url)
+            wx.showToast({ title: '已上传', icon: 'success' })
+          } catch (err) {
+            wx.showToast({ title: String((err && err.message) || '上传失败').slice(0, 20), icon: 'none' })
+          } finally {
+            wx.hideLoading()
+          }
+        },
+      })
+      return
+    }
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['video'],
+      sourceType: ['album', 'camera'],
+      maxDuration: 60,
+      success: async (res) => {
+        const file = res.tempFiles && res.tempFiles[0]
+        const path = file && file.tempFilePath
+        if (!path) return
+        wx.showLoading({ title: '上传中', mask: true })
+        try {
+          const chat = require('../../utils/mpOrderGroupChatApi.js')
+          const uploaded = await chat.uploadMedia(path, 'video/mp4', `custom-${Date.now()}.mp4`)
+          const url = String((uploaded && (uploaded.mediaUrl || uploaded.imageUrl)) || '').trim()
+          if (!/^https:\/\//i.test(url)) throw new Error('视频上传失败')
+          applyValue(url)
+          wx.showToast({ title: '已上传', icon: 'success' })
+        } catch (err) {
+          wx.showToast({ title: String((err && err.message) || '上传失败').slice(0, 20), icon: 'none' })
+        } finally {
+          wx.hideLoading()
+        }
+      },
+    })
   },
   onCustomTemplateDone() {
     const picked = Object.keys(this.data.fieldOn || {}).filter((k) => this.data.fieldOn[k] !== false)
@@ -2087,6 +2157,15 @@ Page({
     return false
   },
   async submitPublishOrder() {
+    const pendingMedia = (this.data.customPublishFields || []).find((row) => {
+      const format = String((row && row.format) || 'text')
+      const value = String((row && row.value) || '').trim()
+      return (format === 'image' || format === 'video') && value && !/^https:\/\//i.test(value)
+    })
+    if (pendingMedia) {
+      wx.showToast({ title: '请先完成图片或视频上传', icon: 'none' })
+      return
+    }
     const order = this.buildOrder()
     const isEdit = !!(this.data.editMpId && this.data.editingOrder)
     this.setData({ submitting: true })

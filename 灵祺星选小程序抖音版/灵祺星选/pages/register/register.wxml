@@ -291,6 +291,17 @@
           bindinput="onPlatformField"
         />
       </view>
+      <view class="form-row" wx:if="{{item.showTradeShot}}">
+        <text class="form-label">近期交易截图（选填）</text>
+        <text class="trade-shot-hint">打开抖音或快手「数据中心 → 数据概览 → 交易分析 → 近30日」，截这一屏。不上传也可以保存。</text>
+        <image class="trade-shot-example" src="/images/trade-screenshot-example.jpg" mode="widthFix" bindtap="onPreviewTradeExample" />
+        <text class="trade-shot-hint">上图是抖音数据中心示例，快手截同样的交易数据页即可。</text>
+        <view class="trade-shot-actions">
+          <button class="profile-autofill-btn" size="mini" data-id="{{item.id}}" bindtap="onUploadTradeShot">{{item.profile.recentTradeScreenshot ? '重新上传' : '上传截图'}}</button>
+          <button wx:if="{{item.profile.recentTradeScreenshot}}" class="profile-autofill-btn" size="mini" data-id="{{item.id}}" bindtap="onClearTradeShot">清除</button>
+        </view>
+        <image wx:if="{{item.profile.recentTradeScreenshot}}" class="trade-shot-preview" src="{{item.profile.recentTradeScreenshot}}" mode="widthFix" data-id="{{item.id}}" bindtap="onPreviewTradeShot" />
+      </view>
       <view class="form-row" wx:if="{{item.showSalesLevel}}">
         <text class="form-label">抖音带货等级 *</text>
         <picker mode="selector" range="{{douyinLevels}}" value="{{item.douyinLevelIndex}}" bindchange="onDouyinLevelChange">

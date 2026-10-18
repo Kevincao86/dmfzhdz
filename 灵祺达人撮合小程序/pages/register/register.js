@@ -530,6 +530,58 @@ Page({
     const expanded = { ...this.data.platformExpanded, [id]: !this.data.platformExpanded[id] }
     syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
   },
+  onPreviewTradeExample() {
+    wx.previewImage({ urls: ['/images/trade-screenshot-example.jpg'] })
+  },
+  onPreviewTradeShot(e) {
+    const id = e.currentTarget.dataset.id
+    const url = id && this.data.platformProfiles && this.data.platformProfiles[id]
+      ? this.data.platformProfiles[id].recentTradeScreenshot
+      : ''
+    if (url) wx.previewImage({ urls: [url] })
+  },
+  onClearTradeShot(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    this.markFormDirty()
+    const profiles = { ...this.data.platformProfiles }
+    profiles[id] = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}), recentTradeScreenshot: '' }
+    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, this.data.platformExpanded)
+  },
+  onUploadTradeShot(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: async (res) => {
+        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (!path) return
+        wx.showLoading({ title: '上传中', mask: true })
+        try {
+          const imageOss = require('../../utils/mpImageOssUpload.js')
+          const url = await imageOss.uploadImageFileToOss(path, {
+            purpose: 'cover',
+            fileName: `trade-${id}-${Date.now()}.jpg`,
+          })
+          this.markFormDirty()
+          const profiles = { ...this.data.platformProfiles }
+          profiles[id] = {
+            ...talentPlatforms.emptyProfile(),
+            ...(profiles[id] || {}),
+            recentTradeScreenshot: url,
+          }
+          syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, this.data.platformExpanded)
+          wx.showToast({ title: '已上传', icon: 'success' })
+        } catch (err) {
+          wx.showToast({ title: String((err && err.message) || '上传失败').slice(0, 20), icon: 'none' })
+        } finally {
+          wx.hideLoading()
+        }
+      },
+    })
+  },
   onPlatformField(e) {
     const id = e.currentTarget.dataset.id
     const k = e.currentTarget.dataset.k
