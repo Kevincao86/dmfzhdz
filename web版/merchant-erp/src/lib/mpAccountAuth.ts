@@ -495,6 +495,8 @@ export function accountToClientPayload(
     lingqiEditTeamId?: string | null
     workIdentity?: string | null
     prFeatureAccess?: { addons: boolean; recommendHall: boolean }
+    mpMembershipPlan?: string | null
+    mpMembershipExpiresAt?: string | null
   },
 ) {
   return {
@@ -516,6 +518,8 @@ export function accountToClientPayload(
     hasPassword: Boolean(account.password_hash),
     needsPhoneBind: mpAccountNeedsPhoneBind(account),
     prFeatureAccess: extras?.prFeatureAccess,
+    mpMembershipPlan: extras?.mpMembershipPlan || undefined,
+    mpMembershipExpiresAt: extras?.mpMembershipExpiresAt || undefined,
   }
 }
 
@@ -537,6 +541,8 @@ export async function accountPayloadWithMemberExtras(
     lingqiEditTeamId?: string | null
     workIdentity?: string | null
     prFeatureAccess?: { addons: boolean; recommendHall: boolean }
+    mpMembershipPlan?: string | null
+    mpMembershipExpiresAt?: string | null
   } = {}
   try {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
@@ -584,6 +590,8 @@ export async function accountPayloadWithMemberExtras(
           },
           data,
         )
+        extras.mpMembershipPlan = member.mpMembershipPlan || 'basic'
+        extras.mpMembershipExpiresAt = member.mpMembershipExpiresAt || ''
       }
     }
     // 达人/拍摄/剪辑身份保留达人会员权限。仅有 PR 编号时不能覆盖，否则专业版达人评估会被 PR 套餐关掉。
@@ -601,6 +609,10 @@ export async function accountPayloadWithMemberExtras(
             data,
           )
         : { ...DEFAULT_PR_FEATURE_ACCESS }
+      if (pr) {
+        extras.mpMembershipPlan = pr.mpMembershipPlan || 'basic'
+        extras.mpMembershipExpiresAt = pr.mpMembershipExpiresAt || ''
+      }
     }
   } catch {
     /* registry optional */
