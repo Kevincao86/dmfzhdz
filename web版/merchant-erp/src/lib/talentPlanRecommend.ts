@@ -36,7 +36,7 @@ export type TalentPlanCard = {
   tierLabel: string
   unitBudgetYuan: number
   talentType: string
-  source: 'library'
+  source: 'library' | 'public'
   reason: string
   empty?: boolean
 }
