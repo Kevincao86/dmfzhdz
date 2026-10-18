@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
+import type { ApplyField } from '../../lib/mpSync/applyFormTemplates'
 import PublishSheet from './PublishSheet'
 import SignupDeadlineSheet from './SignupDeadlineSheet'
 import {
@@ -9,7 +10,6 @@ import {
   saveCustomTemplate,
   templateKindFromRecruitTarget,
   validateTemplateFields,
-  type ApplyField,
 } from '../../lib/mpSync/applyFormTemplates'
 import type { PublishForm } from '../../lib/mpSync/publishOrder'
 import {
@@ -78,6 +78,42 @@ type Props = {
   recruitTarget: string
 }
 
+/** 名称为空时仍保留自定义行，方便删掉「自定义项」后重新输入。 */
+function editorRowsKeepingBlankCustom(
+  fields: ApplyField[],
+  built: ReturnType<typeof buildEditorRows>,
+): ReturnType<typeof buildEditorRows> {
+  const byId = new Map(built.map((row) => [row.id, row]))
+  const merged: ReturnType<typeof buildEditorRows> = []
+  const seen = new Set<string>()
+  for (const field of fields) {
+    const hit = byId.get(field.id)
+    if (hit) {
+      merged.push(hit)
+      seen.add(field.id)
+      continue
+    }
+    if (field.role) continue
+    seen.add(field.id)
+    merged.push({
+      id: field.id,
+      role: null,
+      label: field.label || '',
+      type: field.type || 'text',
+      required: !!field.required,
+      placeholder: field.placeholder || '',
+      displayLabel: '',
+      locked: false,
+      deletable: true,
+      bindKey: `custom_${field.id}`,
+    })
+  }
+  for (const row of built) {
+    if (!seen.has(row.id)) merged.push(row)
+  }
+  return merged
+}
+
 export default function PublishWizardSheets(props: Props) {
   const {
     pickerView,
@@ -140,7 +176,10 @@ export default function PublishWizardSheets(props: Props) {
     form.fansTiers.filter((_, j) => j !== editingTierIndex).map((t) => t.fansRange).filter(Boolean),
   )
   const previewPlatform = form.platform || '抖音'
-  const editorRows = buildEditorRows(applyEditorFields, previewPlatform, applyTemplateKind)
+  const editorRows = editorRowsKeepingBlankCustom(
+    applyEditorFields,
+    buildEditorRows(applyEditorFields, previewPlatform, applyTemplateKind),
+  )
   const customTemplates = listCustomTemplates(applyTemplateKind)
 
   return (
@@ -523,6 +562,10 @@ export default function PublishWizardSheets(props: Props) {
         tall
         onClose={() => setPickerView('')}
         onConfirm={() => {
+          if (applyEditorFields.some((field) => !field.role && !String(field.label || '').trim())) {
+            setErr('请为自定义项填写名称')
+            return
+          }
           const v = validateTemplateFields(applyEditorFields, applyTemplateKind)
           if (v) {
             setErr(v)
