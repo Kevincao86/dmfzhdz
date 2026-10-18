@@ -165,6 +165,9 @@ Page({
     fields: [],
     shop: emptyShop(),
     story: '',
+    plotId: 'expect',
+    plotHint: '',
+    plots: [],
     storyBusy: false,
     cast: [castStore.newMember(1)],
     castPacks: [],
@@ -210,6 +213,7 @@ Page({
       ? this.data.styleId
       : catalog.defaultStyleId(world.id)
     const shop = this.data.shop || emptyShop()
+    const plot = catalog.talentPlot(this.data.plotId || 'expect', scene, shop)
     this.setData({
       worldId: world.id,
       worldBlurb: world.blurb,
@@ -220,6 +224,10 @@ Page({
       styles: styles.map((s) => ({ id: s.id, name: s.name, on: s.id === styleId })),
       styleId,
       fields: packFields(world, shop),
+      plotId: plot.id,
+      plotHint: plot.hint,
+      plots: catalog.TALENT_PLOTS.map((p) => ({ id: p.id, name: p.name, on: p.id === plot.id })),
+      story: plot.story,
     })
     this.refreshClipCopy()
   },
@@ -279,10 +287,28 @@ Page({
   onScene(e) {
     const sceneId = e.currentTarget.dataset.id
     const scene = catalog.sceneOf(sceneId, this.sceneDraft())
+    const shop = shopFromFields(this.data.fields, this.data.shop)
+    const plot = catalog.talentPlot(this.data.plotId || 'expect', scene, shop)
     this.setData({
       sceneId,
       sceneHook: scene.hook,
       scenes: (this.data.scenes || []).map((s) => ({ ...s, on: s.id === sceneId })),
+      plotId: plot.id,
+      plotHint: plot.hint,
+      story: sceneId === 'custom_scene' ? this.data.story : plot.story,
+    })
+  },
+
+  onPlot(e) {
+    const plotId = e.currentTarget.dataset.id
+    const scene = catalog.sceneOf(this.data.sceneId, this.sceneDraft())
+    const shop = shopFromFields(this.data.fields, this.data.shop)
+    const plot = catalog.talentPlot(plotId, scene, shop)
+    this.setData({
+      plotId: plot.id,
+      plotHint: plot.hint,
+      plots: catalog.TALENT_PLOTS.map((p) => ({ id: p.id, name: p.name, on: p.id === plot.id })),
+      story: plot.story,
     })
   },
 
@@ -348,6 +374,7 @@ Page({
     const scene = catalog.sceneOf(this.data.sceneId, this.sceneDraft())
     const shop = shopFromFields(this.data.fields, this.data.shop)
     const guide = catalog.storyLengthGuide(dur)
+    const plot = catalog.talentPlot(this.data.plotId || 'expect', scene, shop)
     this.setData({ storyBusy: true, err: '' })
     try {
       const r = await addonApi.postAiChat(
@@ -361,6 +388,8 @@ Page({
             role: 'user',
             content: [
               `探店品类：${world.label}。场景：${scene.name}。钩子：${scene.hook}`,
+              `内置剧情：${plot.name}。${plot.hint}`,
+              `四拍：${plot.beats.join(' → ')}`,
               `店名：${shop.storeName}，套餐/项目：${shop.offerName}，价格：${shop.price}，使用场景：${shop.area}`,
               `成片时长：${durOpt.label}，共 ${dur} 秒。`,
               `【篇幅锁定】${guide}`,

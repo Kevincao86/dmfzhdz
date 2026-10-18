@@ -1378,6 +1378,88 @@ function presentWorld(world: (typeof WORLDS)[number], talentVisit: boolean) {
     fields: TALENT_VISIT_FIELDS,
   }
 }
+
+function talentSceneHook(scene: DramaScene) {
+  return `达人出镜探店。${scene.hook} 必须自己体验，再说适不适合谁。`
+}
+
+/** 星选内置五条，和达人小程序同一套。主语是出镜探店的达人。 */
+function talentVisitFormulas(scene: DramaScene): DramaFormula[] {
+  const place = scene.name
+  const see = scene.mustSee.trim() || place
+  const specs: Array<{
+    key: string
+    name: string
+    hint: string
+    beats: [string, string, string, string]
+    story: string
+    roles: string
+    conflict: string
+    dialogue: string
+  }> = [
+    {
+      key: 'expect',
+      name: '预期翻车',
+      hint: '达人按听说的来，亲自试完改口',
+      beats: ['先说听来的预期', '拍门头进店核验', `亲自体验${place}`, '改口并说适不适合谁'],
+      story: `探店达人出镜来{店名}拍{品类}。开场先说自己听说{卖点}是什么样，推门核验店招，再亲自体验（${see}），发现和预期不一样，最后按{价格}说明适不适合{位置}来的人。`,
+      roles: '探店达人 / 店员',
+      conflict: '达人进店前对{卖点}的说法，和亲自体验对不上。',
+      dialogue: '我先自己试完，再告诉你适不适合。',
+    },
+    {
+      key: 'first',
+      name: '第一次到店',
+      hint: '达人承认不熟，先找门头再自己试',
+      beats: ['承认第一次来', '找到门头核验', `第一次体验${place}`, '给第一次到店的结论'],
+      story: `探店达人第一次来{店名}拍{品类}。开场承认自己不熟，先找到门头确认是这家，进店问清{卖点}怎么体验，自己上手（${see}），最后告诉第一次来的人{价格}值不值、{位置}适不适合。`,
+      roles: '探店达人 / 店员',
+      conflict: '达人第一次来，不熟流程，只能边问边自己体验。',
+      dialogue: '我也是第一次来，先自己试给你看。',
+    },
+    {
+      key: 'with',
+      name: '带人来探',
+      hint: '达人带人来，自己先试再给同行结论',
+      beats: ['介绍同行的人', '一起进店核验', '达人先体验再分享', '说适不适合一起来'],
+      story: `探店达人带人来{店名}拍{品类}，使用场景是{位置}。开场先介绍同行的人为什么跟着来，进店一起核验，达人自己先体验{卖点}（${see}）再递给同行，最后说这单适不适合一起来、{价格}怎么看。`,
+      roles: '探店达人 / 同行',
+      conflict: '同行还在犹豫，达人必须自己先体验再给结论。',
+      dialogue: '你先看我试，再决定要不要一起。',
+    },
+    {
+      key: 'price',
+      name: '价格核验',
+      hint: '达人先对价，体验完才说值不值',
+      beats: ['先报听到的价', '进店把套餐摊开', `亲自体验${place}`, '直接说值不值'],
+      story: `探店达人来{店名}核对{卖点}到底值不值{价格}。开场先报自己听到的价，进店把套餐或项目摊开看清包含什么，亲自体验（${see}），最后直接说这个价适不适合{位置}。`,
+      roles: '探店达人 / 店员',
+      conflict: '听到的价格和到店看到的{卖点}对不上，达人要自己体验后才下结论。',
+      dialogue: '先别信标价，我体验完再告诉你值不值。',
+    },
+    {
+      key: 'hands',
+      name: '拒绝空镜',
+      hint: '达人不扫空店，必须自己上手',
+      beats: ['拒绝只拍空镜', '进店跟着达人', `亲手体验${place}`, '体验完再下结论'],
+      story: `探店达人在{店名}拒绝只拍空环境。开场先说不能只扫一圈店，必须自己体验{卖点}，镜头跟着达人的手和反应（${see}），体验完才给{位置}的到店结论，并报上{价格}。`,
+      roles: '探店达人 / 店员',
+      conflict: '店里想用空镜应付，达人坚持自己体验才算探店。',
+      dialogue: '空镜不算探店，我自己试完再说。',
+    },
+  ]
+  return specs.map((p) => ({
+    id: `talent_${scene.id}_${p.key}`,
+    scene: scene.id,
+    name: p.name,
+    hint: p.hint,
+    beats: p.beats,
+    story: p.story,
+    roles: p.roles,
+    conflict: p.conflict,
+    dialogue: p.dialogue,
+  }))
+}
 /** 每个大类场景列表末尾都有这一张，不进预设表 */
 const CUSTOM_SCENE_ID = 'custom_scene'
 
@@ -2633,12 +2715,15 @@ export default function ShortDramaPage({
 
   const world = presentWorld(worldOf(worldId), talentVisit)
   const visibleScenes = scenesOf(worldId)
-  const visibleFormulas = formulasOf(sceneId)
-  const visibleStyles = stylesOf(worldId)
-  const scene =
+  const rawScene =
     sceneId === CUSTOM_SCENE_ID
       ? customSceneFor(worldId, customScene)
       : (SCENES.find((s) => s.id === sceneId) ?? visibleScenes.find((s) => s.id !== CUSTOM_SCENE_ID) ?? SCENES[0]!)
+  const visibleFormulas =
+    talentVisit && sceneId !== CUSTOM_SCENE_ID ? talentVisitFormulas(rawScene) : formulasOf(sceneId)
+  const visibleStyles = stylesOf(worldId)
+  const scene =
+    talentVisit && sceneId !== CUSTOM_SCENE_ID ? { ...rawScene, hook: talentSceneHook(rawScene) } : rawScene
   const formula =
     sceneId === CUSTOM_SCENE_ID || formulaId === CUSTOM_FORMULA_ID
       ? resolveCustomFormula(
@@ -2648,7 +2733,7 @@ export default function ShortDramaPage({
             : customHook,
           { story, roles, conflict, dialogue },
         )
-      : FORMULAS.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!
+      : visibleFormulas.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!
   const style = STYLES.find((s) => s.id === styleId) ?? visibleStyles[0] ?? STYLES[0]!
   const hookLabel = talentVisit
     ? '探店剧情'
@@ -2667,7 +2752,7 @@ export default function ShortDramaPage({
       ? Boolean(customScene.name.trim() || customHook.name.trim())
       : formulaId === CUSTOM_FORMULA_ID
         ? Boolean(customHook.name.trim())
-        : Boolean(formulaId && FORMULAS.some((f) => f.id === formulaId))
+        : Boolean(formulaId && visibleFormulas.some((f) => f.id === formulaId))
   const storyWriteGate = useMemo(() => {
     if (!hookSelected && !durationSelected) {
       return sceneId === CUSTOM_SCENE_ID
@@ -3552,22 +3637,26 @@ export default function ShortDramaPage({
   const switchWorld = (nextWorldId: WorldId) => {
     const nextWorld = worldOf(nextWorldId)
     const nextScene = scenesOf(nextWorldId)[0]!
-    const nextFormula = formulasOf(nextScene.id)[0]!
+    const picked = scenesOf(nextWorldId).find((s) => s.id !== CUSTOM_SCENE_ID) ?? nextScene
+    const nextFormula = (talentVisit ? talentVisitFormulas(picked) : formulasOf(picked.id))[0]!
     setWorldId(nextWorldId)
-    setSceneId(nextScene.id)
+    setSceneId(picked.id)
     setFormulaId(nextFormula.id)
     setCustomScene(DEFAULT_CUSTOM_SCENE)
     setStyleId(nextWorld.defaultStyle)
     clearTrial()
     setResultPreviewUrl(null)
-    applyTemplate(nextScene, nextFormula, shop)
+    applyTemplate(picked, nextFormula, shop)
   }
 
   useEffect(() => {
     if (initedRef.current) return
     initedRef.current = true
-    applyTemplate(SCENES[0]!, FORMULAS[0]!, { storeName: '', offerName: '', price: '', area: '' })
-  }, [applyTemplate])
+    const firstScene = SCENES[0]!
+    const firstFormula = talentVisit ? talentVisitFormulas(firstScene)[0]! : FORMULAS[0]!
+    if (talentVisit) setFormulaId(firstFormula.id)
+    applyTemplate(firstScene, firstFormula, { storeName: '', offerName: '', price: '', area: '' })
+  }, [applyTemplate, talentVisit])
 
   useEffect(() => {
     let alive = true
@@ -4407,7 +4496,11 @@ export default function ShortDramaPage({
               const on = s.id === sceneId
               const customCard = s.id === CUSTOM_SCENE_ID
               const cardName = customCard ? customScene.name.trim() || '自定义' : s.name
-              const cardHook = customCard ? customScene.hook.trim() || s.hook : s.hook
+              const cardHook = customCard
+                ? customScene.hook.trim() || s.hook
+                : talentVisit
+                  ? talentSceneHook(s)
+                  : s.hook
               return (
                 <button
                   key={s.id}
@@ -4421,7 +4514,7 @@ export default function ShortDramaPage({
                       setResultPreviewUrl(null)
                       return
                     }
-                    const nextFormula = formulasOf(s.id)[0] ?? formula
+                    const nextFormula = (talentVisit ? talentVisitFormulas(s) : formulasOf(s.id))[0] ?? formula
                     setSceneId(s.id)
                     setFormulaId(nextFormula.id)
                     clearTrial()
@@ -4499,6 +4592,11 @@ export default function ShortDramaPage({
             <section className="erp-panel space-y-5 p-5">
               <div>
                 <p className="mb-2 text-sm font-medium text-slate-800">{hookLabel}</p>
+                {talentVisit ? (
+                  <p className="mb-2 text-[11px] leading-snug text-slate-500">
+                    这五条都是达人出镜探店。点一条会把剧情、角色和对白填好，主语是达人，不是客人躺平。
+                  </p>
+                ) : null}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {visibleFormulas.map((f) => (
                     <button
@@ -4529,7 +4627,7 @@ export default function ShortDramaPage({
                         formulaId === CUSTOM_FORMULA_ID
                           ? customHook
                           : draftFromFormula(
-                              FORMULAS.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!,
+                              visibleFormulas.find((f) => f.id === formulaId) ?? visibleFormulas[0] ?? FORMULAS[0]!,
                             )
                       setCustomHook({
                         name: seed.name === '自定义钩子' ? '' : seed.name,

@@ -65,6 +65,11 @@
       <text class="op-label">{{item.label}}</text>
       <input class="op-input" data-key="{{item.key}}" placeholder="{{item.placeholder}}" value="{{item.value}}" bindinput="onField" />
     </block>
+    <text class="op-label">内置探店剧情</text>
+    <view class="op-chips">
+      <text wx:for="{{plots}}" wx:key="id" class="op-chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onPlot">{{item.name}}</text>
+    </view>
+    <text class="op-body muted">{{plotHint}}。点一条会写成达人出镜探店，可再改。</text>
     <text class="op-label">一句话故事</text>
     <text class="op-body muted">主角是出镜探店的达人。8～15 秒写一个到店钩子，30 秒起按亮人设、到店、体验、结论写满。</text>
     <textarea class="op-area" maxlength="2000" placeholder="先选时长，再点 AI生成故事" value="{{story}}" bindinput="onStory" />

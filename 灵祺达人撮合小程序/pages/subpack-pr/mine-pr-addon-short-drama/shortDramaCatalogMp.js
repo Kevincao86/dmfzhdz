@@ -239,17 +239,23 @@ const DEFAULT_STYLE = {
   comic: 'cel',
 }
 
+function talentSceneHook(scene) {
+  return `达人出镜探店。${scene.hook} 必须自己体验，再说适不适合谁。`
+}
+
 function scenesOf(worldId) {
-  return SCENES.filter((s) => s.world === worldId).concat([
-    {
-      id: 'custom_scene',
-      world: worldId,
-      name: '自定义',
-      hook: '自己写场景名、钩子和画面',
-      mustSee: '',
-      visual: '',
-    },
-  ])
+  return SCENES.filter((s) => s.world === worldId)
+    .map((s) => Object.assign({}, s, { hook: talentSceneHook(s) }))
+    .concat([
+      {
+        id: 'custom_scene',
+        world: worldId,
+        name: '自定义',
+        hook: '自己写场景名、钩子和画面',
+        mustSee: '',
+        visual: '',
+      },
+    ])
 }
 
 function stylesOf(worldId) {
@@ -281,7 +287,70 @@ function sceneOf(id, draft) {
       visual: '用户自定义场景。画面只按用户写的名称、钩子和必须出现的元素出，禁止套用其它预设场景。',
     }
   }
-  return SCENES.find((s) => s.id === id) || SCENES[0]
+  const found = SCENES.find((s) => s.id === id) || SCENES[0]
+  return Object.assign({}, found, { hook: talentSceneHook(found) })
+}
+
+const TALENT_PLOTS = [
+  {
+    id: 'expect',
+    name: '预期翻车',
+    hint: '达人按听说的来，亲自试完改口',
+    beats: ['先说听来的预期', '拍门头进店核验', '亲自体验', '改口并说适不适合谁'],
+    story:
+      '探店达人出镜来{店名}拍{品类}。开场先说自己听说{卖点}是什么样，推门核验店招，再亲自体验，发现和预期不一样，最后按{价格}说明适不适合{位置}来的人。',
+    dialogue: '我先自己试完，再告诉你适不适合。',
+  },
+  {
+    id: 'first',
+    name: '第一次到店',
+    hint: '达人承认不熟，先找门头再自己试',
+    beats: ['承认第一次来', '找到门头核验', '第一次体验', '给第一次到店的结论'],
+    story:
+      '探店达人第一次来{店名}拍{品类}。开场承认自己不熟，先找到门头确认是这家，进店问清{卖点}怎么体验，自己上手，最后告诉第一次来的人{价格}值不值、{位置}适不适合。',
+    dialogue: '我也是第一次来，先自己试给你看。',
+  },
+  {
+    id: 'with',
+    name: '带人来探',
+    hint: '达人带人来，自己先试再给同行结论',
+    beats: ['介绍同行的人', '一起进店核验', '达人先体验再分享', '说适不适合一起来'],
+    story:
+      '探店达人带人来{店名}拍{品类}，使用场景是{位置}。开场先介绍同行的人为什么跟着来，进店一起核验，达人自己先体验{卖点}再递给同行，最后说这单适不适合一起来、{价格}怎么看。',
+    dialogue: '你先看我试，再决定要不要一起。',
+  },
+  {
+    id: 'price',
+    name: '价格核验',
+    hint: '达人先对价，体验完才说值不值',
+    beats: ['先报听到的价', '进店把套餐摊开', '亲自体验', '直接说值不值'],
+    story:
+      '探店达人来{店名}核对{卖点}到底值不值{价格}。开场先报自己听到的价，进店把套餐或项目摊开看清包含什么，亲自体验，最后直接说这个价适不适合{位置}。',
+    dialogue: '先别信标价，我体验完再告诉你值不值。',
+  },
+  {
+    id: 'hands',
+    name: '拒绝空镜',
+    hint: '达人不扫空店，必须自己上手',
+    beats: ['拒绝只拍空镜', '进店跟着达人', '亲手体验', '体验完再下结论'],
+    story:
+      '探店达人在{店名}拒绝只拍空环境。开场先说不能只扫一圈店，必须自己体验{卖点}，镜头跟着达人的手和反应，体验完才给{位置}的到店结论，并报上{价格}。',
+    dialogue: '空镜不算探店，我自己试完再说。',
+  },
+]
+
+function talentPlot(id, scene, shop) {
+  const plot = TALENT_PLOTS.find((p) => p.id === id) || TALENT_PLOTS[0]
+  const see = String((scene && scene.mustSee) || '').trim()
+  const story = fillTokens(plot.story, scene, shop) + (see ? `画面要出现：${see}。` : '')
+  return {
+    id: plot.id,
+    name: plot.name,
+    hint: plot.hint,
+    beats: plot.beats,
+    story,
+    dialogue: plot.dialogue,
+  }
 }
 
 function fillTokens(template, scene, shop) {
@@ -346,4 +415,6 @@ module.exports = {
   styleOf,
   fillTokens,
   buildPrompt,
+  TALENT_PLOTS,
+  talentPlot,
 }
