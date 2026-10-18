@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { uploadContentImage, uploadContentVideo } from '../lib/mpContentUpload'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
 import { applyToMpOrder, fetchMpRegistry, registerTalentMember } from '../lib/mpApi'
@@ -573,6 +574,46 @@ function ApplyFieldInput({
   form: ReturnType<typeof emptyApplyFields>
   onChange: (k: string, v: string) => void
 }) {
+  const [mediaBusy, setMediaBusy] = useState(false)
+  const [mediaErr, setMediaErr] = useState('')
+  if (row.type === 'image' || row.type === 'video') {
+    return (
+      <div>
+        <span className="text-slate-400">
+          {row.displayLabel}
+          {row.required ? ' *' : ''}
+        </span>
+        <input
+          className="mt-1 block w-full text-sm"
+          type="file"
+          accept={row.type === 'video' ? 'video/*' : 'image/png,image/jpeg,image/webp'}
+          disabled={mediaBusy}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = ''
+            if (!file) return
+            setMediaBusy(true)
+            setMediaErr('')
+            const run = row.type === 'video' ? uploadContentVideo(file) : uploadContentImage(file)
+            void run
+              .then((url) => onChange(row.bindKey, url))
+              .catch((err) => setMediaErr(err instanceof Error ? err.message : '上传失败'))
+              .finally(() => setMediaBusy(false))
+          }}
+        />
+        {mediaBusy ? <p className="mt-1 text-xs text-slate-400">上传中…</p> : null}
+        {value && row.type === 'image' ? (
+          <img src={value} alt="" className="mt-2 h-24 w-24 rounded object-cover" />
+        ) : null}
+        {value && row.type === 'video' ? (
+          <a className="mt-2 block text-xs text-violet-600" href={value} target="_blank" rel="noreferrer">
+            已上传视频
+          </a>
+        ) : null}
+        {mediaErr ? <p className="mt-1 text-xs text-red-500">{mediaErr}</p> : null}
+      </div>
+    )
+  }
   if (row.isRegion && row.role === 'province') {
     return (
       <div key={row.id}>

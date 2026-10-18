@@ -73,7 +73,7 @@ type Props = {
   setApplyEditorName: (v: string) => void
   applyEditorTplId: string
   setApplyEditorTplId: (v: string) => void
-  applyEditorMode: 'new' | 'template' | 'edit'
+  applyEditorMode: 'new' | 'template'
   setApplyEditorMode: (v: 'new' | 'template') => void
   recruitTarget: string
 }
@@ -459,21 +459,6 @@ export default function PublishWizardSheets(props: Props) {
 
       <PublishSheet open={pickerView === 'applyMenu'} title={applyMenuTitle} onClose={() => setPickerView('')}>
         <div className="space-y-2">
-          {form.applyFormFields.length ? (
-            <button
-              type="button"
-              className="w-full py-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900 hover:bg-violet-50 transition-colors"
-              onClick={() => {
-                setApplyEditorMode('edit')
-                setApplyEditorTplId(form.applyFormTemplateId || `edit-${Date.now()}`)
-                setApplyEditorName(form.applyFormTemplateName || '已配置报名项')
-                setApplyEditorFields(form.applyFormFields.map((f) => ({ ...f })))
-                setPickerView('applyForm')
-              }}
-            >
-              编辑当前报名项（{form.applyFormFields.length} 项）
-            </button>
-          ) : null}
           <button
             type="button"
             className="w-full py-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900 hover:bg-violet-50 transition-colors"
@@ -553,7 +538,7 @@ export default function PublishWizardSheets(props: Props) {
             applyEditorMode === 'template' &&
             !!applyEditorTplId &&
             customTemplates.some((t) => t.id === applyEditorTplId)
-          if (applyEditorMode !== 'edit' && !usingExistingTemplate) {
+          if (!usingExistingTemplate) {
             const shouldSave = window.confirm('是否同时保存为「我的模版」？')
             if (shouldSave) {
               saveCustomTemplate({
@@ -577,28 +562,58 @@ export default function PublishWizardSheets(props: Props) {
           />
         </label>
         <ul className="text-sm space-y-2">
-          {editorRows.map((row) => (
-            <li key={row.id} className="flex justify-between py-2 border-b border-white/5">
-              <span>
-                {row.displayLabel}
-                {row.required ? ' *' : ''}
-                {row.locked ? <span className="text-xs text-slate-500 ml-1">内置</span> : null}
-              </span>
-              <label className="text-xs text-slate-400 flex items-center gap-1">
-                必填
-                <input
-                  type="checkbox"
-                  checked={!!row.required}
-                  disabled={row.locked}
-                  onChange={(e) => {
-                    setApplyEditorFields((list) =>
-                      list.map((f) => (f.id === row.id ? { ...f, required: e.target.checked } : f)),
-                    )
-                  }}
-                />
-              </label>
-            </li>
-          ))}
+          {editorRows.map((row) => {
+            const custom = !row.role
+            const contentType = row.type === 'image' || row.type === 'video' ? row.type : 'text'
+            return (
+              <li key={row.id} className="flex items-center gap-2 py-2 border-b border-white/5">
+                {custom ? (
+                  <input
+                    className="min-w-0 flex-1 rounded-lg panel-input border px-2 py-1.5"
+                    value={row.label || ''}
+                    placeholder="自定义项名称"
+                    onChange={(e) => {
+                      const label = e.target.value
+                      setApplyEditorFields((list) => list.map((f) => (f.id === row.id ? { ...f, label } : f)))
+                    }}
+                  />
+                ) : (
+                  <span className="min-w-0 flex-1">
+                    {row.displayLabel}
+                    {row.required ? ' *' : ''}
+                    {row.locked ? <span className="text-xs text-slate-500 ml-1">内置</span> : null}
+                  </span>
+                )}
+                {custom ? (
+                  <select
+                    className="shrink-0 rounded-lg panel-input border px-2 py-1.5 text-xs"
+                    value={contentType}
+                    onChange={(e) => {
+                      const type = e.target.value
+                      setApplyEditorFields((list) => list.map((f) => (f.id === row.id ? { ...f, type } : f)))
+                    }}
+                  >
+                    <option value="text">文字</option>
+                    <option value="image">图片</option>
+                    <option value="video">视频</option>
+                  </select>
+                ) : null}
+                <label className="text-xs text-slate-400 flex items-center gap-1 shrink-0">
+                  必填
+                  <input
+                    type="checkbox"
+                    checked={!!row.required}
+                    disabled={row.locked}
+                    onChange={(e) => {
+                      setApplyEditorFields((list) =>
+                        list.map((f) => (f.id === row.id ? { ...f, required: e.target.checked } : f)),
+                      )
+                    }}
+                  />
+                </label>
+              </li>
+            )
+          })}
         </ul>
         <button
           type="button"

@@ -1925,3 +1925,23 @@
   font-size: 22rpx;
   color: #047857;
 }
+
+.apply-format-row {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
+.apply-format-btn {
+  padding: 8rpx 20rpx;
+  border-radius: 8rpx;
+  border: 1px solid #e2e8f0;
+  font-size: 24rpx;
+  color: #334155;
+}
+
+.apply-format-btn--on {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+}

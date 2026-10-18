@@ -192,6 +192,66 @@ function buildTierLevelGrid(selected, usedElsewhere) {
   }))
 }
 
+function attachApplyFieldFormat(page) {
+  const prevEdit = page.onApplyEditField
+  page.onApplyEditField = function (e) {
+    if (typeof prevEdit === 'function') prevEdit.call(this, e)
+    const id = e.currentTarget.dataset.id
+    const field = (this.data.applyFormFields || []).find((f) => f.id === id)
+    const type = field && (field.type === 'image' || field.type === 'video') ? field.type : 'text'
+    this.setData({ editFieldType: field && field.role ? 'text' : type })
+  }
+  page.onPickEditFieldType = function (e) {
+    const type = e.currentTarget.dataset.type
+    if (type !== 'text' && type !== 'image' && type !== 'video') return
+    this.setData({ editFieldType: type })
+  }
+  page.onConfirmFieldEdit = function () {
+    const id = this.data.editingFieldId
+    const field = (this.data.applyFormFields || []).find((f) => f.id === id)
+    if (!field) {
+      this.setData({ showFieldModal: false })
+      return
+    }
+    const label = String(this.data.editLabel || '').trim()
+    if (!field.role && !label) {
+      wx.showToast({ title: '请填写项名称', icon: 'none' })
+      return
+    }
+    const picked = this.data.editFieldType
+    const type = field.role ? field.type : picked === 'image' || picked === 'video' ? picked : 'text'
+    const fields = this.data.applyFormFields.map((f) =>
+      f.id === id
+        ? {
+            ...f,
+            label: field.role ? f.label : label,
+            placeholder: String(this.data.editPlaceholder || '').trim(),
+            required: !!this.data.editRequired,
+            type,
+          }
+        : f,
+    )
+    this.setData({ applyFormFields: fields, showFieldModal: false }, () => applyFormEditor.syncEditorRows(this))
+  }
+  page.onApplyAddCustomField = function () {
+    const options = [
+      { id: 'text', label: '文字' },
+      { id: 'image', label: '图片' },
+      { id: 'video', label: '视频' },
+    ]
+    wx.showActionSheet({
+      itemList: options.map((o) => o.label),
+      success: (res) => {
+        const typeDef = options[res.tapIndex]
+        if (!typeDef) return
+        const field = applyTemplates.emptyCustomField(typeDef.id)
+        const fields = [...(this.data.applyFormFields || []), field]
+        this.setData({ applyFormFields: fields }, () => applyFormEditor.syncEditorRows(this))
+      },
+    })
+  }
+}
+
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
@@ -301,6 +361,7 @@ Page({
   onLoad(options) {
     applyPublishSafeHead(this)
     applyFormEditor.bindEditorHandlers(this)
+    attachApplyFieldFormat(this)
     let editMpId = options && options.editMpId ? String(options.editMpId).trim() : ''
     if (!editMpId) {
       try {
@@ -428,21 +489,6 @@ Page({
   applyTemplateKind() {
     return applyTemplates.templateKindFromRecruitTarget(this.data.recruitTarget || 'talent')
   },
-  openApplyFormEditorCurrent() {
-    const kind = this.applyTemplateKind()
-    applyFormEditor.resetApplyFormEditorSession(this)
-    this.setData(
-      {
-        pickerView: 'applyForm',
-        applyFormEditorMode: 'edit',
-        applyFormTemplateKind: kind,
-      },
-      () => {
-        applyFormEditor.initApplyFormFromPlatform(this, this.data.form && this.data.form.platform)
-        this.syncTabBarOverlay()
-      },
-    )
-  },
   openApplyFormEditorNew() {
     const kind = this.applyTemplateKind()
     const tpl = applyTemplates.emptyCustomTemplate(
@@ -508,16 +554,18 @@ Page({
     const view = e.currentTarget.dataset.view
     if (!view) return
     if (view === 'applyForm') {
-      const fields = (this.data.form && this.data.form.applyFormFields) || []
-      const items = fields.length ? ['编辑当前', '新增', '使用模版'] : ['新增', '使用模版']
+      const target = this.data.recruitTarget || 'talent'
+      const isSupplier = target === 'shoot' || target === 'edit'
+      if (!isSupplier && !this.data.form.platform) {
+        wx.showToast({ title: '请先选择招募平台', icon: 'none' })
+        return
+      }
       this.setData({ lastScrollAnchor: 'field-apply-form' })
       wx.showActionSheet({
-        itemList: items,
+        itemList: ['新增', '使用模版'],
         success: (res) => {
-          const label = items[res.tapIndex]
-          if (label === '编辑当前') this.openApplyFormEditorCurrent()
-          else if (label === '新增') this.openApplyFormEditorNew()
-          else if (label === '使用模版') this.openApplyFormUseTemplate()
+          if (res.tapIndex === 0) this.openApplyFormEditorNew()
+          else if (res.tapIndex === 1) this.openApplyFormUseTemplate()
         },
       })
       return

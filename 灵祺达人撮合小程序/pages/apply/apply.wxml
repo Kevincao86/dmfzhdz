@@ -127,6 +127,13 @@
         />
       </view>
 
+      <view class="form-row" wx:elif="{{item.type === 'image' || item.type === 'video'}}">
+        <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
+        <button class="btn-outline" data-k="{{item.bindKey}}" data-type="{{item.type}}" bindtap="onUploadApplyMedia">{{item.type === 'video' ? '上传视频' : '上传图片'}}</button>
+        <image wx:if="{{item.type === 'image' && customFields[item.bindKey]}}" class="apply-media-preview" src="{{customFields[item.bindKey]}}" mode="aspectFill" />
+        <text wx:elif="{{customFields[item.bindKey]}}" class="hint">已上传</text>
+      </view>
+
       <view class="form-row" wx:else>
         <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
         <input

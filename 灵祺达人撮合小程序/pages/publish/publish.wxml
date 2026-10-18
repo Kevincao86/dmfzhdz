@@ -1105,7 +1105,7 @@
             <view class="tpl-field-row" wx:for="{{applyFormEditorRows}}" wx:key="id">
               <view class="tpl-field-type">
                 <text class="tpl-field-type-txt">{{item.typeIcon}}</text>
-                <text class="tpl-field-type-label">{{item.type === 'number' || item.type === 'digit' ? '数字' : '文本'}}</text>
+                <text class="tpl-field-type-label">{{item.type === 'image' ? '图片' : item.type === 'video' ? '视频' : item.type === 'number' || item.type === 'digit' ? '数字' : '文字'}}</text>
               </view>
               <view class="tpl-field-main">
                 <text class="tpl-field-label">{{item.displayLabel}}</text>
@@ -1146,6 +1146,14 @@
       <view class="form-row" wx:if="{{canEditLabel}}">
         <text class="form-label">名称</text>
         <input class="input" value="{{editLabel}}" bindinput="onEditLabelInput" />
+      </view>
+      <view class="form-row" wx:if="{{canEditLabel}}">
+        <text class="form-label">内容格式</text>
+        <view class="apply-format-row">
+          <view class="apply-format-btn {{editFieldType !== 'image' && editFieldType !== 'video' ? 'apply-format-btn--on' : ''}}" data-type="text" bindtap="onPickEditFieldType">文字</view>
+          <view class="apply-format-btn {{editFieldType === 'image' ? 'apply-format-btn--on' : ''}}" data-type="image" bindtap="onPickEditFieldType">图片</view>
+          <view class="apply-format-btn {{editFieldType === 'video' ? 'apply-format-btn--on' : ''}}" data-type="video" bindtap="onPickEditFieldType">视频</view>
+        </view>
       </view>
       <view class="form-row" wx:else>
         <text class="form-label">名称</text>

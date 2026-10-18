@@ -176,3 +176,11 @@
   line-height: 1.5;
   box-sizing: border-box;
 }
+
+.apply-media-preview {
+  display: block;
+  width: 160rpx;
+  height: 160rpx;
+  margin-top: 12rpx;
+  border-radius: 8rpx;
+}

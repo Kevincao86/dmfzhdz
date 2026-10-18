@@ -811,6 +811,8 @@ PAT
       cat <<'PAT'
 PublishWizard
 pages/publish/publish
+pages/apply/apply
+RecruitmentApplyPage
 change-scope-guard
 PAT
       ;;

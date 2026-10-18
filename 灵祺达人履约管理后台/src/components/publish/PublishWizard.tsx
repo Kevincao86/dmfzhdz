@@ -193,7 +193,7 @@ export default function PublishWizard() {
   const [applyEditorFields, setApplyEditorFields] = useState<ApplyField[]>([])
   const [applyEditorName, setApplyEditorName] = useState('')
   const [applyEditorTplId, setApplyEditorTplId] = useState('')
-  const [applyEditorMode, setApplyEditorMode] = useState<'new' | 'template' | 'edit'>('new')
+  const [applyEditorMode, setApplyEditorMode] = useState<'new' | 'template'>('new')
   const [showDeadlineSheet, setShowDeadlineSheet] = useState(false)
   const [deliveryDeadlineDate, setDeliveryDeadlineDate] = useState('')
   const [deliveryDeadlineTime, setDeliveryDeadlineTime] = useState('18:00')
@@ -385,6 +385,10 @@ export default function PublishWizard() {
 
   function openPicker(view: PickerView) {
     setErr('')
+    if (view === 'applyMenu' && !form.platform) {
+      setErr('请先选择招募平台')
+      return
+    }
     if (view === 'city') refreshCityUi('')
     if (view === 'tag') setTagSelected(new Set(form.talentTags))
     if (view === 'reqLevel') setReqLevelSelected(new Set(form.douyinSalesLevels.length ? form.douyinSalesLevels : ['不限']))

@@ -501,6 +501,65 @@ Page({
     if (!id) return
     wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
   },
+  onUploadApplyMedia(e) {
+    const k = e.currentTarget.dataset.k
+    const kind = e.currentTarget.dataset.type
+    if (!k || (kind !== 'image' && kind !== 'video')) return
+    const applyValue = (url) => {
+      const customFields = { ...(this.data.customFields || {}), [k]: url }
+      this.setData({ customFields, syncMemberProfile: false }, () => syncApplyRows(this))
+    }
+    if (kind === 'image') {
+      wx.chooseMedia({
+        count: 1,
+        mediaType: ['image'],
+        sourceType: ['album', 'camera'],
+        success: async (res) => {
+          const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+          if (!path) return
+          wx.showLoading({ title: '上传中', mask: true })
+          try {
+            const imageOss = require('../../utils/mpImageOssUpload.js')
+            const url = await imageOss.uploadImageFileToOss(path, {
+              purpose: 'cover',
+              fileName: `apply-${Date.now()}.jpg`,
+            })
+            applyValue(url)
+            wx.showToast({ title: '已上传', icon: 'success' })
+          } catch (err) {
+            wx.showToast({ title: String((err && err.message) || '上传失败').slice(0, 20), icon: 'none' })
+          } finally {
+            wx.hideLoading()
+          }
+        },
+      })
+      return
+    }
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['video'],
+      sourceType: ['album', 'camera'],
+      maxDuration: 60,
+      success: async (res) => {
+        const file = res.tempFiles && res.tempFiles[0]
+        const path = file && file.tempFilePath
+        if (!path) return
+        wx.showLoading({ title: '上传中', mask: true })
+        try {
+          const chat = require('../../utils/mpOrderGroupChatApi.js')
+          const uploaded = await chat.uploadMedia(path, 'video/mp4', `apply-${Date.now()}.mp4`)
+          const url = String((uploaded && (uploaded.mediaUrl || uploaded.imageUrl)) || '').trim()
+          if (!/^https:\/\//i.test(url)) throw new Error('视频上传失败')
+          applyValue(url)
+          wx.showToast({ title: '已上传', icon: 'success' })
+        } catch (err) {
+          wx.showToast({ title: String((err && err.message) || '上传失败').slice(0, 20), icon: 'none' })
+        } finally {
+          wx.hideLoading()
+        }
+      },
+    })
+  },
   onField(e) {
     const k = e.currentTarget.dataset.k
     const isCustom = e.currentTarget.dataset.custom === '1'
