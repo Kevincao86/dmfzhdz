@@ -534,9 +534,37 @@ function cityAskedForTalents(text: string): string {
   return best?.city || ''
 }
 
-function formatTalentRecommendBlock(city: string, cards: TalentPlanCard[], cityNote: string): string {
-  const lines = cards
-    .filter((c) => !c.empty && c.nickname.trim())
+function storeTalentRequirement(): { industry: string; storeName: string } {
+  const snap = loadMerchantIntelSnapshot()
+  const industry = String(snap.boundStoreCategoryPath || snap.industryPath || '').trim()
+  const storeName = String(snap.boundStoreName || snap.storeName || '').trim()
+  return { industry, storeName }
+}
+
+function requirementNeedles(industry: string): string[] {
+  return industry
+    .split(/[/、,，|>\s]+/u)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2 && !/本地生活|到店|服务|其他/.test(s))
+    .slice(0, 6)
+}
+
+function cardMatchesCity(card: TalentPlanCard, city: string): boolean {
+  const short = city.replace(/市$/, '').trim()
+  if (short.length < 2) return true
+  const label = String(card.city || '').replace(/市$/, '').trim()
+  if (!label) return false
+  return label.includes(short) || short.includes(label)
+}
+
+function cardMatchesStore(card: TalentPlanCard, needles: string[]): boolean {
+  if (!needles.length) return true
+  const blob = [card.nickname, card.reason, ...(card.tags || [])].join(' ')
+  return needles.some((n) => blob.includes(n))
+}
+
+function formatLibraryLines(cards: TalentPlanCard[]): string {
+  return cards
     .slice(0, 8)
     .map((c) => {
       const bits = [
@@ -544,16 +572,45 @@ function formatTalentRecommendBlock(city: string, cards: TalentPlanCard[], cityN
         c.level,
         c.followers > 0 ? `粉丝${c.followers}` : '',
         c.quoteYuan != null ? `报价¥${c.quoteYuan}` : '',
+        c.tags.slice(0, 2).join('/'),
       ].filter(Boolean)
       return `- ${c.nickname}（${bits.join(' · ')}）`
     })
-  return [
-    '【星选达人库 · 本次推荐】',
-    `用户指定城市：${city || '未点名'}。这份名单来自星选达人库，与抖音来客门店绑定无关。`,
-    cityNote || (lines.length ? '以下为库内达人。' : '库内暂无可用达人。'),
-    lines.length ? lines.join('\n') : '库内暂无可用达人。',
-    '作答：用中文列出以上达人的昵称、城市、粉丝、等级、报价。不要编造电话或微信。不要说未绑定该城数据接口。不要让用户去抖音搜索、蝉妈妈、飞瓜或 MCN。若上面说明是全国参考，先说明该城库内暂无同城，再列出这些人。',
-  ].join('\n')
+    .join('\n')
+}
+
+async function fetchDoubaoPublicTalents(city: string, industry: string, storeName: string): Promise<string> {
+  const region = city || '已绑定门店所在城市'
+  const need = industry || '本地生活到店'
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), 35000)
+  try {
+    const data = await postAiChat(
+      {
+        provider: 'doubao',
+        stream: false,
+        temperature: 0,
+        webSearch: true,
+        messages: [
+          {
+            role: 'system',
+            content: `你是豆包公网达人检索。只写公网能核实的抖音本地生活达人，最多 5 位。区域只限「${region}」。内容要符合门店要求「${need}」。每人一行：昵称、城市、粉丝量级、内容方向、为何符合该门店。没有公开依据的不要写。不要编造联系方式。一个都没有就只回答「公网暂无符合条件的达人」。`,
+          },
+          {
+            role: 'user',
+            content: `门店：${storeName || '未命名'}。经营要求：${need}。请检索${region}、内容方向匹配该门店的达人。`,
+          },
+        ],
+      },
+      { signal: ac.signal },
+    )
+    const text = String(data.content || '').trim()
+    return text ? text.slice(0, 1200) : '公网暂无符合条件的达人。'
+  } catch {
+    return '豆包公网本次没有返回可用名单。'
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function appendTalentRecommendBlock(base: string, userText?: string): Promise<string> {
@@ -563,37 +620,53 @@ async function appendTalentRecommendBlock(base: string, userText?: string): Prom
     return block.trim() ? `${base}\n\n${block}` : base
   } catch {
     const city = cityAskedForTalents(userText)
-    return `${base}\n\n【星选达人库 · 本次推荐】用户指定城市：${city || '未点名'}。名单拉取失败。请说明稍后重试，禁止因门店未绑定该城而拒答。`
+    return `${base}\n\n【达人推荐 · 本次】区域：${city || '已绑定门店'}。两路名单都没取到。请说明稍后重试，禁止整段拒答，禁止让用户自己去站外找人。`
   }
 }
 
 async function loadTalentRecommendBlock(userText: string): Promise<string> {
   const named = cityAskedForTalents(userText)
   let city = named
+  let regionSource = named ? '用户指定' : ''
   if (!city) {
     try {
       city = (await resolveStoreCityFromMerchantStores()).trim()
     } catch {
       city = ''
     }
+    regionSource = city ? '已绑定门店' : '未解析到'
   }
-  const res = await requestTalentPlanRecommend({
-    city,
-    platform: '抖音',
-    talentType: '本地生活',
-    budgetYuan: 5000,
-    headcount: 5,
-    seats: [],
-    excludedIds: [],
-  })
-  if (!res.ok || !res.cards?.length) {
-    return [
-      '【星选达人库 · 本次推荐】',
-      `用户指定城市：${city || '未点名'}。达人名单本次没有取到。`,
-      '请说明暂时取不到星选达人库名单，可稍后重试。禁止声称系统只绑定了某一城门店，禁止让用户去站外找人。',
-    ].join('\n')
-  }
-  return formatTalentRecommendBlock(city, res.cards, res.cityNote || '')
+  const { industry, storeName } = storeTalentRequirement()
+  const needles = requirementNeedles(industry)
+  const [publicText, library] = await Promise.all([
+    fetchDoubaoPublicTalents(city, industry, storeName),
+    requestTalentPlanRecommend({
+      city,
+      platform: '抖音',
+      talentType: industry || '本地生活',
+      budgetYuan: 5000,
+      headcount: 8,
+      seats: [],
+      excludedIds: [],
+    }),
+  ])
+  const sameCity = (library.cards || []).filter(
+    (c) => !c.empty && c.nickname.trim() && cardMatchesCity(c, city),
+  )
+  const matched = sameCity.filter((c) => cardMatchesStore(c, needles))
+  const libraryLines = formatLibraryLines(matched)
+  const libraryNote = libraryLines
+    ? libraryLines
+    : sameCity.length && needles.length
+      ? `星选库在「${city || '该区域'}」有达人，但没有明显符合门店要求「${industry}」的人，本次不列入。`
+      : `星选库在「${city || '该区域'}」暂无符合条件的达人。${library.cityNote ? `（${library.cityNote}）` : ''}`
+  return [
+    '【达人推荐 · 本次】',
+    `区域：${city || '未解析'}（${regionSource}）。门店：${storeName || '未命名'}。门店要求：${industry || '本地生活到店'}。`,
+    '作答必须分成「豆包公网」和「星选达人库」两段，只使用下面给出的人。某一路没有就说明该路没有。不要把其他城市的人说成这个区域的达人。不要编造电话或微信。不要整段拒答，不要让用户自己去蝉妈妈、飞瓜或 MCN。',
+    `【豆包公网】\n${publicText}`,
+    `【星选达人库】\n${libraryNote}`,
+  ].join('\n')
 }
 
 export function AiAgentProvider({ children }: { children: ReactNode }) {
