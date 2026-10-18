@@ -1023,12 +1023,70 @@ export function normalizeStoredPlanVersion(
   return { ...v, permissions: perms, giftPointsMonthly }
 }
 
+function isClosedPermissionCell(cell: unknown): boolean {
+  if (cell == null) return true
+  if (cell === false || cell === '—' || cell === '-' || cell === '' || cell === 'false' || cell === '0') return true
+  if (typeof cell === 'number') return !(Number.isFinite(cell) && cell > 0)
+  return false
+}
+
+function isOpenPermissionCell(cell: unknown): boolean {
+  if (cell === true) return true
+  if (typeof cell === 'number') return Number.isFinite(cell) && cell > 0
+  return false
+}
+
+/**
+ * 旧快照会把后来才按档位放开的权限项在四档上都写成「未开通」。
+ * 四档都是关闭、且当前内置矩阵里有档位已开通时，跟回矩阵；某一档单独改过的值保留。
+ */
+function uniformClosedBuiltinKeys(
+  stored: MpMembershipPlanVersion[],
+  defaults: MpMembershipPlanVersion[],
+  role: MpLibraryRole,
+): Set<string> {
+  const builtinIds = new Set(defaults.map((d) => d.id))
+  const builtinStored = stored
+    .filter((s) => s?.id && builtinIds.has(s.id))
+    .map((s) => normalizeStoredPlanVersion(s, role))
+  if (!builtinStored.length) return new Set()
+  const keys = new Set<string>()
+  for (const row of [...defaults, ...builtinStored]) {
+    for (const key of Object.keys(row.permissions ?? {})) keys.add(key)
+  }
+  const out = new Set<string>()
+  for (const key of keys) {
+    const allClosed = builtinStored.every((s) => isClosedPermissionCell(s.permissions?.[key]))
+    const factoryOpens = defaults.some((d) => isOpenPermissionCell(d.permissions?.[key]))
+    if (allClosed && factoryOpens) out.add(key)
+  }
+  return out
+}
+
+function mergePlanPermissions(
+  factory: Record<string, boolean | number | string> | undefined,
+  storedPerms: Record<string, boolean | number | string> | undefined,
+  restoreKeys: Set<string>,
+): Record<string, boolean | number | string> {
+  const merged: Record<string, boolean | number | string> = {
+    ...(factory ?? {}),
+    ...(storedPerms ?? {}),
+  }
+  if (!factory) return merged
+  for (const key of restoreKeys) {
+    const factoryCell = factory[key]
+    if (isOpenPermissionCell(factoryCell)) merged[key] = factoryCell
+  }
+  return merged
+}
+
 export function mergeMembershipPlanVersions(
   stored: MpMembershipPlanVersion[] | undefined,
   role: MpLibraryRole,
 ): MpMembershipPlanVersion[] {
   const defaults = buildBuiltinPlanVersions(role)
   if (!Array.isArray(stored) || !stored.length) return defaults
+  const restoreKeys = uniformClosedBuiltinKeys(stored, defaults, role)
   const byId = new Map<string, MpMembershipPlanVersion>()
   for (const d of defaults) byId.set(d.id, { ...d })
   for (const s of stored) {
@@ -1038,7 +1096,7 @@ export function mergeMembershipPlanVersions(
     byId.set(s.id, {
       ...(prev ?? { id: normalized.id, name: normalized.name, permissions: {}, sortOrder: normalized.sortOrder }),
       ...normalized,
-      permissions: { ...(prev?.permissions ?? {}), ...(normalized.permissions ?? {}) },
+      permissions: mergePlanPermissions(prev?.permissions, normalized.permissions, prev ? restoreKeys : new Set()),
     })
   }
   return [...byId.values()].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
