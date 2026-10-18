@@ -24,7 +24,8 @@ import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
 import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
-import { resolveShellDisplayName } from '../lib/shellDisplayName'
+import { resolveShellDisplayName, resolveShellMembershipLabel } from '../lib/shellDisplayName'
+import { onProfileDisplayRefresh } from '../lib/shellRefresh'
 import TalentAccountBindPanel from '../components/TalentAccountBindPanel'
 import { ProfileMineHeader } from '../components/ui/MockupLayouts'
 
@@ -86,6 +87,10 @@ import { isDecorVideoMedia, type RegistryPlatformDecorItem } from '@merchant/lib
 
 export default function ProfilePage() {
   const acc = getAccount()
+  const [displayRev, setDisplayRev] = useState(0)
+  useEffect(() => onProfileDisplayRefresh(() => setDisplayRev((n) => n + 1)), [])
+  void displayRev
+  const membershipLabel = resolveShellMembershipLabel()
   const workId = getWorkIdentity()
   const isPr = workId === 'pr'
   const [decorBanner, setDecorBanner] = useState<RegistryPlatformDecorItem | null>(null)
@@ -300,6 +305,7 @@ export default function ProfilePage() {
         avatar={avatar}
         name={displayName}
         roleBadge={edition}
+        planLabel={membershipLabel}
         stats={stats}
       />
 

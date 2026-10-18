@@ -6,7 +6,7 @@ import { pageTitleForPath } from '../lib/shellNavConfig'
 import { unreadNotificationCount } from '../lib/mpSync/messagesStore'
 import { getWorkIdentity, workIdentityLabel } from '../lib/mpWorkIdentity'
 import { identityBadgeClass } from '../lib/identityTheme'
-import { resolveShellDisplayName } from '../lib/shellDisplayName'
+import { resolveShellDisplayName, resolveShellMembershipLabel } from '../lib/shellDisplayName'
 import { onProfileDisplayRefresh } from '../lib/shellRefresh'
 import { readMember } from '../lib/mpSync/talentMember'
 import { readPrProfile } from '../lib/mpSync/userProfile'
@@ -43,6 +43,7 @@ export default function AppTopBar({ variant = 'full' }: AppTopBarProps) {
   void displayRev
 
   const displayName = resolveShellDisplayName()
+  const membershipLabel = resolveShellMembershipLabel()
   const avatarUrl = resolveShellAvatarUrl()
   const avatarInitial = (displayName.match(/[\u4e00-\u9fff]/)?.[0] || displayName.trim().slice(0, 1) || '用')
   const shellWorkId = role === 'pr' ? 'pr' : workId
@@ -82,6 +83,7 @@ export default function AppTopBar({ variant = 'full' }: AppTopBarProps) {
           </span>
         )}
         <span className="app-topbar__name">{displayName}</span>
+        <span className="app-topbar__plan-badge">{membershipLabel}</span>
         <span className={`app-topbar__role-badge ${identityBadgeClass(shellWorkId)}`}>{roleBadge}</span>
       </Link>
     </div>

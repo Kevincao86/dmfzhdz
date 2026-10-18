@@ -1222,6 +1222,11 @@ a.border:hover {
   border-color: transparent !important;
 }
 
+.xx-header-bar .app-topbar__plan-badge {
+  color: #161d24 !important;
+  background: #d4af6a !important;
+}
+
 .xx-header-bar a.app-topbar__upgrade-btn,
 .xx-header-bar a.app-topbar__upgrade-btn:link,
 .xx-header-bar a.app-topbar__upgrade-btn:visited,
@@ -2169,6 +2174,16 @@ html[data-theme='dark'] .app-topbar {
   border: 1px solid var(--identity-badge-border);
 }
 
+.app-topbar__plan-badge {
+  flex-shrink: 0;
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #161d24;
+  background: #d4af6a;
+}
+
 .app-topbar__role-badge--talent,
 .app-topbar__role-badge--shoot,
 .app-topbar__role-badge--edit,
@@ -2633,15 +2648,27 @@ html[data-theme='dark'] .app-topbar {
   letter-spacing: 0.01em;
 }
 
+.profile-mine-header__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
 .profile-mine-header__badge {
   display: inline-block;
-  margin-top: 0.35rem;
+  margin-top: 0;
   padding: 0.15rem 0.5rem;
   border-radius: 0.25rem;
   font-size: 0.6875rem;
   font-weight: 600;
   background: rgba(212, 175, 106, 0.16);
   color: #7a5c24;
+}
+
+.profile-mine-header__badge--plan {
+  background: #d4af6a;
+  color: #161d24;
 }
 
 .profile-mine-header__stats {

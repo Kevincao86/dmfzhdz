@@ -233,12 +233,14 @@ export function ProfileMineHeader({
   avatar,
   name,
   roleBadge,
+  planLabel,
   stats,
   upgradeHref = '/profile/membership',
 }: {
   avatar?: string
   name: string
   roleBadge: string
+  planLabel?: string
   stats: { label: string; value: string | number }[]
   upgradeHref?: string
 }) {
@@ -259,7 +261,10 @@ export function ProfileMineHeader({
               升级会员
             </Link>
           </div>
-          <span className="profile-mine-header__badge">{roleBadge}</span>
+          <div className="profile-mine-header__badges">
+            <span className="profile-mine-header__badge">{roleBadge}</span>
+            {planLabel ? <span className="profile-mine-header__badge profile-mine-header__badge--plan">{planLabel}</span> : null}
+          </div>
         </div>
       </div>
       <div className="profile-mine-header__stats">
