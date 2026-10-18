@@ -113,6 +113,10 @@ import {
   hasRecruitmentCitySelection,
   parseRegionToCityState,
 } from '../lib/recruitmentCityPicker'
+import { allCitiesFlat } from '../lib/chinaRegion'
+import type { TalentPlanCard } from '../lib/talentPlanRecommend'
+import { requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
+import { resolveStoreCityFromMerchantStores } from '../services/aiAgentRecruitmentAllocation'
 import {
   formatAiProductSubmitSummary,
   submitAiProductPlansToPlatforms,
@@ -498,6 +502,100 @@ function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPr
   }
 }
 
+function intentText(text: string): string {
+  return text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+}
+
+/** 「推荐金华的达人」这类话，不是经营数据问答。 */
+function isTalentRecommendAsk(text: string): boolean {
+  const x = intentText(text)
+  if (!/达人/.test(x)) return false
+  return /推荐|找|匹配|名单|有哪些|介绍/.test(x)
+}
+
+/** 离「推荐/达人」最近的一座城。用户点名优先于前文里的门店城市。 */
+function cityAskedForTalents(text: string): string {
+  const body = intentText(text)
+  if (!body) return ''
+  const anchor = Math.max(body.lastIndexOf('推荐'), body.lastIndexOf('达人'), body.lastIndexOf('找'))
+  let best: { dist: number; city: string; len: number } | null = null
+  for (const city of allCitiesFlat()) {
+    const short = city.replace(/市$/, '')
+    const fullAt = body.indexOf(city)
+    const shortAt = short.length >= 2 ? body.indexOf(short) : -1
+    const index = fullAt >= 0 ? fullAt : shortAt
+    if (index < 0) continue
+    const len = fullAt >= 0 ? city.length : short.length
+    const dist = anchor >= 0 ? Math.abs(index - anchor) : index
+    if (!best || dist < best.dist || (dist === best.dist && len > best.len)) {
+      best = { dist, city, len }
+    }
+  }
+  return best?.city || ''
+}
+
+function formatTalentRecommendBlock(city: string, cards: TalentPlanCard[], cityNote: string): string {
+  const lines = cards
+    .filter((c) => !c.empty && c.nickname.trim())
+    .slice(0, 8)
+    .map((c) => {
+      const bits = [
+        c.city,
+        c.level,
+        c.followers > 0 ? `粉丝${c.followers}` : '',
+        c.quoteYuan != null ? `报价¥${c.quoteYuan}` : '',
+      ].filter(Boolean)
+      return `- ${c.nickname}（${bits.join(' · ')}）`
+    })
+  return [
+    '【星选达人库 · 本次推荐】',
+    `用户指定城市：${city || '未点名'}。这份名单来自星选达人库，与抖音来客门店绑定无关。`,
+    cityNote || (lines.length ? '以下为库内达人。' : '库内暂无可用达人。'),
+    lines.length ? lines.join('\n') : '库内暂无可用达人。',
+    '作答：用中文列出以上达人的昵称、城市、粉丝、等级、报价。不要编造电话或微信。不要说未绑定该城数据接口。不要让用户去抖音搜索、蝉妈妈、飞瓜或 MCN。若上面说明是全国参考，先说明该城库内暂无同城，再列出这些人。',
+  ].join('\n')
+}
+
+async function appendTalentRecommendBlock(base: string, userText?: string): Promise<string> {
+  if (!userText || !isTalentRecommendAsk(userText)) return base
+  try {
+    const block = await loadTalentRecommendBlock(userText)
+    return block.trim() ? `${base}\n\n${block}` : base
+  } catch {
+    const city = cityAskedForTalents(userText)
+    return `${base}\n\n【星选达人库 · 本次推荐】用户指定城市：${city || '未点名'}。名单拉取失败。请说明稍后重试，禁止因门店未绑定该城而拒答。`
+  }
+}
+
+async function loadTalentRecommendBlock(userText: string): Promise<string> {
+  const named = cityAskedForTalents(userText)
+  let city = named
+  if (!city) {
+    try {
+      city = (await resolveStoreCityFromMerchantStores()).trim()
+    } catch {
+      city = ''
+    }
+  }
+  const res = await requestTalentPlanRecommend({
+    city,
+    platform: '抖音',
+    talentType: '本地生活',
+    budgetYuan: 5000,
+    headcount: 5,
+    seats: [],
+    excludedIds: [],
+  })
+  if (!res.ok || !res.cards?.length) {
+    return [
+      '【星选达人库 · 本次推荐】',
+      `用户指定城市：${city || '未点名'}。达人名单本次没有取到。`,
+      '请说明暂时取不到星选达人库名单，可稍后重试。禁止声称系统只绑定了某一城门店，禁止让用户去站外找人。',
+    ].join('\n')
+  }
+  return formatTalentRecommendBlock(city, res.cards, res.cityNote || '')
+}
+
 export function AiAgentProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const { plan, entitlements, requireAiImageGen } = useMembership()
@@ -570,7 +668,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const cacheKey = `${taskType ?? ''}|d${domainKey}|m${metricsQ ? 1 : 0}|${domains.length || metricsQ ? String(userText).slice(0, 96) : ''}`
     const hit = merchantIntelCacheRef.current
     if (hit && now - hit.at < MERCHANT_INTEL_CACHE_MS && hit.task === cacheKey) {
-      return hit.text
+      return appendTalentRecommendBlock(hit.text, userText)
     }
     const text = await buildAgentMerchantIntelContextAsync(taskType)
     const habits = buildAgentUserHabitsContext(authUserIdRef.current)
@@ -592,7 +690,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       }
     }
     merchantIntelCacheRef.current = { at: now, task: cacheKey, text: combined }
-    return combined
+    return appendTalentRecommendBlock(combined, userText)
   }, [])
 
   useEffect(() => {
@@ -1963,6 +2061,29 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           })
         }
 
+        if (isTalentRecommendAsk(trimmed)) {
+          const namedCity = cityAskedForTalents(trimmed)
+          if (namedCity) {
+            const open = [...messagesRef.current].reverse().find((m) => {
+              const brief = m.preview?.recruitmentBrief
+              if (m.preview?.taskType !== 'recruit_influencer' || m.previewStatus !== 'pending' || !brief) {
+                return false
+              }
+              const step = brief.wizardStep
+              if (step === 2 || step === 3 || step === 4) return false
+              const path = brief.talentPath
+              return path === 'recommend' || path === 'pending' || !path
+            })
+            const scope = open?.preview?.recruitmentBrief?.wizardScope
+            if (open && scope && !scope.city.includes(namedCity.replace(/市$/, ''))) {
+              patchPreviewRecruitmentBrief(open.id, {
+                talentPath: 'recommend',
+                wizardScope: { ...scope, city: namedCity },
+              })
+            }
+          }
+        }
+
         const merchantCtx = await resolveMerchantIntelBlock(taskType, trimmed)
         const history: AIMessage[] = [
           { role: 'system', content: merchantCtx },
@@ -2259,6 +2380,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       appendStoppedMessage,
       resolveMerchantIntelBlock,
       applyClientToolResults,
+      patchPreviewRecruitmentBrief,
     ],
   )
 
