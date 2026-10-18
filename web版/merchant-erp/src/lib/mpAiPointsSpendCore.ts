@@ -14,7 +14,6 @@ import {
   applySpendPackageFirstToTarget,
   grantPackagePointsDeltaToTarget,
   readMpPointsBucketsForTarget,
-  writeMpPointsBucketsToTarget,
   type MpPointsBuckets,
 } from './mpAiPointsBuckets.js'
 import {
@@ -85,8 +84,10 @@ export function readAccountMpAiPointsBalance(
 }
 
 /**
- * 流水已扣但桶未同步时：以同账号最新 ledger.balanceAfter 纠偏套餐/充值桶。
- * 返回是否写入了 registry（调用方决定是否 save）。
+ * 消耗流水的 balanceAfter 只记录那一笔扣费之后的余额。
+ * 升级赠送和充值加在套餐桶上，不会写消耗流水。
+ * 若把桶压回最近一笔 balanceAfter，会把刚发的版本积分抹掉，而「本月已发」计数还在，之后补差变成 0。
+ * 因此桶高于流水时保持不动。返回值保留给调用方，当前不再改余额。
  */
 export function reconcileAccountPointsBucketsWithLedger(
   data: RegistrySnapshot,
@@ -98,32 +99,14 @@ export function reconcileAccountPointsBucketsWithLedger(
   const role = resolvePointsLibraryRole(data, account, opts)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
   if (!target) return false
-
   const latest = (data.mpAiPointsSpendLedger ?? []).find(
     (row) => String(row.accountId || '').trim() === accountId,
   )
   if (!latest) return false
   const after = Math.max(0, Math.floor(Number(latest.balanceAfter) || 0))
   const buckets = readMpPointsBucketsForTarget(data, role, target)
-  if (buckets.total === after) return false
-  // 仅在「桶高于流水剩余」时纠偏（避免覆盖充值到账尚未写入流水的场景）
-  if (buckets.total < after) return false
-
-  const needReduce = buckets.total - after
-  let pkg = buckets.package
-  let rech = buckets.recharge
-  const fromPkg = Math.min(pkg, needReduce)
-  pkg -= fromPkg
-  rech -= needReduce - fromPkg
-  if (rech < 0) {
-    pkg = Math.max(0, pkg + rech)
-    rech = 0
-  }
-  return writeMpPointsBucketsToTarget(data, role, target, {
-    package: pkg,
-    recharge: rech,
-    total: pkg + rech,
-  })
+  if (buckets.total >= after) return false
+  return false
 }
 
 export function resolveAccountLibraryRole(data: RegistrySnapshot, account: MpAccountRow): MpLibraryRole {

@@ -481,36 +481,6 @@ function sumMonthlySpendForAccount(
     .reduce((sum, row) => sum + Math.max(0, Math.floor(Number(row.points) || 0)), 0)
 }
 
-function clearMonthlyGiftGrantOnTarget(
-  data: RegistrySnapshot,
-  role: MpLibraryRole,
-  targetId: string,
-): void {
-  const id = String(targetId || '').trim()
-  if (!id) return
-  const patch = { mpAiPointsGiftMonth: '', mpAiPointsMonthlyGiftGranted: 0 }
-
-  if (role === 'pr') {
-    const users = data.mpPrUsers ?? []
-    const idx = users.findIndex((u) => u.id === id || u.lingqiPrId === id)
-    if (idx >= 0) {
-      users[idx] = { ...users[idx]!, ...patch, updatedAt: new Date().toISOString() }
-      data.mpPrUsers = users
-    }
-    return
-  }
-
-  if (role === 'talent') {
-    const members = data.mpTalentMembers ?? []
-    const midx = members.findIndex((m) => m.id === id || String(m.lingqiTalentId || '').trim() === id)
-    if (midx >= 0) {
-      members[midx] = { ...members[midx]!, ...patch, updatedAt: new Date().toISOString() }
-      data.mpTalentMembers = members
-      syncTalentEntryBalance(data, id, readPointsBuckets(members[midx]))
-    }
-  }
-}
-
 /** 旧版仅 mpAiPointsBalance 字段 → 写入充值桶，便于双端一致读取 */
 export function normalizeLegacyPointsBucketsOnTarget(
   data: RegistrySnapshot,
@@ -574,13 +544,16 @@ export function grantPackagePointsDeltaToTarget(
   let delta = Math.max(0, quota - prevGranted)
   const bucketsNow = readMpPointsBucketsForTarget(data, role, targetId)
 
-  if (delta <= 0 && prevGranted > 0 && bucketsNow.total <= 0) {
+  // 本月已记满赠送额度，但套餐桶里没有这些积分（曾被按消耗流水抹掉）。
+  // 只在知道账号、能扣掉本月真实消耗时补回，避免把已经花掉的额度再发一遍。
+  if (delta <= 0 && prevGranted > 0) {
     const repairAccountId = String(opts?.repairAccountId || '').trim()
     const spent = repairAccountId ? sumMonthlySpendForAccount(data, repairAccountId, month) : 0
-    if (spent < Math.max(0, prevGranted - 50)) {
-      clearMonthlyGiftGrantOnTarget(data, role, targetId)
-      prevGranted = 0
-      delta = quota
+    const covered = bucketsNow.package + spent
+    if (repairAccountId && covered + 50 < prevGranted) {
+      const missing = prevGranted - covered
+      const repaired = applyPackageGrantToTarget(data, role, targetId, missing, month, prevGranted)
+      if (repaired.ok) return { granted: missing, newBalance: repaired.buckets.total }
     }
   }
 
