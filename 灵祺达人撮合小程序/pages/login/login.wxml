@@ -1,54 +1,42 @@
-<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<page-meta page-style="{{lqPageStyle}}" background-color="#ffffff" background-color-top="#ffffff" background-color-bottom="#ffffff" />
 <view class="{{lqAccentClass}} login-page {{lqThemeClass}}" style="{{lqPageStyle}}">
-  <image class="login-life-bg" src="/images/login-life-bg.jpg" mode="aspectFill" />
   <launch-splash />
   <view class="login-hero" style="{{navBandStyle}}">
-    <view class="login-hero__cosmos" aria-hidden="true">
-      <view class="login-star login-star--1" />
-      <view class="login-star login-star--2" />
-      <view class="login-star login-star--3" />
-    </view>
-    <view class="login-hero__overlay" aria-hidden="true" />
-
     <view class="login-hero__inner">
       <view class="login-hero__brand">
-        <image class="login-hero__logo lq-brand-logo" src="/images/login-logo-beige.png" mode="aspectFill" />
-        <text class="login-hero__title">灵祺星选平台</text>
-        <view class="login-hero__sub">本地生活 · 达人赋能 · 高效撮合</view>
-        <view class="login-chips">
-          <text class="login-chip"><text class="login-chip__ico">📍</text>本地生活</text>
-          <text class="login-chip"><text class="login-chip__ico">🌿</text>探店种草</text>
-          <text class="login-chip"><text class="login-chip__ico">☁</text>云剪直派</text>
-        </view>
+        <image class="login-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+        <text class="login-hero__title">灵祺星选</text>
+        <view class="login-hero__sub">本地生活达人合作</view>
       </view>
     </view>
   </view>
+  <view class="login-rule" />
 
   <view class="login-body">
   <view class="login-stack">
     <view class="login-shell">
       <view class="login-main">
-        <view class="login-tabs lq-gradient-tabs">
+        <view class="login-tabs">
           <view
-            class="login-tab lq-gradient-tabs__item {{tab==='wx'?'login-tab--on lq-gradient-tabs__item--on':''}}"
+            class="login-tab {{tab==='wx'?'login-tab--on':''}}"
             bindtap="onTabWx"
           >
             快捷登录
           </view>
           <view
-            class="login-tab lq-gradient-tabs__item {{tab==='pwd'?'login-tab--on lq-gradient-tabs__item--on':''}}"
+            class="login-tab {{tab==='pwd'?'login-tab--on':''}}"
             bindtap="onTabPwd"
           >
             账号登录
           </view>
           <view
-            class="login-tab lq-gradient-tabs__item {{tab==='sms'?'login-tab--on lq-gradient-tabs__item--on':''}}"
+            class="login-tab {{tab==='sms'?'login-tab--on':''}}"
             bindtap="onTabSms"
           >
-            验证码登录
+            验证码
           </view>
           <view
-            class="login-tab lq-gradient-tabs__item"
+            class="login-tab"
             bindtap="onGoSignup"
           >
             注册
@@ -71,7 +59,7 @@
             disabled="{{loading}}"
             bindtap="onPhoneQuickTap"
           >
-            <text>手机号快捷登录</text>
+            <text>手机号登录</text>
           </button>
           <button
             wx:elif="{{wxPrivacyPending}}"
@@ -92,12 +80,12 @@
             open-type="getPhoneNumber"
             bindgetphonenumber="onGetPhoneNumber"
           >
-            <text>手机号快捷登录</text>
+            <text>手机号登录</text>
           </button>
           <text class="login-hint">微信登录认微信，手机号登录认手机号。要两种都能用，登录后在账号绑定里补上另一个。</text>
           <text class="login-err" wx:if="{{err}}">{{err}}</text>
           <text class="login-hint" wx:if="{{wxPhoneDebug}}">{{wxPhoneDebug}}</text>
-          <button class="login-btn login-btn--ghost" bindtap="onGuestMode">暂不登录</button>
+          <button class="login-btn login-btn--quiet" bindtap="onGuestMode">暂不登录</button>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
@@ -133,7 +121,7 @@
           </view>
           <text class="login-forgot" bindtap="onForgotPassword">忘记密码？切换手机验证码登录 ›</text>
           <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onPwdLogin">登录</button>
-          <button class="login-btn login-btn--ghost" bindtap="onGuestMode">暂不登录</button>
+          <button class="login-btn login-btn--quiet" bindtap="onGuestMode">暂不登录</button>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
@@ -174,7 +162,7 @@
             >{{smsCooldown > 0 ? smsCooldown + 's' : '获取验证码'}}</button>
           </view>
           <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onSmsLogin">验证码登录</button>
-          <button class="login-btn login-btn--ghost" bindtap="onGuestMode">暂不登录</button>
+          <button class="login-btn login-btn--quiet" bindtap="onGuestMode">暂不登录</button>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
@@ -189,19 +177,6 @@
         <text class="login-err" wx:if="{{err && tab !== 'wx'}}">{{err}}</text>
       </view>
 
-      <view class="login-features">
-        <view
-          class="login-feature"
-          wx:for="{{featureItems}}"
-          wx:key="tag"
-        >
-          <view class="login-feature__orb">
-            <text class="login-feature__glyph">{{item.glyph}}</text>
-          </view>
-          <text class="login-feature__tag">{{item.tag}}</text>
-          <text class="login-feature__sub">{{item.text}}</text>
-        </view>
-      </view>
     </view>
   </view>
 
