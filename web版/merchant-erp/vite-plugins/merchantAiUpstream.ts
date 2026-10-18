@@ -3714,7 +3714,7 @@ async function runPublicWebSearch(query: string): Promise<string> {
       const line = bit.trim()
       if (line.length < 12 || line.length > 140) continue
       if (core.length >= 2 && !line.includes(core)) continue
-      if (!/套餐|团购|抖音|点评|探店|\d+\s*元/.test(line)) continue
+      if (!/套餐|团购|抖音|点评|探店|达人|粉丝|博主|\d+\s*元/.test(line)) continue
       if (/牛仔裤|羊毛大衣|搜狗搜索|高级搜索|汉语词语|近义词/.test(line)) continue
       const compact = line.replace(/\s+/g, '')
       if (!lines.includes(compact)) lines.push(compact)
@@ -3729,6 +3729,11 @@ async function runPublicWebSearch(query: string): Promise<string> {
 function webSearchQueries(user: string) {
   const name = (user.match(/店名：([^\n]+)/) || [])[1]?.trim() || ''
   const city = ((user.match(/城市：([^\n]+)/) || [])[1] || '').replace(/市$/u, '').trim()
+  if (/达人|探店博主/.test(user)) {
+    const place = city || searchCore(user)
+    const queries = [`${place} 抖音 探店达人`.trim(), `${place} 抖音 达人 名单`.trim()]
+    return queries.filter((query, index) => query.length >= 2 && queries.indexOf(query) === index).slice(0, 2)
+  }
   const core = searchCore(name || user)
   const queries = [`${core} ${city} 团购套餐`.trim(), `${name || core} ${city} 抖音 团购`.trim()]
   return queries.filter((query, index) => query.length >= 2 && queries.indexOf(query) === index).slice(0, 2)
@@ -3749,16 +3754,21 @@ async function doubaoFunctionWebSearch(
     break
   }
   const notes = blocks.join('\n')
+  const talentAsk = /达人|探店博主/.test(`${system}\n${user}`)
   const grounded = notes
-    ? `${user}\n\n联网检索结果：\n${notes}\n只根据这些检索结果回答。有套餐和价格就写出来。`
+    ? talentAsk
+      ? `${user}\n\n联网检索结果：\n${notes}\n只根据检索结果列出达人。每行：昵称｜城市｜粉丝数字｜等级｜内容方向。不要编造电话或微信。`
+      : `${user}\n\n联网检索结果：\n${notes}\n只根据这些检索结果回答。有套餐和价格就写出来。`
     : user
   return openAiStyleChat(
     `${doubaoArkApiV3Root(env)}/chat/completions`,
     apiKey,
     model,
-    `${system}\n你已经拿到联网检索结果。只根据检索结果回答，不要编造价格。`,
+    talentAsk
+      ? `${system}\n你已经拿到联网检索结果。只根据检索结果列出达人昵称，凑满用户要的人数。`
+      : `${system}\n你已经拿到联网检索结果。只根据检索结果回答，不要编造价格。`,
     grounded,
-    { temperature: 0, max_tokens: 1200 },
+    { temperature: 0, max_tokens: talentAsk ? 2000 : 1200 },
   )
 }
 

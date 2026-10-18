@@ -106,7 +106,7 @@ export function AiAgentPreviewActions({
                 patchRecruitWizard(
                   previewMessageId,
                   { talentPath: 'recruit' },
-                  '第 1 步：核对主推和投放范围。',
+                  '已确认达人名单。请核对主推和投放范围。',
                 )
               }
               disabled={confirmDisabled}
@@ -115,7 +115,7 @@ export function AiAgentPreviewActions({
                 confirmDisabled && 'cursor-not-allowed opacity-50',
               )}
             >
-              继续招募
+              确认达人
             </button>
           ) : null
         ) : isRecruit ? (
