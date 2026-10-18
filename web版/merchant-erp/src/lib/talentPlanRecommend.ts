@@ -1,6 +1,7 @@
 import type { KolTierKey } from './merchantRecruitmentTierPlan'
 import { inferKolTierFromApplicant, kolTierLabel } from './merchantRecruitmentTierPlan'
 import type { RegistryTalentLibraryEntry } from './opsRegistryTypes'
+import { extractProfileLinkUrl } from './talentProfileLink'
 import { isIncompleteTalentLibraryEntry } from './talentLibraryUpsert'
 import {
   buildNoviceAllocationFromTalentLibrary,
@@ -28,6 +29,10 @@ export type TalentPlanCard = {
   level: string
   quoteYuan: number | null
   tags: string[]
+  /** 微信头像，仅 https。账号表只读补全，不落库 */
+  avatarUrl: string
+  /** 可打开的主页链接 */
+  profileLink: string
   tierLabel: string
   unitBudgetYuan: number
   talentType: string
@@ -136,6 +141,12 @@ function categoryHit(entry: RegistryTalentLibraryEntry, talentType: string): boo
   return needles.some((n) => blob.includes(n))
 }
 
+function publicAvatarUrl(raw: unknown): string {
+  const s = String(raw || '').trim()
+  if (!/^https:\/\//i.test(s)) return ''
+  return s
+}
+
 function toCard(
   entry: RegistryTalentLibraryEntry,
   seat: TalentPlanSeat,
@@ -152,6 +163,8 @@ function toCard(
     level: String(entry.douyinSalesLevel || '').trim(),
     quoteYuan: quote,
     tags: (entry.accountTags || []).map((t) => String(t)).filter(Boolean).slice(0, 3),
+    avatarUrl: publicAvatarUrl(entry.avatarUrl),
+    profileLink: extractProfileLinkUrl(entry.profileLink),
     tierLabel: seat.tierLabel,
     unitBudgetYuan: seat.unitBudgetYuan,
     talentType: seat.talentType,
@@ -171,6 +184,8 @@ function emptyCard(seat: TalentPlanSeat): TalentPlanCard {
     level: '',
     quoteYuan: null,
     tags: [],
+    avatarUrl: '',
+    profileLink: '',
     tierLabel: seat.tierLabel,
     unitBudgetYuan: seat.unitBudgetYuan,
     talentType: seat.talentType,

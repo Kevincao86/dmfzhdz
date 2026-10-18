@@ -2,7 +2,28 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isPartnerEdition } from '../lib/appEdition'
 import type { TalentPlanCard, TalentPlanSeat } from '../lib/talentPlanRecommend'
+import { profileLinkLabel } from '../lib/talentProfileLink'
 import { requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
+
+function TalentAvatar({ url, name }: { url: string; name: string }) {
+  const [failed, setFailed] = useState(false)
+  const show = Boolean(url) && !failed
+  return (
+    <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-xs font-medium text-slate-600">
+      {show ? (
+        <img
+          src={url}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        (name || '达').slice(0, 1)
+      )}
+    </span>
+  )
+}
 
 type Props = {
   city: string
@@ -172,22 +193,35 @@ export function TalentPlanChoice({
                 <p className="mt-0.5 text-xs text-slate-500">{card.reason}</p>
               </div>
             ) : (
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-900">
-                  {card.nickname}
-                  <span className="ml-2 text-xs font-normal text-slate-500">
-                    {card.platform}
-                    {card.city ? ` · ${card.city}` : ''}
-                    {card.followers > 0 ? ` · 粉丝${card.followers}` : ''}
-                  </span>
-                </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                  {card.tierLabel}
-                  {card.unitBudgetYuan > 0 ? ` · 车马费¥${card.unitBudgetYuan}` : ''}
-                  {card.quoteYuan != null ? ` · 报价¥${card.quoteYuan}` : ''}
-                  {card.level ? ` · ${card.level}` : ''}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">{card.reason}</p>
+              <div className="flex min-w-0 gap-2.5">
+                <TalentAvatar url={card.avatarUrl} name={card.nickname} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-900">
+                    {card.nickname}
+                    <span className="ml-2 text-xs font-normal text-slate-500">
+                      {card.platform}
+                      {card.city ? ` · ${card.city}` : ''}
+                      {card.followers > 0 ? ` · 粉丝${card.followers}` : ''}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+                    {card.tierLabel}
+                    {card.unitBudgetYuan > 0 ? ` · 车马费¥${card.unitBudgetYuan}` : ''}
+                    {card.quoteYuan != null ? ` · 报价¥${card.quoteYuan}` : ''}
+                    {card.level ? ` · ${card.level}` : ''}
+                  </p>
+                  {card.profileLink ? (
+                    <a
+                      href={card.profileLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-0.5 inline-block text-xs text-violet-700 hover:underline"
+                    >
+                      {profileLinkLabel(card.platform, card.profileLink)}
+                    </a>
+                  ) : null}
+                  <p className="mt-0.5 text-xs text-slate-500">{card.reason}</p>
+                </div>
               </div>
             )}
             <button

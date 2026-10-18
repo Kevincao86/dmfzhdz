@@ -13,6 +13,8 @@ import {
   parseTalentPlanRecommendRequest,
   recommendTalentPlan,
 } from '../src/lib/talentPlanRecommend.js'
+import type { RegistryTalentLibraryEntry } from '../src/lib/opsRegistryTypes.js'
+import { hydrateRecommendHallAvatarsFromAccounts } from '../src/lib/recommendHallMemberAvatars.js'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -92,8 +94,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
       const data = await loadRegistrySnapshotForGet(io)
+      const hydrated = await hydrateRecommendHallAvatarsFromAccounts(
+        { talentLibraryEntries: data.talentLibraryEntries ?? [] },
+        supabaseUrl,
+        serviceRole,
+      )
+      const entries = (
+        Array.isArray(hydrated.talentLibraryEntries) ? hydrated.talentLibraryEntries : []
+      ) as RegistryTalentLibraryEntry[]
       const filled = recommendTalentPlan({
-        entries: data.talentLibraryEntries ?? [],
+        entries,
         ...parsed.value,
       })
       sendOpsJson(res, 200, { ok: true, ...filled })
