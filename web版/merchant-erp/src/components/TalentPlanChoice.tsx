@@ -61,7 +61,8 @@ export function TalentPlanChoice({
     })
     setLoading(false)
     if (!res.ok || !res.cards) {
-      setError('推荐名单暂时取不到，可以先去招募，或稍后再试')
+      const raw = res.error?.trim() || ''
+      setError(/[\u4e00-\u9fff]/.test(raw) ? raw : '推荐名单暂时取不到，可以先去招募，或稍后再试')
       return
     }
     setCards(res.cards)
