@@ -745,17 +745,14 @@ export async function runAiOpsPlanCore(
       const resolved = resolveTalentLibraryEntriesForCity({
         entries,
         city: storeCity,
-        platform: talentPlatform,
       })
       const insight = buildTalentLibraryPlanInsight({
         entries,
         city: storeCity,
-        platform: talentPlatform,
       })
       talentLibraryBlock = buildTalentLibraryPlanPromptBlock({
         entries,
         city: storeCity,
-        platform: talentPlatform,
       })
       talentLibraryMeta = {
         city: storeCity || resolved.filterCity,
@@ -859,7 +856,7 @@ export async function runAiOpsPlanCore(
             sourceLabel: talentLibraryMeta.sourceLabel,
             citySource: talentLibraryMeta.citySource,
             filterCity: talentLibraryMeta.city,
-            platform: talentPlatform,
+            platform: insight.platform || talentPlatform,
             headCount: talentLibraryMeta.headCount,
             midTailCount: talentLibraryMeta.midTailCount,
             headSamples: talentLibraryMeta.headSamples,

@@ -297,10 +297,34 @@ export function inferKolTierFromApplicant(a: {
   }
   const level = String(a.douyinSalesLevel || '').trim()
   const fans = Number(a.followers) || 0
-  if (/5\+|5以上|V5\+|Lv5\+|五星/i.test(level) || fans >= 500_000) return 'v5plus'
-  if (/^5|V5|Lv5|五星|五级/i.test(level) || fans >= 100_000) return 'v5'
-  if (/^4|V4|Lv4|四星|四级/i.test(level) || fans >= 10_000) return 'v4'
+  const rank = salesLevelRank(level)
+  if (rank != null) {
+    if (rank > 5) return 'v5plus'
+    if (rank >= 5) return 'v5'
+    if (rank >= 4) return 'v4'
+    return 'v3'
+  }
+  if (fans >= 500_000) return 'v5plus'
+  if (fans >= 100_000) return 'v5'
+  if (fans >= 10_000) return 'v4'
   return 'v3'
+}
+
+/** 带货等级数字。5 级及以上算头部：5 → V5，6/7/8 与「5+」→ V5+。 */
+function salesLevelRank(level: string): number | null {
+  const s = level.trim()
+  if (!s || s === '不限') return null
+  const plus = /[+＋]|以上/.test(s)
+  const digit = s.match(/(\d+)/)
+  if (digit) {
+    const n = Number(digit[1])
+    if (Number.isFinite(n) && n >= 0 && n <= 8) return plus && n >= 5 ? n + 0.5 : n
+  }
+  const cn: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8 }
+  const m = s.match(/([一二三四五六七八])(?:级|星)/)
+  if (!m || cn[m[1]!] == null) return null
+  const n = cn[m[1]!]!
+  return plus && n >= 5 ? n + 0.5 : n
 }
 
 export function kolTierLabel(t: KolTierKey): string {

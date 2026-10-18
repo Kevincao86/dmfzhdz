@@ -85,10 +85,10 @@ export function isLocalLifeTalentEntry(entry: RegistryTalentLibraryEntry): boole
 }
 
 export type TalentLibraryCityResolve = {
-  /** 供均价/方案使用的达人子集（已按平台过滤） */
+  /** 供均价/方案使用的达人子集（已按平台过滤；未指定平台则含各平台） */
   entries: RegistryTalentLibraryEntry[]
   filterCity: string
-  platform: RegistryTalentLibraryEntry['platform']
+  platform: string
   source: TalentLibraryCitySource
   cityMatchedCount: number
   nationwideLocalLifeCount: number
@@ -115,8 +115,13 @@ export function resolveTalentLibraryEntriesForCity(params: {
     (e) => !isIncompleteTalentLibraryEntry(e),
   )
   const city = params.city.trim()
-  const platform = params.platform ?? '抖音'
-  const byPlatform = platformFilter(all, platform)
+  const platform = params.platform
+  const byPlatform = platform ? platformFilter(all, platform) : all
+  const platformName = (rows: RegistryTalentLibraryEntry[]) => {
+    if (platform) return platform
+    const names = [...new Set(rows.map((e) => e.platform).filter(Boolean))]
+    return names.length ? names.join('、') : '各平台'
+  }
 
   const cityMatched = city
     ? byPlatform.filter((e) => cityMatchesTalentEntryStrict(e.city, city))
@@ -125,7 +130,7 @@ export function resolveTalentLibraryEntriesForCity(params: {
     return {
       entries: cityMatched,
       filterCity: city,
-      platform,
+      platform: platformName(cityMatched),
       source: 'city',
       cityMatchedCount: cityMatched.length,
       nationwideLocalLifeCount: 0,
@@ -138,7 +143,7 @@ export function resolveTalentLibraryEntriesForCity(params: {
     return {
       entries: nationwideLocalLife,
       filterCity: city || '全国',
-      platform,
+      platform: platformName(nationwideLocalLife),
       source: 'nationwide_local_life',
       cityMatchedCount: 0,
       nationwideLocalLifeCount: nationwideLocalLife.length,
@@ -149,7 +154,7 @@ export function resolveTalentLibraryEntriesForCity(params: {
   return {
     entries: byPlatform,
     filterCity: city || '全国',
-    platform,
+    platform: platformName(byPlatform),
     source: 'nationwide_local_life',
     cityMatchedCount: 0,
     nationwideLocalLifeCount: 0,
