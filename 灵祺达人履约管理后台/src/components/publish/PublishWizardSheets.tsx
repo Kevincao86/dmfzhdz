@@ -73,7 +73,7 @@ type Props = {
   setApplyEditorName: (v: string) => void
   applyEditorTplId: string
   setApplyEditorTplId: (v: string) => void
-  applyEditorMode: 'new' | 'template'
+  applyEditorMode: 'new' | 'template' | 'edit'
   setApplyEditorMode: (v: 'new' | 'template') => void
   recruitTarget: string
 }
@@ -459,9 +459,24 @@ export default function PublishWizardSheets(props: Props) {
 
       <PublishSheet open={pickerView === 'applyMenu'} title={applyMenuTitle} onClose={() => setPickerView('')}>
         <div className="space-y-2">
+          {form.applyFormFields.length ? (
+            <button
+              type="button"
+              className="w-full py-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900 hover:bg-violet-50 transition-colors"
+              onClick={() => {
+                setApplyEditorMode('edit')
+                setApplyEditorTplId(form.applyFormTemplateId || `edit-${Date.now()}`)
+                setApplyEditorName(form.applyFormTemplateName || '已配置报名项')
+                setApplyEditorFields(form.applyFormFields.map((f) => ({ ...f })))
+                setPickerView('applyForm')
+              }}
+            >
+              编辑当前报名项（{form.applyFormFields.length} 项）
+            </button>
+          ) : null}
           <button
             type="button"
-            className="w-full py-3 rounded-lg bg-white/10 text-sm hover:bg-violet-600/30 transition-colors"
+            className="w-full py-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900 hover:bg-violet-50 transition-colors"
             onClick={() => {
               const tpl = emptyCustomTemplate(
                 applyTemplateKind === 'shoot'
@@ -482,7 +497,7 @@ export default function PublishWizardSheets(props: Props) {
           </button>
           <button
             type="button"
-            className="w-full py-3 rounded-lg bg-white/10 text-sm hover:bg-violet-600/30 transition-colors"
+            className="w-full py-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900 hover:bg-violet-50 transition-colors"
             onClick={() => {
               if (!customTemplates.length) {
                 setErr('请先在「我的模版」中新建对应类型的自定义模版')
@@ -538,7 +553,7 @@ export default function PublishWizardSheets(props: Props) {
             applyEditorMode === 'template' &&
             !!applyEditorTplId &&
             customTemplates.some((t) => t.id === applyEditorTplId)
-          if (!usingExistingTemplate) {
+          if (applyEditorMode !== 'edit' && !usingExistingTemplate) {
             const shouldSave = window.confirm('是否同时保存为「我的模版」？')
             if (shouldSave) {
               saveCustomTemplate({

@@ -141,6 +141,7 @@ list_scopes() {
   merchant_mp_review    商家小程序审核：先浏览再登录；分析提升先付费再提醒绑定门店
   meituan_groupbuy     美团团购数据互通；大众点评商家版绑定仅提示连锁可用
   pr_logo_share_chat   推荐商单平台logo；PR公司logo与分享海报/招募封面；聊天页去掉备案号
+  recruit_apply_editor 发布招募：达人报名必填信息可打开，并编辑当前报名项
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -803,6 +804,13 @@ PrOrdersScreen
 lingqi-xingxuan-app/src/api/registry
 lingqi-xingxuan-app/src/lib/applicationsStore
 publishedOrders
+change-scope-guard
+PAT
+      ;;
+    recruit_apply_editor)
+      cat <<'PAT'
+PublishWizard
+pages/publish/publish
 change-scope-guard
 PAT
       ;;

@@ -468,6 +468,21 @@ Page({
   applyTemplateKind() {
     return applyTemplates.templateKindFromRecruitTarget(this.data.recruitTarget || 'talent')
   },
+  openApplyFormEditorCurrent() {
+    const kind = this.applyTemplateKind()
+    applyFormEditor.resetApplyFormEditorSession(this)
+    this.setData(
+      {
+        pickerView: 'applyForm',
+        applyFormEditorMode: 'edit',
+        applyFormTemplateKind: kind,
+      },
+      () => {
+        applyFormEditor.initApplyFormFromPlatform(this, this.data.form && this.data.form.platform)
+        this.syncTabBarOverlay()
+      },
+    )
+  },
   openApplyFormEditorNew() {
     const kind = this.applyTemplateKind()
     const tpl = applyTemplates.emptyCustomTemplate(
@@ -533,18 +548,16 @@ Page({
     const view = e.currentTarget.dataset.view
     if (!view) return
     if (view === 'applyForm') {
-      const target = this.data.recruitTarget || 'talent'
-      const isSupplier = target === 'shoot' || target === 'edit'
-      if (!isSupplier && !this.data.form.platform) {
-        wx.showToast({ title: '请先选择招募平台', icon: 'none' })
-        return
-      }
+      const fields = (this.data.form && this.data.form.applyFormFields) || []
+      const items = fields.length ? ['编辑当前', '新增', '使用模版'] : ['新增', '使用模版']
       this.setData({ lastScrollAnchor: 'field-apply-form' })
       wx.showActionSheet({
-        itemList: ['新增', '使用模版'],
+        itemList: items,
         success: (res) => {
-          if (res.tapIndex === 0) this.openApplyFormEditorNew()
-          else if (res.tapIndex === 1) this.openApplyFormUseTemplate()
+          const label = items[res.tapIndex]
+          if (label === '编辑当前') this.openApplyFormEditorCurrent()
+          else if (label === '新增') this.openApplyFormEditorNew()
+          else if (label === '使用模版') this.openApplyFormUseTemplate()
         },
       })
       return
