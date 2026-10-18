@@ -28,6 +28,7 @@ export function AiAgentPreviewActions({
     cancelPendingTask,
     advanceRecruitWizard,
     backRecruitWizard,
+    patchRecruitWizard,
     isPreviewLoading,
     isPreviewConfirming,
   } = useAiAgent()
@@ -97,7 +98,27 @@ export function AiAgentPreviewActions({
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {isRecruit && talentGate ? null : isRecruit ? (
+        {isRecruit && talentGate ? (
+          talentPath === 'recommend' ? (
+            <button
+              type="button"
+              onClick={() =>
+                patchRecruitWizard(
+                  previewMessageId,
+                  { talentPath: 'recruit' },
+                  '第 1 步：核对主推和投放范围。',
+                )
+              }
+              disabled={confirmDisabled}
+              className={cn(
+                'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
+                confirmDisabled && 'cursor-not-allowed opacity-50',
+              )}
+            >
+              继续招募
+            </button>
+          ) : null
+        ) : isRecruit ? (
           <>
             {recruitStep > 1 ? (
               <button

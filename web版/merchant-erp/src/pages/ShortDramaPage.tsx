@@ -5452,15 +5452,20 @@ export default function ShortDramaPage() {
                     activeWorkId === w.id ? 'ring-cyan-600' : 'ring-slate-200',
                   )}
                 >
-                  <button type="button" className="block w-full" onClick={() => setActiveWorkId(w.id)}>
-                    {w.previewUrl ? (
-                      <video src={w.previewUrl} className="aspect-[9/16] w-full bg-slate-950 object-contain" muted />
-                    ) : (
-                      <div className="flex aspect-[9/16] w-full items-center justify-center bg-slate-950 px-4 text-center text-xs text-slate-400">
-                        视频文件已过期，请重新生成
-                      </div>
-                    )}
-                  </button>
+                  {w.previewUrl || w.sourceUrl ? (
+                    <video
+                      src={w.previewUrl || w.sourceUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="aspect-[9/16] w-full bg-slate-950 object-contain"
+                      onPlay={() => setActiveWorkId(w.id)}
+                    />
+                  ) : (
+                    <div className="flex aspect-[9/16] w-full items-center justify-center bg-slate-950 px-4 text-center text-xs text-slate-400">
+                      视频文件已过期，请重新生成
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-2 px-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-800">{w.title}</p>

@@ -1562,14 +1562,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   )
 
   const advanceRecruitWizard = useCallback(
-    (previewMessageId: string) => {
+    (previewMessageId: string): boolean => {
       const pending = messagesRef.current.find((m) => m.id === previewMessageId)
       const brief = pending?.preview?.recruitmentBrief
-      if (!brief || pending?.previewStatus !== 'pending') return
+      if (!brief || pending?.previewStatus !== 'pending') return false
       const step = recruitWizardStepOf(brief)
       const scope = brief.wizardScope
       const budget = brief.wizardBudget
-      if (!scope || !budget) return
+      if (!scope || !budget) return false
 
       if (step === 1) {
         const citySt = scope.city.trim()
@@ -1577,7 +1577,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           : { cityNational: false, selectedCities: [] as string[] }
         if (!hasRecruitmentCitySelection(citySt.cityNational, citySt.selectedCities)) {
           window.alert('请选择招募城市（可多选或选全国，与星选发招募一致）')
-          return
+          return false
         }
         patchPreviewRecruitmentBrief(
           previewMessageId,
@@ -1600,7 +1600,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             enrichError: `档位测算未完成：${msg.slice(0, 80)}，可先按当前预算继续。`,
           })
         })
-        return
+        return true
       }
 
       if (step === 2) {
@@ -1647,7 +1647,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             })
           }
         })()
-        return
+        return true
       }
 
       if (step === 3) {
@@ -1659,7 +1659,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           { wizardStep: 4, briefText },
           '第 4 步：确认后发到星选大厅。',
         )
+        return true
       }
+      return false
     },
     [lastPlanBriefs, patchPreviewRecruitmentBrief, runRecruitWizardAllocation],
   )
@@ -1826,6 +1828,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const continuePlanPreviewsRef = useRef(continuePlanPreviews)
   continuePlanPreviewsRef.current = continuePlanPreviews
+  const confirmPendingTaskRef = useRef<
+    (previewMessageId: string, opts?: { productSubmitMode?: 'draft' | 'submit' }) => void
+  >(() => {})
 
   const scheduleContinuePlanPreviews = useCallback((pageLabel?: string) => {
     queueMicrotask(() => {
@@ -1841,6 +1846,34 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         strippedLine,
         visionUrls,
       )
+      if (result.action.type === 'none' && result.assistantLine?.includes('还在等待确认')) {
+        const pending = messagesRef.current.find(
+          (m) => isPendingPreviewMessage(m) && m.preview?.taskType === 'recruit_influencer',
+        )
+        const brief = pending?.preview?.recruitmentBrief
+        if (pending && brief) {
+          const path = brief.talentPath
+          if (!path || path === 'pending' || path === 'recommend') {
+            patchPreviewRecruitmentBrief(
+              pending.id,
+              { talentPath: 'recruit' },
+              '第 1 步：核对主推和投放范围。',
+            )
+            appendAssistantLine('已进入招募下一步：请核对主推和投放范围，再点「下一步」。')
+            return true
+          }
+          const step = recruitWizardStepOf(brief)
+          if (step < 4) {
+            const moved = advanceRecruitWizard(pending.id)
+            appendAssistantLine(
+              moved ? '已继续招募的下一步。' : '这一步还缺城市或主推，补上后再继续。',
+            )
+            return true
+          }
+          confirmPendingTaskRef.current(pending.id)
+          return true
+        }
+      }
       executionStateRef.current = result.state
       if (result.assistantLine) appendAssistantLine(result.assistantLine)
 
@@ -1856,7 +1889,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           return false
       }
     },
-    [appendAssistantLine, triggerParallelPreviews],
+    [appendAssistantLine, triggerParallelPreviews, patchPreviewRecruitmentBrief, advanceRecruitWizard],
   )
 
   const scheduleTaskPreview = useCallback(
@@ -3247,6 +3280,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       modelPickerKey,
     ],
   )
+  confirmPendingTaskRef.current = confirmPendingTask
 
   const submitPendingTaskToPlatforms = useCallback(
     (previewMessageId: string) => {
