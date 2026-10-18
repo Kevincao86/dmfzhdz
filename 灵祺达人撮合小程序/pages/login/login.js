@@ -238,10 +238,15 @@ Page({
     loginIdentityIcon: '',
     loginName: '',
     password: '',
+    codeChannel: 'phone',
     smsPhone: '',
     smsLoginCode: '',
     smsSending: false,
     smsCooldown: 0,
+    emailAddr: '',
+    emailLoginCode: '',
+    emailSending: false,
+    emailCooldown: 0,
     loading: false,
     err: '',
     navBandStyle: '',
@@ -384,17 +389,25 @@ Page({
     this.setData({ tab: 'pwd', err: '' })
   },
   onTabSms() {
+    const name = String(this.data.loginName || '').trim()
+    const isMail = name.indexOf('@') >= 0
     this.setData({
       tab: 'sms',
       err: '',
-      smsPhone: this.data.loginName || this.data.smsPhone || '',
+      codeChannel: isMail ? 'email' : this.data.codeChannel || 'phone',
+      smsPhone: isMail ? this.data.smsPhone : name || this.data.smsPhone || '',
+      emailAddr: isMail ? name : this.data.emailAddr,
     })
   },
   onForgotPassword() {
+    const name = String(this.data.loginName || '').trim()
+    const isMail = name.indexOf('@') >= 0
     this.setData({
       tab: 'sms',
       err: '',
-      smsPhone: this.data.loginName || this.data.smsPhone || '',
+      codeChannel: isMail ? 'email' : 'phone',
+      smsPhone: isMail ? this.data.smsPhone : name || this.data.smsPhone || '',
+      emailAddr: isMail ? name : this.data.emailAddr,
     })
     wx.showToast({ title: '已切换验证码登录', icon: 'none' })
   },
@@ -403,6 +416,20 @@ Page({
   },
   onSmsPhone(e) {
     this.setData({ smsPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+  },
+  onCodeChannel(e) {
+    const channel = e.currentTarget.dataset.channel === 'email' ? 'email' : 'phone'
+    this.setData({ codeChannel: channel, err: '' })
+  },
+  onEmailAddr(e) {
+    this.setData({ emailAddr: String((e.detail && e.detail.value) || '').slice(0, 80) })
+  },
+  onEmailLoginCode(e) {
+    this.setData({
+      emailLoginCode: String((e.detail && e.detail.value) || '')
+        .replace(/\D/g, '')
+        .slice(0, 6),
+    })
   },
   onSmsLoginCode(e) {
     this.setData({
@@ -442,7 +469,7 @@ Page({
   },
 
   onLoginName(e) {
-    this.setData({ loginName: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+    this.setData({ loginName: String((e.detail && e.detail.value) || '').slice(0, 64) })
   },
   onPassword(e) {
     this.setData({ password: e.detail.value })
@@ -732,10 +759,19 @@ Page({
     await this.doPwdLogin()
   },
 
-  async doPwdLogin(workId) {
+  async doPwdLogin() {
+    const loginName = String(this.data.loginName || '').trim()
+    if (!loginName) {
+      this.setData({ err: '请输入账号' })
+      return
+    }
+    if (!this.data.password) {
+      this.setData({ err: '请输入密码' })
+      return
+    }
     this.setData({ loading: true, err: '' })
     try {
-      const data = await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
+      const data = await auth.passwordLogin(loginName, this.data.password)
       await applyLoginIdentity(data)
       await navigateAfterLogin(this)
     } catch (e) {
@@ -777,6 +813,10 @@ Page({
       openLegalPrompt(this, 'talent', 'sms')
       return
     }
+    if (this.data.codeChannel === 'email') {
+      await this.doEmailLogin()
+      return
+    }
     await this.doSmsLogin()
   },
 
@@ -799,6 +839,58 @@ Page({
       const msg = e && e.message ? e.message : '登录失败'
       this.setData({
         err: /phone_not_registered/i.test(msg) ? '该手机号尚未注册，请先注册' : msg,
+      })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
+  async onSendEmailLoginCode() {
+    const mail = String(this.data.emailAddr || '').trim().toLowerCase()
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(mail)) {
+      this.setData({ err: '请输入有效邮箱' })
+      return
+    }
+    this.setData({ emailSending: true, err: '', emailAddr: mail })
+    try {
+      await auth.sendEmailCode(mail)
+      wx.showToast({ title: '验证码已发送至邮箱', icon: 'none' })
+      this.setData({ emailCooldown: 60 })
+      const tick = setInterval(() => {
+        const n = this.data.emailCooldown - 1
+        if (n <= 0) {
+          clearInterval(tick)
+          this.setData({ emailCooldown: 0 })
+        } else {
+          this.setData({ emailCooldown: n })
+        }
+      }, 1000)
+    } catch (e) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '邮箱验证码发送失败') })
+    } finally {
+      this.setData({ emailSending: false })
+    }
+  },
+
+  async doEmailLogin() {
+    const mail = String(this.data.emailAddr || '').trim().toLowerCase()
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(mail)) {
+      this.setData({ err: '请输入有效邮箱' })
+      return
+    }
+    if (!/^\d{6}$/.test(this.data.emailLoginCode)) {
+      this.setData({ err: '请输入 6 位验证码' })
+      return
+    }
+    this.setData({ loading: true, err: '' })
+    try {
+      const data = await auth.emailLogin(mail, this.data.emailLoginCode)
+      await applyLoginIdentity(data)
+      await navigateAfterLogin(this)
+    } catch (e) {
+      const msg = e && e.message ? e.message : '登录失败'
+      this.setData({
+        err: /email_not_registered|not_registered/i.test(msg) ? '该邮箱尚未注册，请先注册' : msg,
       })
     } finally {
       this.setData({ loading: false })

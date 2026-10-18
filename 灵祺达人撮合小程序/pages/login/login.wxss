@@ -1292,6 +1292,23 @@
   pointer-events: none;
 }
 
+.login-code-switch {
+  display: flex;
+  gap: 28rpx;
+  margin: 0 0 28rpx;
+}
+
+.login-code-switch__item {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #9aa0a6;
+}
+
+.login-code-switch__item--on {
+  color: #111111;
+  font-weight: 700;
+}
+
 .login-field--row {
   display: flex;
   gap: 12rpx;
@@ -1420,6 +1437,7 @@
 
 .login-page.lq-accent-dark .login-hero__sub,
 .login-page.lq-accent-dark .login-tab,
+.login-page.lq-accent-dark .login-code-switch__item,
 .login-page.lq-accent-dark .login-hint,
 .login-page.lq-accent-dark .login-btn--quiet,
 .login-page.lq-accent-dark .login-btn--quiet text {
@@ -1428,7 +1446,8 @@
   background: transparent !important;
 }
 
-.login-page.lq-accent-dark .login-tab--on {
+.login-page.lq-accent-dark .login-tab--on,
+.login-page.lq-accent-dark .login-code-switch__item--on {
   color: #111111 !important;
   -webkit-text-fill-color: #111111 !important;
   background: transparent !important;

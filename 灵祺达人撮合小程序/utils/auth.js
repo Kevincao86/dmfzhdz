@@ -134,6 +134,14 @@ async function smsLogin(phone, smsCode) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function emailLogin(email, emailCode) {
+  const data = await authPost('email_login', {
+    email: String(email || '').trim(),
+    emailCode: String(emailCode || '').trim(),
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 async function phoneQuickLogin(phoneCode) {
   const data = await authPost('phone_quick_login', {
     phoneCode: String(phoneCode || '').trim(),
@@ -321,6 +329,7 @@ module.exports = {
   wxLogin,
   passwordLogin,
   smsLogin,
+  emailLogin,
   phoneQuickLogin,
   setLoginCredentials,
   changePasswordBySms,
