@@ -162,9 +162,18 @@
     <button class="op-btn" loading="{{talentBusy}}" disabled="{{talentBusy}}" bindtap="onTalentRecommend">给我推荐</button>
     <button class="op-btn" bindtap="onTalentRecruit">我要招募</button>
     <text wx:if="{{talentNote}}" class="op-meta">{{talentNote}}</text>
-    <view wx:for="{{talentCards}}" wx:key="seatId" class="op-li">
-      <text class="op-body">{{item.line}}</text>
-      <text wx:if="{{item.reason}}" class="op-body muted">{{item.reason}}</text>
+    <view wx:for="{{talentCards}}" wx:key="seatId" class="op-li talent-card">
+      <view class="talent-card-row">
+        <view wx:if="{{!item.empty}}" class="talent-avatar">
+          <image wx:if="{{item.avatarUrl}}" class="talent-avatar-img" src="{{item.avatarUrl}}" mode="aspectFill" />
+          <text wx:else>{{item.avatarInitial}}</text>
+        </view>
+        <view class="talent-card-text">
+          <text class="op-body">{{item.line}}</text>
+          <text wx:if="{{item.profileLink}}" class="talent-home" data-link="{{item.profileLink}}" catchtap="onCopyTalentProfile">{{item.profileLabel}}</text>
+          <text wx:if="{{item.reason}}" class="op-body muted">{{item.reason}}</text>
+        </view>
+      </view>
       <button wx:if="{{!item.empty}}" class="op-btn" data-id="{{item.talentId}}" bindtap="onTalentReplace">替换</button>
     </view>
   </view>

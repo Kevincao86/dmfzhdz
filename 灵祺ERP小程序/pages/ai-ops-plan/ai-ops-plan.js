@@ -252,6 +252,12 @@ Page({
     void this.loadTalents(id)
   },
 
+  onCopyTalentProfile(e) {
+    const link = String((e.currentTarget.dataset && e.currentTarget.dataset.link) || '').trim()
+    if (!/^https:\/\//i.test(link)) return
+    wx.setClipboardData({ data: link })
+  },
+
   onTalentRecruit() {
     wx.navigateTo({ url: '/pages/recruit-hub/recruit-hub' })
   },

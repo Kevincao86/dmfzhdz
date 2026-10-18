@@ -417,6 +417,44 @@
   background: #f8fafc;
 }
 
+.talent-card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.talent-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 999rpx;
+  overflow: hidden;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 28rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.talent-avatar-img {
+  width: 72rpx;
+  height: 72rpx;
+}
+
+.talent-card-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.talent-home {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 24rpx;
+  color: #6d28d9;
+}
+
 .preview-actions {
   display: flex;
   gap: 12rpx;

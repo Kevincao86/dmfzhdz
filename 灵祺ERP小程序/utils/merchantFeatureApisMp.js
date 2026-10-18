@@ -339,6 +339,25 @@ function textLines(list, mapFn) {
   return list.map(mapFn).map((s) => String(s || '').trim()).filter(Boolean)
 }
 
+function httpsUrl(raw) {
+  const s = String(raw || '').trim()
+  return /^https:\/\//i.test(s) ? s : ''
+}
+
+function talentProfileLabel(platform, url) {
+  const host = String(url || '')
+    .replace(/^https?:\/\//i, '')
+    .split('/')[0]
+    .replace(/^www\./, '')
+  const plat = String(platform || '')
+  if (plat === '抖音' || /douyin/.test(host)) return '复制抖音主页'
+  if (plat === '小红书' || /xhs|xiaohongshu/.test(host)) return '复制小红书主页'
+  if (plat === '大众点评' || /dianping/.test(host)) return '复制大众点评主页'
+  if (plat === '快手' || /kuaishou|chenzhong/.test(host)) return '复制快手主页'
+  if (plat === '微信视频号' || /weixin|channels/.test(host)) return '复制视频号主页'
+  return '复制主页链接'
+}
+
 function decorateTalentCards(cards, seats) {
   const byId = {}
   ;(seats || []).forEach((s) => {
@@ -348,6 +367,8 @@ function decorateTalentCards(cards, seats) {
     const seat = byId[c.seatId] || {}
     const nickname = String(c.nickname || '').trim()
     const empty = !!c.empty || !c.talentId
+    const platform = String(c.platform || seat.platform || '抖音')
+    const profileLink = empty ? '' : httpsUrl(c.profileLink)
     return {
       seatId: String(c.seatId || ''),
       talentId: String(c.talentId || ''),
@@ -355,13 +376,18 @@ function decorateTalentCards(cards, seats) {
       tierLabel: String(c.tierLabel || seat.tierLabel || ''),
       unitBudgetYuan: Number(c.unitBudgetYuan || seat.unitBudgetYuan || 0),
       talentType: String(c.talentType || seat.talentType || ''),
-      platform: String(c.platform || seat.platform || '抖音'),
+      platform,
+      nickname,
+      avatarUrl: empty ? '' : httpsUrl(c.avatarUrl),
+      avatarInitial: (nickname || '达').slice(0, 1),
+      profileLink,
+      profileLabel: profileLink ? talentProfileLabel(platform, profileLink) : '',
       line: empty
         ? `${c.tierLabel || '这一档'} · 库内暂无下一位`
         : [
             nickname || '达人',
             c.city || '',
-            c.platform || '',
+            platform,
             `${Number(c.followers) || 0}粉`,
             c.quoteYuan != null && c.quoteYuan !== '' ? `¥${c.quoteYuan}` : '',
           ]

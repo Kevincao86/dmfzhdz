@@ -813,6 +813,12 @@ Page({
     void this.onTalentRecommend(e)
   },
 
+  onCopyTalentProfile(e) {
+    const link = String((e.currentTarget.dataset && e.currentTarget.dataset.link) || '').trim()
+    if (!/^https:\/\//i.test(link)) return
+    wx.setClipboardData({ data: link })
+  },
+
   async onRecruitNext(e) {
     const id = e.currentTarget.dataset.id
     const msg = this.findPreview(id)

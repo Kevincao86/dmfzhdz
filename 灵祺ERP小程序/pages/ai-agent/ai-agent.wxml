@@ -156,8 +156,17 @@
             </view>
             <text wx:if="{{item.preview.recruitmentBrief.talentNote}}" class="plan-desc">{{item.preview.recruitmentBrief.talentNote}}</text>
             <view wx:for="{{item.preview.recruitmentBrief.talentCards}}" wx:for-item="card" wx:key="seatId" class="shoot-box">
-              <text class="plan-desc">{{card.line}}</text>
-              <text wx:if="{{card.reason}}" class="plan-desc">{{card.reason}}</text>
+              <view class="talent-card-row">
+                <view wx:if="{{!card.empty}}" class="talent-avatar">
+                  <image wx:if="{{card.avatarUrl}}" class="talent-avatar-img" src="{{card.avatarUrl}}" mode="aspectFill" />
+                  <text wx:else>{{card.avatarInitial}}</text>
+                </view>
+                <view class="talent-card-text">
+                  <text class="plan-desc">{{card.line}}</text>
+                  <text wx:if="{{card.profileLink}}" class="talent-home" data-link="{{card.profileLink}}" catchtap="onCopyTalentProfile">{{card.profileLabel}}</text>
+                  <text wx:if="{{card.reason}}" class="plan-desc">{{card.reason}}</text>
+                </view>
+              </view>
               <view wx:if="{{!card.empty}}" class="btn-ghost" data-id="{{item.id}}" data-talent="{{card.talentId}}" bindtap="onTalentReplace">替换</view>
             </view>
           </view>
