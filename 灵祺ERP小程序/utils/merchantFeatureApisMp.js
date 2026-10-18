@@ -6,13 +6,14 @@ const api = require('./api.js')
 const { merchantRequestAuth } = require('./merchantApi.js')
 const sessionSync = require('./merchantSessionSyncMp.js')
 const supabaseRest = require('./supabaseRest.js')
+const talentCities = require('./talentCityNamesMp.js')
 
-function postJson(path, body) {
+function postJson(path, body, timeoutMs) {
   const token = api.getBearerToken()
   return merchantRequestAuth('POST', path, {
     data: body || {},
     bearerToken: token,
-    timeoutMs: 120000,
+    timeoutMs: timeoutMs || 120000,
   }).then((r) => r || {})
 }
 
@@ -293,8 +294,8 @@ async function synthesizeDigitalHumanTts(body) {
 
 function tierKeyFromLabel(tier) {
   const s = String(tier || '').trim()
-  if (/5\+|V5\+|以上/.test(s)) return 'v5plus'
-  if (/头|V5|^5|五级/.test(s)) return 'v5'
+  if (/5\+|V5\+|以上|Lv[6-8]|[6-8]级|六级|七级|八级/.test(s)) return 'v5plus'
+  if (/头|V5|Lv5|^5|五级/.test(s)) return 'v5'
   if (/腰|V4|^4|四级/.test(s)) return 'v4'
   return 'v3'
 }
@@ -309,7 +310,7 @@ function seatsFromTalentBudget(budget, fallbackPlatform) {
     const tierLabel = String(row.tier || '').trim()
     const platform = String(row.platform || fallbackPlatform || '抖音').trim() || '抖音'
     const talentType = String(row.talentType || row.category || kind || '').trim()
-    for (let i = 0; i < count && seats.length < 24; i += 1) {
+    for (let i = 0; i < count && seats.length < 80; i += 1) {
       seats.push({
         seatId: `${kind}-${seats.length + 1}`,
         tierKey: tierKeyFromLabel(tierLabel),
@@ -378,6 +379,12 @@ function decorateTalentCards(cards, seats) {
       talentType: String(c.talentType || seat.talentType || ''),
       platform,
       nickname,
+      city: String(c.city || ''),
+      followers: Number(c.followers) || 0,
+      quoteYuan: c.quoteYuan != null && c.quoteYuan !== '' ? Number(c.quoteYuan) : null,
+      level: String(c.level || c.tierLabel || ''),
+      tags: Array.isArray(c.tags) ? c.tags : [],
+      source: String(c.source || ''),
       avatarUrl: empty ? '' : httpsUrl(c.avatarUrl),
       avatarInitial: (nickname || '达').slice(0, 1),
       profileLink,
@@ -409,7 +416,9 @@ function seatsForTalentReplace(cards, replaceId) {
       talentType: c.talentType || '',
       platform: c.platform || '抖音',
     }
-    if (c.talentId && c.talentId !== replaceId) seat.lockedTalentId = c.talentId
+    if (c.talentId && c.talentId !== replaceId && String(c.talentId).indexOf('public:') !== 0) {
+      seat.lockedTalentId = c.talentId
+    }
     return seat
   })
 }
@@ -505,16 +514,413 @@ function normalizeOpsPlan(plan) {
   }
 }
 
-async function requestTalentRecommend(body) {
+function intentText(text) {
+  return String(text || '')
+    .replace(/\[引用[\s\S]*?\n\n/, '')
+    .trim()
+}
+
+function nearestCity(text, anchorWords) {
+  const body = String(text || '')
+  if (!body.trim()) return ''
+  let anchor = -1
+  ;(anchorWords || []).forEach((word) => {
+    anchor = Math.max(anchor, body.lastIndexOf(word))
+  })
+  let best = null
+  talentCities.forEach((city) => {
+    const short = String(city).replace(/市$/, '')
+    const fullAt = body.indexOf(city)
+    const shortAt = short.length >= 2 ? body.indexOf(short) : -1
+    const index = fullAt >= 0 ? fullAt : shortAt
+    if (index < 0) return
+    const len = fullAt >= 0 ? city.length : short.length
+    const dist = anchor >= 0 ? Math.abs(index - anchor) : index
+    if (!best || dist < best.dist || (dist === best.dist && len > best.len)) {
+      best = { dist, city, len }
+    }
+  })
+  return best ? best.city : ''
+}
+
+function cityAskedForTalents(text) {
+  return nearestCity(intentText(text), ['推荐', '达人', '找'])
+}
+
+function cityMentionedInText(text) {
+  const body = String(text || '')
+  if (!body.trim()) return ''
+  let best = null
+  talentCities.forEach((city) => {
+    const short = String(city).replace(/市$/, '')
+    const fullAt = body.indexOf(city)
+    const shortAt = short.length >= 2 ? body.indexOf(short) : -1
+    const index = fullAt >= 0 ? fullAt : shortAt
+    if (index < 0) return
+    const len = fullAt >= 0 ? city.length : short.length
+    if (!best || index < best.index || (index === best.index && len > best.len)) {
+      best = { index, city, len }
+    }
+  })
+  return best ? best.city : ''
+}
+
+function isTalentRecommendAsk(text) {
+  const x = intentText(text)
+  if (!/达人/.test(x)) return false
+  return /推荐|找|匹配|名单|有哪些|介绍/.test(x)
+}
+
+function intelField(intel, label) {
+  const matched = String(intel || '').match(new RegExp(label + '：([^\\n]+)'))
+  return matched ? String(matched[1]).trim() : ''
+}
+
+function requirementNeedles(industry) {
+  return String(industry || '')
+    .split(/[/、,，|>\s]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2 && !/本地生活|到店|服务|其他/.test(s))
+    .slice(0, 6)
+}
+
+function cardMatchesCity(card, city) {
+  const short = String(city || '').replace(/市$/, '').trim()
+  if (short.length < 2) return true
+  const label = String((card && card.city) || '').replace(/市$/, '').trim()
+  if (!label) return false
+  return label.indexOf(short) >= 0 || short.indexOf(label) >= 0
+}
+
+function cardMatchesStore(card, needles) {
+  if (!needles.length) return true
+  const blob = [card.nickname, card.reason, card.line].concat(card.tags || []).join(' ')
+  return needles.some((n) => blob.indexOf(n) >= 0)
+}
+
+function parseFans(raw) {
+  const t = String(raw || '').replace(/粉丝/g, '').trim()
+  const wan = t.match(/(\d+(?:\.\d+)?)\s*万/)
+  if (wan) return Math.round(Number(wan[1]) * 10000)
+  const n = t.match(/(\d{2,})/)
+  return n ? Number(n[1]) : 0
+}
+
+function parsePublicTalentLines(text, cityHint, limit) {
+  const cap = Math.min(20, Math.max(1, limit || 1))
+  const out = []
+  const seen = {}
+  const want = String(cityHint || '').replace(/市$/, '').trim()
+  String(text || '').split(/\n+/).forEach((line) => {
+    if (out.length >= cap) return
+    const row = line.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim()
+    if (!row || /^公网暂无|^暂无符合/.test(row)) return
+    const parts = row.split(/[|｜]/).map((s) => s.trim()).filter(Boolean)
+    let person = null
+    if (parts.length >= 2) {
+      const nickname = parts[0].replace(/^昵称[:：]/, '').slice(0, 24)
+      if (/^达人$|^公网$|^检索$/.test(nickname)) return
+      person = {
+        nickname,
+        city: parts[1] || cityHint,
+        followers: parseFans(parts[2] || row),
+        level: parts[3] || '',
+        reason: parts.slice(4).join(' ').slice(0, 80),
+      }
+    } else {
+      if (want && row.indexOf(want) < 0 && !/粉丝|万粉|探店/.test(row)) return
+      const nickname = (row.match(/[\u4e00-\u9fffA-Za-z0-9_（）()]{2,16}/) || [])[0] || ''
+      if (!nickname || nickname === want || /^(达人|公网|检索|粉丝|探店|本地生活)$/.test(nickname)) return
+      person = {
+        nickname: nickname.replace(/[（(].*$/, '').slice(0, 24),
+        city: cityHint,
+        followers: parseFans(row),
+        level: '',
+        reason: row.slice(0, 80),
+      }
+    }
+    const key = person.nickname.trim()
+    if (key.length < 2 || seen[key]) return
+    seen[key] = true
+    out.push(person)
+  })
+  return out
+}
+
+async function fetchPublicTalents(opts) {
+  const city = String(opts.city || '').trim() || '门店所在城市'
+  const need = String(opts.talentType || '').trim() || '本地生活'
+  const want = Math.min(20, Math.max(1, Number(opts.count) || 1))
+  const skip = (opts.skipNames || []).filter(Boolean).slice(0, 24)
   try {
-    const r = await postJson('/api/meoo-ops-novice-kol-allocation', Object.assign({ mode: 'talent_recommend' }, body || {}))
+    const data = await postJson(
+      '/api/meoo-ai-chat',
+      {
+        provider: 'doubao',
+        stream: false,
+        temperature: 0,
+        webSearch: true,
+        messages: [
+          {
+            role: 'system',
+            content: `你是豆包公网达人检索。请联网搜索「${city} 抖音 探店达人」「${city} ${need} 达人」。只写${opts.platform || '抖音'}、区域在「${city}」、内容贴近「${need}」的达人，凑满 ${want} 位。不要前言。每行严格：昵称｜${city}｜粉丝数字｜等级｜内容方向。不要电话或微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+          },
+          {
+            role: 'user',
+            content: `城市：${city}\n搜索：${city} 抖音 达人 探店 ${need}\n请列出 ${want} 位达人。`,
+          },
+        ],
+      },
+      90000,
+    )
+    return parsePublicTalentLines(String((data && data.content) || ''), city, want)
+  } catch (_) {
+    return []
+  }
+}
+
+async function fetchPublicTalentsUntil(opts) {
+  const all = []
+  const seen = {}
+  ;(opts.skipNames || []).forEach((name) => {
+    if (name) seen[name] = true
+  })
+  let left = Math.min(20, Math.max(0, Number(opts.count) || 0))
+  for (let round = 0; round < 2 && left > 0; round += 1) {
+    const batch = await fetchPublicTalents(
+      Object.assign({}, opts, { count: left, skipNames: Object.keys(seen) }),
+    )
+    if (!batch.length) break
+    batch.forEach((person) => {
+      if (seen[person.nickname]) return
+      seen[person.nickname] = true
+      all.push(person)
+    })
+    left = Math.min(20, Number(opts.count) || 0) - all.length
+  }
+  return all
+}
+
+function publicCard(person, base, city, platform) {
+  const seat = base || {}
+  return {
+    seatId: seat.seatId || '',
+    empty: false,
+    talentId: `public:${person.nickname}`,
+    nickname: person.nickname,
+    city: person.city || city,
+    platform: platform || seat.platform || '抖音',
+    followers: person.followers,
+    level: person.level || seat.tierLabel || '',
+    tierLabel: seat.tierLabel || '公网',
+    tierKey: seat.tierKey || '',
+    unitBudgetYuan: seat.unitBudgetYuan || 0,
+    talentType: seat.talentType || '',
+    quoteYuan: null,
+    tags: [],
+    avatarUrl: '',
+    profileLink: '',
+    source: 'public',
+    reason: person.reason ? `公网 · ${person.reason}` : '公网补位',
+  }
+}
+
+function fillEmptyCardsFromPublic(cards, people, city, platform, target) {
+  let cursor = 0
+  let filled = 0
+  const want = String(city || '').replace(/市$/, '').trim()
+  const take = () => {
+    while (cursor < people.length) {
+      const cityName = people[cursor] && people[cursor].city ? people[cursor].city : ''
+      if (!want || !cityName || cityName.indexOf(want) >= 0) break
+      cursor += 1
+    }
+    const person = people[cursor]
+    if (!person) return null
+    cursor += 1
+    return person
+  }
+  const next = []
+  ;(cards || []).forEach((card) => {
+    if (card && !card.empty && card.talentId) {
+      next.push(card)
+      return
+    }
+    const person = take()
+    if (!person) return
+    filled += 1
+    next.push(publicCard(person, card, city, platform))
+  })
+  const template = (cards || []).find((card) => card && !card.empty && card.talentId) || (cards || [])[0]
+  while (template && next.length < target) {
+    const person = take()
+    if (!person) break
+    filled += 1
+    next.push(
+      publicCard(
+        person,
+        Object.assign({}, template, { seatId: `public-extra-${filled}`, tierLabel: template.tierLabel || '公网' }),
+        city,
+        platform,
+      ),
+    )
+  }
+  return { cards: next, filled }
+}
+
+function recommendTarget(payload, libraryCards) {
+  const seats = Array.isArray(payload.seats) ? payload.seats : []
+  const headcount = Number(payload.headcount) || 0
+  const budgetYuan = Number(payload.budgetYuan) || 0
+  const count = seats.length > 0 ? seats.length : headcount > 0 ? headcount : budgetYuan > 0 ? Math.max(3, Math.min(12, Math.round(budgetYuan / 1200))) : 0
+  return Math.max(count, headcount, (libraryCards || []).length)
+}
+
+async function fillTalentShortfallFromPublic(payload, libraryCards, cityNote) {
+  const city = String(payload.city || '').trim()
+  const platform = String(payload.platform || '抖音')
+  const libraryFilled = (libraryCards || []).filter((c) => c && !c.empty && c.talentId)
+  const target = recommendTarget(payload, libraryCards)
+  const needPublic = Math.max(0, target - libraryFilled.length)
+  if (needPublic <= 0) return { cards: libraryCards, cityNote }
+  const people = await fetchPublicTalentsUntil({
+    city,
+    talentType: payload.talentType,
+    platform,
+    count: needPublic,
+    skipNames: libraryFilled
+      .map((c) => String(c.nickname || '').trim())
+      .concat(payload.skipNames || [])
+      .filter(Boolean),
+  })
+  const filled = fillEmptyCardsFromPublic(libraryCards, people, city, platform, target)
+  const short = Math.max(0, target - filled.cards.length)
+  return {
+    cards: filled.cards,
+    cityNote: [
+      cityNote,
+      `星选库 ${libraryFilled.length} 位，公网补了 ${filled.filled} 位。`,
+      short > 0 ? `还差 ${short} 位，公网这次没有更多同城达人。` : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+  }
+}
+
+async function fetchDoubaoPublicTalentText(city, industry, storeName) {
+  const region = city || '已绑定门店所在城市'
+  const need = industry || '本地生活到店'
+  try {
+    const data = await postJson(
+      '/api/meoo-ai-chat',
+      {
+        provider: 'doubao',
+        stream: false,
+        temperature: 0,
+        webSearch: true,
+        messages: [
+          {
+            role: 'system',
+            content: `你是豆包公网达人检索。只写公网能核实的抖音本地生活达人，最多 5 位。区域只限「${region}」。内容要符合门店要求「${need}」。每人一行：昵称、城市、粉丝量级、内容方向、为何符合该门店。没有公开依据的不要写。不要编造联系方式。一个都没有就只回答「公网暂无符合条件的达人」。`,
+          },
+          {
+            role: 'user',
+            content: `门店：${storeName || '未命名'}。经营要求：${need}。请检索${region}、内容方向匹配该门店的达人。`,
+          },
+        ],
+      },
+      35000,
+    )
+    const text = String((data && data.content) || '').trim()
+    return text ? text.slice(0, 1200) : '公网暂无符合条件的达人。'
+  } catch (_) {
+    return '豆包公网本次没有返回可用名单。'
+  }
+}
+
+function formatLibraryLines(cards) {
+  return (cards || [])
+    .slice(0, 8)
+    .map((c) => {
+      const bits = [
+        c.city,
+        c.level,
+        c.followers > 0 ? `粉丝${c.followers}` : '',
+        c.quoteYuan != null ? `报价¥${c.quoteYuan}` : '',
+        (c.tags || []).slice(0, 2).join('/'),
+      ].filter(Boolean)
+      return `- ${c.nickname}（${bits.join(' · ')}）`
+    })
+    .join('\n')
+}
+
+async function buildTalentRecommendChatBlock(userText, intelText) {
+  if (!isTalentRecommendAsk(userText)) return ''
+  const named = cityAskedForTalents(userText)
+  let city = named
+  let regionSource = named ? '用户指定' : ''
+  if (!city) {
+    city = intelField(intelText, '门店所在城市')
+    regionSource = city ? '已绑定门店' : '未解析到'
+  }
+  const industryRaw = intelField(intelText, '经营类目').replace(/（.*$/, '').trim()
+  const industry = industryRaw && industryRaw.indexOf('绑定接口未返回') < 0 ? industryRaw : ''
+  const storeName = intelField(intelText, '当前门店')
+  const needles = requirementNeedles(industry)
+  const [publicText, library] = await Promise.all([
+    fetchDoubaoPublicTalentText(city, industry, storeName),
+    requestTalentRecommend({
+      city,
+      platform: '抖音',
+      talentType: industry || '本地生活',
+      budgetYuan: 5000,
+      headcount: 8,
+      seats: [],
+      excludedIds: [],
+      skipPublic: true,
+    }),
+  ])
+  const cards = (library && library.cards) || []
+  const sameCity = cards.filter((c) => !c.empty && String(c.nickname || '').trim() && cardMatchesCity(c, city))
+  const matched = sameCity.filter((c) => cardMatchesStore(c, needles))
+  const libraryLines = formatLibraryLines(matched)
+  const libraryNote = libraryLines
+    ? libraryLines
+    : sameCity.length && needles.length
+      ? `星选库在「${city || '该区域'}」有达人，但没有明显符合门店要求「${industry}」的人，本次不列入。`
+      : `星选库在「${city || '该区域'}」暂无符合条件的达人。${library && library.cityNote ? `（${library.cityNote}）` : ''}`
+  return [
+    '【达人推荐 · 本次】',
+    `区域：${city || '未解析'}（${regionSource}）。门店：${storeName || '未命名'}。门店要求：${industry || '本地生活到店'}。`,
+    '作答必须分成「豆包公网」和「星选达人库」两段，只使用下面给出的人。某一路没有就说明该路没有。不要把其他城市的人说成这个区域的达人。不要编造电话或微信。不要整段拒答，不要让用户自己去蝉妈妈、飞瓜或 MCN。',
+    `【豆包公网】\n${publicText}`,
+    `【星选达人库】\n${libraryNote}`,
+  ].join('\n')
+}
+
+async function requestTalentRecommend(body) {
+  const payload = Object.assign({}, body || {})
+  const skipPublic = !!payload.skipPublic
+  const skipNames = Array.isArray(payload.skipNames) ? payload.skipNames : []
+  delete payload.skipPublic
+  delete payload.skipNames
+  try {
+    const r = await postJson('/api/meoo-ops-novice-kol-allocation', Object.assign({ mode: 'talent_recommend' }, payload))
     if (r && r.ok) {
       const seats = Array.isArray(r.seats) ? r.seats : []
+      const libraryCards = Array.isArray(r.cards) ? r.cards : []
+      const filled = skipPublic
+        ? { cards: libraryCards, cityNote: String(r.cityNote || '') }
+        : await fillTalentShortfallFromPublic(
+            Object.assign({}, payload, { skipNames }),
+            libraryCards,
+            String(r.cityNote || ''),
+          )
       return {
         ok: true,
-        cards: decorateTalentCards(Array.isArray(r.cards) ? r.cards : [], seats),
+        cards: decorateTalentCards(filled.cards, seats),
         seats,
-        cityNote: String(r.cityNote || ''),
+        cityNote: filled.cityNote,
       }
     }
     return { ok: false, message: String((r && (r.error || r.message || r.detail)) || '推荐名单暂时取不到') }
@@ -598,4 +1004,8 @@ module.exports = {
   runSiteSelection,
   requestTalentRecommend,
   seatsForTalentReplace,
+  buildTalentRecommendChatBlock,
+  cityAskedForTalents,
+  cityMentionedInText,
+  isTalentRecommendAsk,
 }

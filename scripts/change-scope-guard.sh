@@ -146,6 +146,7 @@ list_scopes() {
   pr_logo_share_chat   推荐商单平台logo；PR公司logo与分享海报/招募封面；聊天页去掉备案号
   recruit_apply_editor 发布招募：达人报名必填信息可打开，并编辑当前报名项
   merchant_ops_talent_head 商家运营方案：同城达人库头部按 5 级及以上统计，不单看小红书
+  merchant_mp_erp_sync 商家小程序：达人推荐与智能回复对齐商家 ERP
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -816,6 +817,18 @@ PAT
 talentLibraryTierPricing
 merchantRecruitmentTierPlan
 merchantAiOpsPlanCore
+change-scope-guard
+PAT
+      ;;
+    merchant_mp_erp_sync)
+      cat <<'PAT'
+merchantIntelMp
+merchantFeatureApisMp
+talentCityNamesMp
+aiAgentMp
+aiAgentExecutionMp
+pages/ai-agent/ai-agent
+pages/ai-ops-plan/ai-ops-plan
 change-scope-guard
 PAT
       ;;

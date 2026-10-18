@@ -174,7 +174,7 @@
           <text wx:if="{{item.reason}}" class="op-body muted">{{item.reason}}</text>
         </view>
       </view>
-      <button wx:if="{{!item.empty}}" class="op-btn" data-id="{{item.talentId}}" bindtap="onTalentReplace">替换</button>
+      <button wx:if="{{!item.empty}}" class="op-btn" data-id="{{item.talentId}}" data-name="{{item.nickname}}" bindtap="onTalentReplace">替换</button>
     </view>
   </view>
 <site-icp-footer />

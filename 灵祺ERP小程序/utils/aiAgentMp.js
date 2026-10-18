@@ -9,10 +9,11 @@ const platformBindingsMp = require('./platformBindingsMp.js')
 const habitsMp = require('./agentUserHabitsMp.js')
 const stateCloudMp = require('./agentUserStateCloudMp.js')
 const sessionSync = require('./merchantSessionSyncMp.js')
+const feat = require('./merchantFeatureApisMp.js')
 
 const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺助手」，嵌入灵祺商家 ERP，同时也是开放型通用对话助手（与电脑端商家后台助手同源规则）。
 
-【开放对话】用户可以询问任何类型的问题，均须正常、完整、友好地作答；不要以「只能帮商家经营」等理由拒绝。若缺少实时外部数据，说明限制并给出查法或常识参考，仍应尽力回答。
+【开放对话】用户可以询问任何类型的问题，均须正常、完整、友好地作答；不要以「只能帮商家经营」等理由拒绝。若缺少实时外部数据，说明限制并给出查法或常识参考，仍应尽力回答。达人推荐例外：用户要某城市的达人时，按下文【达人推荐 · 本次】分成「豆包公网」和「星选达人库」两段作答，不要整段拒答，不要让用户去蝉妈妈、飞瓜或 MCN。经营数据铁律只约束营收、订单、评价、线索。
 
 【ERP 专有能力】仅当用户主动提出经营、商品、达人、报税等相关需求时：涉及创建、修改、发布等写操作须先输出执行预览 JSON（供系统解析，含 actionType、confirmRequired: true），不得直接执行；用户确认前不要假设写操作已完成。
 
@@ -717,6 +718,14 @@ async function postAiChatRequest(opts) {
       intelText = ''
     }
   }
+  try {
+    const block = await feat.buildTalentRecommendChatBlock(opts.userLine, intelText)
+    if (block) intelText = intelText ? `${intelText}\n\n${block}` : block
+  } catch (_) {
+    if (feat.isTalentRecommendAsk && feat.isTalentRecommendAsk(opts.userLine)) {
+      intelText += '\n\n【达人推荐 · 本次】两路名单都没取到。请说明稍后重试，禁止整段拒答，禁止让用户自己去站外找人。'
+    }
+  }
   const body = {
     provider: parsed.provider,
     model: chatModel || undefined,
@@ -901,6 +910,57 @@ async function processAgentTurn(opts, executionState) {
       userMsg: turn.userMsg,
       assistantMsgs: [turn.assistantMsg],
       executionState: state,
+    }
+  }
+
+  const talentQuote = exec.quoteAsksTalentDetail(line, feat.cityMentionedInText)
+  if (talentQuote && /确认执行|按方案执行|就按这个|按这个|明细|名单/.test(line || talentQuote.quote)) {
+    const plan = {
+      userBrief: line || '按引用的预算给出达人明细',
+      assistantContent: talentQuote.quote,
+      taskTypes: ['recruit_influencer'],
+    }
+    const previewMsgs = await previewMp.spawnPreviewsForTaskTypes(plan, ['recruit_influencer'])
+    const brief = previewMsgs[0] && previewMsgs[0].preview && previewMsgs[0].preview.recruitmentBrief
+    if (brief) {
+      brief.talentPath = 'recommend'
+      if (talentQuote.city && brief.wizardScope) brief.wizardScope.city = talentQuote.city
+      if (brief.wizardBudget) {
+        if (talentQuote.budgetYuan >= 100) brief.wizardBudget.budgetYuan = talentQuote.budgetYuan
+        if (talentQuote.headcount > 0) brief.wizardBudget.headcount = talentQuote.headcount
+      }
+      const recommended = await feat.requestTalentRecommend({
+        city: (brief.wizardScope && brief.wizardScope.city) || talentQuote.city || '',
+        platform: '抖音',
+        talentType: brief.mainProductName || '',
+        budgetYuan: (brief.wizardBudget && brief.wizardBudget.budgetYuan) || talentQuote.budgetYuan || 0,
+        headcount: (brief.wizardBudget && brief.wizardBudget.headcount) || talentQuote.headcount || 0,
+        seats: [],
+        excludedIds: [],
+      })
+      brief.talentCards = recommended.ok ? recommended.cards || [] : []
+      brief.talentNote = recommended.ok ? recommended.cityNote || '' : recommended.message || '推荐名单暂时取不到'
+    }
+    const userMsg = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: line,
+    }
+    const assistantMsgs = [
+      {
+        id: `a-${Date.now()}-line`,
+        role: 'assistant',
+        content: '按你引用的预算和人数，给出达人明细。',
+      },
+    ].concat(previewMsgs)
+    state = exec.markPreviewsActive({
+      stage: 'awaiting_execute_confirm',
+      plan,
+    })
+    return {
+      userMsg,
+      assistantMsgs,
+      executionState: exec.syncStageAfterPreviewChange(state, history.concat([userMsg], assistantMsgs)),
     }
   }
 

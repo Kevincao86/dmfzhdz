@@ -766,12 +766,20 @@ Page({
 
   onTalentRecruit(e) {
     const id = e.currentTarget.dataset.id
-    this.patchRecruitBrief(id, { talentPath: 'recruit' }, '第 1 步：核对主推和投放范围。')
+    const msg = this.findPreview(id)
+    const brief = msg && msg.preview && msg.preview.recruitmentBrief
+    const fromRecommend = brief && brief.talentPath === 'recommend'
+    this.patchRecruitBrief(
+      id,
+      { talentPath: 'recruit' },
+      fromRecommend ? '已确认达人名单。请核对主推和投放范围。' : '第 1 步：核对主推和投放范围。',
+    )
   },
 
   async onTalentRecommend(e) {
     const id = e.currentTarget.dataset.id
     const replaceId = String(e.currentTarget.dataset.talent || '')
+    const replaceName = String(e.currentTarget.dataset.name || '')
     const msg = this.findPreview(id)
     const brief = msg && msg.preview && msg.preview.recruitmentBrief
     if (!brief || !feat || this.data.sending) return
@@ -780,9 +788,14 @@ Page({
     const refreshing = !replaceId
     const cards = refreshing ? [] : Array.isArray(brief.talentCards) ? brief.talentCards : []
     const excluded = refreshing ? [] : Array.isArray(brief.excludedIds) ? brief.excludedIds.slice() : []
-    if (replaceId) excluded.push(replaceId)
+    if (refreshing) this._skippedPublic = []
+    if (replaceId && replaceId.indexOf('public:') === 0) {
+      if (replaceName) this._skippedPublic = (this._skippedPublic || []).concat([replaceName])
+    } else if (replaceId) {
+      excluded.push(replaceId)
+    }
     const seats = cards.length ? feat.seatsForTalentReplace(cards, replaceId) : []
-    this.setData({ sending: true })
+    this.setData({ sending: true, thinkingText: '正在按方案人数配人，不够会从公网补…' })
     const r = await feat.requestTalentRecommend({
       city: scope.city || '',
       platform: scope.platformDouyin === false && scope.platformXhs ? '小红书' : '抖音',
@@ -791,8 +804,9 @@ Page({
       headcount: Number(budget.headcount) || 0,
       seats,
       excludedIds: excluded,
+      skipNames: this._skippedPublic || [],
     })
-    this.setData({ sending: false })
+    this.setData({ sending: false, thinkingText: '正在生成…' })
     if (!r.ok) {
       this.patchRecruitBrief(id, { talentPath: 'recommend', talentNote: r.message || '推荐名单暂时取不到' })
       return

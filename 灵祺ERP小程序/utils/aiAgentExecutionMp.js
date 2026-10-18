@@ -485,6 +485,29 @@ function buildCombinedBrief(plan) {
     : plan.userBrief
 }
 
+/** 引用段落按预算列达人，且用户没有改口去创建商品时，走达人明细而不是创建商品。 */
+function quoteAsksTalentDetail(text, cityOf) {
+  const raw = String(text || '')
+  const matched = raw.match(/^\[引用[\s\S]*?\n\n/)
+  if (!matched) return null
+  const quote = matched[0]
+  const own = raw.slice(quote.length).trim()
+  if (!/达人|招募|KOL|KOC|车马费|达人明细|预算分配/.test(quote)) return null
+  if (/创建商品|上架商品|组品|商品图|生成商品|团购商品|请上传商品/.test(`${quote}\n${own}`)) return null
+  if (own && !/确认执行|按方案执行|就按这个|按这个|给出|明细|达人|预算|名单/.test(own)) return null
+  const flat = quote.replace(/,/g, '')
+  const budgetMatch = flat.match(/(\d{3,6})\s*元\s*预算|预算\s*[:：]?\s*(\d{3,6})/)
+  const headMatch = flat.match(/(\d{1,3})\s*位\s*达人/)
+  const budgetYuan = Number((budgetMatch && (budgetMatch[1] || budgetMatch[2])) || 0)
+  const headcount = Number((headMatch && headMatch[1]) || 0)
+  return {
+    quote,
+    city: typeof cityOf === 'function' ? cityOf(quote) || '' : '',
+    budgetYuan: budgetYuan >= 100 ? budgetYuan : 0,
+    headcount: headcount > 0 ? headcount : 0,
+  }
+}
+
 module.exports = {
   TASK_LABELS,
   inferTaskTypeFromText,
@@ -509,4 +532,5 @@ module.exports = {
   recoverPlanFromMessages,
   resolveExecutionUserMessage,
   buildCombinedBrief,
+  quoteAsksTalentDetail,
 }

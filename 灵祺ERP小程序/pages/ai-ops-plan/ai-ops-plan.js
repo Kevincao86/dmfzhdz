@@ -212,12 +212,17 @@ Page({
     })()
   },
 
-  async loadTalents(replaceId) {
+  async loadTalents(replaceId, replaceName) {
     if (this.data.talentBusy) return
     const plan = this.data.plan || {}
     const cards = this.data.talentCards || []
     const excluded = (this._excludedIds || []).slice()
-    if (replaceId) excluded.push(replaceId)
+    const isPublic = String(replaceId || '').indexOf('public:') === 0
+    if (replaceId && isPublic && replaceName) {
+      this._skippedPublic = (this._skippedPublic || []).concat([replaceName])
+    } else if (replaceId) {
+      excluded.push(replaceId)
+    }
     this._excludedIds = excluded
     const seats = cards.length ? feat.seatsForTalentReplace(cards, replaceId || '') : plan.talentSeats || []
     this.setData({ talentBusy: true })
@@ -229,6 +234,7 @@ Page({
       headcount: 0,
       seats,
       excludedIds: excluded,
+      skipNames: this._skippedPublic || [],
     })
     if (!r.ok) {
       this.setData({ talentBusy: false, talentNote: r.message || '推荐名单暂时取不到' })
@@ -243,13 +249,15 @@ Page({
 
   onTalentRecommend() {
     this._excludedIds = []
+    this._skippedPublic = []
     void this.loadTalents('')
   },
 
   onTalentReplace(e) {
     const id = e.currentTarget.dataset.id
+    const name = e.currentTarget.dataset.name
     if (!id) return
-    void this.loadTalents(id)
+    void this.loadTalents(id, name)
   },
 
   onCopyTalentProfile(e) {
