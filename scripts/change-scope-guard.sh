@@ -59,6 +59,7 @@ list_scopes() {
   regional_partner     区域服务商（城市代理门户 + 运营台开账号）
   mp_pr_orphan_delete  我的发单 orphan 误删（includePrOwned 空列表剪枝）
   mp_recruit_no_drop   招募单禁止 slice(200) 丢单 + 备份复原
+  mp_recruit_order_rows 新发招募单一行一单；旧注册表单不搬不改
   mp_hall_list_full    星选大厅招募单列表完整展示（瘦身 1MB 截断）
   merchant_landing_hero 商家落地页首屏图空白补全（平板工作台 / 全息文案）
   cs_web_beautify      商家 CS 全站视觉（落地+登录+工作台壳层/内页主题，不部署）
@@ -846,6 +847,16 @@ opsRegistryGatewayShared
 opsRegistrySupabaseDispatch
 registrySnapshotPgAppend
 商家管理后台/src/ops/opsRegistrySupabaseDispatch
+change-scope-guard
+PAT
+      ;;
+    mp_recruit_order_rows)
+      cat <<'PAT'
+mpRecruitmentOrderRowStore
+registrySnapshotPgAppend
+registrySnapshotIoFetch
+mpHallRegistryCore
+meoo-ops-mp-recruitment-orders-append
 change-scope-guard
 PAT
       ;;

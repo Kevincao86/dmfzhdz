@@ -79,12 +79,15 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
       }
       const parsed = (rows[0]?.registry ?? null) as Partial<RegistryFile> | null
       const { normalizeRegistryFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
+      const { attachRowOrdersForRead } = await import('./mpRecruitmentOrderRowStore.js')
       try {
-        return rememberLoadedMpOrders(normalizeRegistryFile(parsed))
+        const file = rememberLoadedMpOrders(normalizeRegistryFile(parsed))
+        await attachRowOrdersForRead(file)
+        return file
       } catch (normalizeErr) {
         const hint = normalizeErr instanceof Error ? normalizeErr.message : String(normalizeErr)
         console.error('[registrySnapshotIoFetch] normalizeRegistryFile failed:', hint.slice(0, 400))
-        return rememberLoadedMpOrders(normalizeRegistryFile({
+        const file = rememberLoadedMpOrders(normalizeRegistryFile({
           mpRecruitmentOrders: Array.isArray(parsed?.mpRecruitmentOrders) ? parsed!.mpRecruitmentOrders : [],
           recruitmentOrders: Array.isArray(parsed?.recruitmentOrders) ? parsed!.recruitmentOrders : [],
           mpTalentMembers: Array.isArray(parsed?.mpTalentMembers) ? parsed!.mpTalentMembers : [],
@@ -92,6 +95,8 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
           mpTalentInbox: Array.isArray(parsed?.mpTalentInbox) ? parsed!.mpTalentInbox : [],
           mpOrderGroupChats: Array.isArray(parsed?.mpOrderGroupChats) ? parsed!.mpOrderGroupChats : [],
         }))
+        await attachRowOrdersForRead(file)
+        return file
       }
     },
 
@@ -103,6 +108,8 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
       }
       const { registryForPersistentFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
       let persist = registryForPersistentFile(data) as RegistryFile
+      const { peelRowOrdersBeforeSnapshotSave } = await import('./mpRecruitmentOrderRowStore.js')
+      await peelRowOrdersBeforeSnapshotSave(data, persist)
       const baseline = loadedMpOrderIds.get(data) ?? null
       const { mergeMpOrdersPreservingConcurrent, saveRegistryMergingMpOrders } = await import(
         './registrySnapshotPgAppend.js'

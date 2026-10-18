@@ -195,6 +195,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         })
         return
       }
+      sendOpsJson(res, pgResult.status || 500, { ok: false, error: pgResult.error })
+      return
     }
 
     await appendViaRegistryIo(supabaseUrl, serviceRole, order)

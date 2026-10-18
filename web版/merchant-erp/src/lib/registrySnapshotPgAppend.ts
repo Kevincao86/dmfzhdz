@@ -14,6 +14,15 @@ import {
   sanitizeValueForPostgresJson,
   stripOrderInlineImagesForPersist,
 } from './mpRecruitmentRegistryPersist.js'
+import {
+  insertMpRecruitmentOrderRow,
+  isMpOrderFormRelayGroupQrFromRow,
+  patchMpRecruitmentOrderRowGroupQr,
+  readMpFormRelayGroupQrFromRow,
+  readMpRecruitmentOrderRow,
+  readMpRecruitmentOrderRowGroupQr,
+  readMpRecruitmentOrdersByIdsFromRows,
+} from './mpRecruitmentOrderRowStore.js'
 
 const { Client } = pg
 
@@ -159,8 +168,7 @@ export async function appendMpRecruitmentOrderViaPg(
   const client = new Client({ connectionString: cs })
   await client.connect()
   try {
-    await client.query('BEGIN')
-    await client.query(`SELECT id FROM ops_registry_snapshot WHERE id = 1 FOR UPDATE`)
+    // 只读旧名单，确认不会和历史单号撞车。不锁、不改注册表。
     const dup = await client.query<{ existing_id: string | null }>(
       `SELECT o->>'id' AS existing_id
        FROM ops_registry_snapshot s,
@@ -171,63 +179,23 @@ export async function appendMpRecruitmentOrderViaPg(
     )
     const existingId = String(dup.rows[0]?.existing_id || '').trim()
     if (existingId) {
-      await client.query('COMMIT')
-      if (existingId === String(order.id)) {
-        return { ok: true, groupQrSaved: false }
-      }
+      if (existingId === String(order.id)) return { ok: true, groupQrSaved: false }
       return { ok: false, error: 'duplicate_merchant_order', status: 409, existingId }
     }
-
-    // 只 prepend，禁止再 LIMIT/slice 截断——否则新发单会永久挤掉旧单
-    await client.query(
-      `UPDATE ops_registry_snapshot
-       SET registry = jsonb_set(
-         COALESCE(registry, '{}'::jsonb),
-         '{mpRecruitmentOrders}',
-         jsonb_build_array($1::jsonb) || COALESCE(registry->'mpRecruitmentOrders', '[]'::jsonb),
-         true
-       ),
-       updated_at = now()
-       WHERE id = 1`,
-      [JSON.stringify(prepared.order)],
-    )
-
-    for (const [orderId, qr] of Object.entries(prepared.groupQrByOrderId)) {
-      await client.query(
-        `UPDATE ops_registry_snapshot
-         SET registry = jsonb_set(
-           COALESCE(registry, '{}'::jsonb),
-           '{mpGroupQrByOrderId}',
-           COALESCE(registry->'mpGroupQrByOrderId', '{}'::jsonb) || jsonb_build_object($1::text, $2::text),
-           true
-         ),
-         updated_at = now()
-         WHERE id = 1`,
-        [orderId, qr],
-      )
-    }
-
-    await client.query('COMMIT')
-
-    const groupQrSaved = Object.keys(prepared.groupQrByOrderId).length > 0
-    if (groupQrSaved) {
-      const verify = await client.query<{ qr: string | null }>(
-        `SELECT registry->'mpGroupQrByOrderId'->>$1 AS qr
-         FROM ops_registry_snapshot WHERE id = 1`,
-        [String(prepared.order.id || '').trim()],
-      )
-      if (!String(verify.rows[0]?.qr || '').trim()) {
-        throw new Error('group_qr_not_persisted')
-      }
-    }
-
-    return { ok: true, groupQrSaved }
-  } catch (e) {
-    await client.query('ROLLBACK').catch(() => {})
-    throw e
   } finally {
     await client.end()
   }
+
+  const groupQr = Object.values(prepared.groupQrByOrderId)[0] || ''
+  const inserted = await insertMpRecruitmentOrderRow({ order: prepared.order, groupQr })
+  if (!inserted.ok) return inserted
+
+  const groupQrSaved = Object.keys(prepared.groupQrByOrderId).length > 0
+  if (groupQrSaved) {
+    const saved = await readMpRecruitmentOrderRowGroupQr(String(prepared.order.id || ''))
+    if (!saved) throw new Error('group_qr_not_persisted')
+  }
+  return { ok: true, groupQrSaved }
 }
 
 /**
@@ -323,6 +291,8 @@ export async function patchMpGroupQrViaPg(
     return { ok: false, error: 'group_qr_too_large', status: 400 }
   }
 
+  if (await patchMpRecruitmentOrderRowGroupQr(id, qr)) return { ok: true }
+
   const client = new Client({ connectionString: cs })
   await client.connect()
   try {
@@ -394,6 +364,12 @@ export async function readMpGroupQrSideMapViaPg(
 
   const id = String(mpOrderId || '').trim()
   if (!id) return { ok: false, error: 'invalid_mp_order', status: 400 }
+
+  const rowOrder = await readMpRecruitmentOrderRow(id)
+  if (rowOrder) {
+    if (!rowOrder.groupQr) return { ok: false, error: 'group_qr_missing', status: 404 }
+    return { ok: true, groupQrImage: rowOrder.groupQr }
+  }
 
   const client = new Client({ connectionString: cs })
   await client.connect()
@@ -525,7 +501,23 @@ export async function readMpRecruitmentOrdersByIdsViaPg(
       }
     }
 
-    return { ok: true, orders, mpPrUsers, groupQrByOrderId }
+    const fromRows = await readMpRecruitmentOrdersByIdsFromRows(ids)
+    const have = new Set(orders.map((order) => String(order.id || '').trim()).filter(Boolean))
+    const mergedOrders = [
+      ...fromRows.orders.filter((order) => {
+        const id = String(order.id || '').trim()
+        return id && !have.has(id)
+      }),
+      ...orders,
+    ]
+    const mergedQr = { ...fromRows.groupQrByOrderId, ...groupQrByOrderId }
+
+    return {
+      ok: true,
+      orders: mergedOrders,
+      mpPrUsers,
+      groupQrByOrderId: mergedQr,
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, error: msg.slice(0, 240) }
@@ -546,6 +538,13 @@ export async function readMpFormRelayGroupQrViaPg(
 
   const id = String(mpOrderId || '').trim()
   if (!id) return { ok: false, error: 'invalid_mp_order', status: 400 }
+
+  const fromRow = await readMpFormRelayGroupQrFromRow(id)
+  if (fromRow.found) {
+    if (!fromRow.isGroupQr) return { ok: false, error: 'not_group_qr_relay', status: 404 }
+    if (!fromRow.groupQr) return { ok: false, error: 'group_qr_missing', status: 404 }
+    return { ok: true, mpOrderId: id, title: fromRow.title, groupQrImage: fromRow.groupQr }
+  }
 
   const client = new Client({ connectionString: cs })
   await client.connect()
@@ -598,6 +597,9 @@ export async function isMpOrderFormRelayGroupQrRelayViaPg(
 
   const id = String(mpOrderId || '').trim()
   if (!id) return null
+
+  const fromRow = await isMpOrderFormRelayGroupQrFromRow(id)
+  if (fromRow !== null) return fromRow
 
   const client = new Client({ connectionString: cs })
   await client.connect()

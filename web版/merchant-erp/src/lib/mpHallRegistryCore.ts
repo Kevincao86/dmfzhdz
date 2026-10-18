@@ -37,6 +37,7 @@ import {
   readMpRecruitmentOrdersByIdsViaPg,
 } from './registrySnapshotPgAppend.js'
 import { isFormRelayGroupQrRelay, readExternalFormRelay } from './formRelayPlatforms.js'
+import { overlayRowOrdersOnPartial } from './mpRecruitmentOrderRowStore.js'
 
 function looksLikePhone(raw: string): boolean {
   const digits = String(raw || '').replace(/\D/g, '')
@@ -228,7 +229,9 @@ async function fetchRegistryPartialFromDb(
   }
   const reg = rows[0]?.registry
   if (!reg || typeof reg !== 'object') return {}
-  return reg as Partial<RegistryFile>
+  const partial = reg as Partial<RegistryFile>
+  await overlayRowOrdersOnPartial(partial)
+  return partial
 }
 
 /** 仅拉 mpRecruitmentOrders 列，比全量 registry 更小更稳（运营台列表读专用，不做 slim） */
@@ -257,8 +260,11 @@ export async function fetchRegistryMpOrdersFromDb(
     throw new Error(`registry_mp_orders_parse:${text.slice(0, 120)}`)
   }
   const mp = rows[0]?.mpRecruitmentOrders
-  if (!Array.isArray(mp)) return {}
-  return { mpRecruitmentOrders: mp as RegistryMpRecruitmentOrder[] }
+  const partial: Partial<RegistryFile> = Array.isArray(mp)
+    ? { mpRecruitmentOrders: mp as RegistryMpRecruitmentOrder[] }
+    : {}
+  await overlayRowOrdersOnPartial(partial)
+  return partial
 }
 
 /** 仅拉 mpGroupQrByOrderId（转发群码/入选群码 side map；订单体已脱敏不含码） */
@@ -287,8 +293,12 @@ async function fetchRegistryMpGroupQrByOrderIdFromDb(
     throw new Error(`registry_mp_group_qr_parse:${text.slice(0, 120)}`)
   }
   const map = rows[0]?.mpGroupQrByOrderId
-  if (!map || typeof map !== 'object' || Array.isArray(map)) return {}
-  return { mpGroupQrByOrderId: map as Record<string, string> }
+  const partial: Partial<RegistryFile> =
+    map && typeof map === 'object' && !Array.isArray(map)
+      ? { mpGroupQrByOrderId: map as Record<string, string> }
+      : {}
+  await overlayRowOrdersOnPartial(partial)
+  return partial
 }
 
 /** 仅拉 mpPrUsers 列，供海报/详情读取发单方名称 */
@@ -727,7 +737,9 @@ async function fetchRegistryRecommendPoolFromDb(
   }
   const row = rows[0]
   if (!row || typeof row !== 'object') return {}
-  return row as Partial<RegistryFile>
+  const partial = row as Partial<RegistryFile>
+  await overlayRowOrdersOnPartial(partial)
+  return partial
 }
 
 function recommendPoolCount(partial: Partial<RegistryFile>): number {
