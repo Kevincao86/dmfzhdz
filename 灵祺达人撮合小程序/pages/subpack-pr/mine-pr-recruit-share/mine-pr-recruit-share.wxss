@@ -67,14 +67,16 @@
   display: flex;
   justify-content: center;
 }
-.theme-scroll {
-  white-space: nowrap;
-  width: 100%;
+.month-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
   margin-bottom: 16rpx;
 }
+.month-chip,
 .theme-chip {
-  display: inline-flex;
-  margin-right: 12rpx;
+  min-width: 88rpx;
+  margin: 0;
 }
 .link-box {
   background: #f1f5f9;

@@ -26,28 +26,28 @@ const COLORS = [
 ]
 
 const FESTIVALS = [
-  { id: 'newyear', label: '元旦', accent: '#C9A227', paper: '#FFFBF2' },
-  { id: 'spring', label: '春节', accent: '#E11D2E', paper: '#FFF7E8' },
-  { id: 'lantern', label: '元宵', accent: '#FF8A3D', paper: '#FFF8EF' },
-  { id: 'valentine', label: '情人节', accent: '#BE185D', paper: '#FFF1F6' },
-  { id: 'women', label: '妇女节', accent: '#DB2777', paper: '#FFF5F8' },
-  { id: 'qingming', label: '清明', accent: '#0F766E', paper: '#F3FBF7' },
-  { id: 'labor', label: '劳动节', accent: '#0F766E', paper: '#F0FDFA' },
-  { id: 'youth', label: '青年节', accent: '#1D4ED8', paper: '#F0F9FF' },
-  { id: 'mother', label: '母亲节', accent: '#9F1239', paper: '#FFF1F2' },
-  { id: 'child', label: '儿童节', accent: '#0284C7', paper: '#F0FDFF' },
-  { id: 'duanwu', label: '端午', accent: '#166534', paper: '#F0FDF4' },
-  { id: 'father', label: '父亲节', accent: '#1E3A5F', paper: '#F8FAFC' },
-  { id: 'qixi', label: '七夕', accent: '#7C3AED', paper: '#FAF5FF' },
-  { id: 'teacher', label: '教师节', accent: '#C2410C', paper: '#FFF7ED' },
-  { id: 'midautumn', label: '中秋', accent: '#FDE68A', paper: '#FFFBEB' },
-  { id: 'national', label: '国庆', accent: '#DC2626', paper: '#FFF7ED' },
-  { id: 'chongyang', label: '重阳', accent: '#B45309', paper: '#FFFBEB' },
-  { id: 'halloween', label: '万圣节', accent: '#F97316', paper: '#FFF7ED' },
-  { id: 'sale', label: '双十一', accent: '#EF4444', paper: '#FFF7ED' },
-  { id: 'dongzhi', label: '冬至', accent: '#1D4ED8', paper: '#EFF6FF' },
-  { id: 'christmas', label: '圣诞', accent: '#166534', paper: '#F0FDF4' },
-  { id: 'countdown', label: '跨年', accent: '#7C3AED', paper: '#F8FAFC' },
+  { id: 'newyear', label: '元旦', month: 1, accent: '#C9A227', paper: '#FFFBF2' },
+  { id: 'spring', label: '春节', month: 2, accent: '#E11D2E', paper: '#FFF7E8' },
+  { id: 'lantern', label: '元宵', month: 2, accent: '#FF8A3D', paper: '#FFF8EF' },
+  { id: 'valentine', label: '情人节', month: 2, accent: '#BE185D', paper: '#FFF1F6' },
+  { id: 'women', label: '妇女节', month: 3, accent: '#DB2777', paper: '#FFF5F8' },
+  { id: 'qingming', label: '清明', month: 4, accent: '#0F766E', paper: '#F3FBF7' },
+  { id: 'labor', label: '劳动节', month: 5, accent: '#0F766E', paper: '#F0FDFA' },
+  { id: 'youth', label: '青年节', month: 5, accent: '#1D4ED8', paper: '#F0F9FF' },
+  { id: 'mother', label: '母亲节', month: 5, accent: '#9F1239', paper: '#FFF1F2' },
+  { id: 'child', label: '儿童节', month: 6, accent: '#0284C7', paper: '#F0FDFF' },
+  { id: 'duanwu', label: '端午', month: 6, accent: '#166534', paper: '#F0FDF4' },
+  { id: 'father', label: '父亲节', month: 6, accent: '#1E3A5F', paper: '#F8FAFC' },
+  { id: 'qixi', label: '七夕', month: 8, accent: '#7C3AED', paper: '#FAF5FF' },
+  { id: 'teacher', label: '教师节', month: 9, accent: '#C2410C', paper: '#FFF7ED' },
+  { id: 'midautumn', label: '中秋', month: 9, accent: '#FDE68A', paper: '#FFFBEB' },
+  { id: 'national', label: '国庆', month: 10, accent: '#DC2626', paper: '#FFF7ED' },
+  { id: 'chongyang', label: '重阳', month: 10, accent: '#B45309', paper: '#FFFBEB' },
+  { id: 'halloween', label: '万圣节', month: 10, accent: '#F97316', paper: '#FFF7ED' },
+  { id: 'sale', label: '双十一', month: 11, accent: '#EF4444', paper: '#FFF7ED' },
+  { id: 'dongzhi', label: '冬至', month: 12, accent: '#1D4ED8', paper: '#EFF6FF' },
+  { id: 'christmas', label: '圣诞', month: 12, accent: '#166534', paper: '#F0FDF4' },
+  { id: 'countdown', label: '跨年', month: 12, accent: '#7C3AED', paper: '#F8FAFC' },
 ]
 
 function recruitmentWebUrl(id: string) {
@@ -74,6 +74,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   const [posterErr, setPosterErr] = useState('')
   const [posterStyleIndex, setPosterStyleIndex] = useState(0)
   const [themeId, setThemeId] = useState('')
+  const [themeMonth, setThemeMonth] = useState(() => new Date().getMonth() + 1)
   const [posterAccent, setPosterAccent] = useState('#7c3aed')
   const [codeUrl, setCodeUrl] = useState('')
   const [codeErr, setCodeErr] = useState('')
@@ -194,6 +195,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   }
 
   const activeTheme = FESTIVALS.find((item) => item.id === themeId) || null
+  const monthFestivals = FESTIVALS.filter((item) => item.month === themeMonth)
   const tabs: { id: Tab; label: string }[] = [
     { id: 'poster', label: '分享图' },
     { id: 'code', label: '小程序码' },
@@ -321,18 +323,32 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
         ) : null}
 
         {tab === 'web' && webMode !== 'qr' ? null : (
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            <button type="button" className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs ${themeId ? '' : 'border-blue-600 text-blue-600'}`} onClick={() => pickTheme('')}>经典</button>
-            {FESTIVALS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs ${themeId === item.id ? 'border-blue-600 text-blue-600' : ''}`}
-                onClick={() => pickTheme(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
+          <div className="mt-4 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                <button
+                  key={month}
+                  type="button"
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs ${themeMonth === month ? 'border-blue-600 text-blue-600' : ''}`}
+                  onClick={() => setThemeMonth(month)}
+                >
+                  {month}月
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={`rounded-lg border px-3 py-1.5 text-xs ${themeId ? '' : 'border-blue-600 text-blue-600'}`} onClick={() => pickTheme('')}>经典</button>
+              {monthFestivals.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`rounded-lg border px-3 py-1.5 text-xs ${themeId === item.id ? 'border-blue-600 text-blue-600' : ''}`}
+                  onClick={() => pickTheme(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

@@ -22,6 +22,16 @@ function withOn(list, id, key) {
   return (list || []).map((item) => Object.assign({}, item, { on: item[key || 'id'] === id }))
 }
 
+function monthChips(active) {
+  const list = []
+  for (let id = 1; id <= 12; id += 1) list.push({ id, label: `${id}月`, on: id === active })
+  return list
+}
+
+function themeChips(month, themeId) {
+  return withOn(themes.themesInMonth(month), themeId)
+}
+
 Page({
   data: {
     tabs: TABS,
@@ -35,7 +45,9 @@ Page({
     webMode: 'link',
     colors: withOn(hub.POSTER_COLORS, 'sunset'),
     colorId: 'sunset',
-    themes: withOn(themes.THEMES, ''),
+    themeMonth: new Date().getMonth() + 1,
+    months: monthChips(new Date().getMonth() + 1),
+    themes: themeChips(new Date().getMonth() + 1, ''),
     themeId: '',
     styleIndex: 0,
     sizes: withOn(hub.CODE_SIZES, 'm'),
@@ -127,7 +139,7 @@ Page({
         styleIndex: hit.index,
         colors: withOn(hub.POSTER_COLORS, hit.id),
         themeId: '',
-        themes: withOn(themes.THEMES, ''),
+        themes: themeChips(this.data.themeMonth, ''),
         posterPath: '',
         qrPath: '',
         codePath: '',
@@ -136,12 +148,22 @@ Page({
     )
   },
 
+  onThemeMonth(e) {
+    const month = Number(e.currentTarget.dataset.month)
+    if (!month || month === this.data.themeMonth) return
+    this.setData({
+      themeMonth: month,
+      months: monthChips(month),
+      themes: themeChips(month, this.data.themeId),
+    })
+  },
+
   onTheme(e) {
     const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
     this.setData(
       {
         themeId: id,
-        themes: withOn(themes.THEMES, id),
+        themes: themeChips(this.data.themeMonth, id),
         posterPath: '',
         qrPath: '',
         codePath: '',

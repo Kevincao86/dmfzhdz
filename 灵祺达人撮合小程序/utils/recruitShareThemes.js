@@ -1,29 +1,34 @@
 /** 分享海报 / 小程序码 / 网页二维码共用的节日主题。画在画布上，不依赖外链大图。 */
 
 const THEMES = [
-  { id: 'newyear', label: '元旦', bg: ['#FFF8EA', '#F6E2A8'], accent: '#C9A227', ink: '#7A5412', paper: '#FFFBF2', motif: 'firework' },
-  { id: 'spring', label: '春节', bg: ['#E11D2E', '#9F1239'], accent: '#F6C453', ink: '#FFF4D4', paper: '#FFF7E8', motif: 'lantern' },
-  { id: 'lantern', label: '元宵', bg: ['#FF8A3D', '#F4B183'], accent: '#FFF3D6', ink: '#7C2D12', paper: '#FFF8EF', motif: 'tangyuan' },
-  { id: 'valentine', label: '情人节', bg: ['#F472B6', '#FBCFE8'], accent: '#BE185D', ink: '#831843', paper: '#FFF1F6', motif: 'heart' },
-  { id: 'women', label: '妇女节', bg: ['#F9A8D4', '#FDE68A'], accent: '#DB2777', ink: '#9D174D', paper: '#FFF5F8', motif: 'flower' },
-  { id: 'qingming', label: '清明', bg: ['#D1FAE5', '#A7C4B5'], accent: '#0F766E', ink: '#134E4A', paper: '#F3FBF7', motif: 'willow' },
-  { id: 'labor', label: '劳动节', bg: ['#5EEAD4', '#0F766E'], accent: '#134E4A', ink: '#042F2E', paper: '#F0FDFA', motif: 'city' },
-  { id: 'youth', label: '青年节', bg: ['#38BDF8', '#1D4ED8'], accent: '#E0F2FE', ink: '#082F49', paper: '#F0F9FF', motif: 'run' },
-  { id: 'mother', label: '母亲节', bg: ['#F9A8D4', '#FB7185'], accent: '#9F1239', ink: '#881337', paper: '#FFF1F2', motif: 'flower' },
-  { id: 'child', label: '儿童节', bg: ['#67E8F9', '#FDE047'], accent: '#0284C7', ink: '#0C4A6E', paper: '#F0FDFF', motif: 'balloon' },
-  { id: 'duanwu', label: '端午', bg: ['#4ADE80', '#166534'], accent: '#FDE68A', ink: '#14532D', paper: '#F0FDF4', motif: 'zongzi' },
-  { id: 'father', label: '父亲节', bg: ['#1E3A5F', '#0F172A'], accent: '#F6C453', ink: '#E2E8F0', paper: '#F8FAFC', motif: 'tie' },
-  { id: 'qixi', label: '七夕', bg: ['#4C1D95', '#7C3AED'], accent: '#F9A8D4', ink: '#FAE8FF', paper: '#FAF5FF', motif: 'magpie' },
-  { id: 'teacher', label: '教师节', bg: ['#F6D7A8', '#C2410C'], accent: '#7C2D12', ink: '#7C2D12', paper: '#FFF7ED', motif: 'book' },
-  { id: 'midautumn', label: '中秋', bg: ['#1E1B4B', '#312E81'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#FFFBEB', motif: 'moon' },
-  { id: 'national', label: '国庆', bg: ['#DC2626', '#991B1B'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#FFF7ED', motif: 'flag' },
-  { id: 'chongyang', label: '重阳', bg: ['#F59E0B', '#B45309'], accent: '#7C2D12', ink: '#78350F', paper: '#FFFBEB', motif: 'flower' },
-  { id: 'halloween', label: '万圣节', bg: ['#F97316', '#1F2937'], accent: '#111827', ink: '#FFEDD5', paper: '#FFF7ED', motif: 'pumpkin' },
-  { id: 'sale', label: '双十一', bg: ['#EF4444', '#F97316'], accent: '#FFF7ED', ink: '#7F1D1D', paper: '#FFF7ED', motif: 'tag' },
-  { id: 'dongzhi', label: '冬至', bg: ['#BFDBFE', '#1D4ED8'], accent: '#1E3A8A', ink: '#1E3A8A', paper: '#EFF6FF', motif: 'dumpling' },
-  { id: 'christmas', label: '圣诞', bg: ['#166534', '#B91C1C'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#F0FDF4', motif: 'tree' },
-  { id: 'countdown', label: '跨年', bg: ['#0F172A', '#7C3AED'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#F8FAFC', motif: 'firework' },
+  { id: 'newyear', label: '元旦', month: 1, bg: ['#FFF8EA', '#F6E2A8'], accent: '#C9A227', ink: '#7A5412', paper: '#FFFBF2', motif: 'firework' },
+  { id: 'spring', label: '春节', month: 2, bg: ['#E11D2E', '#9F1239'], accent: '#F6C453', ink: '#FFF4D4', paper: '#FFF7E8', motif: 'lantern' },
+  { id: 'lantern', label: '元宵', month: 2, bg: ['#FF8A3D', '#F4B183'], accent: '#FFF3D6', ink: '#7C2D12', paper: '#FFF8EF', motif: 'tangyuan' },
+  { id: 'valentine', label: '情人节', month: 2, bg: ['#F472B6', '#FBCFE8'], accent: '#BE185D', ink: '#831843', paper: '#FFF1F6', motif: 'heart' },
+  { id: 'women', label: '妇女节', month: 3, bg: ['#F9A8D4', '#FDE68A'], accent: '#DB2777', ink: '#9D174D', paper: '#FFF5F8', motif: 'flower' },
+  { id: 'qingming', label: '清明', month: 4, bg: ['#D1FAE5', '#A7C4B5'], accent: '#0F766E', ink: '#134E4A', paper: '#F3FBF7', motif: 'willow' },
+  { id: 'labor', label: '劳动节', month: 5, bg: ['#5EEAD4', '#0F766E'], accent: '#134E4A', ink: '#042F2E', paper: '#F0FDFA', motif: 'city' },
+  { id: 'youth', label: '青年节', month: 5, bg: ['#38BDF8', '#1D4ED8'], accent: '#E0F2FE', ink: '#082F49', paper: '#F0F9FF', motif: 'run' },
+  { id: 'mother', label: '母亲节', month: 5, bg: ['#F9A8D4', '#FB7185'], accent: '#9F1239', ink: '#881337', paper: '#FFF1F2', motif: 'flower' },
+  { id: 'child', label: '儿童节', month: 6, bg: ['#67E8F9', '#FDE047'], accent: '#0284C7', ink: '#0C4A6E', paper: '#F0FDFF', motif: 'balloon' },
+  { id: 'duanwu', label: '端午', month: 6, bg: ['#4ADE80', '#166534'], accent: '#FDE68A', ink: '#14532D', paper: '#F0FDF4', motif: 'zongzi' },
+  { id: 'father', label: '父亲节', month: 6, bg: ['#1E3A5F', '#0F172A'], accent: '#F6C453', ink: '#E2E8F0', paper: '#F8FAFC', motif: 'tie' },
+  { id: 'qixi', label: '七夕', month: 8, bg: ['#4C1D95', '#7C3AED'], accent: '#F9A8D4', ink: '#FAE8FF', paper: '#FAF5FF', motif: 'magpie' },
+  { id: 'teacher', label: '教师节', month: 9, bg: ['#F6D7A8', '#C2410C'], accent: '#7C2D12', ink: '#7C2D12', paper: '#FFF7ED', motif: 'book' },
+  { id: 'midautumn', label: '中秋', month: 9, bg: ['#1E1B4B', '#312E81'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#FFFBEB', motif: 'moon' },
+  { id: 'national', label: '国庆', month: 10, bg: ['#DC2626', '#991B1B'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#FFF7ED', motif: 'flag' },
+  { id: 'chongyang', label: '重阳', month: 10, bg: ['#F59E0B', '#B45309'], accent: '#7C2D12', ink: '#78350F', paper: '#FFFBEB', motif: 'flower' },
+  { id: 'halloween', label: '万圣节', month: 10, bg: ['#F97316', '#1F2937'], accent: '#111827', ink: '#FFEDD5', paper: '#FFF7ED', motif: 'pumpkin' },
+  { id: 'sale', label: '双十一', month: 11, bg: ['#EF4444', '#F97316'], accent: '#FFF7ED', ink: '#7F1D1D', paper: '#FFF7ED', motif: 'tag' },
+  { id: 'dongzhi', label: '冬至', month: 12, bg: ['#BFDBFE', '#1D4ED8'], accent: '#1E3A8A', ink: '#1E3A8A', paper: '#EFF6FF', motif: 'dumpling' },
+  { id: 'christmas', label: '圣诞', month: 12, bg: ['#166534', '#B91C1C'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#F0FDF4', motif: 'tree' },
+  { id: 'countdown', label: '跨年', month: 12, bg: ['#0F172A', '#7C3AED'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#F8FAFC', motif: 'firework' },
 ]
+
+function themesInMonth(month) {
+  const m = Number(month) || 0
+  return THEMES.filter((item) => item.month === m)
+}
 
 function findTheme(id) {
   const key = String(id || '').trim()
@@ -180,6 +185,7 @@ function clipShape(ctx, x, y, size, shapeId) {
 
 module.exports = {
   THEMES,
+  themesInMonth,
   findTheme,
   roundRect,
   paintPosterChrome,

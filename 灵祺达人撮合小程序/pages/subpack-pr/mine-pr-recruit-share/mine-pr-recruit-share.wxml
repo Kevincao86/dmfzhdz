@@ -38,16 +38,27 @@
       <text class="edition {{edition === 'pure' ? 'on' : ''}}" data-id="pure" bindtap="onEdition">纯净版（无额外说明）</text>
     </view>
 
-    <scroll-view wx:if="{{tab !== 'web' || webMode === 'qr'}}" class="theme-scroll" scroll-x>
-      <view class="chip theme-chip {{themeId ? '' : 'on'}}" data-id="" bindtap="onTheme">经典</view>
-      <view
-        wx:for="{{themes}}"
-        wx:key="id"
-        class="chip theme-chip {{item.on ? 'on' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onTheme"
-      >{{item.label}}</view>
-    </scroll-view>
+    <block wx:if="{{tab !== 'web' || webMode === 'qr'}}">
+      <view class="month-row">
+        <view
+          wx:for="{{months}}"
+          wx:key="id"
+          class="chip month-chip {{item.on ? 'on' : ''}}"
+          data-month="{{item.id}}"
+          bindtap="onThemeMonth"
+        >{{item.label}}</view>
+      </view>
+      <view class="month-row">
+        <view class="chip theme-chip {{themeId ? '' : 'on'}}" data-id="" bindtap="onTheme">经典</view>
+        <view
+          wx:for="{{themes}}"
+          wx:key="id"
+          class="chip theme-chip {{item.on ? 'on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onTheme"
+        >{{item.label}}</view>
+      </view>
+    </block>
 
     <view wx:if="{{tab !== 'web'}}" class="tool-tabs">
       <text class="tool {{tab === 'poster' ? 'on' : ''}}">颜色</text>
