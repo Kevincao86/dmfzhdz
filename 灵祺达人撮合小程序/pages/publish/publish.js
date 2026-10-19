@@ -16,6 +16,7 @@ const recruitShareCover = require('../../utils/recruitShareCover.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
 const posterAi = require('../../utils/mpRecruitSharePosterAi.js')
 const recruitTarget = require('../../utils/recruitTarget.js')
+const shareHub = require('../../utils/recruitShareHub.js')
 const userProfile = require('../../utils/userProfile.js')
 const auth = require('../../utils/auth.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
@@ -381,6 +382,7 @@ Page({
     groupQrUploading: false,
     editGroupQrUploading: false,
     createdOrder: null,
+    showShareSheet: false,
     shareTitle: '',
     groupCopyText: '',
     posterAiPrompt: '',
@@ -2410,6 +2412,20 @@ Page({
       path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(order.id)}`,
     }
     return recruitShareCover.attachShareCoverPromise(share, coverUrl)
+  },
+  onOpenCreatedShare() {
+    if (!this.data.createdOrder) return
+    this.setData({ showShareSheet: true })
+  },
+  onCloseCreatedShare() {
+    this.setData({ showShareSheet: false })
+  },
+  onOpenCreatedStudio(e) {
+    const order = this.data.createdOrder
+    if (!order) return
+    const detail = (e && e.detail) || {}
+    this.setData({ showShareSheet: false })
+    shareHub.openStudio(order, detail.tab || 'poster', detail.mode || 'link')
   },
   onCopyGroupShare() {
     const order = this.data.createdOrder

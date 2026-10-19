@@ -471,7 +471,8 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   ctx.fillStyle = tmpl.outerBg || '#E5E7EB'
   ctx.fillRect(0, 0, POSTER_W, POSTER_H)
 
-  roundRect(ctx, pad, pad, cardW, cardH, 24)
+  const cardRadius = Math.max(0, Number(design && design.cardRadius) || 24)
+  roundRect(ctx, pad, pad, cardW, cardH, cardRadius)
   ctx.fillStyle = '#FFFFFF'
   ctx.fill()
 
@@ -529,6 +530,7 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   if (panelW > 120 && design.footerPanel) {
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
+  if (design && design.hideQr) return Promise.resolve()
   return drawStyledPosterQr(
     ctx,
     wxacodeImg,
@@ -627,6 +629,15 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
   if (brand.name) input.inviterName = brand.name
   if (brand.logoUrl) input.inviterAvatarUrl = brand.logoUrl
   const design = resolvePosterDesign(shareOrder, styleIndex)
+  const vis = opts && opts.visibility
+  if (vis && vis.brand === false) {
+    input.inviterName = ''
+    input.inviterAvatarUrl = ''
+  }
+  if (vis && vis.title === false) input.title = ''
+  if (vis && vis.meta === false) input.rows = []
+  if (vis && vis.qr === false) design.hideQr = true
+  if (opts && opts.cardRadius != null) design.cardRadius = opts.cardRadius
   let canvas
   try {
     canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })

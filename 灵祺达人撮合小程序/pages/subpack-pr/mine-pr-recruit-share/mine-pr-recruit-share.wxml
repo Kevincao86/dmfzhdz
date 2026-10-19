@@ -1,0 +1,95 @@
+<view class="page">
+  <view class="tabs">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="id"
+      class="tab {{item.on ? 'on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onTab"
+    >{{item.label}}</view>
+  </view>
+
+  <view wx:if="{{tab === 'poster'}}" class="stage">
+    <view wx:if="{{posterLoading}}" class="hint">正在生成分享图…</view>
+    <image wx:elif="{{posterPath}}" class="poster" src="{{posterPath}}" mode="widthFix" show-menu-by-longpress="{{true}}" />
+    <view wx:else class="hint">{{posterErr || '分享图生成失败'}}</view>
+  </view>
+
+  <view wx:elif="{{tab === 'code'}}" class="stage">
+    <view wx:if="{{codeLoading}}" class="hint">正在生成小程序码…</view>
+    <view wx:elif="{{codePath}}" class="code-wrap" style="width: {{codePx}}rpx;">
+      <image class="code {{shapeId}}" src="{{codePath}}" mode="aspectFit" />
+      <text wx:if="{{showLogo}}" class="code-cap">{{caption || '长按识别小程序码报名'}}</text>
+    </view>
+    <view wx:else class="hint">{{codeErr || '小程序码生成失败'}}</view>
+  </view>
+
+  <view wx:else class="stage stage-web">
+    <view class="notice">该链接可放在公众号菜单、阅读原文、网站、论坛或微博等所有可以插入网页链接的位置。达人打开后进入星选招募详情报名。</view>
+    <view wx:if="{{webMode !== 'qr'}}" class="link-box">{{webMode === 'short' ? (shortLink || '短链生成中…') : webUrl}}</view>
+    <view wx:else>
+      <view wx:if="{{qrLoading}}" class="hint">正在生成二维码…</view>
+      <image wx:elif="{{qrPath}}" class="qr" src="{{qrPath}}" mode="widthFix" />
+    </view>
+  </view>
+
+  <view class="panel">
+    <view wx:if="{{tab === 'web'}}" class="editions">
+      <text class="edition {{edition === 'normal' ? 'on' : ''}}" data-id="normal" bindtap="onEdition">普通版</text>
+      <text class="edition {{edition === 'pure' ? 'on' : ''}}" data-id="pure" bindtap="onEdition">纯净版（无额外说明）</text>
+    </view>
+
+    <view wx:if="{{tab !== 'web'}}" class="tool-tabs">
+      <text class="tool {{tab === 'poster' ? 'on' : ''}}">颜色</text>
+      <text wx:if="{{tab === 'code'}}" class="tool">尺寸</text>
+      <text class="tool">形状</text>
+      <text wx:if="{{tab === 'code'}}" class="tool">文案</text>
+      <text wx:if="{{tab === 'poster'}}" class="tool">显示/隐藏</text>
+      <text class="tool">logo</text>
+    </view>
+
+    <view class="swatches">
+      <view
+        wx:for="{{colors}}"
+        wx:key="id"
+        class="swatch {{item.on ? 'on' : ''}}"
+        style="background: {{item.color}}"
+        data-id="{{item.id}}"
+        bindtap="onColor"
+      />
+    </view>
+
+    <view wx:if="{{tab === 'code'}}" class="chips">
+      <text wx:for="{{sizes}}" wx:key="id" class="chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onSize">{{item.label}}</text>
+    </view>
+    <view wx:if="{{tab !== 'web'}}" class="chips">
+      <text wx:for="{{shapes}}" wx:key="id" class="chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onShape">{{item.label}}</text>
+    </view>
+    <view wx:if="{{tab === 'code'}}">
+      <input class="cap-input" maxlength="24" value="{{caption}}" bindinput="onCaption" placeholder="码下方文案" />
+    </view>
+    <view wx:if="{{tab === 'poster'}}" class="chips">
+      <text class="chip {{showTitle ? 'on' : ''}}" data-key="showTitle" bindtap="onToggle">标题</text>
+      <text class="chip {{showMeta ? 'on' : ''}}" data-key="showMeta" bindtap="onToggle">信息</text>
+      <text class="chip {{showQr ? 'on' : ''}}" data-key="showQr" bindtap="onToggle">二维码</text>
+      <text class="chip {{showBrand ? 'on' : ''}}" data-key="showBrand" bindtap="onToggle">发布方</text>
+    </view>
+    <view wx:if="{{tab !== 'web'}}" class="chips">
+      <text class="chip {{showLogo ? 'on' : ''}}" data-key="showLogo" bindtap="onToggle">{{showLogo ? '显示标识' : '隐藏标识'}}</text>
+    </view>
+
+    <view wx:if="{{tab === 'web'}}" class="modes">
+      <text
+        wx:for="{{webModes}}"
+        wx:key="id"
+        class="mode {{item.on ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onWebMode"
+      >{{item.label}}</text>
+    </view>
+
+    <button class="save" bindtap="onPrimary">
+      {{tab === 'poster' ? '保存分享图' : tab === 'code' ? '保存小程序码' : webMode === 'qr' ? '保存二维码' : '复制'}}
+    </button>
+  </view>
+</view>

@@ -1218,12 +1218,18 @@
         <view class="pub-done-icon">✓</view>
         <text class="pub-done-title">招募已创建</text>
         <text class="pub-done-sub">{{createdOrder.title}}</text>
-        <button class="btn-primary pub-done-btn" open-type="share">分享招募</button>
+        <button class="btn-primary pub-done-btn" bindtap="onOpenCreatedShare">分享招募</button>
         <button class="btn-ghost pub-done-btn" bindtap="onCopyGroupShare">分享群聊（复制招募信息）</button>
         <button class="btn-secondary pub-done-btn" bindtap="onFinish">完成创建</button>
       </view>
     </view>
     </view>
   </block>
+  <recruit-share-dock
+    show="{{showShareSheet}}"
+    title="{{createdOrder.title}}"
+    bind:close="onCloseCreatedShare"
+    bind:open="onOpenCreatedStudio"
+  />
   <site-icp-footer />
 </view>

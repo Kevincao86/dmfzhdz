@@ -8,6 +8,7 @@ const userProfile = require('../../../utils/userProfile.js')
 const mpShare = require('../../../utils/mpShare.js')
 const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
 const recruitShareCover = require('../../../utils/recruitShareCover.js')
+const shareHub = require('../../../utils/recruitShareHub.js')
 const sharePoster = require('../../../utils/recruitmentSharePoster.js')
 const mpApplyShortLink = require('../../../utils/mpApplyShortLink.js')
 const prRecruitQr = require('../../../utils/prRecruitQr.js')
@@ -738,6 +739,13 @@ Page({
         }
       })
       .catch(() => {})
+  },
+  onOpenShareStudio(e) {
+    const order = this.data.shareOrder
+    if (!order) return
+    const detail = (e && e.detail) || {}
+    this.setData({ showShareSheet: false })
+    shareHub.openStudio(order, detail.tab || 'poster', detail.mode || 'link')
   },
   onShareTab(e) {
     const tab = e.currentTarget.dataset.tab

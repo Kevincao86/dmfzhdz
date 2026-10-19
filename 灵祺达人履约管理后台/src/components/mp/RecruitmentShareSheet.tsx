@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import { copyTextToClipboard } from '../../lib/copyTextToClipboard'
 import {
   buildRecruitmentApplyLink,
@@ -6,13 +7,27 @@ import {
 } from '../../lib/mpSync/recruitmentShareCopy'
 import {
   buildRecruitmentSharePosterDataUrl,
-  normalizePosterStyleIndex,
   resolvePosterDesign,
   resolvePosterThemeColor,
 } from '../../lib/mpSync/recruitmentSharePoster'
-import { fetchMpApplyShortLink } from '../../lib/mpApi'
+import { fetchMpApplyShortLink, fetchMpApplyWxacode } from '../../lib/mpApi'
 
-type Tab = 'copy' | 'poster' | 'link'
+type Tab = 'poster' | 'code' | 'web'
+type WebMode = 'link' | 'text' | 'qr' | 'short'
+type Edition = 'normal' | 'pure'
+
+const COLORS = [
+  { id: 'sunset', color: '#F97316', index: 0 },
+  { id: 'aurora', color: '#7C3AED', index: 1 },
+  { id: 'mint', color: '#0D9488', index: 2 },
+  { id: 'night', color: '#6366F1', index: 3 },
+  { id: 'rose', color: '#E11D48', index: 4 },
+  { id: 'gold', color: '#D97706', index: 5 },
+]
+
+function recruitmentWebUrl(id: string) {
+  return `https://dr.mofangdianai.com/recruitment/${encodeURIComponent(id)}`
+}
 
 type Props = {
   text: string
@@ -22,38 +37,38 @@ type Props = {
 }
 
 export default function RecruitmentShareSheet({ text, title, order, onClose }: Props) {
-  const [tab, setTab] = useState<Tab>('copy')
+  const orderId = String(order.id || '').trim()
+  const webUrl = recruitmentWebUrl(orderId)
+  const [tab, setTab] = useState<Tab>('web')
+  const [webMode, setWebMode] = useState<WebMode>('link')
+  const [edition, setEdition] = useState<Edition>('normal')
   const [copied, setCopied] = useState(false)
-  const [copyErr, setCopyErr] = useState(false)
-  const [linkCopied, setLinkCopied] = useState(false)
-  const [applyLink, setApplyLink] = useState('')
+  const [shortLink, setShortLink] = useState('')
   const [posterUrl, setPosterUrl] = useState('')
   const [posterLoading, setPosterLoading] = useState(false)
   const [posterErr, setPosterErr] = useState('')
   const [posterStyleIndex, setPosterStyleIndex] = useState(0)
-  const [posterStyleLabel, setPosterStyleLabel] = useState('')
   const [posterAccent, setPosterAccent] = useState('#7c3aed')
+  const [codeUrl, setCodeUrl] = useState('')
+  const [codeErr, setCodeErr] = useState('')
+  const [qrUrl, setQrUrl] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    const id = String(order.id || '').trim()
-    if (!id) return
-    let link = resolveCachedApplyLink(order)
-    if (link) {
-      setApplyLink(link)
-      return
-    }
-    void fetchMpApplyShortLink(id, String(order.title || ''))
-      .then((out) => {
-        if (!cancelled) setApplyLink(out.link || buildRecruitmentApplyLink(id))
-      })
-      .catch(() => {
-        if (!cancelled) setApplyLink(buildRecruitmentApplyLink(id))
-      })
+    if (!orderId) return
+    const cached = resolveCachedApplyLink(order)
+    const load = cached
+      ? Promise.resolve(cached)
+      : fetchMpApplyShortLink(orderId, String(order.title || ''))
+          .then((out) => out.link || buildRecruitmentApplyLink(orderId))
+          .catch(() => buildRecruitmentApplyLink(orderId))
+    void load.then((link) => {
+      if (!cancelled) setShortLink(link)
+    })
     return () => {
       cancelled = true
     }
-  }, [order])
+  }, [order, orderId])
 
   useEffect(() => {
     if (tab !== 'poster') return
@@ -62,11 +77,9 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     setPosterErr('')
     void buildRecruitmentSharePosterDataUrl(order, posterStyleIndex)
       .then(({ dataUrl, design }) => {
-        if (!cancelled) {
-          setPosterUrl(dataUrl)
-          setPosterStyleLabel(design.styleLabel || '')
-          setPosterAccent(resolvePosterThemeColor(design))
-        }
+        if (cancelled) return
+        setPosterUrl(dataUrl)
+        setPosterAccent(resolvePosterThemeColor(design))
       })
       .catch((e) => {
         if (!cancelled) setPosterErr(e instanceof Error ? e.message : '海报生成失败')
@@ -79,52 +92,79 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     }
   }, [tab, order, posterStyleIndex])
 
-  function onSwitchPosterStyle() {
-    if (posterLoading) return
-    const next = normalizePosterStyleIndex(posterStyleIndex + 1)
-    const previewDesign = resolvePosterDesign(order, next)
-    setPosterStyleIndex(next)
-    setPosterUrl('')
-    setPosterErr('')
-    setPosterAccent(resolvePosterThemeColor(previewDesign))
-  }
-
-  async function onCopyText() {
-    const ok = await copyTextToClipboard(text)
-    if (ok) {
-      setCopied(true)
-      setCopyErr(false)
-      return
+  useEffect(() => {
+    if (tab !== 'code' || !orderId) return
+    let cancelled = false
+    void fetchMpApplyWxacode(orderId)
+      .then((out) => {
+        if (!cancelled) setCodeUrl(out.dataUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setCodeErr('小程序码生成失败')
+      })
+    return () => {
+      cancelled = true
     }
-    setCopyErr(true)
+  }, [tab, orderId])
+
+  useEffect(() => {
+    if (tab !== 'web' || webMode !== 'qr' || !webUrl) return
+    const color = COLORS.find((c) => c.index === posterStyleIndex)?.color || '#0f172a'
+    let cancelled = false
+    void QRCode.toDataURL(webUrl, { width: 360, margin: 1, color: { dark: color, light: '#ffffff' } }).then((url) => {
+      if (!cancelled) setQrUrl(url)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [tab, webMode, webUrl, posterStyleIndex])
+
+  function pickColor(index: number) {
+    if (posterLoading) return
+    const preview = resolvePosterDesign(order, index)
+    setPosterStyleIndex(index)
+    setPosterUrl('')
+    setPosterAccent(resolvePosterThemeColor(preview))
   }
 
-  async function onCopyLink() {
-    const id = String(order.id || '').trim()
-    const link = applyLink || buildRecruitmentApplyLink(id)
-    const ok = await copyTextToClipboard(link)
-    if (ok) setLinkCopied(true)
+  function copyPayload() {
+    const name = String(order.title || title || '招募').trim()
+    if (webMode === 'short') {
+      return edition === 'pure' ? shortLink : `【${name}】\n微信里点开即可报名：\n${shortLink}`
+    }
+    if (webMode === 'text') {
+      return edition === 'pure' ? `${name}\n${webUrl}` : text || `${name}\n${webUrl}`
+    }
+    return edition === 'pure' ? webUrl : `【${name}】\n打开链接查看招募并报名：\n${webUrl}`
   }
 
-  function onDownloadPoster() {
-    if (!posterUrl) return
+  async function onCopy() {
+    const ok = await copyTextToClipboard(copyPayload())
+    setCopied(ok)
+  }
+
+  function onDownload(url: string, name: string) {
+    if (!url) return
     const a = document.createElement('a')
-    a.href = posterUrl
-    a.download = `recruit-poster-${String(order.id || 'share').slice(0, 12)}.png`
+    a.href = url
+    a.download = name
     a.click()
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'copy', label: '文案+链接' },
-    { id: 'poster', label: '海报' },
+    { id: 'poster', label: '分享图' },
+    { id: 'code', label: '小程序码' },
+    { id: 'web', label: '网页链接' },
+  ]
+  const modes: { id: WebMode; label: string }[] = [
     { id: 'link', label: '链接' },
+    { id: 'text', label: '文字+链接' },
+    { id: 'qr', label: '图文二维码' },
+    { id: 'short', label: '小程序短链' },
   ]
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         className="w-full max-w-lg rounded-2xl panel-card p-4 sm:p-5 shadow-xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -135,16 +175,11 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 id="recruitment-share-title" className="text-base font-semibold text-[var(--shell-text)]">
-              分享招募
+              生成分享图
             </h3>
             {title ? <p className="text-sm text-[var(--shell-muted)] mt-1 truncate">{title}</p> : null}
           </div>
-          <button
-            type="button"
-            className="shrink-0 text-2xl leading-none text-[var(--shell-muted)] hover:text-[var(--shell-text)]"
-            aria-label="关闭"
-            onClick={onClose}
-          >
+          <button type="button" className="shrink-0 text-2xl leading-none text-[var(--shell-muted)]" aria-label="关闭" onClick={onClose}>
             ×
           </button>
         </div>
@@ -154,10 +189,8 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
             <button
               key={t.id}
               type="button"
-              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                tab === t.id
-                  ? 'border-violet-600 text-violet-600'
-                  : 'border-transparent text-[var(--shell-muted)] hover:text-[var(--shell-text)]'
+              className={`flex-1 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
+                tab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-[var(--shell-muted)]'
               }`}
               onClick={() => setTab(t.id)}
             >
@@ -166,129 +199,101 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
           ))}
         </div>
 
-        {tab === 'copy' ? (
-          <>
-            <textarea
-              readOnly
-              value={text}
-              rows={12}
-              className="mt-4 w-full rounded-xl border border-[var(--shell-border)] bg-[var(--shell-bg)] px-3 py-2.5 text-sm leading-relaxed text-[var(--shell-text)] resize-none"
-              onFocus={(e) => e.currentTarget.select()}
-            />
-            {copied ? (
-              <p className="mt-3 text-sm text-emerald-600">已复制到剪贴板，可粘贴到微信群发送给达人。</p>
-            ) : copyErr ? (
-              <p className="mt-3 text-sm text-amber-600">无法自动复制，请全选上方文案后手动复制。</p>
-            ) : (
-              <p className="mt-3 text-sm text-[var(--shell-muted)]">复制完整招募文案与报名指引，粘贴到微信群即可。</p>
-            )}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="flex-1 min-w-[8rem] py-2.5 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500"
-                onClick={() => void onCopyText()}
-              >
-                复制文案
-              </button>
-              <button
-                type="button"
-                className="px-4 py-2.5 rounded-xl border border-[var(--shell-border)] text-sm text-[var(--shell-text)]"
-                onClick={onClose}
-              >
-                关闭
-              </button>
-            </div>
-          </>
-        ) : null}
-
         {tab === 'poster' ? (
-          <>
-            <div className="mt-4 flex justify-center">
-              {posterLoading ? (
-                <div className="w-[225px] h-[360px] rounded-xl bg-slate-100 animate-pulse flex items-center justify-center text-sm text-slate-500">
-                  生成海报中…
-                </div>
-              ) : posterUrl ? (
-                <img
-                  src={posterUrl}
-                  alt="招募分享海报"
-                  className="max-w-[225px] w-full rounded-xl border border-[var(--shell-border)] shadow-sm"
-                />
-              ) : (
-                <p className="text-sm text-amber-600">{posterErr || '海报生成失败，请稍后重试'}</p>
-              )}
-            </div>
-            {(posterUrl || posterStyleLabel) ? (
-              <div className="mt-2 flex items-center justify-between gap-3 px-1">
-                <p className="text-xs text-[var(--shell-muted)]">
-                  {posterStyleLabel ? `当前样式：${posterStyleLabel}` : null}
-                </p>
-                <button
-                  type="button"
-                  className="text-sm font-medium disabled:opacity-50"
-                  style={{ color: posterAccent }}
-                  disabled={posterLoading}
-                  onClick={onSwitchPosterStyle}
-                >
-                  换个样式
-                </button>
-              </div>
-            ) : null}
-            <p className="mt-3 text-sm text-[var(--shell-muted)] text-center">
-              保存海报后发到朋友圈或微信群，达人长按识别二维码即可报名。
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={!posterUrl}
-                className="flex-1 min-w-[8rem] py-2.5 rounded-xl border text-sm font-medium disabled:opacity-50"
-                style={{ color: posterAccent, borderColor: posterAccent }}
-                onClick={onDownloadPoster}
-              >
-                保存海报
-              </button>
-              <button
-                type="button"
-                className="px-4 py-2.5 rounded-xl border border-[var(--shell-border)] text-sm text-[var(--shell-text)]"
-                onClick={onClose}
-              >
-                关闭
-              </button>
-            </div>
-          </>
+          <div className="mt-4 flex justify-center">
+            {posterLoading ? (
+              <div className="w-[225px] h-[360px] rounded-xl bg-slate-100 flex items-center justify-center text-sm text-slate-500">生成海报中…</div>
+            ) : posterUrl ? (
+              <img src={posterUrl} alt="招募分享海报" className="max-w-[225px] w-full rounded-xl border border-[var(--shell-border)]" />
+            ) : (
+              <p className="text-sm text-amber-600">{posterErr || '海报生成失败'}</p>
+            )}
+          </div>
         ) : null}
 
-        {tab === 'link' ? (
-          <>
-            <div className="mt-4 rounded-xl border border-[var(--shell-border)] bg-[var(--shell-bg)] px-3 py-3">
-              <p className="text-xs text-[var(--shell-muted)] mb-2">报名链接（微信群可点击）</p>
-              <p className="text-sm break-all text-[var(--shell-text)]">
-                {applyLink || buildRecruitmentApplyLink(String(order.id || ''))}
-              </p>
-            </div>
-            {linkCopied ? (
-              <p className="mt-3 text-sm text-emerald-600">链接已复制。</p>
+        {tab === 'code' ? (
+          <div className="mt-4 flex flex-col items-center">
+            {codeUrl ? (
+              <img src={codeUrl} alt="小程序码" className="h-52 w-52 rounded-xl bg-white object-contain" />
             ) : (
-              <p className="mt-3 text-sm text-[var(--shell-muted)]">仅复制报名链接，适合单独发送。</p>
+              <p className="text-sm text-amber-600">{codeErr || '正在生成小程序码…'}</p>
             )}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="flex-1 min-w-[8rem] py-2.5 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500"
-                onClick={() => void onCopyLink()}
-              >
-                复制链接
+            <p className="mt-2 text-xs text-[var(--shell-muted)]">长按识别小程序码报名</p>
+          </div>
+        ) : null}
+
+        {tab === 'web' ? (
+          <div className="mt-4 space-y-3">
+            <p className="rounded-xl bg-orange-50 px-3 py-2 text-sm leading-relaxed text-orange-700">
+              该链接可放在公众号菜单、阅读原文、网站、论坛或微博等所有可以插入网页链接的位置。达人打开后进入星选招募详情报名。
+            </p>
+            {webMode === 'qr' && qrUrl ? (
+              <img src={qrUrl} alt="网页二维码" className="mx-auto h-52 w-52" />
+            ) : (
+              <p className="break-all rounded-xl bg-slate-100 px-3 py-3 text-sm text-[var(--shell-text)]">
+                {webMode === 'short' ? shortLink || '短链生成中…' : webUrl}
+              </p>
+            )}
+            <div className="flex gap-4 text-sm">
+              <button type="button" className={edition === 'normal' ? 'font-semibold' : 'text-[var(--shell-muted)]'} onClick={() => setEdition('normal')}>
+                普通版
               </button>
-              <button
-                type="button"
-                className="px-4 py-2.5 rounded-xl border border-[var(--shell-border)] text-sm text-[var(--shell-text)]"
-                onClick={onClose}
-              >
-                关闭
+              <button type="button" className={edition === 'pure' ? 'font-semibold' : 'text-[var(--shell-muted)]'} onClick={() => setEdition('pure')}>
+                纯净版（无额外说明）
               </button>
             </div>
-          </>
+            <div className="grid grid-cols-4 gap-2">
+              {modes.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`rounded-lg border px-2 py-2 text-xs ${webMode === m.id ? 'border-blue-600 text-blue-600' : 'border-[var(--shell-border)]'}`}
+                  onClick={() => setWebMode(m.id)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {COLORS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              aria-label={c.id}
+              className={`h-8 w-8 rounded-md border-2 ${posterStyleIndex === c.index ? 'border-slate-900' : 'border-transparent'}`}
+              style={{ background: c.color }}
+              onClick={() => pickColor(c.index)}
+            />
+          ))}
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          {tab === 'web' && webMode !== 'qr' ? (
+            <button type="button" className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-medium text-white" onClick={() => void onCopy()}>
+              {copied ? '已复制' : '复制'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              disabled={tab === 'poster' ? !posterUrl : tab === 'code' ? !codeUrl : !qrUrl}
+              onClick={() =>
+                onDownload(
+                  tab === 'poster' ? posterUrl : tab === 'code' ? codeUrl : qrUrl,
+                  tab === 'code' ? 'recruit-wxacode.png' : tab === 'web' ? 'recruit-qr.png' : 'recruit-poster.png',
+                )
+              }
+            >
+              {tab === 'poster' ? '保存分享图' : tab === 'code' ? '保存小程序码' : '保存二维码'}
+            </button>
+          )}
+          <button type="button" className="rounded-xl border border-[var(--shell-border)] px-4 py-2.5 text-sm" onClick={onClose}>
+            关闭
+          </button>
+        </div>
       </div>
     </div>
   )

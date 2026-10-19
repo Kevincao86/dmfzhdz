@@ -1,5 +1,7 @@
 {
   "navigationStyle": "custom",
   "navigationBarTitleText": "发招募",
-  "usingComponents": {}
+  "usingComponents": {
+    "recruit-share-dock": "/components/recruit-share-dock/index"
+  }
 }
