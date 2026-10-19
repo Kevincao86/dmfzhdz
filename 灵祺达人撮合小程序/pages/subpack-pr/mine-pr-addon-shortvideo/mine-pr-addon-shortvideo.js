@@ -155,6 +155,7 @@ Page({
     pointsHintMix: pointsHints.bannerText('cloud_edit'),
     genKind: 'text',
     imitateLink: '',
+    imitateSource: 'share',
     imitateVideoPath: '',
     imitateVideoName: '',
     imitateDurationSec: 8,
@@ -424,9 +425,31 @@ Page({
       resultUrl: '',
       pointsHintGenerate:
         genKind === 'imitate'
-          ? '消耗提醒：按镜头生成 80 积分/秒；上传参考视频换人 50 积分/秒。成片成功后按实际秒数扣。'
+          ? this.data.imitateSource === 'video'
+            ? '消耗提醒：上传视频换人 50 积分/秒，最低 200 积分。'
+            : '消耗提醒：分享链接按镜头生成 80 积分/秒，最低 400 积分。'
           : pointsHints.bannerText('shortvideo', Number(this.data.durationSec) || 15),
     })
+  },
+  onImitateSource(e) {
+    const next = e.currentTarget.dataset.source === 'video' ? 'video' : 'share'
+    const patch = {
+      imitateSource: next,
+      imitateShots: [],
+      imitateNote: '',
+      err: '',
+      resultUrl: '',
+    }
+    if (next === 'share') {
+      patch.imitateVideoPath = ''
+      patch.imitateVideoName = ''
+      patch.imitateDurationSec = 8
+      patch.pointsHintGenerate = '消耗提醒：分享链接按镜头生成 80 积分/秒，最低 400 积分。'
+    } else {
+      patch.imitateLink = ''
+      patch.pointsHintGenerate = '消耗提醒：上传视频换人 50 积分/秒，最低 200 积分。'
+    }
+    this.setData(patch)
   },
   onImitateLink(e) {
     this.setData({ imitateLink: e.detail.value })
@@ -556,37 +579,41 @@ Page({
     const caption = String((link.match(/】\s*([\s\S]*?)(?:https?:\/\/|$)/) || [])[1] || '')
       .replace(/\s+/g, ' ')
       .trim()
-    if (!link && !this.data.imitateVideoPath) {
-      this.setData({ err: '请先上传 1 分钟内的视频，或粘贴分享链接' })
+    const useVideo = this.data.imitateSource === 'video'
+    if (useVideo && !this.data.imitateVideoPath) {
+      this.setData({ err: '请先上传 1 分钟内的视频' })
       return
     }
-    if (Number(this.data.imitateDurationSec) > IMITATE_VIDEO_MAX_SEC && this.data.imitateVideoPath) {
+    if (!useVideo && !link) {
+      this.setData({ err: '请先粘贴分享链接' })
+      return
+    }
+    if (useVideo && Number(this.data.imitateDurationSec) > IMITATE_VIDEO_MAX_SEC) {
       this.setData({ err: '参考视频请控制在 1 分钟以内' })
       return
     }
-    const hasVideo = !!this.data.imitateVideoPath
-    const dur = hasVideo ? Math.min(IMITATE_VIDEO_MAX_SEC, Math.max(1, Number(this.data.imitateDurationSec) || 8)) : 8
+    const dur = useVideo ? Math.min(IMITATE_VIDEO_MAX_SEC, Math.max(1, Number(this.data.imitateDurationSec) || 8)) : 8
     this.setData({
       busy: true,
       err: '',
-      progress: hasVideo ? '正在按镜头抽帧…' : '正在从分享链接整理画面、口播和背景音…',
+      progress: useVideo ? '正在按镜头抽帧…' : '正在从分享链接整理画面、口播和背景音…',
     })
     try {
-      const source = caption || link.slice(0, 500)
+      const source = useVideo ? '' : caption || link.slice(0, 500)
       let frames = []
-      if (hasVideo) {
+      if (useVideo) {
         frames = await studio.extractFrames(this, this.data.imitateVideoPath, studio.sampleTimes(dur))
         this.setData({ progress: '正在分析画面、口播和背景音…' })
       }
       let text = ''
-      let note = hasVideo
+      let note = useVideo
         ? frames.length
-          ? '已按参考视频画面和时间轴整理成镜头。'
+          ? '已按上传视频的画面和时间轴拆成镜头。将按原片换人。'
           : '画面抽帧暂不可用，已按视频时长生成可编辑拆解稿。'
-        : '已按分享文案整理成画面、口播、背景音。可以直接开始模仿；要按原片换人，再上传 1 分钟内的视频。'
+        : '已按分享文案拆成画面、口播、背景音。将按镜头生成。'
       try {
         const chat = await addonApi.postAiChat(
-          [{ role: 'user', content: hasVideo ? studio.videoAnalyzeContent(dur, caption) : studio.shareAnalyzeContent(source) }],
+          [{ role: 'user', content: useVideo ? studio.videoAnalyzeContent(dur, '') : studio.shareAnalyzeContent(source) }],
           {
             provider: 'doubao',
             temperature: 0.2,
@@ -683,7 +710,11 @@ Page({
       this.setData({ err: '请添加一段音乐，或改回沿用原片' })
       return
     }
-    const hasVideo = !!this.data.imitateVideoPath
+    if (this.data.imitateSource === 'video' && !this.data.imitateVideoPath) {
+      this.setData({ err: '请先上传 1 分钟内的视频' })
+      return
+    }
+    const hasVideo = this.data.imitateSource === 'video'
     const durationSec = hasVideo
       ? Math.min(IMITATE_VIDEO_MAX_SEC, Math.max(1, Number(this.data.imitateDurationSec) || 8))
       : shotPlanSec(this.data.imitateShots)

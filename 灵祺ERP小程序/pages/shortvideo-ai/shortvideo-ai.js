@@ -442,10 +442,10 @@ Page({
     const genSec = this.estimateShortvideoDurationSec()
     const mixKind = this.isSmartPreset() ? 'cloud_edit_smart' : 'cloud_edit'
     const mixSec = Number(this.data.clipEndSec) || 10
-    const imitateMotion = !!this.data.imitateVideoPath
+    const imitateMotion = this.data.imitateSource === 'video'
     const imitateSec = imitateMotion
       ? Math.max(1, Math.ceil(Number(this.data.imitateDurationSec) || 8))
-      : Math.max(5, Math.ceil(Number(genSec) || 15))
+      : 15
     const genCost = economics.mpPointsCostForUsage('shortvideo', { durationSec: genSec })
     const mixCost = economics.mpPointsCostForUsage(mixKind, { durationSec: mixSec })
     const imitateCost = economics.mpPointsCostForUsage('imitate', {
@@ -453,8 +453,10 @@ Page({
       motionImitate: imitateMotion,
     })
     const imitateHint = imitateMotion
-      ? `消耗提醒：上传参考视频换人 50 积分/秒；当前约 ${imitateSec} 秒预计 ${imitateCost} 积分。`
-      : `${imitate.IMITATE_HINT} 未上传参考视频时按镜头秒数预估，最低 400 积分。`
+      ? this.data.imitateVideoPath
+        ? `消耗提醒：上传视频换人 50 积分/秒；当前约 ${imitateSec} 秒预计 ${imitateCost} 积分。`
+        : '消耗提醒：上传视频换人 50 积分/秒，最低 200 积分。'
+      : '消耗提醒：分享链接按镜头生成 80 积分/秒，最低 400 积分。'
     this.setData({
       pointsHintGenerate:
         this.data.genMode === 'imitate'

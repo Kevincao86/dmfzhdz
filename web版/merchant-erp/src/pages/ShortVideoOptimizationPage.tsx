@@ -2650,7 +2650,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                         ? genMode === 'motion' || genMode === 'imitate'
                           ? cfg?.motionImitateConfigured || cfg?.omnihumanConfigured
                             ? genMode === 'imitate'
-                              ? '模仿视频 · 拆解参考片后换人、换声音、换背景乐'
+                              ? '模仿视频 · 分享链接或上传视频，二选一拆解'
                               : VIDEO_ENGINE_HINT_MOTION_IMITATE
                             : '动作模仿未开通'
                           : cfg?.arkKeyConfigured

@@ -66,11 +66,17 @@
     </block>
     <view class="addon-card" wx:else>
       <text class="addon-card__title">模仿视频</text>
-      <text class="addon-card__sub">拆解后可以直接开始模仿，按镜头生成成片。要按原片换人，再上传 1 分钟内的视频。</text>
+      <text class="addon-card__sub">拆解二选一。分享链接按镜头生成；上传视频按画面拆解并换人。不能两条一起用。</text>
       <view class="addon-points-tip">{{pointsHintGenerate}}</view>
-      <text class="addon-label">分享链接（可选）</text>
-      <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴分享文案，用来整理画面、口播、背景音" value="{{imitateLink}}" bindinput="onImitateLink" maxlength="500" />
-      <button class="addon-btn addon-btn--ghost" bindtap="onPickImitateVideo">{{imitateVideoName || '上传参考视频（换人才需要，1 分钟内）'}}</button>
+      <view class="addon-chips">
+        <view class="addon-chip {{imitateSource !== 'video' ? 'addon-chip--on' : ''}}" data-source="share" bindtap="onImitateSource">分享链接拆解</view>
+        <view class="addon-chip {{imitateSource === 'video' ? 'addon-chip--on' : ''}}" data-source="video" bindtap="onImitateSource">上传视频拆解</view>
+      </view>
+      <block wx:if="{{imitateSource !== 'video'}}">
+        <text class="addon-label">分享链接</text>
+        <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴分享文案，用来整理画面、口播、背景音" value="{{imitateLink}}" bindinput="onImitateLink" maxlength="500" />
+      </block>
+      <button wx:else class="addon-btn addon-btn--ghost" bindtap="onPickImitateVideo">{{imitateVideoName || '上传视频（1 分钟内，按画面拆解并换人）'}}</button>
       <text class="addon-card__sub" wx:if="{{imitateNote}}">{{imitateNote}}</text>
       <view class="imitate-actions">
         <button class="addon-btn addon-btn--ghost" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateAnalyze">拆解画面 / 口播 / 背景音</button>

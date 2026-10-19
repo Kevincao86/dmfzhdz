@@ -57,9 +57,13 @@
     </view>
 
     <view wx:if="{{genMode === 'imitate'}}" class="sv-cabin">
-      <text class="sv-cabin-tip">分享链接整理成画面、口播、背景音后，可以直接开始模仿。要按原片换人，再上传 1 分钟内的视频。成片成功后按实际秒数扣积分。</text>
-      <textarea class="sv-area-sm" placeholder="粘贴分享文案，用来整理画面、口播、背景音" value="{{imitateLink}}" bindinput="onImitateLink" maxlength="500" />
-      <button class="sv-btn-outline" bindtap="onPickImitateVideo">{{imitateVideoName || '上传参考视频（换人才需要，1 分钟内）'}}</button>
+      <text class="sv-cabin-tip">拆解二选一。分享链接按镜头生成；上传视频按画面拆解并换人。不能两条一起用。成片成功后按实际秒数扣积分。</text>
+      <view class="sv-mode-row">
+        <view class="sv-chip {{imitateSource !== 'video' ? 'cyan' : ''}}" data-source="share" bindtap="onImitateSource">分享链接拆解</view>
+        <view class="sv-chip {{imitateSource === 'video' ? 'cyan' : ''}}" data-source="video" bindtap="onImitateSource">上传视频拆解</view>
+      </view>
+      <textarea wx:if="{{imitateSource !== 'video'}}" class="sv-area-sm" placeholder="粘贴分享文案，用来整理画面、口播、背景音" value="{{imitateLink}}" bindinput="onImitateLink" maxlength="500" />
+      <button wx:else class="sv-btn-outline" bindtap="onPickImitateVideo">{{imitateVideoName || '上传视频（1 分钟内，按画面拆解并换人）'}}</button>
       <text class="sv-cabin-tip" wx:if="{{imitateNote}}">{{imitateNote}}</text>
       <view class="sv-imitate-actions">
         <button class="sv-btn-outline" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateAnalyze">拆解画面 / 口播 / 背景音</button>

@@ -300,6 +300,7 @@ export default function ShortVideoImitateStudio() {
   const photoInputRef = useRef<HTMLInputElement>(null)
   const voiceInputRef = useRef<HTMLInputElement>(null)
   const bgmInputRef = useRef<HTMLInputElement>(null)
+  const [source, setSource] = useState<'share' | 'video'>('share')
   const [link, setLink] = useState('')
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [videoPreview, setVideoPreview] = useState('')
@@ -320,6 +321,23 @@ export default function ShortVideoImitateStudio() {
   const [progress, setProgress] = useState('')
   const [err, setErr] = useState('')
   const [resultUrl, setResultUrl] = useState('')
+
+  function clearVideo() {
+    if (videoPreview) URL.revokeObjectURL(videoPreview)
+    setVideoFile(null)
+    setVideoPreview('')
+    setDurationSec(0)
+  }
+
+  function chooseSource(next: 'share' | 'video') {
+    setSource(next)
+    setShots([])
+    setLinkNote('')
+    setErr('')
+    setResultUrl('')
+    if (next === 'share') clearVideo()
+    else setLink('')
+  }
 
   function setVideo(file: File) {
     if (file.size > VIDEO_MAX_BYTES) {
@@ -350,10 +368,14 @@ export default function ShortVideoImitateStudio() {
     setBusy(true)
     setProgress('正在拆解…')
     try {
-      const file = videoFile
-      const share = link.trim()
-      if (!file && !share) {
-        setErr('请先上传 1 分钟内的视频，或粘贴分享链接')
+      const file = source === 'video' ? videoFile : null
+      const share = source === 'share' ? link.trim() : ''
+      if (source === 'video' && !file) {
+        setErr('请先上传 1 分钟内的视频')
+        return
+      }
+      if (source === 'share' && !share) {
+        setErr('请先粘贴分享链接')
         return
       }
       if (file && file.size > VIDEO_MAX_BYTES) {
@@ -365,7 +387,7 @@ export default function ShortVideoImitateStudio() {
         return
       }
       const caption = captionFromShare(share)
-      if (share && !file) {
+      if (source === 'share') {
         setProgress('正在从分享链接整理画面、口播和背景音…')
         let text = ''
         try {
@@ -390,7 +412,7 @@ export default function ShortVideoImitateStudio() {
           setErr(explainImitateError(e instanceof Error ? e.message : '链接整理失败'))
         }
         setShots(parseShots(text, durationSec || 8, caption))
-        setLinkNote('已按分享文案整理成画面、口播、背景音。可以直接开始模仿；要按原片换人，再上传 1 分钟内的视频。')
+        setLinkNote('已按分享文案拆成画面、口播、背景音。将按镜头生成，不会使用上传视频。')
         return
       }
       const dur = durationSec || (file ? await probeVideoDurationSec(file) : 0) || 8
@@ -404,6 +426,7 @@ export default function ShortVideoImitateStudio() {
       const frames = file ? await extractVideoFramesAtTimesPureBase64(file, times.length ? times : [0.4]) : []
       setProgress('正在分析画面、口播和背景音…')
       let text = ''
+      let note = ''
       try {
         const chat = await postAiChat({
           provider: 'doubao',
@@ -415,7 +438,7 @@ export default function ShortVideoImitateStudio() {
               role: 'user',
               content: [
                 `参考视频约 ${dur.toFixed(1)} 秒。按时间顺序拆成 2 到 4 个镜头。`,
-                caption ? `分享文案：${caption.slice(0, 400)}` : '请根据画面写口播，看不清就留空。',
+                '请根据画面写口播，看不清就留空。',
                 '只返回 JSON 数组，每项字段：startSec,endSec,visual,action,speech,hasBgm。visual 是画面，action 是动作，speech 是口播，hasBgm 表示有没有背景音。',
               ].join('\n'),
             },
@@ -423,10 +446,11 @@ export default function ShortVideoImitateStudio() {
         })
         text = chat.content || ''
       } catch {
-        setLinkNote('画面模型暂不可用，已按视频时长生成可编辑拆解稿。')
+        note = '画面模型暂不可用，已按视频时长生成可编辑拆解稿。'
       }
-      setShots(parseShots(text, dur, caption))
-      if (share) setLinkNote('分享链接已整理成画面、口播、背景音，没有当成参考视频。')
+      if (!frames.length && !note) note = '画面抽帧暂不可用，已按视频时长生成可编辑拆解稿。'
+      setShots(parseShots(text, dur, ''))
+      setLinkNote(note || '已按上传视频的画面和时间轴拆成镜头。将按原片换人，不会使用分享链接。')
     } catch (e) {
       setErr(explainImitateError(e instanceof Error ? e.message : '拆解失败'))
     } finally {
@@ -588,7 +612,7 @@ export default function ShortVideoImitateStudio() {
       setErr('请先拆解画面、口播和背景音')
       return
     }
-    if (!videoFile) {
+    if (source !== 'video') {
       const est = storyboardDurationSec(shots)
       const afford = await checkMpAddonPointsAffordable('imitate', est)
       if (!afford.ok) {
@@ -634,6 +658,10 @@ export default function ShortVideoImitateStudio() {
       } finally {
         setBusy(false)
       }
+      return
+    }
+    if (!videoFile) {
+      setErr('请先上传 1 分钟内的视频')
       return
     }
     if (videoFile.size > VIDEO_MAX_BYTES) {
@@ -694,20 +722,41 @@ export default function ShortVideoImitateStudio() {
     <div className="space-y-3 rounded-xl border border-cyan-200/80 bg-cyan-50/40 p-3">
       <p className="text-sm font-medium text-slate-800">模仿视频</p>
       <p className="text-xs leading-relaxed text-slate-600">
-        分享链接整理成画面、口播、背景音后，可以直接开始模仿，按镜头生成成片。要按原片换人，再上传 1 分钟内的视频。声音和背景音可以沿用成片，也可以换成自己的。成片成功后按实际秒数扣积分：按镜头生成 {MP_POINTS_IMITATE_STORYBOARD_PER_SEC} 积分/秒，上传参考视频换人 {MP_POINTS_IMITATE_MOTION_PER_SEC} 积分/秒。
+        拆解二选一。分享链接只整理文案，按镜头生成；上传视频只按画面拆时间轴，并按原片换人。不能两条一起用。声音和背景音可以沿用成片，也可以换成自己的。成片成功后按实际秒数扣积分：分享链接 {MP_POINTS_IMITATE_STORYBOARD_PER_SEC} 积分/秒，上传视频换人 {MP_POINTS_IMITATE_MOTION_PER_SEC} 积分/秒。
       </p>
-      <label className="block text-xs font-medium text-slate-700">
-        分享链接（可选）
-        <input
-          value={link}
-          onChange={(e) => setLink(e.target.value)}
+      <div className="flex gap-2 text-xs">
+        <button
+          type="button"
           disabled={busy}
-          placeholder="粘贴分享文案，用来整理画面、口播、背景音"
-          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-        />
-      </label>
+          className={`rounded-full px-3 py-1 ${source === 'share' ? 'bg-cyan-600 text-white' : 'bg-white ring-1 ring-slate-200'}`}
+          onClick={() => chooseSource('share')}
+        >
+          分享链接拆解
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          className={`rounded-full px-3 py-1 ${source === 'video' ? 'bg-cyan-600 text-white' : 'bg-white ring-1 ring-slate-200'}`}
+          onClick={() => chooseSource('video')}
+        >
+          上传视频拆解
+        </button>
+      </div>
+      {source === 'share' ? (
+        <label className="block text-xs font-medium text-slate-700">
+          分享链接
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            disabled={busy}
+            placeholder="粘贴分享文案，用来整理画面、口播、背景音"
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+          />
+        </label>
+      ) : null}
       {linkNote ? <p className="text-xs text-cyan-800">{linkNote}</p> : null}
       <div className="grid gap-3 sm:grid-cols-2">
+        {source === 'video' ? (
         <div className="space-y-2">
           <p className="text-xs font-medium text-slate-700">参考视频</p>
           <input
@@ -733,8 +782,9 @@ export default function ShortVideoImitateStudio() {
               上传视频
             </button>
           )}
-          <p className="text-[11px] text-slate-500">换人才需要。MP4 / MOV，1 分钟以内，48MB 以内。不上传也可以按镜头直接生成。</p>
+          <p className="text-[11px] text-slate-500">按这段视频抽帧拆解并换人。MP4 / MOV，1 分钟以内，48MB 以内。</p>
         </div>
+        ) : null}
         <div className="space-y-2">
           <p className="text-xs font-medium text-slate-700">人物</p>
           <div className="flex gap-2 text-xs">
