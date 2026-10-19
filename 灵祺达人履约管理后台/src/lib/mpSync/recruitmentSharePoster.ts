@@ -11,7 +11,7 @@ import { renderRecruitmentPosterToDataUrl } from './recruitmentSharePosterRender
 export async function buildRecruitmentSharePosterDataUrl(
   order: Record<string, unknown>,
   styleIndex = 0,
-  opts?: { accentColor?: string; accentLight?: string; themeLabel?: string; festivalUrl?: string },
+  opts?: { accentColor?: string; accentLight?: string; themeLabel?: string; festivalUrl?: string; blessing?: string },
 ): Promise<{ dataUrl: string; design: PosterDesignTokens }> {
   const orderId = String(order.id || '').trim()
   const qrUrl = buildRecruitmentMpPath(orderId) || orderId
@@ -31,6 +31,7 @@ export async function buildRecruitmentSharePosterDataUrl(
     }
     design.forceGradientHero = !opts.festivalUrl
     design.shareThemeLabel = opts.themeLabel || ''
+    design.shareBlessing = opts.blessing || ''
     design.festivalUrl = opts.festivalUrl || ''
   }
 

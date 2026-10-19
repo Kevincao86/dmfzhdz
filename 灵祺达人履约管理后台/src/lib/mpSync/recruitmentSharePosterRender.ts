@@ -215,6 +215,34 @@ function drawHeroSection(
   drawTagChips(ctx, design.tags.chipLabels, x + 24, y + h - 36, w - 48)
 }
 
+function drawFestivalBlessing(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  const blessing = String(text || '').trim()
+  if (!blessing) return
+  ctx.save()
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.font = 'bold 40px sans-serif'
+  const lines = wrapLines(ctx, blessing, w - 8, 2)
+  const lineH = 52
+  const startY = y + h / 2 - ((lines.length - 1) * lineH) / 2
+  ctx.lineWidth = 8
+  ctx.strokeStyle = 'rgba(255,255,255,0.94)'
+  ctx.fillStyle = '#0F172A'
+  lines.forEach((line, i) => {
+    const ly = startY + i * lineH
+    ctx.strokeText(line, x, ly)
+    ctx.fillText(line, x, ly)
+  })
+  ctx.restore()
+}
+
 function readableOnLight(hex: string): string {
   const m = String(hex || '').trim().match(/^#?([0-9a-f]{6})$/i)
   if (!m) return '#0F172A'
@@ -386,10 +414,18 @@ function drawStyledQr(
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
   const theme = revealTheme ? ctx.getImageData(x, y, frameSize, frameSize) : null
-  ctx.fillStyle = revealTheme ? 'rgba(255,255,255,0.5)' : '#FFFFFF'
-  ctx.fillRect(x, y, frameSize, frameSize)
-  ctx.drawImage(qrImage, innerX, innerY, innerSize, innerSize)
-  if (theme) tintWhitesWithTheme(ctx, theme, x, y, frameSize, frameSize, 0.46)
+  if (!revealTheme) {
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(x, y, frameSize, frameSize)
+  }
+  ctx.drawImage(
+    qrImage,
+    revealTheme ? x : innerX,
+    revealTheme ? y : innerY,
+    revealTheme ? frameSize : innerSize,
+    revealTheme ? frameSize : innerSize,
+  )
+  if (theme) tintWhitesWithTheme(ctx, theme, x, y, frameSize, frameSize, 1)
 }
 
 export async function renderRecruitmentPosterCanvas(
@@ -501,7 +537,9 @@ export async function renderRecruitmentPosterCanvas(
   const panelW = qrX - panelX - 16
   const panelY = qrY + 6
   const panelH = qrFrameSize + 28 - 12
-  if (panelW > 120 && design.footerPanel) {
+  if (design.shareBlessing && panelW > 80) {
+    drawFestivalBlessing(ctx, design.shareBlessing, panelX, panelY, panelW, panelH)
+  } else if (panelW > 120 && design.footerPanel) {
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
   if (qrImage) {

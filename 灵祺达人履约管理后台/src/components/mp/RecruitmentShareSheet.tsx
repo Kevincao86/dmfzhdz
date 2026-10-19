@@ -29,34 +29,34 @@ const FESTIVAL_CDN = 'https://mofangdianai.com/recruit-covers/festivals'
 const FESTIVAL_VER = 'festival20261019b'
 
 const FESTIVALS = [
-  { id: 'newyear', label: '元旦', month: 1, accent: '#C9A227', paper: '#FFFBF2' },
-  { id: 'laba', label: '腊八', month: 1, accent: '#9A3412', paper: '#FFF7ED' },
-  { id: 'spring', label: '春节', month: 2, accent: '#E11D2E', paper: '#FFF7E8' },
-  { id: 'lantern', label: '元宵', month: 2, accent: '#FF8A3D', paper: '#FFF8EF' },
-  { id: 'valentine', label: '情人节', month: 2, accent: '#BE185D', paper: '#FFF1F6' },
-  { id: 'women', label: '妇女节', month: 3, accent: '#DB2777', paper: '#FFF5F8' },
-  { id: 'tree', label: '植树节', month: 3, accent: '#166534', paper: '#F0FDF4' },
-  { id: 'qingming', label: '清明', month: 4, accent: '#0F766E', paper: '#F3FBF7' },
-  { id: 'labor', label: '劳动节', month: 5, accent: '#0F766E', paper: '#F0FDFA' },
-  { id: 'youth', label: '青年节', month: 5, accent: '#1D4ED8', paper: '#F0F9FF' },
-  { id: 'nurse', label: '护士节', month: 5, accent: '#0F766E', paper: '#F0FDFA' },
-  { id: 'mother', label: '母亲节', month: 5, accent: '#9F1239', paper: '#FFF1F2' },
-  { id: 'child', label: '儿童节', month: 6, accent: '#0284C7', paper: '#F0FDFF' },
-  { id: 'duanwu', label: '端午', month: 6, accent: '#166534', paper: '#F0FDF4' },
-  { id: 'father', label: '父亲节', month: 6, accent: '#1E3A5F', paper: '#F8FAFC' },
-  { id: 'party', label: '建党节', month: 7, accent: '#DC2626', paper: '#FEF2F2' },
-  { id: 'army', label: '建军节', month: 8, accent: '#3F6212', paper: '#F7FEE7' },
-  { id: 'qixi', label: '七夕', month: 8, accent: '#7C3AED', paper: '#FAF5FF' },
-  { id: 'zhongyuan', label: '中元', month: 8, accent: '#1E3A8A', paper: '#EFF6FF' },
-  { id: 'teacher', label: '教师节', month: 9, accent: '#C2410C', paper: '#FFF7ED' },
-  { id: 'midautumn', label: '中秋', month: 9, accent: '#FDE68A', paper: '#FFFBEB' },
-  { id: 'national', label: '国庆', month: 10, accent: '#DC2626', paper: '#FFF7ED' },
-  { id: 'chongyang', label: '重阳', month: 10, accent: '#B45309', paper: '#FFFBEB' },
-  { id: 'halloween', label: '万圣节', month: 10, accent: '#F97316', paper: '#FFF7ED' },
-  { id: 'sale', label: '双十一', month: 11, accent: '#EF4444', paper: '#FFF7ED' },
-  { id: 'dongzhi', label: '冬至', month: 12, accent: '#1D4ED8', paper: '#EFF6FF' },
-  { id: 'christmas', label: '圣诞', month: 12, accent: '#166534', paper: '#F0FDF4' },
-  { id: 'countdown', label: '跨年', month: 12, accent: '#7C3AED', paper: '#F8FAFC' },
+  { id: 'newyear', label: '元旦', blessing: '元旦快乐', month: 1, accent: '#C9A227', paper: '#FFFBF2' },
+  { id: 'laba', label: '腊八', blessing: '腊八安康', month: 1, accent: '#9A3412', paper: '#FFF7ED' },
+  { id: 'spring', label: '春节', blessing: '新春快乐', month: 2, accent: '#E11D2E', paper: '#FFF7E8' },
+  { id: 'lantern', label: '元宵', blessing: '元宵喜乐', month: 2, accent: '#FF8A3D', paper: '#FFF8EF' },
+  { id: 'valentine', label: '情人节', blessing: '情人节快乐', month: 2, accent: '#BE185D', paper: '#FFF1F6' },
+  { id: 'women', label: '妇女节', blessing: '妇女节快乐', month: 3, accent: '#DB2777', paper: '#FFF5F8' },
+  { id: 'tree', label: '植树节', blessing: '春风植绿', month: 3, accent: '#166534', paper: '#F0FDF4' },
+  { id: 'qingming', label: '清明', blessing: '清明安康', month: 4, accent: '#0F766E', paper: '#F3FBF7' },
+  { id: 'labor', label: '劳动节', blessing: '劳动节快乐', month: 5, accent: '#0F766E', paper: '#F0FDFA' },
+  { id: 'youth', label: '青年节', blessing: '青春正好', month: 5, accent: '#1D4ED8', paper: '#F0F9FF' },
+  { id: 'nurse', label: '护士节', blessing: '护士节安康', month: 5, accent: '#0F766E', paper: '#F0FDFA' },
+  { id: 'mother', label: '母亲节', blessing: '母亲节快乐', month: 5, accent: '#9F1239', paper: '#FFF1F2' },
+  { id: 'child', label: '儿童节', blessing: '儿童节快乐', month: 6, accent: '#0284C7', paper: '#F0FDFF' },
+  { id: 'duanwu', label: '端午', blessing: '端午安康', month: 6, accent: '#166534', paper: '#F0FDF4' },
+  { id: 'father', label: '父亲节', blessing: '父亲节快乐', month: 6, accent: '#1E3A5F', paper: '#F8FAFC' },
+  { id: 'party', label: '建党节', blessing: '七一快乐', month: 7, accent: '#DC2626', paper: '#FEF2F2' },
+  { id: 'army', label: '建军节', blessing: '建军节快乐', month: 8, accent: '#3F6212', paper: '#F7FEE7' },
+  { id: 'qixi', label: '七夕', blessing: '七夕快乐', month: 8, accent: '#7C3AED', paper: '#FAF5FF' },
+  { id: 'zhongyuan', label: '中元', blessing: '中元安康', month: 8, accent: '#1E3A8A', paper: '#EFF6FF' },
+  { id: 'teacher', label: '教师节', blessing: '教师节快乐', month: 9, accent: '#C2410C', paper: '#FFF7ED' },
+  { id: 'midautumn', label: '中秋', blessing: '中秋快乐', month: 9, accent: '#FDE68A', paper: '#FFFBEB' },
+  { id: 'national', label: '国庆', blessing: '国庆快乐', month: 10, accent: '#DC2626', paper: '#FFF7ED' },
+  { id: 'chongyang', label: '重阳', blessing: '重阳安康', month: 10, accent: '#B45309', paper: '#FFFBEB' },
+  { id: 'halloween', label: '万圣节', blessing: '万圣快乐', month: 10, accent: '#F97316', paper: '#FFF7ED' },
+  { id: 'sale', label: '双十一', blessing: '狂欢好价', month: 11, accent: '#EF4444', paper: '#FFF7ED' },
+  { id: 'dongzhi', label: '冬至', blessing: '冬至安康', month: 12, accent: '#1D4ED8', paper: '#EFF6FF' },
+  { id: 'christmas', label: '圣诞', blessing: '圣诞快乐', month: 12, accent: '#166534', paper: '#F0FDF4' },
+  { id: 'countdown', label: '跨年', blessing: '跨年快乐', month: 12, accent: '#7C3AED', paper: '#F8FAFC' },
 ]
 
 function recruitmentWebUrl(id: string) {
@@ -117,6 +117,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
           accentColor: theme.accent,
           accentLight: theme.paper,
           themeLabel: theme.label,
+          blessing: theme.blessing,
           festivalUrl: `${FESTIVAL_CDN}/festival-${theme.id}.jpg?v=${FESTIVAL_VER}`,
         }
       : undefined)
@@ -279,11 +280,10 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
                   backgroundPosition: 'center',
                 }}
               >
-                {activeTheme ? <div className="pointer-events-none absolute inset-3 rounded-xl bg-white/50" /> : null}
                 <img
                   src={codeUrl}
                   alt="小程序码"
-                  className={`relative h-52 w-52 rounded-xl object-contain ${activeTheme ? 'mix-blend-multiply' : 'bg-white'}`}
+                  className={`relative h-52 w-52 object-contain ${activeTheme ? 'mix-blend-multiply' : 'rounded-xl bg-white'}`}
                 />
               </div>
             ) : (

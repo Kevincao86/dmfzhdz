@@ -256,6 +256,27 @@ function readableOnLight(hex) {
   return luminance > 0.55 ? '#0F172A' : `#${m[1]}`
 }
 
+function drawFestivalBlessing(ctx, text, x, y, w, h) {
+  const blessing = String(text || '').trim()
+  if (!blessing) return
+  ctx.save()
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.font = 'bold 40px sans-serif'
+  const lines = wrapLines(ctx, blessing, w - 8, 2)
+  const lineH = 52
+  const startY = y + h / 2 - ((lines.length - 1) * lineH) / 2
+  ctx.lineWidth = 8
+  ctx.strokeStyle = 'rgba(255,255,255,0.94)'
+  ctx.fillStyle = '#0F172A'
+  for (let i = 0; i < lines.length; i += 1) {
+    const ly = startY + i * lineH
+    ctx.strokeText(lines[i], x, ly)
+    ctx.fillText(lines[i], x, ly)
+  }
+  ctx.restore()
+}
+
 function drawFooterPanel(ctx, x, y, w, h, panel, design) {
   const slogan = String((panel && panel.slogan) || '').trim()
   const highlights = Array.isArray(panel && panel.highlights)
@@ -367,12 +388,14 @@ function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackCon
   const innerY = y + (frameSize - innerSize) / 2
   const themeShot = revealTheme ? shareThemes.captureTheme(ctx, x, y, frameSize, frameSize) : null
 
-  ctx.fillStyle = revealTheme ? 'rgba(255,255,255,0.55)' : '#FFFFFF'
-  ctx.fillRect(x, y, frameSize, frameSize)
+  if (!revealTheme) {
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(x, y, frameSize, frameSize)
+  }
 
   if (qrImg) {
-    ctx.drawImage(qrImg, innerX, innerY, innerSize, innerSize)
-    if (themeShot) themeShot.reveal(0.46)
+    ctx.drawImage(qrImg, revealTheme ? x : innerX, revealTheme ? y : innerY, revealTheme ? frameSize : innerSize, revealTheme ? frameSize : innerSize)
+    if (themeShot) themeShot.reveal(1)
     return Promise.resolve()
   }
 
@@ -389,7 +412,7 @@ function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackCon
         '#ffffff',
       )
     return Promise.resolve(drawn).then(() => {
-      if (themeShot) themeShot.reveal(0.46)
+      if (themeShot) themeShot.reveal(1)
     })
   }
 
@@ -557,7 +580,10 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   const panelW = qrX - panelX - 16
   const panelY = qrY + 6
   const panelH = qrFrameSize + 28 - 12
-  if (panelW > 120 && design.footerPanel) {
+  const blessing = design && design.shareTheme && design.shareTheme.blessing
+  if (blessing && panelW > 80) {
+    drawFestivalBlessing(ctx, blessing, panelX, panelY, panelW, panelH)
+  } else if (panelW > 120 && design.footerPanel) {
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
   if (design && design.hideQr) return Promise.resolve()
