@@ -299,6 +299,8 @@ const TALENT_PLOTS = [
     beats: ['先说听来的预期', '拍门头进店核验', '亲自体验', '改口并说适不适合谁'],
     story:
       '探店达人出镜来{店名}拍{品类}。开场先说自己听说{卖点}是什么样，推门核验店招，再亲自体验，发现和预期不一样，最后按{价格}说明适不适合{位置}来的人。',
+    roles: '探店达人 / 店员',
+    conflict: '达人进店前对{卖点}的说法，和亲自体验对不上。',
     dialogue: '我先自己试完，再告诉你适不适合。',
   },
   {
@@ -308,6 +310,8 @@ const TALENT_PLOTS = [
     beats: ['承认第一次来', '找到门头核验', '第一次体验', '给第一次到店的结论'],
     story:
       '探店达人第一次来{店名}拍{品类}。开场承认自己不熟，先找到门头确认是这家，进店问清{卖点}怎么体验，自己上手，最后告诉第一次来的人{价格}值不值、{位置}适不适合。',
+    roles: '探店达人 / 店员',
+    conflict: '达人第一次来，不熟流程，只能边问边自己体验。',
     dialogue: '我也是第一次来，先自己试给你看。',
   },
   {
@@ -317,6 +321,8 @@ const TALENT_PLOTS = [
     beats: ['介绍同行的人', '一起进店核验', '达人先体验再分享', '说适不适合一起来'],
     story:
       '探店达人带人来{店名}拍{品类}，使用场景是{位置}。开场先介绍同行的人为什么跟着来，进店一起核验，达人自己先体验{卖点}再递给同行，最后说这单适不适合一起来、{价格}怎么看。',
+    roles: '探店达人 / 同行',
+    conflict: '同行还在犹豫，达人必须自己先体验再给结论。',
     dialogue: '你先看我试，再决定要不要一起。',
   },
   {
@@ -326,6 +332,8 @@ const TALENT_PLOTS = [
     beats: ['先报听到的价', '进店把套餐摊开', '亲自体验', '直接说值不值'],
     story:
       '探店达人来{店名}核对{卖点}到底值不值{价格}。开场先报自己听到的价，进店把套餐或项目摊开看清包含什么，亲自体验，最后直接说这个价适不适合{位置}。',
+    roles: '探店达人 / 店员',
+    conflict: '听到的价格和到店看到的{卖点}对不上，达人要自己体验后才下结论。',
     dialogue: '先别信标价，我体验完再告诉你值不值。',
   },
   {
@@ -335,6 +343,8 @@ const TALENT_PLOTS = [
     beats: ['拒绝只拍空镜', '进店跟着达人', '亲手体验', '体验完再下结论'],
     story:
       '探店达人在{店名}拒绝只拍空环境。开场先说不能只扫一圈店，必须自己体验{卖点}，镜头跟着达人的手和反应，体验完才给{位置}的到店结论，并报上{价格}。',
+    roles: '探店达人 / 店员',
+    conflict: '店里想用空镜应付，达人坚持自己体验才算探店。',
     dialogue: '空镜不算探店，我自己试完再说。',
   },
 ]
@@ -349,6 +359,8 @@ function talentPlot(id, scene, shop) {
     hint: plot.hint,
     beats: plot.beats,
     story,
+    roles: fillTokens(plot.roles, scene, shop),
+    conflict: fillTokens(plot.conflict, scene, shop),
     dialogue: plot.dialogue,
   }
 }
@@ -370,7 +382,7 @@ function kindLine() {
   return '探店达人真人出镜竖屏短剧。主角是到店体验的达人，不是老板独白，不是客人躺平。前 3 秒先亮人设或预期反差，接着门头进店，再亲自体验并给真实反应，最后说清适不适合谁。使用场景只写约会、下班犒劳、朋友局、带家人、一个人也值、第一次到店。禁止职场豪门重生，禁止漫画分格，禁止产品参数广告片，禁止仙侠古装。'
 }
 
-function buildPrompt(world, scene, shop, story, dialogue, style, hasSceneRefs) {
+function buildPrompt(world, scene, shop, story, roles, conflict, dialogue, style, hasSceneRefs, plotName) {
   const infoBits = (world.fields || [])
     .map((f) => {
       const v = String((shop && shop[f.key]) || '').trim()
@@ -378,20 +390,25 @@ function buildPrompt(world, scene, shop, story, dialogue, style, hasSceneRefs) {
     })
     .filter(Boolean)
     .join('，')
-  const quoted = String(dialogue || '').trim()
+  const spoken = String(dialogue || '').trim()
+  const quoted = spoken ? (spoken.indexOf('"') >= 0 ? spoken : `"${spoken}"`) : ''
   const sceneLine = hasSceneRefs
     ? '【背景锁定】已上传参考画面。成片的空间、灯光和陈设必须按参考画面出片。故事只决定动作和对白，禁止改到另一间房或另一条街。'
     : `【故事配景】未上传参考画面。场景按故事匹配：${scene.mustSee}。${scene.visual}。`
+  const plot = String(plotName || '').trim()
   return [
-    `【竖屏短剧·${world.label}·${scene.name}】`,
-    kindLine(world.promptKind),
+    `【AI短剧·${world.label}·${scene.name}${plot ? `·${plot}` : ''}】`,
+    kindLine(),
     sceneLine,
     style && style.name ? `画风：${style.name}${style.visual ? `（${style.visual}）` : ''}。` : '',
+    `画面必须出现：${scene.mustSee}。${scene.visual}。`,
     infoBits ? `创作信息：${infoBits}。` : '',
     `主题：${fillTokens(story || scene.hook, scene, shop)}`,
+    String(roles || '').trim() ? `角色：${String(roles).trim()}。` : '',
+    String(conflict || '').trim() ? `核心冲突：${String(conflict).trim()}。` : '',
     `钩子：${scene.hook}。`,
-    quoted ? `对白钩子：「${quoted}」。` : '',
-    '运镜跟拍，禁止拖沓空镜，禁止大面积海报字幕。口播与对白短、口语。禁止电影片头片尾和演职员表。',
+    quoted ? `对白钩子：${quoted}。` : '',
+    '运镜跟拍，禁止拖沓空镜，禁止大面积海报字幕。口播与对白必须有人声（开口说话），禁止无声片、禁止只配字幕不发声。禁止电影片头片尾和演职员表。',
   ]
     .filter(Boolean)
     .join('\n')

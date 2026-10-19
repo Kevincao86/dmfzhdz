@@ -119,6 +119,34 @@ function shopFromFields(fields, prev) {
   return shop
 }
 
+function parseStoryAi(raw) {
+  const text = String(raw || '').trim()
+  if (!text) return null
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const jsonStr = (fence && fence[1] ? fence[1] : text).trim()
+  const start = jsonStr.indexOf('{')
+  const end = jsonStr.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try {
+      const o = JSON.parse(jsonStr.slice(start, end + 1))
+      const story = String(o.story || o['一句话故事'] || '').trim()
+      if (story) {
+        return {
+          story,
+          roles: String(o.roles || o['角色'] || o['人设'] || '').trim(),
+          conflict: String(o.conflict || o['核心冲突'] || '').trim(),
+          dialogue: String(o.dialogue || o['对白钩子'] || o['对白'] || '').trim(),
+        }
+      }
+    } catch (_) {}
+  }
+  const first = text
+    .split('\n')
+    .map((s) => s.trim())
+    .find((s) => s && s.charAt(0) !== '{' && s.indexOf('```') !== 0)
+  return first ? { story: first.replace(/^["「]|["」]$/g, ''), roles: '', conflict: '', dialogue: '' } : null
+}
+
 function parsePortraitAi(raw) {
   const text = String(raw || '').trim()
   if (!text) return ''
@@ -165,9 +193,14 @@ Page({
     fields: [],
     shop: emptyShop(),
     story: '',
+    roles: '',
+    conflict: '',
+    dialogue: '',
     plotId: 'expect',
+    plotName: '',
     plotHint: '',
     plots: [],
+    hasConfirmedCast: false,
     storyBusy: false,
     cast: [castStore.newMember(1)],
     castPacks: [],
@@ -225,9 +258,13 @@ Page({
       styleId,
       fields: packFields(world, shop),
       plotId: plot.id,
+      plotName: plot.name,
       plotHint: plot.hint,
       plots: catalog.TALENT_PLOTS.map((p) => ({ id: p.id, name: p.name, on: p.id === plot.id })),
       story: plot.story,
+      roles: plot.roles,
+      conflict: plot.conflict,
+      dialogue: plot.dialogue,
     })
     this.refreshClipCopy()
   },
@@ -250,27 +287,107 @@ Page({
     const scene = catalog.sceneOf(this.data.sceneId, this.sceneDraft())
     const style = catalog.styleOf(this.data.styleId)
     const shop = shopFromFields(this.data.fields, this.data.shop)
-    const castLine = (this.data.cast || [])
-      .map((c) => {
-        const name = String(c.name || '').trim()
-        const desc = String(c.desc || '').trim()
-        if (!name && !desc) return ''
-        return `${name || '角色'}：${desc || '按故事里的形象'}`
+    const plot = (this.data.plots || []).find((p) => p.on)
+    return catalog.buildPrompt(
+      world,
+      scene,
+      shop,
+      this.data.story,
+      this.data.roles,
+      this.data.conflict,
+      this.data.dialogue,
+      style,
+      false,
+      (plot && plot.name) || this.data.plotName,
+    )
+  },
+
+  castUsable() {
+    return (this.data.cast || []).some((m) => {
+      const name = String(m.name || '').trim()
+      const named = name && !/^角色\d+$/.test(name)
+      return named || String(m.desc || '').trim() || m.previewPath || m.sourcePath || m.previewDataUrl || m.confirmed
+    })
+  },
+
+  castConfirmed(cast) {
+    return (cast || this.data.cast || []).some((m) => m.confirmed && (m.previewDataUrl || m.previewPath))
+  },
+
+  leadCastName() {
+    const cast = this.data.cast || []
+    const named = cast.filter(
+      (m) => String(m.name || '').trim() || String(m.desc || '').trim() || m.previewPath || m.previewDataUrl,
+    )
+    const photo = named.find((m) => m.confirmed && (m.previewDataUrl || m.previewPath))
+    const notGuest = (m) => !/客人|顾客|客户|对方|男客|女客|旁人/.test(String(m.name || ''))
+    const hit = photo || named.find(notGuest) || named[0]
+    const memberName = hit ? String(hit.name || '').trim() : ''
+    if (memberName && !/^角色\d+$/.test(memberName) && notGuest(hit)) {
+      return memberName.replace(/（主角）|\(主角\)/g, '')
+    }
+    const fromDesc = hit ? String(hit.desc || '').match(/女技师|男技师|技师|店员|主理人|老板娘|老板|达人/) : null
+    return (fromDesc && fromDesc[0]) || '探店达人'
+  },
+
+  castBrief() {
+    const cast = this.data.cast || []
+    const leadName = this.leadCastName()
+    const named = cast.filter(
+      (m) => String(m.name || '').trim() || String(m.desc || '').trim() || m.previewPath || m.previewDataUrl,
+    )
+    const lead =
+      named.find((m) => String(m.name || '').trim() === leadName) ||
+      named.find((m) => m.confirmed) ||
+      named[0]
+    const leadDesc = lead ? String(lead.desc || '').trim().slice(0, 80) : ''
+    const support = named
+      .filter((m) => m !== lead)
+      .map((m) => {
+        const n = String(m.name || '').trim() || '配角'
+        const d = String(m.desc || '').trim()
+        return `${n}${d ? `（${d.slice(0, 36)}）` : ''}${m.confirmed ? '·已确认形象' : ''}`
       })
+    const brief = [
+      `画面主角：${leadName}${lead && lead.confirmed ? '（已确认角色形象照，视频会用这张脸，故事必须以 TA 为动作主语）' : ''}`,
+      leadDesc ? `主角画像：${leadDesc}` : '',
+      support.length ? `配角：${support.join('、')}` : '配角：店员或同行只作配角。',
+      named.length >= 2
+        ? '对手戏铁律：已填写的角色必须全部入画、有走位和对白，禁止写成一个人独行。'
+        : '主次铁律：一句话故事的主语、欲望、镜头中心必须是画面主角。',
+    ]
       .filter(Boolean)
-      .join('；')
-    return catalog.buildPrompt(world, scene, shop, this.data.story, castLine, style, false)
+      .join('\n')
+    return { leadName, brief, count: named.length }
+  },
+
+  blockStep(step) {
+    if (step >= 3 && !this.castUsable()) return '请先选择或填写角色，再写故事'
+    if (step >= 4 && !String(this.data.story || '').trim()) return '请先确认一句话故事，或点「AI生成故事」'
+    return ''
   },
 
   onDramaStep(e) {
     const step = Number(e.currentTarget.dataset.step) || 1
-    const patch = { dramaStep: step }
+    const block = this.blockStep(step)
+    if (block) {
+      this.setData({ err: block })
+      wx.showToast({ title: block.slice(0, 18), icon: 'none' })
+      return
+    }
+    const patch = { dramaStep: step, err: '' }
     if (step === 4) patch.promptPreview = this.currentPrompt()
     this.setData(patch)
   },
 
   onDramaNext() {
     const step = Math.min(4, (Number(this.data.dramaStep) || 1) + 1)
+    const block = this.blockStep(step)
+    if (block) {
+      this.setData({ err: block })
+      wx.showToast({ title: block.slice(0, 18), icon: 'none' })
+      return
+    }
     const patch = { dramaStep: step, err: '' }
     if (step === 4) patch.promptPreview = this.currentPrompt()
     this.setData(patch)
@@ -294,8 +411,12 @@ Page({
       sceneHook: scene.hook,
       scenes: (this.data.scenes || []).map((s) => ({ ...s, on: s.id === sceneId })),
       plotId: plot.id,
+      plotName: plot.name,
       plotHint: plot.hint,
       story: sceneId === 'custom_scene' ? this.data.story : plot.story,
+      roles: sceneId === 'custom_scene' ? this.data.roles : plot.roles,
+      conflict: sceneId === 'custom_scene' ? this.data.conflict : plot.conflict,
+      dialogue: sceneId === 'custom_scene' ? this.data.dialogue : plot.dialogue,
     })
   },
 
@@ -306,10 +427,24 @@ Page({
     const plot = catalog.talentPlot(plotId, scene, shop)
     this.setData({
       plotId: plot.id,
+      plotName: plot.name,
       plotHint: plot.hint,
       plots: catalog.TALENT_PLOTS.map((p) => ({ id: p.id, name: p.name, on: p.id === plot.id })),
       story: plot.story,
+      roles: plot.roles,
+      conflict: plot.conflict,
+      dialogue: plot.dialogue,
     })
+  },
+
+  onRoles(e) {
+    this.setData({ roles: e.detail.value })
+  },
+  onConflict(e) {
+    this.setData({ conflict: e.detail.value })
+  },
+  onDialogue(e) {
+    this.setData({ dialogue: e.detail.value })
   },
 
   onCustomSceneName(e) {
@@ -364,6 +499,10 @@ Page({
 
   async onAiStory() {
     if (this.data.storyBusy) return
+    if (!this.castUsable()) {
+      this.setData({ err: '请先选择或填写角色，再生成故事' })
+      return
+    }
     const dur = Number(this.data.durationSec) || 0
     const durOpt = (this.data.durationOptions || []).find((o) => Number(o.sec) === dur)
     if (!dur || !durOpt) {
@@ -375,32 +514,78 @@ Page({
     const shop = shopFromFields(this.data.fields, this.data.shop)
     const guide = catalog.storyLengthGuide(dur)
     const plot = catalog.talentPlot(this.data.plotId || 'expect', scene, shop)
+    const brief = this.castBrief()
+    const style = catalog.styleOf(this.data.styleId)
+    const shopLines = (world.fields || [])
+      .map((f) => `${f.label}：${String((shop && shop[f.key]) || '').trim() || '未填'}`)
+      .join('\n')
+    const system =
+      '你是探店达人竖屏短剧编剧。主角必须是出镜探店的达人，店员和同行只作配角。剧情只走亮人设、到店核验、亲自体验、到店结论。使用场景只写约会、下班犒劳、朋友局、带家人、一个人也值、第一次到店。禁止职场打脸、重生豪门、漫画分格、产品参数广告、仙侠古装、客人躺平视角。篇幅必须严格等于成片时长：8～15 秒写短钩子，30 秒及以上按标注秒数写满。不要写技术参数，不要出现字幕/Logo/演职员表。'
+    const user = [
+      '先看已确认的角色，再写故事。不要空套钩子模板。',
+      `场景：${world.label} / ${scene.name}`,
+      `钩子标签：${plot.name}。钩子要落在画面主角身上。`,
+      plot.hint ? `钩子提示：${plot.hint}` : '',
+      `四拍结构（按主角动作写）：${plot.beats.join(' → ')}`,
+      `成片时长：${durOpt.label}（${durOpt.hint}，共 ${dur} 秒）`,
+      `【篇幅锁定】${guide}`,
+      style && style.name ? `画风：${style.name}` : '',
+      '店名、项目、价格、使用场景必须写进故事：',
+      shopLines,
+      '【主次角色·必须遵守】',
+      brief.brief,
+      String(this.data.roles || '').trim() ? `角色栏原文：${String(this.data.roles).trim()}` : '',
+      String(this.data.conflict || '').trim() ? `已有核心冲突：${String(this.data.conflict).trim()}` : '',
+      String(this.data.dialogue || '').trim() ? `已有对白钩子（可原句出现）：${String(this.data.dialogue).trim()}` : '',
+      String(this.data.story || '').trim()
+        ? `已有故事草稿（主语必须改成「${brief.leadName}」）：${String(this.data.story).trim()}`
+        : '',
+      '【探店规范】四拍只许这一条：亮人设 → 到店核验 → 亲自体验 → 到店结论。',
+      `按篇幅锁定写出刚好能拍满 ${dur} 秒的剧情。主语必须是「${brief.leadName}」。`,
+      brief.count >= 2 ? '必须写到每位已填写角色的对手戏，禁止写成一个人独行。' : '',
+      '只输出 JSON：{"story":"...","roles":"...","conflict":"...","dialogue":"..."}',
+      `story 必须以「${brief.leadName}」开头或作第一动作主语。roles、conflict、dialogue 仅在原文为空时补全。不要 markdown、不要解释。`,
+    ]
+      .filter(Boolean)
+      .join('\n')
     this.setData({ storyBusy: true, err: '' })
     try {
-      const r = await addonApi.postAiChat(
-        [
-          {
-            role: 'system',
-            content:
-              '你是探店达人竖屏短剧编剧。只输出剧情正文，不要标题。主角是出镜探店的达人。剧情只走亮人设、到店核验、亲自体验、到店结论。使用场景只写约会、下班犒劳、朋友局、带家人、一个人也值、第一次到店。禁止职场豪门、漫画和产品广告。篇幅必须严格等于成片时长。',
-          },
-          {
-            role: 'user',
-            content: [
-              `探店品类：${world.label}。场景：${scene.name}。钩子：${scene.hook}`,
-              `内置剧情：${plot.name}。${plot.hint}`,
-              `四拍：${plot.beats.join(' → ')}`,
-              `店名：${shop.storeName}，套餐/项目：${shop.offerName}，价格：${shop.price}，使用场景：${shop.area}`,
-              `成片时长：${durOpt.label}，共 ${dur} 秒。`,
-              `【篇幅锁定】${guide}`,
-              '按探店达人四拍写能拍满的剧情：亮人设、到店核验、亲自体验、到店结论。短的不要注水，长的必须按时间轴写满。',
-            ].join('\n'),
-          },
-        ],
-        { provider: 'qwen', taskType: 'generate_copywriting', temperature: 0.55 },
+      let lastErr = '生成故事失败，请稍后重试'
+      const providers = ['doubao', 'qwen', 'deepseek']
+      for (let i = 0; i < providers.length; i += 1) {
+        const r = await addonApi.postAiChat(
+          [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          { provider: providers[i], taskType: 'generate_copywriting', temperature: 0.7 },
+        )
+        if (!r.ok) {
+          lastErr = r.message || lastErr
+          continue
+        }
+        const parsed = parseStoryAi(r.content)
+        if (!parsed || !parsed.story) {
+          lastErr = '未返回可用故事，请稍后重试'
+          continue
+        }
+        const patch = {
+          story: parsed.story,
+          hint: `已按「${durOpt.label}」写好剧情（主角「${brief.leadName}」），可再微调后生成短剧。`,
+          err: '',
+        }
+        if (!String(this.data.roles || '').trim() && parsed.roles) patch.roles = parsed.roles
+        if (!String(this.data.conflict || '').trim() && parsed.conflict) patch.conflict = parsed.conflict
+        if (!String(this.data.dialogue || '').trim() && parsed.dialogue) patch.dialogue = parsed.dialogue
+        this.setData(patch)
+        return
+      }
+      const overdue = /overdue balance|account has an overdue|欠费|余额不足/i.test(lastErr)
+      throw new Error(
+        overdue
+          ? '豆包账户欠费，已自动换通义/DeepSeek 仍未写成功。请到火山方舟充值后再点「AI生成故事」。'
+          : lastErr,
       )
-      if (!r.ok) throw new Error(r.message)
-      this.setData({ story: String(r.content || '').trim() })
     } catch (e) {
       this.setData({ err: (e && e.message) || '故事生成失败' })
     } finally {
@@ -410,7 +595,7 @@ Page({
 
   _patchCast(id, patch) {
     const cast = (this.data.cast || []).map((m) => (m.id === id ? Object.assign({}, m, patch) : m))
-    this.setData({ cast })
+    this.setData({ cast, hasConfirmedCast: this.castConfirmed(cast) })
     return cast
   },
   _member(id) {
@@ -525,12 +710,14 @@ Page({
       wx.showToast({ title: `最多 ${castStore.MAX} 个角色`, icon: 'none' })
       return
     }
-    this.setData({ cast: cast.concat(castStore.newMember(cast.length + 1)) })
+    const next = cast.concat(castStore.newMember(cast.length + 1))
+    this.setData({ cast: next, hasConfirmedCast: this.castConfirmed(next) })
   },
   onRemoveCast(e) {
     const id = e.currentTarget.dataset.id
-    const cast = (this.data.cast || []).filter((c) => c.id !== id)
-    this.setData({ cast: cast.length ? cast : [castStore.newMember(1)] })
+    const left = (this.data.cast || []).filter((c) => c.id !== id)
+    const cast = left.length ? left : [castStore.newMember(1)]
+    this.setData({ cast, hasConfirmedCast: this.castConfirmed(cast) })
   },
   onCastName(e) {
     this._patchCast(e.currentTarget.dataset.id, { name: e.detail.value })
@@ -757,7 +944,13 @@ Page({
   onLoadCastPack(e) {
     const pack = (this.data.castPacks || []).find((p) => p.id === e.currentTarget.dataset.id)
     if (!pack || !pack.members || !pack.members.length) return
-    this.setData({ cast: pack.members.slice(0, castStore.MAX), showCastLibrary: false, hint: `已载入「${pack.name}」。` })
+    const cast = pack.members.slice(0, castStore.MAX)
+    this.setData({
+      cast,
+      hasConfirmedCast: this.castConfirmed(cast),
+      showCastLibrary: false,
+      hint: `已载入「${pack.name}」。`,
+    })
   },
   onDeleteCastPack(e) {
     const packs = castStore.loadPacks().filter((p) => p.id !== e.currentTarget.dataset.id)
@@ -769,7 +962,11 @@ Page({
     if (this.data.busy) return
     const story = String(this.data.story || '').trim()
     if (!story) {
-      this.setData({ err: '请先写一句话故事，或用 AI 生成故事' })
+      this.setData({ err: '请先确认一句话故事，或点「AI生成故事」。' })
+      return
+    }
+    if (!this.castConfirmed()) {
+      this.setData({ err: '请先确认角色形象（上传照片或生成并确认预览），不能只凭文案生成。' })
       return
     }
     const sec = Number(this.data.durationSec) || 15

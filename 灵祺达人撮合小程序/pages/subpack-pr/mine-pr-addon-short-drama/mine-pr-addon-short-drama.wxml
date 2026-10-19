@@ -8,8 +8,8 @@
 
   <view class="op-steps">
     <text class="op-step {{dramaStep === 1 ? 'on' : ''}}" data-step="1" bindtap="onDramaStep">1 场景</text>
-    <text class="op-step {{dramaStep === 2 ? 'on' : ''}}" data-step="2" bindtap="onDramaStep">2 故事</text>
-    <text class="op-step {{dramaStep === 3 ? 'on' : ''}}" data-step="3" bindtap="onDramaStep">3 角色</text>
+    <text class="op-step {{dramaStep === 2 ? 'on' : ''}}" data-step="2" bindtap="onDramaStep">2 角色</text>
+    <text class="op-step {{dramaStep === 3 ? 'on' : ''}}" data-step="3" bindtap="onDramaStep">3 故事</text>
     <text class="op-step {{dramaStep === 4 ? 'on' : ''}}" data-step="4" bindtap="onDramaStep">4 出片</text>
   </view>
 
@@ -44,10 +44,6 @@
       <text class="op-label">画面里必须出现</text>
       <input class="op-input" placeholder="例如：卷帘门、剩汤、路灯" value="{{customSceneMustSee}}" bindinput="onCustomSceneMust" />
     </block>
-    <button class="op-btn" bindtap="onDramaNext">下一步：写故事</button>
-  </view>
-
-  <view class="op-card" wx:elif="{{dramaStep === 2}}">
     <text class="op-label">成片时长</text>
     <picker mode="selector" range="{{durationOptions}}" range-key="label" value="{{durationIdx}}" bindchange="onDuration">
       <view class="op-picker">{{durationOptions[durationIdx].label}}</view>
@@ -69,20 +65,14 @@
     <view class="op-chips">
       <text wx:for="{{plots}}" wx:key="id" class="op-chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onPlot">{{item.name}}</text>
     </view>
-    <text class="op-body muted">{{plotHint}}。点一条会写成达人出镜探店，可再改。</text>
-    <text class="op-label">一句话故事</text>
-    <text class="op-body muted">主角是出镜探店的达人。8～15 秒写一个到店钩子，30 秒起按亮人设、到店、体验、结论写满。</text>
-    <textarea class="op-area" maxlength="2000" placeholder="先选时长，再点 AI生成故事" value="{{story}}" bindinput="onStory" />
-    <button class="op-btn-ghost" loading="{{storyBusy}}" bindtap="onAiStory">{{storyBusy ? '正在写故事' : 'AI生成故事'}}</button>
-    <view class="op-pair">
-      <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
-      <button class="op-btn" bindtap="onDramaNext">下一步：角色</button>
-    </view>
+    <text class="op-body muted">{{plotHint}}。点一条会写成达人出镜探店。先确认角色，再生成一句话故事。</text>
+    <text wx:if="{{err}}" class="op-err">{{err}}</text>
+    <button class="op-btn" bindtap="onDramaNext">下一步：角色</button>
   </view>
 
-  <view class="op-card" wx:elif="{{dramaStep === 3}}">
+  <view class="op-card" wx:elif="{{dramaStep === 2}}">
     <text class="op-label">角色形象</text>
-    <text class="op-body muted">和商家端同一套：写形象或上传参考图，生成预览后点「用此图确认角色」。</text>
+    <text class="op-body muted">先确认角色形象，再生成一句话故事。写形象或上传参考图，生成预览后点「用此图确认角色」。</text>
     <view class="op-row">
       <button class="op-btn-ghost" bindtap="onToggleCastLibrary">选用已存{{castPacks.length ? ' ' + castPacks.length : ''}}</button>
       <button class="op-btn-ghost" bindtap="onToggleCastSave">保存角色</button>
@@ -144,12 +134,34 @@
     <text wx:if="{{err}}" class="op-err">{{err}}</text>
     <view class="op-pair">
       <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
+      <button class="op-btn" bindtap="onDramaNext">下一步：故事</button>
+    </view>
+  </view>
+
+  <view class="op-card" wx:elif="{{dramaStep === 3}}">
+    <text class="op-label">当前剧情</text>
+    <text class="op-body muted">{{plotName}}。{{plotHint}}</text>
+    <text class="op-label">角色</text>
+    <input class="op-input" placeholder="例：探店达人 / 店员" value="{{roles}}" bindinput="onRoles" />
+    <text class="op-label">对白钩子</text>
+    <input class="op-input" placeholder="例：我先自己试完，再告诉你适不适合。" value="{{dialogue}}" bindinput="onDialogue" />
+    <text class="op-label">核心冲突</text>
+    <input class="op-input" placeholder="达人亲自体验后，和进店前的说法对不上" value="{{conflict}}" bindinput="onConflict" />
+    <text class="op-label">一句话故事</text>
+    <text class="op-body muted">先确认角色，再点 AI 生成。主角是出镜探店的达人。8～15 秒写一个到店钩子，30 秒起按亮人设、到店、体验、结论写满。</text>
+    <textarea class="op-area" maxlength="2000" placeholder="先确认角色，再点 AI生成故事" value="{{story}}" bindinput="onStory" />
+    <button class="op-btn-ghost" loading="{{storyBusy}}" bindtap="onAiStory">{{storyBusy ? '正在写故事' : 'AI生成故事'}}</button>
+    <text wx:if="{{hint}}" class="op-meta">{{hint}}</text>
+    <text wx:if="{{err}}" class="op-err">{{err}}</text>
+    <view class="op-pair">
+      <button class="op-btn-ghost" bindtap="onDramaPrev">上一步</button>
       <button class="op-btn" bindtap="onDramaNext">下一步：出片</button>
     </view>
   </view>
 
   <view class="op-card" wx:elif="{{dramaStep === 4}}">
     <text class="op-label">出片</text>
+    <text class="op-body muted" wx:if="{{!hasConfirmedCast}}">出片前须确认角色形象。回到「角色」，上传或生成预览后点「用此图确认角色」。</text>
     <text class="op-body muted">{{clipHint}}</text>
     <text class="op-points" wx:if="{{pointsHint}}">{{pointsHint}}</text>
     <text class="op-body">{{promptPreview}}</text>
