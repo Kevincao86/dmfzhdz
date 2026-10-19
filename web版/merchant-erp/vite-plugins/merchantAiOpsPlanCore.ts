@@ -731,6 +731,7 @@ export async function runAiOpsPlanCore(
     midTailSamples: string[]
     sourceLabel: string
     tierAvgSummary: string
+    platform: string
   } | null = null
   try {
     const { loadRegistrySnapshotForServer } = await import('../src/lib/registrySnapshotServerLoad.js')
@@ -764,6 +765,7 @@ export async function runAiOpsPlanCore(
         midTailSamples: insight.midTailSamples,
         sourceLabel: insight.sourceLabel,
         tierAvgSummary: insight.tierAvgSummary,
+        platform: insight.platform || talentPlatform,
       }
     } else {
       talentLibraryBlock =
@@ -856,7 +858,7 @@ export async function runAiOpsPlanCore(
             sourceLabel: talentLibraryMeta.sourceLabel,
             citySource: talentLibraryMeta.citySource,
             filterCity: talentLibraryMeta.city,
-            platform: insight.platform || talentPlatform,
+            platform: talentLibraryMeta.platform || talentPlatform,
             headCount: talentLibraryMeta.headCount,
             midTailCount: talentLibraryMeta.midTailCount,
             headSamples: talentLibraryMeta.headSamples,
