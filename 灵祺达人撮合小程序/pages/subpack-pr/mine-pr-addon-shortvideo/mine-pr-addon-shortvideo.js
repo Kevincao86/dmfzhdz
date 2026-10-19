@@ -569,17 +569,17 @@ Page({
               ].join('\n'),
             },
           ],
-          { provider: 'qwen', temperature: 0.2 },
+          { provider: 'doubao', temperature: 0.2 },
         )
         if (chat.ok) {
           shots = parseShotJson(chat.content, source, '')
         } else if (/overdue balance|account has an overdue|欠费|余额不足/i.test(String(chat.message || ''))) {
           this.setData({
-            err: '当前模型线路欠费。拆解已改走通义，请在运营台把通义切到有余额的备选线路。',
+            err: '豆包这条线路欠费。请到运营台把豆包改成手动，选中备选 1 并保存线路。',
           })
         }
       } catch (_) {
-        /* 通义失败时仍展示按文案整理的画面、口播、背景音 */
+        /* 豆包失败时仍展示按文案整理的画面、口播、背景音 */
       }
       this.setData({ imitateShots: shots, imitateNote: note, progress: '' })
     } catch (e) {

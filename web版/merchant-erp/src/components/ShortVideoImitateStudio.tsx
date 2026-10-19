@@ -50,7 +50,7 @@ function captionFromShare(text: string): string {
 function explainImitateError(raw: string): string {
   const t = raw.replace(/^upstream_error\s*[—\-:]\s*/i, '').trim()
   if (/overdue balance|account has an overdue|欠费|余额不足/i.test(raw)) {
-    return '当前这条模型线路欠费。拆解已改走通义，不会再打欠费的豆包主账号；请在运营台把通义切到有余额的备选线路后重试。'
+    return '豆包这条线路欠费。请到运营台「API 线路」把豆包改成手动，点备选 1 的「改用这条」，再点「保存线路」。'
   }
   return t || '拆解失败'
 }
@@ -302,7 +302,7 @@ export default function ShortVideoImitateStudio() {
         let text = ''
         try {
           const chat = await postAiChat({
-            provider: 'qwen',
+            provider: 'doubao',
             stream: false,
             temperature: 0.2,
             messages: [
@@ -338,7 +338,7 @@ export default function ShortVideoImitateStudio() {
       let text = ''
       try {
         const chat = await postAiChat({
-          provider: 'qwen',
+          provider: 'doubao',
           stream: false,
           temperature: 0.2,
           imageDataUrls: frames.slice(0, 3).map((f) => `data:image/jpeg;base64,${f.pureBase64}`),
