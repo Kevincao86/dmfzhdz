@@ -1,5 +1,6 @@
 /**
  * 商家 / 服务商 ERP AI API：JWT 租户积分预检与成功后扣减。
+ * 星选履约与达人小程序会话（userId 以 mp: 开头）扣注册表钱包积分，不查商家租户。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
@@ -13,6 +14,11 @@ import {
   spendErpAiPoints,
   type ErpAiUsageKind,
 } from '../../src/lib/erpAiPointsSpendCore.js'
+import {
+  assertMpAiPointsAffordableForSessionToken,
+  spendMpAiPointsForSessionToken,
+} from '../../src/lib/mpAiPointsSpendSession.js'
+import { parseMpPointsUsageKind, type MpPointsUsageKind } from '../../src/lib/mpPointsEconomics.js'
 
 function supabaseBase(env: Record<string, string>): string {
   return (env.SUPABASE_URL || env.VITE_SUPABASE_URL || '').replace(/\/$/, '')
@@ -28,6 +34,14 @@ function bearerFromAuth(authHeader: string | undefined): string {
   return a
 }
 
+function isMpBillingUser(userId: string): boolean {
+  return userId.startsWith('mp:')
+}
+
+function mpKindOrNull(kind: ErpAiUsageKind): MpPointsUsageKind | null {
+  return parseMpPointsUsageKind(kind)
+}
+
 export type ErpAiApiPointsGateOk = { ok: true; tenantId: string; userId: string }
 export type ErpAiApiPointsGateFail = {
   ok: false
@@ -36,6 +50,72 @@ export type ErpAiApiPointsGateFail = {
   message: string
   required?: number
   balance?: number
+}
+
+/** 星选 / 达人：按钱包积分（与「我的钱包」同一本账）预检，不查商家租户。 */
+async function requireMpWalletPointsAffordable(
+  authHeader: string | undefined,
+  userId: string,
+  kind: ErpAiUsageKind,
+  env: Record<string, string>,
+  opts?: { durationSec?: number },
+): Promise<ErpAiApiPointsGateOk | ErpAiApiPointsGateFail> {
+  const token = bearerFromAuth(authHeader)
+  const mpKind = mpKindOrNull(kind)
+  if (!token) {
+    return { ok: false, status: 401, error: 'unauthorized', message: '请先登录' }
+  }
+  if (!mpKind) {
+    return { ok: false, status: 400, error: 'invalid_kind', message: '该功能暂不能使用星选积分' }
+  }
+  const base = supabaseBase(env)
+  const serviceRole = serviceRoleKey(env)
+  if (!base || !serviceRole) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'points_billing_unavailable',
+      message: '积分计费服务未配置',
+    }
+  }
+  const result = await assertMpAiPointsAffordableForSessionToken(base, serviceRole, token, mpKind, {
+    durationSec: opts?.durationSec,
+  })
+  if (!result.ok) {
+    return {
+      ok: false,
+      status: result.error === 'insufficient_points' ? 402 : result.error === 'not_found' ? 403 : 400,
+      error: result.error,
+      message: result.message,
+      required: result.required,
+      balance: result.balance,
+    }
+  }
+  return { ok: true, tenantId: userId, userId }
+}
+
+async function chargeMpWalletPoints(
+  authHeader: string | undefined,
+  kind: ErpAiUsageKind,
+  base: string,
+  serviceRole: string,
+  opts?: { durationSec?: number; idempotencyKey?: string; note?: string },
+): Promise<{ pointsCharged: number; balance: number; already?: boolean } | null> {
+  const token = bearerFromAuth(authHeader)
+  const mpKind = mpKindOrNull(kind)
+  if (!token || !mpKind) return null
+  const result = await spendMpAiPointsForSessionToken(base, serviceRole, token, {
+    kind: mpKind,
+    durationSec: opts?.durationSec,
+    idempotencyKey: opts?.idempotencyKey,
+    note: opts?.note,
+  })
+  if (!result.ok) return null
+  return {
+    pointsCharged: result.pointsCharged,
+    balance: result.newBalance,
+    already: result.already,
+  }
 }
 
 /** 生成前校验：余额不足返回 402 */
@@ -48,6 +128,9 @@ export async function requireErpAiPointsAffordable(
   const user = await verifyBearerJwt(authHeader, env)
   if (!user) {
     return { ok: false, status: 401, error: 'unauthorized', message: '请先登录' }
+  }
+  if (isMpBillingUser(user.id)) {
+    return requireMpWalletPointsAffordable(authHeader, user.id, kind, env, opts)
   }
   const jwt = bearerFromAuth(authHeader)
   const ctx = await loadTenantAiContextForUser(user.id, env, jwt || undefined, opts?.tenantIdHint)
@@ -97,6 +180,9 @@ export async function requireReviewAiBatchAffordable(
   if (!user) {
     return { ok: false, status: 401, error: 'unauthorized', message: '请先登录' }
   }
+  if (isMpBillingUser(user.id)) {
+    return requireMpWalletPointsAffordable(authHeader, user.id, 'review_ai', env)
+  }
   const jwt = bearerFromAuth(authHeader)
   const ctx = await loadTenantAiContextForUser(user.id, env, jwt || undefined, opts?.tenantIdHint)
   if (!ctx) {
@@ -142,9 +228,15 @@ async function recordReviewAiAfterSuccess(
   if (!base || !serviceRole) return null
 
   let tenantId = String(opts?.tenantId || '').trim()
+  if (tenantId.startsWith('mp:')) {
+    return chargeMpWalletPoints(authHeader, 'review_ai', base, serviceRole, opts)
+  }
   if (!tenantId) {
     const user = await verifyBearerJwt(authHeader, env)
     if (!user) return null
+    if (isMpBillingUser(user.id)) {
+      return chargeMpWalletPoints(authHeader, 'review_ai', base, serviceRole, opts)
+    }
     const jwt = bearerFromAuth(authHeader)
     const ctx = await loadTenantAiContextForUser(user.id, env, jwt || undefined, opts?.tenantIdHint)
     if (!ctx) return null
@@ -182,9 +274,15 @@ export async function chargeErpAiPointsAfterSuccess(
   if (!base || !serviceRole) return null
 
   let tenantId = String(opts?.tenantId || '').trim()
+  if (tenantId.startsWith('mp:')) {
+    return chargeMpWalletPoints(authHeader, kind, base, serviceRole, opts)
+  }
   if (!tenantId) {
     const user = await verifyBearerJwt(authHeader, env)
     if (!user) return null
+    if (isMpBillingUser(user.id)) {
+      return chargeMpWalletPoints(authHeader, kind, base, serviceRole, opts)
+    }
     const jwt = bearerFromAuth(authHeader)
     const ctx = await loadTenantAiContextForUser(user.id, env, jwt || undefined, opts?.tenantIdHint)
     if (!ctx) return null
