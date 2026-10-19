@@ -43,9 +43,11 @@
   border: none;
 }
 .dock-icon-img {
+  display: block;
   width: 96rpx;
   height: 96rpx;
   border-radius: 28rpx;
+  flex-shrink: 0;
 }
 .dock-label {
   margin-top: 12rpx;
