@@ -56,7 +56,7 @@ export default function OpsShortDramaPage() {
       setHint(null)
     }
     try {
-      const reg = await fetchRegistry()
+      const reg = await fetchRegistry({ slice: 'ai' })
       if (!editingRef.current) {
         setVideoAi(reg.videoAi ? { ...reg.videoAi } : {})
         setUpdatedAt(reg.videoAiUpdatedAt ?? '')

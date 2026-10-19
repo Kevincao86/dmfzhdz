@@ -146,6 +146,7 @@ export function slimRegistrySnapshotForAiBootstrap(
     vendorKeysUpdatedAt: file.vendorKeysUpdatedAt ?? '',
     vendorKeysWriter: file.vendorKeysWriter ?? 'ops',
     aiVendorCatalog: file.aiVendorCatalog ?? [],
+    aiVendorRoutes: file.aiVendorRoutes,
     videoAi: file.videoAi,
     videoAiUpdatedAt: file.videoAiUpdatedAt,
     videoAiWriter: file.videoAiWriter,

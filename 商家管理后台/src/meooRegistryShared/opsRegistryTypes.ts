@@ -471,6 +471,8 @@ export type RegistryFile = {
   vendorKeysWriter: 'erp' | 'ops'
   /** 磁盘：仅追加型自定义厂商列表；网关 GET 会与内置目录合并写入此字段再给前端 */
   aiVendorCatalog?: AiVendorCatalogEntry[]
+  /** 每个厂商主线路 + 两条备选。缺这个字段时，读完再保存会把备选 Key 整段丢掉。 */
+  aiVendorRoutes?: import('./aiVendorRouteShared').RegistryAiVendorRoutes
   /** 短视频/视频模型网关（运营台「AI模型」专区） */
   videoAi?: RegistryVideoAi
   videoAiUpdatedAt?: string

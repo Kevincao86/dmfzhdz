@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import SecretInput from '../../components/SecretInput'
 import {
@@ -28,12 +28,15 @@ export default function OpsAiRoutesPage() {
   const [hint, setHint] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const dirtyRef = useRef(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { force?: boolean }) => {
+    if (opts?.force) dirtyRef.current = false
     setLoading(true)
-    setHint(null)
+    if (!dirtyRef.current) setHint(null)
     try {
-      const reg = await fetchRegistry()
+      const reg = await fetchRegistry({ slice: 'ai' })
+      if (dirtyRef.current) return
       const legacy: Record<string, string | undefined> = {}
       const keys = (reg.vendorKeys ?? {}) as RegistryVendorKeys
       for (const vendor of AI_ROUTE_VENDORS) legacy[vendor.id] = keys[vendor.id]
@@ -50,6 +53,7 @@ export default function OpsAiRoutesPage() {
   }, [load])
 
   function updateVendor(id: string, next: AiVendorRoute) {
+    dirtyRef.current = true
     setRoutes((prev) => {
       if (!prev) return prev
       return { ...prev, vendors: { ...prev.vendors, [id]: next } }
@@ -71,8 +75,25 @@ export default function OpsAiRoutesPage() {
         aiVendorRoutes: { ...routes, updatedAt: new Date().toISOString() },
         lastWriter: 'ops',
       })
-      setHint('已保存。手动模式只走选中线路；自动模式每次从主线路开始，失败才换备选。')
-      await load()
+      dirtyRef.current = false
+      const reg = await fetchRegistry({ slice: 'ai' })
+      const legacy: Record<string, string | undefined> = {}
+      const savedKeys = (reg.vendorKeys ?? {}) as RegistryVendorKeys
+      for (const vendor of AI_ROUTE_VENDORS) legacy[vendor.id] = savedKeys[vendor.id]
+      const next = displayAiVendorRoutes(reg.aiVendorRoutes, legacy)
+      const lost = AI_ROUTE_VENDORS.some((vendor) => {
+        const before = routes.vendors[vendor.id]
+        const after = next.vendors[vendor.id]
+        if (!before || !after) return false
+        return before.lines.some((line, index) => line.apiKey.trim() && !after.lines[index]?.apiKey.trim())
+      })
+      if (lost) {
+        dirtyRef.current = true
+        setHint('备选 Key 没有写进注册表，页面上刚填的内容先留着。请再点一次「保存线路」。')
+        return
+      }
+      setRoutes(next)
+      setHint('已保存。手动模式只走标成「当前线路」的那一把 Key。要让豆包改走备选 1，先点「改用这条」，再点「保存线路」。')
     } catch (e) {
       setHint(e instanceof Error ? e.message : '保存失败')
     } finally {
@@ -89,7 +110,7 @@ export default function OpsAiRoutesPage() {
           会显示在主线路，模式为手动，行为与现在一致。
         </p>
         <p className="mt-2 text-xs leading-relaxed text-slate-500">
-          自动切换按每一次请求计算：主线路失败（欠费、鉴权、超时、5xx）才试备选 1，再试备选 2。内容审核和参数错误不换线。下一次请求仍从主线路开始。
+          填进备选框之后必须点「保存线路」，刷新前不会入库。手动模式下还要点该行的「改用这条」，豆包才会改用备选 1；只填写、仍显示主线路为「当前线路」时，请求还是打主线路。
         </p>
         <p className="mt-2 text-xs text-slate-500">
           厂商 Key 仍在{' '}
@@ -110,7 +131,7 @@ export default function OpsAiRoutesPage() {
           <button
             type="button"
             disabled={loading || saving}
-            onClick={() => void load()}
+            onClick={() => void load({ force: true })}
             className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
           >
             {loading ? '读取中…' : '重新读取'}
@@ -180,19 +201,25 @@ export default function OpsAiRoutesPage() {
                         className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100"
                       />
                       {route.mode === 'manual' ? (
-                        <button
-                          type="button"
-                          onClick={() => updateVendor(vendor.id, { ...route, active: index })}
-                          className={
-                            selected
-                              ? 'rounded-lg bg-slate-200 px-3 py-2 text-xs font-medium text-slate-900'
-                              : 'rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-300'
-                          }
-                        >
-                          {selected ? '当前线路' : '改用这条'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-slate-500">{line.apiKey.trim() ? '已填写' : '未填写'}</span>
+                          <button
+                            type="button"
+                            onClick={() => updateVendor(vendor.id, { ...route, active: index })}
+                            className={
+                              selected
+                                ? 'rounded-lg bg-slate-200 px-3 py-2 text-xs font-medium text-slate-900'
+                                : 'rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-300'
+                            }
+                          >
+                            {selected ? '当前线路' : '改用这条'}
+                          </button>
+                        </div>
                       ) : (
-                        <span className="text-xs text-slate-500">{index === 0 ? '先试' : `失败再试 ${index}`}</span>
+                        <span className="text-xs text-slate-500">
+                          {line.apiKey.trim() ? '已填写 · ' : '未填写 · '}
+                          {index === 0 ? '先试' : `失败再试 ${index}`}
+                        </span>
                       )}
                     </div>
                   )

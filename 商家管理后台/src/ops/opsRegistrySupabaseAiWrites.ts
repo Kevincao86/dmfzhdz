@@ -3,6 +3,12 @@
  * 供独立 Vercel 路由与 dispatch 共用，避免 POST 冷启动拉整包租户/招聘逻辑导致 FUNCTION_INVOCATION_FAILED。
  */
 import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../meooRegistryShared/aiVendorCatalogShared.js'
+import {
+  AI_ROUTE_VENDORS,
+  displayAiVendorRoutes,
+  effectiveVendorKey,
+  type RegistryAiVendorRoutes,
+} from '../meooRegistryShared/aiVendorRouteShared.js'
 import { expandVendorKeysForRegistrySave } from '../meooRegistryShared/aiVendorKeysShared.js'
 import type {
   AiVendorCatalogEntry,
@@ -19,12 +25,14 @@ export async function opsRegistrySupabaseSaveVendorKeys(
   let body: {
     keys?: RegistryVendorKeys
     aiVendorCatalog?: AiVendorCatalogEntry[]
+    aiVendorRoutes?: RegistryAiVendorRoutes
     lastWriter?: 'erp' | 'ops'
   }
   try {
     body = JSON.parse(bodyRaw || '{}') as {
       keys?: RegistryVendorKeys
       aiVendorCatalog?: AiVendorCatalogEntry[]
+      aiVendorRoutes?: RegistryAiVendorRoutes
       lastWriter?: 'erp' | 'ops'
     }
   } catch {
@@ -40,6 +48,18 @@ export async function opsRegistrySupabaseSaveVendorKeys(
     const t = typeof v === 'string' ? v.trim() : ''
     if (t) merged[id] = t
     else delete merged[id]
+  }
+  if (body.aiVendorRoutes !== undefined) {
+    const routes = displayAiVendorRoutes(body.aiVendorRoutes)
+    for (const vendor of AI_ROUTE_VENDORS) {
+      const route = routes.vendors[vendor.id]
+      if (!route) continue
+      const effective = effectiveVendorKey(route)
+      if (effective) merged[vendor.id] = effective
+      else delete merged[vendor.id]
+    }
+    routes.updatedAt = new Date().toISOString()
+    data.aiVendorRoutes = routes
   }
   data.vendorKeys = expandVendorKeysForRegistrySave(merged)
   if (body.aiVendorCatalog !== undefined) {

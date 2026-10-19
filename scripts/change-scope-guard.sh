@@ -351,6 +351,8 @@ merchantVideoAiGateway
 tokenmixImageGenerate
 opsRegistryTypes
 opsRegistryApi
+registryTenantIsolation
+OpsShortDramaPage
 opsNavConfig
 商家管理后台/src/App.tsx
 change-scope-guard

@@ -471,9 +471,10 @@ function isMerchantStrippedOpsRegistry(file: RegistryFile): boolean {
   return (Array.isArray(tenants) && tenants.length > 0) || (Array.isArray(mpOrders) && mpOrders.length > 0)
 }
 
-export async function fetchRegistry(): Promise<RegistryFile> {
-  // 运营台优先全量；meoo-ops-sync-registry 已挂商家裁剪 handler（匿名 talentLibraryEntries=[]）
-  const paths = ['/api/ops-sync/registry', '/api/meoo-ops-sync-registry']
+export async function fetchRegistry(opts?: { slice?: 'ai' }): Promise<RegistryFile> {
+  // 线路页、短剧页只需要 Key。全量注册表约 7MB，读回来会盖掉还没保存的备选。
+  const q = opts?.slice === 'ai' ? '?slice=ai' : ''
+  const paths = [`/api/ops-sync/registry${q}`, `/api/meoo-ops-sync-registry${q}`]
   let lastErr: Error | undefined
   for (const path of paths) {
     try {
