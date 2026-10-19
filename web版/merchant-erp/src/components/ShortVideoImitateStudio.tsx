@@ -1,7 +1,7 @@
 /**
  * AI 短视频 · 模仿视频：拆解参考片，换系统人物或全身照，可选声音与背景乐取段拼接。
  */
-import { useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { CUSTOM_UPLOAD_VOICE_PRESETS, PRESET_AVATARS } from '../lib/digitalHumanBroadcast'
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
@@ -239,6 +239,49 @@ async function buildMixedWav(opts: {
   }
 }
 
+/** 把拆解稿的时间轴拉到成片真实时长上，每一镜口播只占自己那一段。 */
+function narrationWindows(rows: Shot[], videoSec: number): Array<{ start: number; end: number; speech: string }> {
+  const spoken = rows.filter((s) => s.speech.trim())
+  if (!spoken.length || videoSec < 0.5) return []
+  const planEnd = Math.max(
+    0.5,
+    ...spoken.map((s) => Number(s.endSec) || 0),
+    ...spoken.map((s) => (Number(s.startSec) || 0) + 0.5),
+  )
+  const starts = spoken.map((s) => (Math.max(0, Number(s.startSec) || 0) / planEnd) * videoSec)
+  return spoken.map((s, i) => ({
+    start: starts[i] ?? 0,
+    end: i + 1 < spoken.length ? Math.max((starts[i] ?? 0) + 0.35, starts[i + 1] ?? videoSec) : videoSec,
+    speech: s.speech.trim(),
+  }))
+}
+
+/** 每段口播按自己的镜头时长变速，整段声音和画面一起结束。语速限制在 0.8–1.4，避免过慢或过尖。 */
+async function renderNarrationToVideo(
+  parts: Array<{ blob: Blob; start: number; end: number }>,
+  videoSec: number,
+): Promise<Blob> {
+  const ctx = new AudioContext()
+  try {
+    const rate = 44100
+    const offline = new OfflineAudioContext(2, Math.max(1, Math.ceil(videoSec * rate)), rate)
+    for (const part of parts) {
+      const buf = await decodeFile(ctx, part.blob)
+      const windowSec = Math.max(0.35, part.end - part.start)
+      const playback = Math.min(1.4, Math.max(0.8, buf.duration / windowSec))
+      const src = offline.createBufferSource()
+      src.buffer = buf
+      src.playbackRate.value = playback
+      src.connect(offline.destination)
+      src.start(part.start)
+      src.stop(part.end)
+    }
+    return encodeWav(await offline.startRendering())
+  } finally {
+    await ctx.close().catch(() => undefined)
+  }
+}
+
 const REAL_AVATARS = [
   ...PRESET_AVATARS.filter((a) => a.style === 'realistic' && a.bodyFrame === 'full'),
   ...PRESET_AVATARS.filter((a) => a.style === 'realistic' && a.bodyFrame !== 'full'),
@@ -269,11 +312,6 @@ export default function ShortVideoImitateStudio() {
   const [progress, setProgress] = useState('')
   const [err, setErr] = useState('')
   const [resultUrl, setResultUrl] = useState('')
-
-  const speechText = useMemo(
-    () => shots.map((s) => s.speech.trim()).filter(Boolean).join('\n'),
-    [shots],
-  )
 
   function setVideo(file: File) {
     if (file.size > VIDEO_MAX_BYTES) {
@@ -468,12 +506,13 @@ export default function ShortVideoImitateStudio() {
     }
   }
 
-  async function mixOnto(videoBlob: Blob, est: number): Promise<Blob> {
+  async function mixOnto(videoBlob: Blob, videoSec: number): Promise<Blob> {
     let narration: Blob | null = null
     const keepOriginalAudio = voiceMode === 'keep' && bgmMode === 'custom' && bgmClips.length > 0
     if (voiceMode !== 'keep') {
-      setProgress('正在按拆解稿合成声音…')
-      const text = speechText || shots.map((s) => s.speech || s.visual).filter(Boolean).join('。')
+      setProgress('正在按成片时长合成口播…')
+      const windows = narrationWindows(shots, videoSec)
+      if (!windows.length) throw new Error('请先写好每一镜的口播')
       let referenceAudioBase64: string | undefined
       if (voiceMode === 'clone') {
         if (!voiceFile) throw new Error('请上传一段清晰的人声音频，用于模仿声音')
@@ -481,18 +520,26 @@ export default function ShortVideoImitateStudio() {
         referenceAudioBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
       }
       const voicePreset = CUSTOM_UPLOAD_VOICE_PRESETS.find((v) => v.id === voiceId)
-      const spoken = await synthesizeDigitalHumanSpeech({
-        text: text.slice(0, 480),
-        voicePresetId: voiceMode === 'clone' ? 'v-clone' : voiceId,
-        speechRate: voicePreset?.rate ?? 1,
-        speechPitch: voicePreset?.pitch ?? 1,
-        referenceAudioBase64,
-      })
-      if (!spoken.ok) throw new Error(spoken.message)
-      const binary = atob(spoken.audioBase64.replace(/\s/g, ''))
-      const bytes = new Uint8Array(binary.length)
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-      narration = new Blob([bytes], { type: spoken.mimeType || 'audio/mpeg' })
+      const parts: Array<{ blob: Blob; start: number; end: number }> = []
+      for (const slot of windows) {
+        const spoken = await synthesizeDigitalHumanSpeech({
+          text: slot.speech.slice(0, 200),
+          voicePresetId: voiceMode === 'clone' ? 'v-clone' : voiceId,
+          speechRate: voicePreset?.rate ?? 1,
+          speechPitch: voicePreset?.pitch ?? 1,
+          referenceAudioBase64,
+        })
+        if (!spoken.ok) throw new Error(spoken.message)
+        const binary = atob(spoken.audioBase64.replace(/\s/g, ''))
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        parts.push({
+          blob: new Blob([bytes], { type: spoken.mimeType || 'audio/mpeg' }),
+          start: slot.start,
+          end: slot.end,
+        })
+      }
+      narration = await renderNarrationToVideo(parts, videoSec)
     }
     if (narration || (bgmMode === 'custom' && bgmClips.length)) {
       setProgress('正在混合声音和背景乐…')
@@ -501,7 +548,7 @@ export default function ShortVideoImitateStudio() {
         originalAudio: keepOriginalAudio ? videoBlob : null,
         clips: bgmMode === 'custom' ? bgmClips : [],
         volume: bgmVolume,
-        targetSec: est,
+        targetSec: videoSec,
       })
       return muxVideoAudioOnServer(videoBlob, wav, { timeoutMs: 180_000 })
     }
@@ -545,7 +592,8 @@ export default function ShortVideoImitateStudio() {
           setResultUrl(job.videoUrl)
         } else {
           const videoBlob = await downloadVideoUrlAsBlob(job.videoUrl, { maxAttempts: 3 })
-          setResultUrl(URL.createObjectURL(await mixOnto(videoBlob, est)))
+          const videoSec = (await probeVideoDurationSec(videoBlob).catch(() => 0)) || est
+          setResultUrl(URL.createObjectURL(await mixOnto(videoBlob, videoSec)))
         }
         setProgress('')
       } catch (e) {
@@ -597,7 +645,8 @@ export default function ShortVideoImitateStudio() {
         return
       }
       let videoBlob = await fetch(job.videoUrl).then((r) => r.blob())
-      videoBlob = await mixOnto(videoBlob, est)
+      const videoSec = (await probeVideoDurationSec(videoBlob).catch(() => 0)) || est
+      videoBlob = await mixOnto(videoBlob, videoSec)
       const url = URL.createObjectURL(videoBlob)
       setResultUrl(url)
       setProgress('')

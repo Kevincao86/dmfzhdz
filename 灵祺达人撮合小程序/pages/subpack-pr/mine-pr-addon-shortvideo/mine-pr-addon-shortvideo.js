@@ -70,6 +70,28 @@ function pickAudioFile() {
   })
 }
 
+function fitSpeechRate(text, videoSec, baseRate) {
+  const chars = String(text || '').replace(/\s/g, '').length
+  const natural = Math.max(0.8, chars / 4.2)
+  const target = Math.max(0.8, Number(videoSec) || natural)
+  const rate = (Number(baseRate) || 1) * (natural / target)
+  return Math.min(1.4, Math.max(0.8, Math.round(rate * 100) / 100))
+}
+
+function videoInfoDuration(src) {
+  return new Promise((resolve) => {
+    if (!src || typeof wx.getVideoInfo !== 'function') {
+      resolve(0)
+      return
+    }
+    wx.getVideoInfo({
+      src,
+      success: (info) => resolve(Number(info && info.duration) || 0),
+      fail: () => resolve(0),
+    })
+  })
+}
+
 function shotPlanSec(shots) {
   let end = 0
   ;(shots || []).forEach((shot, i) => {
@@ -761,10 +783,12 @@ Page({
               .filter(Boolean)
               .join('\n')
               .slice(0, 480)
+            const probed = await videoInfoDuration(done.videoUrl)
+            const voiceSec = probed > 0.4 ? probed : durationSec
             const ttsBody = {
               text: speech || '沿用参考视频里的动作和口播。',
               voicePresetId: this.data.voiceMode === 'clone' ? 'v-clone' : voice.id,
-              speechRate: voice.rate,
+              speechRate: fitSpeechRate(speech, voiceSec, voice.rate),
               speechPitch: voice.pitch,
             }
             if (this.data.voiceMode === 'clone') {
