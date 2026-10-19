@@ -256,8 +256,11 @@ function drawFooterPanel(ctx, x, y, w, h, panel, design) {
   const accentLight = design.accentLight || '#EEF2FF'
 
   roundRect(ctx, x, y, w, h, 18)
+  ctx.save()
+  ctx.globalAlpha = design && design.shareTheme ? 0.55 : 1
   ctx.fillStyle = accentLight
   ctx.fill()
+  ctx.restore()
   roundRect(ctx, x, y, w, h, 18)
   ctx.strokeStyle = accent + '33'
   ctx.lineWidth = 2
@@ -351,32 +354,36 @@ function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
   ctx.drawImage(qrImg, x, y, size, size)
 }
 
-function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackContent) {
+function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackContent, revealTheme) {
   const innerSize = Math.round(frameSize * 0.92)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
+  const themeShot = revealTheme ? shareThemes.captureTheme(ctx, x, y, frameSize, frameSize) : null
 
-  ctx.fillStyle = '#FFFFFF'
+  ctx.fillStyle = revealTheme ? 'rgba(255,255,255,0.55)' : '#FFFFFF'
   ctx.fillRect(x, y, frameSize, frameSize)
 
   if (qrImg) {
     ctx.drawImage(qrImg, innerX, innerY, innerSize, innerSize)
+    if (themeShot) themeShot.reveal(0.46)
     return Promise.resolve()
   }
 
   if (qrFallbackContent) {
-    if (!frameImg) {
-      return drawLocalPosterQr(ctx, qrFallbackContent, innerX, innerY, innerSize)
-    }
-    return drawQrModules(
-      ctx,
-      qrFallbackContent,
-      innerX,
-      innerY,
-      innerSize,
-      '#0f172a',
-      '#ffffff',
-    )
+    const drawn = !frameImg
+      ? drawLocalPosterQr(ctx, qrFallbackContent, innerX, innerY, innerSize)
+      : drawQrModules(
+        ctx,
+        qrFallbackContent,
+        innerX,
+        innerY,
+        innerSize,
+        '#0f172a',
+        '#ffffff',
+      )
+    return Promise.resolve(drawn).then(() => {
+      if (themeShot) themeShot.reveal(0.46)
+    })
   }
 
   return Promise.resolve()
@@ -485,9 +492,10 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
     ctx.fillRect(0, 0, POSTER_W, POSTER_H)
   }
 
+  const glassy = !!(festivalImg || (design && design.shareTheme))
   const cardRadius = Math.max(0, Number(design && design.cardRadius) || 24)
   roundRect(ctx, pad, pad, cardW, cardH, cardRadius)
-  ctx.fillStyle = '#FFFFFF'
+  ctx.fillStyle = glassy ? 'rgba(255,255,255,0.72)' : '#FFFFFF'
   ctx.fill()
 
   let y = pad + 36
@@ -502,8 +510,10 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   const heroH = 280
   const heroX = pad + 24
   const heroW = cardW - 48
-  drawHeroSection(ctx, canvas, input, design, festivalImg || bgImg, platformImg, heroX, y, heroW, heroH)
-  y += heroH + 24
+  if (!glassy) {
+    drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, heroX, y, heroW, heroH)
+    y += heroH + 24
+  }
 
   ctx.textAlign = 'left'
   ctx.fillStyle = '#0F172A'
@@ -551,6 +561,7 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
     qrY,
     qrFrameSize,
     wxacodeImg ? '' : qrFallbackContent,
+    glassy,
   ).then(() => {
     const cx = qrX + qrFrameSize / 2
     const cy = qrY + qrFrameSize / 2

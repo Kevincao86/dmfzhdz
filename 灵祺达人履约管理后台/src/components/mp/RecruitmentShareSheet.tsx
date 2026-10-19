@@ -25,20 +25,29 @@ const COLORS = [
   { id: 'gold', color: '#D97706', index: 5 },
 ]
 
+const FESTIVAL_CDN = 'https://mofangdianai.com/recruit-covers/festivals'
+const FESTIVAL_VER = 'festival20261019b'
+
 const FESTIVALS = [
   { id: 'newyear', label: '元旦', month: 1, accent: '#C9A227', paper: '#FFFBF2' },
+  { id: 'laba', label: '腊八', month: 1, accent: '#9A3412', paper: '#FFF7ED' },
   { id: 'spring', label: '春节', month: 2, accent: '#E11D2E', paper: '#FFF7E8' },
   { id: 'lantern', label: '元宵', month: 2, accent: '#FF8A3D', paper: '#FFF8EF' },
   { id: 'valentine', label: '情人节', month: 2, accent: '#BE185D', paper: '#FFF1F6' },
   { id: 'women', label: '妇女节', month: 3, accent: '#DB2777', paper: '#FFF5F8' },
+  { id: 'tree', label: '植树节', month: 3, accent: '#166534', paper: '#F0FDF4' },
   { id: 'qingming', label: '清明', month: 4, accent: '#0F766E', paper: '#F3FBF7' },
   { id: 'labor', label: '劳动节', month: 5, accent: '#0F766E', paper: '#F0FDFA' },
   { id: 'youth', label: '青年节', month: 5, accent: '#1D4ED8', paper: '#F0F9FF' },
+  { id: 'nurse', label: '护士节', month: 5, accent: '#0F766E', paper: '#F0FDFA' },
   { id: 'mother', label: '母亲节', month: 5, accent: '#9F1239', paper: '#FFF1F2' },
   { id: 'child', label: '儿童节', month: 6, accent: '#0284C7', paper: '#F0FDFF' },
   { id: 'duanwu', label: '端午', month: 6, accent: '#166534', paper: '#F0FDF4' },
   { id: 'father', label: '父亲节', month: 6, accent: '#1E3A5F', paper: '#F8FAFC' },
+  { id: 'party', label: '建党节', month: 7, accent: '#DC2626', paper: '#FEF2F2' },
+  { id: 'army', label: '建军节', month: 8, accent: '#3F6212', paper: '#F7FEE7' },
   { id: 'qixi', label: '七夕', month: 8, accent: '#7C3AED', paper: '#FAF5FF' },
+  { id: 'zhongyuan', label: '中元', month: 8, accent: '#1E3A8A', paper: '#EFF6FF' },
   { id: 'teacher', label: '教师节', month: 9, accent: '#C2410C', paper: '#FFF7ED' },
   { id: 'midautumn', label: '中秋', month: 9, accent: '#FDE68A', paper: '#FFFBEB' },
   { id: 'national', label: '国庆', month: 10, accent: '#DC2626', paper: '#FFF7ED' },
@@ -108,7 +117,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
           accentColor: theme.accent,
           accentLight: theme.paper,
           themeLabel: theme.label,
-          festivalUrl: `https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/festivals/festival-${theme.id}.jpg?v=festival20261019`,
+          festivalUrl: `${FESTIVAL_CDN}/festival-${theme.id}.jpg?v=${FESTIVAL_VER}`,
         }
       : undefined)
       .then(({ dataUrl, design }) => {
@@ -260,17 +269,22 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
           <div className="mt-4 flex flex-col items-center">
             {codeUrl ? (
               <div
-                className="rounded-2xl p-3"
+                className="relative rounded-2xl p-3"
                 style={{
                   backgroundColor: activeTheme?.accent || COLORS.find((c) => c.index === posterStyleIndex)?.color || '#6366F1',
                   backgroundImage: activeTheme
-                    ? `url(https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/festivals/festival-${activeTheme.id}.jpg?v=festival20261019)`
+                    ? `url(${FESTIVAL_CDN}/festival-${activeTheme.id}.jpg?v=${FESTIVAL_VER})`
                     : undefined,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                 }}
               >
-                <img src={codeUrl} alt="小程序码" className="h-52 w-52 rounded-xl bg-white object-contain" />
+                {activeTheme ? <div className="pointer-events-none absolute inset-3 rounded-xl bg-white/50" /> : null}
+                <img
+                  src={codeUrl}
+                  alt="小程序码"
+                  className={`relative h-52 w-52 rounded-xl object-contain ${activeTheme ? 'mix-blend-multiply' : 'bg-white'}`}
+                />
               </div>
             ) : (
               <p className="text-sm text-amber-600">{codeErr || '正在生成小程序码…'}</p>
@@ -287,11 +301,17 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
             {webMode === 'qr' && qrUrl ? (
               <div className="flex justify-center">
                 <div
-                  className="rounded-2xl p-4"
-                  style={{ background: activeTheme ? `linear-gradient(160deg, ${activeTheme.accent}, ${activeTheme.paper})` : '#fff', border: '1px solid #e2e8f0' }}
+                  className="relative overflow-hidden rounded-2xl p-4"
+                  style={{
+                    backgroundColor: '#fff',
+                    backgroundImage: activeTheme ? `url(${FESTIVAL_CDN}/festival-${activeTheme.id}.jpg?v=${FESTIVAL_VER})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    border: '1px solid #e2e8f0',
+                  }}
                 >
-                  <img src={qrUrl} alt="网页二维码" className="mx-auto h-52 w-52 bg-white" />
-                  {activeTheme ? <p className="mt-2 text-center text-xs" style={{ color: activeTheme.accent }}>{activeTheme.label}</p> : null}
+                  {activeTheme ? <div className="pointer-events-none absolute inset-4 rounded-xl bg-white/55" /> : null}
+                  <img src={qrUrl} alt="网页二维码" className={`relative mx-auto h-52 w-52 ${activeTheme ? 'mix-blend-multiply' : 'bg-white'}`} />
                 </div>
               </div>
             ) : (
@@ -323,31 +343,37 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
         ) : null}
 
         {tab === 'web' && webMode !== 'qr' ? null : (
-          <div className="mt-4 space-y-2">
-            <div className="flex flex-wrap gap-2">
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                <button
-                  key={month}
-                  type="button"
-                  className={`rounded-lg border px-2.5 py-1.5 text-xs ${themeMonth === month ? 'border-blue-600 text-blue-600' : ''}`}
-                  onClick={() => setThemeMonth(month)}
-                >
-                  {month}月
-                </button>
-              ))}
+          <div className="mt-4 space-y-3">
+            <div className="rounded-xl bg-slate-100 p-2">
+              <p className="mb-2 px-1 text-[11px] text-slate-500">月份</p>
+              <div className="flex flex-wrap gap-1.5">
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                  <button
+                    key={month}
+                    type="button"
+                    className={`rounded-full px-2.5 py-1 text-xs ${themeMonth === month ? 'bg-blue-600 text-white' : 'text-slate-500'}`}
+                    onClick={() => setThemeMonth(month)}
+                  >
+                    {month}月
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className={`rounded-lg border px-3 py-1.5 text-xs ${themeId ? '' : 'border-blue-600 text-blue-600'}`} onClick={() => pickTheme('')}>经典</button>
-              {monthFestivals.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`rounded-lg border px-3 py-1.5 text-xs ${themeId === item.id ? 'border-blue-600 text-blue-600' : ''}`}
-                  onClick={() => pickTheme(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-2">
+              <p className="mb-2 px-1 text-[11px] text-orange-700">当月节日</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" className={`rounded-full px-3 py-1 text-xs ${themeId ? 'text-slate-600' : 'bg-orange-600 text-white'}`} onClick={() => pickTheme('')}>经典</button>
+                {monthFestivals.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`rounded-full border px-3 py-1 text-xs ${themeId === item.id ? 'border-orange-600 bg-orange-600 text-white' : 'border-orange-200 bg-white text-slate-700'}`}
+                    onClick={() => pickTheme(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

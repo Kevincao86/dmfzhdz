@@ -2,7 +2,7 @@
  * 招募单分享海报 Canvas 绘制（Web / Node）
  */
 import type { PosterDesignTokens, PosterInput } from './recruitmentSharePosterCore'
-import { posterBackgroundCandidates, posterQrFrameCandidates } from './recruitmentPosterAssets'
+import { posterBackgroundCandidates } from './recruitmentPosterAssets'
 
 export const POSTER_W = 750
 export const POSTER_H = 1200
@@ -75,18 +75,6 @@ async function loadPosterBackground(tmpl: {
   backgroundUrl?: string
 }): Promise<HTMLImageElement | null> {
   const candidates = posterBackgroundCandidates(tmpl)
-  for (const url of candidates) {
-    const img = await loadImage(url)
-    if (img) return img
-  }
-  return null
-}
-
-async function loadPosterQrFrame(tmpl: {
-  qrFrameFile?: string
-  qrFrameUrl?: string
-}): Promise<HTMLImageElement | null> {
-  const candidates = posterQrFrameCandidates(tmpl)
   for (const url of candidates) {
     const img = await loadImage(url)
     if (img) return img
@@ -246,8 +234,11 @@ function drawFooterPanel(
   const accentLight = design.accentLight || '#EEF2FF'
 
   roundRect(ctx, x, y, w, h, 18)
+  ctx.save()
+  ctx.globalAlpha = design.festivalUrl ? 0.55 : 1
   ctx.fillStyle = accentLight
   ctx.fill()
+  ctx.restore()
   roundRect(ctx, x, y, w, h, 18)
   ctx.strokeStyle = `${accent}33`
   ctx.lineWidth = 2
@@ -353,25 +344,45 @@ function drawWxMiniProgramCode(
   ctx.drawImage(qrImage, x, y, size, size)
 }
 
+function tintWhitesWithTheme(
+  ctx: CanvasRenderingContext2D,
+  theme: ImageData,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  mix: number,
+) {
+  const now = ctx.getImageData(x, y, w, h)
+  const src = theme.data
+  const dst = now.data
+  for (let i = 0; i < dst.length; i += 4) {
+    if (dst[i] > 228 && dst[i + 1] > 228 && dst[i + 2] > 228) {
+      dst[i] = Math.round(dst[i] * (1 - mix) + src[i] * mix)
+      dst[i + 1] = Math.round(dst[i + 1] * (1 - mix) + src[i + 1] * mix)
+      dst[i + 2] = Math.round(dst[i + 2] * (1 - mix) + src[i + 2] * mix)
+      dst[i + 3] = 255
+    }
+  }
+  ctx.putImageData(now, x, y)
+}
+
 function drawStyledQr(
   ctx: CanvasRenderingContext2D,
   qrImage: CanvasImageSource,
-  frameImage: HTMLImageElement | null,
   x: number,
   y: number,
   frameSize: number,
+  revealTheme: boolean,
 ) {
   const innerSize = Math.round(frameSize * QR_INNER_RATIO)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
-
-  if (frameImage) {
-    ctx.drawImage(frameImage, x, y, frameSize, frameSize)
-    ctx.drawImage(qrImage, innerX, innerY, innerSize, innerSize)
-    return
-  }
-
-  drawWxMiniProgramCode(ctx, qrImage, innerX, innerY, innerSize)
+  const theme = revealTheme ? ctx.getImageData(x, y, frameSize, frameSize) : null
+  ctx.fillStyle = revealTheme ? 'rgba(255,255,255,0.5)' : '#FFFFFF'
+  ctx.fillRect(x, y, frameSize, frameSize)
+  ctx.drawImage(qrImage, innerX, innerY, innerSize, innerSize)
+  if (theme) tintWhitesWithTheme(ctx, theme, x, y, frameSize, frameSize, 0.46)
 }
 
 export async function renderRecruitmentPosterCanvas(
@@ -386,7 +397,6 @@ export async function renderRecruitmentPosterCanvas(
   const cardH = POSTER_H - pad * 2
   const festivalImg = design.festivalUrl ? await loadImage(design.festivalUrl) : null
   const bgImg = festivalImg || (design.forceGradientHero ? null : await loadPosterBackground(tmpl))
-  const qrFrameImg = await loadPosterQrFrame(tmpl)
   const brandImg = await loadImage(String(input.inviterAvatarUrl || ''))
 
   if (festivalImg) {
@@ -409,8 +419,9 @@ export async function renderRecruitmentPosterCanvas(
     ctx.fillText(design.shareThemeLabel, POSTER_W / 2, 34)
   }
 
+  const glassy = !!festivalImg
   roundRect(ctx, pad, pad, cardW, cardH, 24)
-  ctx.fillStyle = '#FFFFFF'
+  ctx.fillStyle = glassy ? 'rgba(255,255,255,0.72)' : '#FFFFFF'
   ctx.fill()
 
   let y = pad + 36
@@ -444,8 +455,10 @@ export async function renderRecruitmentPosterCanvas(
   const heroH = 280
   const heroX = pad + 24
   const heroW = cardW - 48
-  drawHeroSection(ctx, input, design, bgImg, heroX, y, heroW, heroH)
-  y += heroH + 24
+  if (!glassy) {
+    drawHeroSection(ctx, input, design, bgImg, heroX, y, heroW, heroH)
+    y += heroH + 24
+  }
 
   ctx.textAlign = 'left'
   ctx.fillStyle = '#0F172A'
@@ -484,7 +497,7 @@ export async function renderRecruitmentPosterCanvas(
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
   if (qrImage) {
-    drawStyledQr(ctx, qrImage, qrFrameImg, qrX, qrY, qrFrameSize)
+    drawStyledQr(ctx, qrImage, qrX, qrY, qrFrameSize, !!festivalImg)
   }
   const cx = qrX + qrFrameSize / 2
   const cy = qrY + qrFrameSize / 2

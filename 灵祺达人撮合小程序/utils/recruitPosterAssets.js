@@ -71,6 +71,10 @@ function posterAssetUrlCandidates(filename) {
   return out
 }
 
+function festivalRootCdn() {
+  return String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')
+}
+
 function festivalAssetCandidates(filename) {
   const rel = `festivals/${String(filename || '').replace(/^\/+/, '')}`
   if (!filename) return []
@@ -79,13 +83,13 @@ function festivalAssetCandidates(filename) {
   const add = (base) => {
     const root = String(base || '').replace(/\/$/, '')
     if (!root) return
-    const url = `${withCacheBust(`${root}/${rel}`)}&festival=20261019`
+    const url = `${withCacheBust(`${root}/${rel}`)}&festival=20261019b`
     if (seen.has(url)) return
     seen.add(url)
     out.push(url)
   }
-  add(posterRootCdn())
-  add(posterRootOss())
+  add(festivalRootCdn())
+  add(readOssCoverBase())
   return out
 }
 

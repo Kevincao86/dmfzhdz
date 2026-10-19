@@ -67,16 +67,43 @@
   display: flex;
   justify-content: center;
 }
+.month-bar {
+  background: #f1f5f9;
+  border-radius: 20rpx;
+  padding: 16rpx 16rpx 8rpx;
+  margin-bottom: 16rpx;
+}
+.festival-bar {
+  background: #fff7ed;
+  border: 2rpx solid #fed7aa;
+  border-radius: 20rpx;
+  padding: 16rpx 16rpx 8rpx;
+  margin-bottom: 16rpx;
+}
+.bar-label {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+  margin-bottom: 10rpx;
+}
+.festival-label {
+  color: #c2410c;
+}
 .month-row {
   display: flex;
   flex-wrap: wrap;
   gap: 12rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 8rpx;
 }
 .month-chip,
 .theme-chip {
   min-width: 88rpx;
   margin: 0;
+}
+.month-chip {
+  background: transparent;
+  border-color: transparent;
+  color: #64748b;
 }
 .link-box {
   background: #f1f5f9;
@@ -135,6 +162,16 @@
   border-color: #2563eb;
   color: #2563eb;
   background: #eff6ff;
+}
+.chip.month-chip.on {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+.chip.theme-chip.on {
+  background: #ea580c;
+  border-color: #ea580c;
+  color: #fff;
 }
 .cap-input {
   background: #f8fafc;

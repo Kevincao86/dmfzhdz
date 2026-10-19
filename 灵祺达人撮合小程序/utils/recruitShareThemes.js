@@ -2,18 +2,24 @@
 
 const THEMES = [
   { id: 'newyear', label: '元旦', month: 1, bg: ['#FFF8EA', '#F6E2A8'], accent: '#C9A227', ink: '#7A5412', paper: '#FFFBF2', motif: 'firework' },
+  { id: 'laba', label: '腊八', month: 1, bg: ['#F6E2A8', '#C2410C'], accent: '#9A3412', ink: '#7C2D12', paper: '#FFF7ED', motif: 'tangyuan' },
   { id: 'spring', label: '春节', month: 2, bg: ['#E11D2E', '#9F1239'], accent: '#F6C453', ink: '#FFF4D4', paper: '#FFF7E8', motif: 'lantern' },
   { id: 'lantern', label: '元宵', month: 2, bg: ['#FF8A3D', '#F4B183'], accent: '#FFF3D6', ink: '#7C2D12', paper: '#FFF8EF', motif: 'tangyuan' },
   { id: 'valentine', label: '情人节', month: 2, bg: ['#F472B6', '#FBCFE8'], accent: '#BE185D', ink: '#831843', paper: '#FFF1F6', motif: 'heart' },
   { id: 'women', label: '妇女节', month: 3, bg: ['#F9A8D4', '#FDE68A'], accent: '#DB2777', ink: '#9D174D', paper: '#FFF5F8', motif: 'flower' },
+  { id: 'tree', label: '植树节', month: 3, bg: ['#86EFAC', '#166534'], accent: '#166534', ink: '#14532D', paper: '#F0FDF4', motif: 'city' },
   { id: 'qingming', label: '清明', month: 4, bg: ['#D1FAE5', '#A7C4B5'], accent: '#0F766E', ink: '#134E4A', paper: '#F3FBF7', motif: 'willow' },
   { id: 'labor', label: '劳动节', month: 5, bg: ['#5EEAD4', '#0F766E'], accent: '#134E4A', ink: '#042F2E', paper: '#F0FDFA', motif: 'city' },
   { id: 'youth', label: '青年节', month: 5, bg: ['#38BDF8', '#1D4ED8'], accent: '#E0F2FE', ink: '#082F49', paper: '#F0F9FF', motif: 'run' },
+  { id: 'nurse', label: '护士节', month: 5, bg: ['#99F6E4', '#0F766E'], accent: '#0F766E', ink: '#134E4A', paper: '#F0FDFA', motif: 'heart' },
   { id: 'mother', label: '母亲节', month: 5, bg: ['#F9A8D4', '#FB7185'], accent: '#9F1239', ink: '#881337', paper: '#FFF1F2', motif: 'flower' },
   { id: 'child', label: '儿童节', month: 6, bg: ['#67E8F9', '#FDE047'], accent: '#0284C7', ink: '#0C4A6E', paper: '#F0FDFF', motif: 'balloon' },
   { id: 'duanwu', label: '端午', month: 6, bg: ['#4ADE80', '#166534'], accent: '#FDE68A', ink: '#14532D', paper: '#F0FDF4', motif: 'zongzi' },
   { id: 'father', label: '父亲节', month: 6, bg: ['#1E3A5F', '#0F172A'], accent: '#F6C453', ink: '#E2E8F0', paper: '#F8FAFC', motif: 'tie' },
+  { id: 'party', label: '建党节', month: 7, bg: ['#DC2626', '#7F1D1D'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#FEF2F2', motif: 'flag' },
+  { id: 'army', label: '建军节', month: 8, bg: ['#3F6212', '#14532D'], accent: '#FDE68A', ink: '#ECFCCB', paper: '#F7FEE7', motif: 'flag' },
   { id: 'qixi', label: '七夕', month: 8, bg: ['#4C1D95', '#7C3AED'], accent: '#F9A8D4', ink: '#FAE8FF', paper: '#FAF5FF', motif: 'magpie' },
+  { id: 'zhongyuan', label: '中元', month: 8, bg: ['#1E3A8A', '#0F172A'], accent: '#FDE68A', ink: '#E0E7FF', paper: '#EFF6FF', motif: 'lantern' },
   { id: 'teacher', label: '教师节', month: 9, bg: ['#F6D7A8', '#C2410C'], accent: '#7C2D12', ink: '#7C2D12', paper: '#FFF7ED', motif: 'book' },
   { id: 'midautumn', label: '中秋', month: 9, bg: ['#1E1B4B', '#312E81'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#FFFBEB', motif: 'moon' },
   { id: 'national', label: '国庆', month: 10, bg: ['#DC2626', '#991B1B'], accent: '#FDE68A', ink: '#FEF3C7', paper: '#FFF7ED', motif: 'flag' },
@@ -159,15 +165,48 @@ function paintFrame(ctx, theme, w, h, inset, radius, opts) {
   if (o.image) drawCover(ctx, o.image, 0, 0, w, h)
   else paintScene(ctx, theme, w, h)
   const labelH = o.showLabel === false ? 0 : 28
-  roundRect(ctx, inset, inset, w - inset * 2, h - inset * 2 - labelH, radius)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
+  if (o.plate !== false) {
+    roundRect(ctx, inset, inset, w - inset * 2, h - inset * 2 - labelH, radius)
+    ctx.fillStyle = o.plate || 'rgba(255,255,255,0.72)'
+    ctx.fill()
+  }
   if (o.showLabel !== false) {
     ctx.fillStyle = theme.ink
     ctx.font = 'bold 22px sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(theme.label, w / 2, h - 16)
+  }
+}
+
+function captureTheme(ctx, x, y, w, h) {
+  const left = Math.max(0, Math.floor(x))
+  const top = Math.max(0, Math.floor(y))
+  const width = Math.max(1, Math.floor(w))
+  const height = Math.max(1, Math.floor(h))
+  let theme = null
+  try {
+    theme = ctx.getImageData(left, top, width, height)
+  } catch (_) {}
+  return {
+    reveal(mix) {
+      if (!theme) return
+      const amount = mix == null ? 0.4 : mix
+      try {
+        const now = ctx.getImageData(left, top, width, height)
+        const src = theme.data
+        const dst = now.data
+        for (let i = 0; i < dst.length; i += 4) {
+          if (dst[i] > 228 && dst[i + 1] > 228 && dst[i + 2] > 228) {
+            dst[i] = Math.round(dst[i] * (1 - amount) + src[i] * amount)
+            dst[i + 1] = Math.round(dst[i + 1] * (1 - amount) + src[i + 1] * amount)
+            dst[i + 2] = Math.round(dst[i + 2] * (1 - amount) + src[i + 2] * amount)
+            dst[i + 3] = 255
+          }
+        }
+        ctx.putImageData(now, left, top)
+      } catch (_) {}
+    },
   }
 }
 
@@ -191,5 +230,6 @@ module.exports = {
   paintPosterChrome,
   paintFrame,
   drawCover,
+  captureTheme,
   clipShape,
 }

@@ -424,17 +424,14 @@ function drawCodeCard(opts) {
   const side = codeSize + inset * 2
   const canvas = wx.createOffscreenCanvas({ type: '2d', width: side, height: side })
   const ctx = canvas.getContext('2d')
-  const radius = opts.shapeId === 'square' ? 0 : opts.shapeId === 'round' ? Math.round(side * 0.08) : 20
   const urls = opts.theme ? posterAssets.festivalAssetCandidates(`festival-${opts.theme.id}.jpg`) : []
   return loadRemoteImage(canvas, urls).then((bg) => {
     if (opts.theme) {
-      themes.paintFrame(ctx, opts.theme, side, side, inset, radius, { image: bg, showLabel: false })
+      if (bg) themes.drawCover(ctx, bg, 0, 0, side, side)
+      else themes.paintPosterChrome(ctx, opts.theme, side, side)
     } else {
       ctx.fillStyle = opts.color
       ctx.fillRect(0, 0, side, side)
-      themes.roundRect(ctx, inset, inset, side - inset * 2, side - inset * 2, radius)
-      ctx.fillStyle = '#FFFFFF'
-      ctx.fill()
     }
     return new Promise((resolve, reject) => {
       const img = canvas.createImage()
@@ -442,12 +439,14 @@ function drawCodeCard(opts) {
         const x = inset + 8
         const y = inset + 8
         const inner = side - inset * 2 - 16
+        const shot = themes.captureTheme(ctx, x, y, inner, inner)
         ctx.save()
         themes.clipShape(ctx, x, y, inner, opts.shapeId)
-        ctx.fillStyle = '#FFFFFF'
+        ctx.fillStyle = 'rgba(255,255,255,0.42)'
         ctx.fillRect(x, y, inner, inner)
         ctx.drawImage(img, x, y, inner, inner)
         ctx.restore()
+        shot.reveal(0.5)
         exportCanvas(canvas, side, side, 'share-code').then(resolve).catch(reject)
       }
       img.onerror = () => reject(new Error('小程序码图片无效'))
@@ -463,46 +462,58 @@ function drawLinkCard(url, title, theme, edition) {
   const canvas = wx.createOffscreenCanvas({ type: '2d', width: W, height: H })
   const ctx = canvas.getContext('2d')
   const accent = theme ? theme.accent : '#EA580C'
-  if (theme) themes.paintFrame(ctx, theme, W, H, 36, 24)
-  else {
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fillRect(0, 0, W, H)
-    ctx.strokeStyle = accent
-    ctx.lineWidth = 14
-    ctx.strokeRect(18, 18, W - 36, H - 36)
-  }
   const titleH = edition === 'pure' ? 0 : 64
   const capH = edition === 'pure' ? 0 : 40
   const top = Math.round((H - (titleH + qrSize + capH)) / 2)
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  if (edition !== 'pure') {
-    ctx.fillStyle = '#0F172A'
-    ctx.font = 'bold 30px sans-serif'
-    ctx.fillText(String(title || '招募').slice(0, 16), W / 2, top + 20)
-  }
-  const UQRCode = require('../../../utils/uqrcode.js')
-  const qr = new UQRCode()
-  qr.data = url
-  qr.size = qrSize
-  qr.margin = 0
-  qr.backgroundColor = '#ffffff'
-  qr.foregroundColor = accent
-  qr.make()
-  qr.canvasContext = ctx
   const qx = Math.round((W - qrSize) / 2)
   const qy = top + titleH
-  ctx.save()
-  ctx.translate(qx, qy)
-  return Promise.resolve(qr.drawCanvas()).then(() => {
-    ctx.restore()
-    if (edition !== 'pure') {
-      ctx.fillStyle = '#64748B'
-      ctx.font = '24px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText('扫码查看招募并报名', W / 2, qy + qrSize + 28)
+  const urls = theme ? posterAssets.festivalAssetCandidates(`festival-${theme.id}.jpg`) : []
+  return loadRemoteImage(canvas, urls).then((bg) => {
+    if (theme) {
+      if (bg) themes.drawCover(ctx, bg, 0, 0, W, H)
+      else themes.paintPosterChrome(ctx, theme, W, H)
+    } else {
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, W, H)
+      ctx.strokeStyle = accent
+      ctx.lineWidth = 14
+      ctx.strokeRect(18, 18, W - 36, H - 36)
     }
-    return exportCanvas(canvas, W, H, 'share-qr')
+    const shot = themes.captureTheme(ctx, qx, qy, qrSize, qrSize)
+    if (theme) {
+      themes.roundRect(ctx, 28, 28, W - 56, H - 56, 24)
+      ctx.fillStyle = 'rgba(255,255,255,0.62)'
+      ctx.fill()
+    }
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    if (edition !== 'pure') {
+      ctx.fillStyle = '#0F172A'
+      ctx.font = 'bold 30px sans-serif'
+      ctx.fillText(String(title || '招募').slice(0, 16), W / 2, top + 20)
+    }
+    const UQRCode = require('../../../utils/uqrcode.js')
+    const qr = new UQRCode()
+    qr.data = url
+    qr.size = qrSize
+    qr.margin = 0
+    qr.backgroundColor = '#ffffff'
+    qr.foregroundColor = '#0F172A'
+    qr.make()
+    qr.canvasContext = ctx
+    ctx.save()
+    ctx.translate(qx, qy)
+    return Promise.resolve(qr.drawCanvas()).then(() => {
+      ctx.restore()
+      shot.reveal(0.48)
+      if (edition !== 'pure') {
+        ctx.fillStyle = '#334155'
+        ctx.font = '24px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('扫码查看招募并报名', W / 2, qy + qrSize + 28)
+      }
+      return exportCanvas(canvas, W, H, 'share-qr')
+    })
   })
 }
 

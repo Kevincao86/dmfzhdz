@@ -39,24 +39,30 @@
     </view>
 
     <block wx:if="{{tab !== 'web' || webMode === 'qr'}}">
-      <view class="month-row">
-        <view
-          wx:for="{{months}}"
-          wx:key="id"
-          class="chip month-chip {{item.on ? 'on' : ''}}"
-          data-month="{{item.id}}"
-          bindtap="onThemeMonth"
-        >{{item.label}}</view>
+      <view class="month-bar">
+        <text class="bar-label">月份</text>
+        <view class="month-row">
+          <view
+            wx:for="{{months}}"
+            wx:key="id"
+            class="chip month-chip {{item.on ? 'on' : ''}}"
+            data-month="{{item.id}}"
+            bindtap="onThemeMonth"
+          >{{item.label}}</view>
+        </view>
       </view>
-      <view class="month-row">
-        <view class="chip theme-chip {{themeId ? '' : 'on'}}" data-id="" bindtap="onTheme">经典</view>
-        <view
-          wx:for="{{themes}}"
-          wx:key="id"
-          class="chip theme-chip {{item.on ? 'on' : ''}}"
-          data-id="{{item.id}}"
-          bindtap="onTheme"
-        >{{item.label}}</view>
+      <view class="festival-bar">
+        <text class="bar-label festival-label">当月节日</text>
+        <view class="month-row">
+          <view class="chip theme-chip {{themeId ? '' : 'on'}}" data-id="" bindtap="onTheme">经典</view>
+          <view
+            wx:for="{{themes}}"
+            wx:key="id"
+            class="chip theme-chip {{item.on ? 'on' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onTheme"
+          >{{item.label}}</view>
+        </view>
       </view>
     </block>
 
