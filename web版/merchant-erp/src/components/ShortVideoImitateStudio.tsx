@@ -7,13 +7,13 @@ import { CUSTOM_UPLOAD_VOICE_PRESETS, PRESET_AVATARS } from '../lib/digitalHuman
 import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { extractVideoFramesAtTimesPureBase64 } from '../lib/videoFrameUtils'
 import { postAiChat } from '../services/ai/aiClient'
-import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { synthesizeDigitalHumanSpeech } from '../services/digitalHumanTtsApi'
 import { checkMpAddonPointsAffordable } from '../services/mpAddonPointsSpendClient'
 import { runDhMotionImitateJob } from '../lib/dhOmniHumanVideoApi'
 import { formatVideoAiUserError, muxVideoAudioOnServer } from '../services/videoAiApi'
 
-const VIDEO_MAX_BYTES = 12 * 1024 * 1024
+const VIDEO_MAX_BYTES = 48 * 1024 * 1024
+const VIDEO_MAX_SEC = 60
 
 type Shot = {
   id: string
@@ -50,7 +50,7 @@ function captionFromShare(text: string): string {
 function explainImitateError(raw: string): string {
   const t = raw.replace(/^upstream_error\s*[—\-:]\s*/i, '').trim()
   if (/overdue balance|account has an overdue|欠费|余额不足/i.test(raw)) {
-    return '豆包账户欠费，分享链接里的视频没有拉下来。请点「上传视频」选择本地文件；充值火山方舟后可以再拆链接。'
+    return '当前这条模型线路欠费。拆解已改走通义，不会再打欠费的豆包主账号；请在运营台把通义切到有余额的备选线路后重试。'
   }
   return t || '拆解失败'
 }
@@ -254,79 +254,91 @@ export default function ShortVideoImitateStudio() {
   )
 
   function setVideo(file: File) {
+    if (file.size > VIDEO_MAX_BYTES) {
+      setErr('视频请小于 48MB')
+      return
+    }
     if (videoPreview) URL.revokeObjectURL(videoPreview)
+    const url = URL.createObjectURL(file)
     setVideoFile(file)
-    setVideoPreview(URL.createObjectURL(file))
+    setVideoPreview(url)
     setShots([])
     setErr('')
-    void probeVideoDurationSec(file).then((n) => setDurationSec(n > 0 ? n : 0))
+    void probeVideoDurationSec(file).then((n) => {
+      if (n > VIDEO_MAX_SEC) {
+        URL.revokeObjectURL(url)
+        setVideoFile(null)
+        setVideoPreview('')
+        setDurationSec(0)
+        setErr('参考视频请控制在 1 分钟以内')
+        return
+      }
+      setDurationSec(n > 0 ? n : 0)
+    })
   }
 
   async function onAnalyze() {
     setErr('')
     setBusy(true)
-    setProgress('正在拆解参考视频…')
+    setProgress('正在拆解…')
     try {
-      let speechHint = ''
-      let motionHint = ''
-      let activeFile = videoFile
-      if (link.trim()) {
-        setProgress('正在读取分享链接里的口播…')
-        const parsed = await parseDouyinLinkForDigitalHuman(link.trim())
-        if (!parsed.ok) {
-          const caption = captionFromShare(link)
-          if (caption) {
-            setShots(fallbackShots(durationSec || 8, caption))
-            setLinkNote('已按分享文案写了一版镜头，可直接改。')
-          }
-          setErr(explainImitateError(parsed.message || '链接解析失败'))
-          return
-        }
-        speechHint = parsed.script || ''
-        motionHint = parsed.motionInstructions || ''
-        setLinkNote(parsed.sourceTitle ? `已读取：${parsed.sourceTitle}` : '已读取链接中的口播')
-        if (/^https?:\/\/.+\.(mp4|mov|webm)(\?|$)/i.test(parsed.normalizedUrl) && !videoFile) {
-          try {
-            const res = await fetch(parsed.normalizedUrl)
-            if (res.ok) {
-              const blob = await res.blob()
-              if (blob.size > 1024 && blob.size <= VIDEO_MAX_BYTES) {
-                activeFile = new File([blob], 'link.mp4', { type: blob.type || 'video/mp4' })
-                setVideo(activeFile)
-              }
-            }
-          } catch {
-            setLinkNote('链接口播已读取。请再上传视频文件，才能按画面换人。')
-          }
-        }
-      }
-      const file = activeFile
-      if (!file && !speechHint) {
-        setErr('请先上传视频，或粘贴分享链接')
+      const file = videoFile
+      const share = link.trim()
+      if (!file && !share) {
+        setErr('请先上传 1 分钟内的视频，或粘贴分享链接')
         return
       }
-      if (!file) {
-        setShots(fallbackShots(durationSec || 12, speechHint))
-        if (motionHint && speechHint) {
-          setShots((prev) => prev.map((s, i) => (i === 0 ? { ...s, action: motionHint.slice(0, 180) } : s)))
+      if (file && file.size > VIDEO_MAX_BYTES) {
+        setErr('参考视频请压缩到 48MB、1 分钟以内')
+        return
+      }
+      if (file && durationSec > VIDEO_MAX_SEC) {
+        setErr('参考视频请控制在 1 分钟以内')
+        return
+      }
+      const caption = captionFromShare(share)
+      if (share && !file) {
+        setProgress('正在从分享链接整理画面、口播和背景音…')
+        let text = ''
+        try {
+          const chat = await postAiChat({
+            provider: 'qwen',
+            stream: false,
+            temperature: 0.2,
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  '下面是一条短视频分享文案。不要下载视频，只整理成画面、口播、背景音。',
+                  '只返回 JSON 数组，2 到 4 项，字段：startSec,endSec,visual,speech,hasBgm。',
+                  'visual 写画面，speech 写口播，hasBgm 表示这段有没有背景音。',
+                  caption || share.slice(0, 500),
+                ].join('\n'),
+              },
+            ],
+          })
+          text = chat.content || ''
+        } catch (e) {
+          setErr(explainImitateError(e instanceof Error ? e.message : '链接整理失败'))
         }
+        setShots(parseShots(text, durationSec || 8, caption))
+        setLinkNote('已按分享文案整理成画面、口播、背景音，可直接改。换人请另外上传 1 分钟内的视频。')
         return
       }
-      if (file.size > VIDEO_MAX_BYTES) {
-        setErr('参考视频请压缩到 12MB 以内')
+      const dur = durationSec || (file ? await probeVideoDurationSec(file) : 0) || 8
+      if (dur > VIDEO_MAX_SEC) {
+        setErr('参考视频请控制在 1 分钟以内')
         return
       }
-      const dur = durationSec || (await probeVideoDurationSec(file)) || 8
       setDurationSec(dur)
       const times = [0.4, dur * 0.35, dur * 0.68].filter((t) => t < dur - 0.1)
       setProgress('正在按镜头抽帧…')
-      const frames = await extractVideoFramesAtTimesPureBase64(file, times.length ? times : [0.4])
-      setProgress('正在分析画面、人物、动作和口播…')
+      const frames = file ? await extractVideoFramesAtTimesPureBase64(file, times.length ? times : [0.4]) : []
+      setProgress('正在分析画面、口播和背景音…')
       let text = ''
       try {
         const chat = await postAiChat({
-          provider: 'tokenmix',
-          modelFamily: 'gemini',
+          provider: 'qwen',
           stream: false,
           temperature: 0.2,
           imageDataUrls: frames.slice(0, 3).map((f) => `data:image/jpeg;base64,${f.pureBase64}`),
@@ -335,12 +347,9 @@ export default function ShortVideoImitateStudio() {
               role: 'user',
               content: [
                 `参考视频约 ${dur.toFixed(1)} 秒。按时间顺序拆成 2 到 4 个镜头。`,
-                speechHint ? `已识别口播：\n${speechHint.slice(0, 800)}` : '请根据画面推断口播，听不清就留空。',
-                motionHint ? `动作提示：${motionHint.slice(0, 300)}` : '',
-                '只返回 JSON 数组，每项字段：startSec,endSec,visual,person,action,speech,hasBgm。',
-              ]
-                .filter(Boolean)
-                .join('\n'),
+                caption ? `分享文案：${caption.slice(0, 400)}` : '请根据画面写口播，看不清就留空。',
+                '只返回 JSON 数组，每项字段：startSec,endSec,visual,speech,hasBgm。visual 是画面，speech 是口播，hasBgm 表示有没有背景音。',
+              ].join('\n'),
             },
           ],
         })
@@ -348,7 +357,8 @@ export default function ShortVideoImitateStudio() {
       } catch {
         setLinkNote('画面模型暂不可用，已按视频时长生成可编辑拆解稿。')
       }
-      setShots(parseShots(text, dur, speechHint))
+      setShots(parseShots(text, dur, caption))
+      if (share) setLinkNote('分享链接已整理成画面、口播、背景音，没有当成参考视频。')
     } catch (e) {
       setErr(explainImitateError(e instanceof Error ? e.message : '拆解失败'))
     } finally {
@@ -390,18 +400,22 @@ export default function ShortVideoImitateStudio() {
     setErr('')
     setResultUrl('')
     if (!videoFile) {
-      setErr('请上传参考视频。分享链接只负责拆口播，换人需要视频文件。')
+      setErr('换人需要另外上传 1 分钟内的参考视频。分享链接只呈现画面、口播和背景音。')
       return
     }
     if (videoFile.size > VIDEO_MAX_BYTES) {
-      setErr('参考视频请压缩到 12MB 以内')
+      setErr('参考视频请压缩到 48MB、1 分钟以内')
+      return
+    }
+    if (durationSec > VIDEO_MAX_SEC) {
+      setErr('参考视频请控制在 1 分钟以内')
       return
     }
     if (!shots.length) {
-      setErr('请先拆解参考视频')
+      setErr('请先拆解画面、口播和背景音')
       return
     }
-    const est = Math.min(15, Math.max(1, Math.ceil(durationSec || 8)))
+    const est = Math.min(VIDEO_MAX_SEC, Math.max(1, Math.ceil(durationSec || 8)))
     const afford = await checkMpAddonPointsAffordable('shortvideo', est, { motionImitate: true })
     if (!afford.ok) {
       setErr(afford.message || '积分不足')
@@ -485,7 +499,7 @@ export default function ShortVideoImitateStudio() {
     <div className="space-y-3 rounded-xl border border-cyan-200/80 bg-cyan-50/40 p-3">
       <p className="text-sm font-medium text-slate-800">模仿视频</p>
       <p className="text-xs leading-relaxed text-slate-600">
-        上传参考视频，或先粘贴分享链接拆口播。系统按镜头写出画面、人物、动作、口播和有没有背景乐。再选系统人物或上传全身照，声音和背景乐可以沿用原片，也可以换成自己的。
+        分享链接只整理成画面、口播、背景音，不会变成参考视频。换人请另外上传 1 分钟内的视频，再选系统人物或全身照，声音和背景音可以沿用原片，也可以换成自己的。
       </p>
       <label className="block text-xs font-medium text-slate-700">
         分享链接（可选）
@@ -493,7 +507,7 @@ export default function ShortVideoImitateStudio() {
           value={link}
           onChange={(e) => setLink(e.target.value)}
           disabled={busy}
-          placeholder="抖音分享口令或链接，用来拆口播和动作"
+          placeholder="粘贴分享文案，用来整理画面、口播、背景音"
           className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
         />
       </label>
@@ -521,14 +535,10 @@ export default function ShortVideoImitateStudio() {
               onClick={() => videoInputRef.current?.click()}
               className="flex h-28 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500"
             >
-              {link.trim() ? '链接没变成视频，请上传' : '上传视频'}
+              上传视频
             </button>
           )}
-          <p className="text-[11px] text-slate-500">
-            {link.trim() && !videoFile
-              ? '分享链接只带口播。参考视频请从相册上传 MP4 / MOV，约 3～15 秒，12MB 以内。'
-              : 'MP4 / MOV，约 3～15 秒，12MB 以内。'}
-          </p>
+          <p className="text-[11px] text-slate-500">MP4 / MOV，1 分钟以内，48MB 以内。分享链接不会填进这里。</p>
         </div>
         <div className="space-y-2">
           <p className="text-xs font-medium text-slate-700">人物</p>
@@ -594,7 +604,7 @@ export default function ShortVideoImitateStudio() {
         onClick={() => void onAnalyze()}
         className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200 disabled:opacity-50"
       >
-        {busy && progress.includes('拆') ? '拆解中…' : '拆解画面 / 口播 / 背景乐'}
+        {busy && (progress.includes('拆') || progress.includes('整理') || progress.includes('分析')) ? '拆解中…' : '拆解画面 / 口播 / 背景音'}
       </button>
       {shots.length ? (
         <div className="space-y-2">
@@ -620,19 +630,14 @@ export default function ShortVideoImitateStudio() {
                 className="mt-1 w-full rounded border px-2 py-1"
                 value={s.visual}
                 onChange={(e) => patchShot(s.id, { visual: e.target.value })}
-              />
-              <input
-                className="mt-1 w-full rounded border px-2 py-1"
-                value={s.action}
-                onChange={(e) => patchShot(s.id, { action: e.target.value })}
-                placeholder="动作"
+                placeholder="画面"
               />
               <textarea
                 className="mt-1 w-full rounded border px-2 py-1"
                 rows={2}
                 value={s.speech}
                 onChange={(e) => patchShot(s.id, { speech: e.target.value })}
-                placeholder="口播，可改"
+                placeholder="口播"
               />
               <label className="mt-1 flex items-center gap-2">
                 <input
@@ -640,7 +645,7 @@ export default function ShortVideoImitateStudio() {
                   checked={s.hasBgm}
                   onChange={(e) => patchShot(s.id, { hasBgm: e.target.checked })}
                 />
-                这段有背景乐
+                背景音
               </label>
             </div>
           ))}

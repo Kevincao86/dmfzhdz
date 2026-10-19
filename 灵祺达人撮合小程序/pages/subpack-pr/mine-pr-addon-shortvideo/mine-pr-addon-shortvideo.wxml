@@ -66,13 +66,13 @@
     </block>
     <view class="addon-card" wx:else>
       <text class="addon-card__title">模仿视频</text>
-      <text class="addon-card__sub">上传参考视频，或粘贴分享链接拆口播。选系统人物或全身照，声音和背景乐可以沿用原片。</text>
+      <text class="addon-card__sub">分享链接只整理成画面、口播、背景音，不会变成参考视频。换人请另外上传 1 分钟内的视频。</text>
       <view class="addon-points-tip">{{pointsHintGenerate}}</view>
       <text class="addon-label">分享链接（可选）</text>
-      <textarea class="addon-textarea addon-textarea--sm" placeholder="抖音分享口令或链接，用来拆口播" value="{{imitateLink}}" bindinput="onImitateLink" maxlength="500" />
-      <button class="addon-btn addon-btn--ghost" bindtap="onPickImitateVideo">{{imitateVideoName || '上传参考视频（12MB 内）'}}</button>
+      <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴分享文案，用来整理画面、口播、背景音" value="{{imitateLink}}" bindinput="onImitateLink" maxlength="500" />
+      <button class="addon-btn addon-btn--ghost" bindtap="onPickImitateVideo">{{imitateVideoName || '上传参考视频（1 分钟内）'}}</button>
       <text class="addon-card__sub" wx:if="{{imitateNote}}">{{imitateNote}}</text>
-      <button class="addon-btn addon-btn--ghost" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateAnalyze">拆解画面 / 口播 / 背景乐</button>
+      <button class="addon-btn addon-btn--ghost" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateAnalyze">拆解画面 / 口播 / 背景音</button>
       <view wx:for="{{imitateShots}}" wx:key="id" class="imitate-shot">
         <view class="imitate-shot__head">
           <text>镜头 {{index + 1}}</text>
@@ -81,8 +81,8 @@
           <text data-id="{{item.id}}" bindtap="onRemoveShot">删除</text>
         </view>
         <input class="imitate-input" value="{{item.visual}}" data-id="{{item.id}}" data-field="visual" bindinput="onShotField" placeholder="画面" />
-        <input class="imitate-input" value="{{item.action}}" data-id="{{item.id}}" data-field="action" bindinput="onShotField" placeholder="动作" />
-        <textarea class="addon-textarea addon-textarea--sm" value="{{item.speech}}" data-id="{{item.id}}" data-field="speech" bindinput="onShotField" placeholder="口播，可改" maxlength="200" />
+        <textarea class="addon-textarea addon-textarea--sm" value="{{item.speech}}" data-id="{{item.id}}" data-field="speech" bindinput="onShotField" placeholder="口播" maxlength="200" />
+        <view class="addon-chip {{item.hasBgm ? 'addon-chip--on' : ''}}" data-id="{{item.id}}" bindtap="onToggleShotBgm">背景音</view>
       </view>
       <text class="addon-label">人物</text>
       <view class="addon-chips">

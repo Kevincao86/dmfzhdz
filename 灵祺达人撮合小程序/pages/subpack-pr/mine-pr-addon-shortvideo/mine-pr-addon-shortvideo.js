@@ -10,7 +10,8 @@ const upgradeHint = require('../../../utils/mpAddonUpgradeHint.js')
 const videoGenBrief = require('../../../utils/videoGenBrief.js')
 
 const SMART_EFFECT_LABEL = '智能（按内容自动转场）'
-const IMITATE_VIDEO_MAX = 12 * 1024 * 1024
+const IMITATE_VIDEO_MAX = 48 * 1024 * 1024
+const IMITATE_VIDEO_MAX_SEC = 60
 const IMITATE_AVATAR_BASE =
   'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/merchant/digital-human/avatars'
 const IMITATE_AVATARS = [
@@ -34,7 +35,7 @@ function videoDurationSec(filePath) {
     }
     wx.getVideoInfo({
       src: filePath,
-      success: (res) => resolve(Math.min(15, Math.max(1, Math.ceil(Number(res.duration) || 8)))),
+      success: (res) => resolve(Math.max(1, Math.ceil(Number(res.duration) || 8))),
       fail: () => resolve(8),
     })
   })
@@ -80,6 +81,7 @@ function shotsFromSpeech(speech, motion) {
     visual: `第 ${i + 1} 段画面`,
     action: i === 0 && motion ? String(motion).slice(0, 80) : '沿用参考动作',
     speech: line,
+    hasBgm: true,
   }))
 }
 
@@ -96,6 +98,7 @@ function parseShotJson(text, speech, motion) {
       visual: String((item && item.visual) || `第 ${i + 1} 段画面`),
       action: String((item && item.action) || '沿用参考动作'),
       speech: String((item && item.speech) || ''),
+      hasBgm: Boolean(item && item.hasBgm),
     }))
   } catch (_) {
     return shotsFromSpeech(speech, motion)
@@ -443,10 +446,14 @@ Page({
       const picked = await media.chooseVideo()
       const size = await fileBytes(picked.path)
       if (size > IMITATE_VIDEO_MAX) {
-        wx.showToast({ title: '请压缩到 12MB 内', icon: 'none' })
+        wx.showToast({ title: '请压缩到 48MB 内', icon: 'none' })
         return
       }
       const durationSec = await videoDurationSec(picked.path)
+      if (durationSec > IMITATE_VIDEO_MAX_SEC) {
+        wx.showToast({ title: '请控制在 1 分钟内', icon: 'none' })
+        return
+      }
       this.setData({
         imitateVideoPath: picked.path,
         imitateVideoName: '已选择参考视频',
@@ -524,58 +531,55 @@ Page({
       if (!/cancel/i.test(String(e && e.message))) wx.showToast({ title: '选择音乐失败', icon: 'none' })
     }
   },
+  onToggleShotBgm(e) {
+    const id = e.currentTarget.dataset.id
+    this.setData({
+      imitateShots: (this.data.imitateShots || []).map((row) => (row.id === id ? { ...row, hasBgm: !row.hasBgm } : row)),
+    })
+  },
   async onImitateAnalyze() {
     const link = String(this.data.imitateLink || '').trim()
+    const caption = String((link.match(/】\s*([\s\S]*?)(?:https?:\/\/|$)/) || [])[1] || '')
+      .replace(/\s+/g, ' ')
+      .trim()
     if (!link && !this.data.imitateVideoPath) {
-      this.setData({ err: '请先上传视频，或粘贴分享链接' })
+      this.setData({ err: '请先上传 1 分钟内的视频，或粘贴分享链接' })
       return
     }
-    this.setData({ busy: true, err: '', progress: '正在拆解…' })
+    if (Number(this.data.imitateDurationSec) > IMITATE_VIDEO_MAX_SEC && this.data.imitateVideoPath) {
+      this.setData({ err: '参考视频请控制在 1 分钟以内' })
+      return
+    }
+    this.setData({ busy: true, err: '', progress: '正在整理画面、口播、背景音…' })
     try {
-      let speech = ''
-      let motion = ''
-      let note = ''
-      if (link) {
-        const parsed = await addonApi.postDouyinLinkForDh(link)
-        if (!parsed.ok) {
-          const raw = String(parsed.message || '链接解析失败')
-          const overdue = /overdue balance|account has an overdue|欠费|余额不足/i.test(raw)
-          const caption = (String(link).match(/】\s*([\s\S]*?)(?:https?:\/\/|$)/) || [])[1]
-          const speech = String(caption || '').replace(/\s+/g, ' ').trim()
-          this.setData({
-            err: overdue
-              ? '豆包账户欠费，分享链接里的视频没有拉下来。请上传本地视频；充值火山方舟后可以再拆链接。'
-              : raw.replace(/^upstream_error\s*[—\-:]\s*/i, ''),
-            imitateShots: speech ? shotsFromSpeech(speech, '') : this.data.imitateShots,
-            imitateNote: speech ? '已按分享文案写了一版镜头，可直接改。' : this.data.imitateNote,
-          })
-          return
-        }
-        speech = parsed.script || ''
-        motion = parsed.motionInstructions || ''
-        note = parsed.sourceTitle ? `已读取：${parsed.sourceTitle}` : '已读取链接中的口播'
-        if (!this.data.imitateVideoPath) note += '。换人仍需要上传视频文件。'
-      }
-      let shots = shotsFromSpeech(speech, motion)
+      const source = caption || link.slice(0, 500)
+      let shots = shotsFromSpeech(source, '')
+      let note = link
+        ? '已按分享文案整理成画面、口播、背景音。分享链接不会变成参考视频。'
+        : '已按视频说明整理成画面、口播、背景音。'
       try {
         const chat = await addonApi.postAiChat(
           [
             {
               role: 'user',
               content: [
-                '把下面的口播拆成 2 到 4 个镜头。只返回 JSON 数组，每项字段 visual,action,speech。',
-                speech ? `口播：\n${speech.slice(0, 800)}` : '没有口播，请按参考视频写可编辑的镜头说明。',
-                motion ? `动作：${motion.slice(0, 240)}` : '',
-              ]
-                .filter(Boolean)
-                .join('\n'),
+                '不要下载视频。把下面的内容整理成 2 到 4 个镜头。',
+                '只返回 JSON 数组，每项字段 visual,speech,hasBgm。visual 是画面，speech 是口播，hasBgm 表示有没有背景音。',
+                source || '没有分享文案，请写一段可编辑的画面和口播。',
+              ].join('\n'),
             },
           ],
-          { provider: 'tokenmix', modelFamily: 'gemini', temperature: 0.2 },
+          { provider: 'qwen', temperature: 0.2 },
         )
-        if (chat.ok) shots = parseShotJson(chat.content, speech, motion)
+        if (chat.ok) {
+          shots = parseShotJson(chat.content, source, '')
+        } else if (/overdue balance|account has an overdue|欠费|余额不足/i.test(String(chat.message || ''))) {
+          this.setData({
+            err: '当前模型线路欠费。拆解已改走通义，请在运营台把通义切到有余额的备选线路。',
+          })
+        }
       } catch (_) {
-        note = note || '已按口播生成可编辑拆解稿'
+        /* 通义失败时仍展示按文案整理的画面、口播、背景音 */
       }
       this.setData({ imitateShots: shots, imitateNote: note, progress: '' })
     } catch (e) {
@@ -586,7 +590,7 @@ Page({
   },
   async onImitateGenerate() {
     if (!this.data.imitateVideoPath) {
-      this.setData({ err: '请上传参考视频。分享链接只负责拆口播。' })
+      this.setData({ err: '换人需要另外上传 1 分钟内的参考视频。分享链接只呈现画面、口播和背景音。' })
       return
     }
     if (!(this.data.imitateShots || []).length) {
@@ -606,7 +610,7 @@ Page({
       return
     }
     try {
-      const durationSec = Math.min(15, Math.max(1, Number(this.data.imitateDurationSec) || 8))
+      const durationSec = Math.min(IMITATE_VIDEO_MAX_SEC, Math.max(1, Number(this.data.imitateDurationSec) || 8))
       await mpPointsSpend.assertAddonAffordable('shortvideo', durationSec, { motionImitate: true })
     } catch (e) {
       this.setData({ err: String(e.message || '积分不足').slice(0, 100) })
@@ -688,7 +692,7 @@ Page({
         }
       }
       const charge = await mpPointsSpend.spendAddonPoints('shortvideo', {
-        durationSec: Math.min(15, Math.max(1, Number(this.data.imitateDurationSec) || 8)),
+        durationSec: Math.min(IMITATE_VIDEO_MAX_SEC, Math.max(1, Number(this.data.imitateDurationSec) || 8)),
         motionImitate: true,
         idempotencyKey: `imitate:${start.taskId || Date.now()}`,
         note: `motion_imitate:${start.taskId || ''}`,
