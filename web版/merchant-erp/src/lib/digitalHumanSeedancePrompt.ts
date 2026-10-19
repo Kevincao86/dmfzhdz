@@ -52,14 +52,16 @@ export function buildDhOmniHumanPrompt(
 ): string {
   const bg = clip(backgroundPromptForDraft(draft), 36)
   const frame = frameDesc(draft)
-  const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 56)
+  const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 180)
   const theme = opts?.scriptHint?.trim()
-    ? `口播主题：${clip(opts.scriptHint, 40)}，手势含义须与主题一致。`
+    ? `口播主题：${clip(opts.scriptHint, 80)}，动作必须和这句话一致。`
     : ''
-  // 未开启手持产品时：禁止模型凭空捏造瓶罐/化妆品等实物（常见误伤）
+  const namedProp = motionNamesProp(opts?.motionText, opts?.scriptHint)
   const hands = opts?.hasProductFusion
     ? '人物自然手持参考图中的产品，禁止换成其它品类。'
-    : '双手自然空闲或仅做空手比划，禁止凭空手持瓶罐、化妆品、面霜、包装盒、餐盒等任何实物道具；口播提到食品时用手势比划外形即可，画面不得出现未提供的实物。'
+    : namedProp
+      ? '必须完成下面写的动作：点名的食物、饮品或物品要一直留在手上或嘴边，禁止改成空手比划，禁止把实物变没。'
+      : '不要凭空多出与口播无关的瓶罐或化妆品。'
   const body = [
     `竖屏9:16数字人口播，人物已站在场景（${bg}）中，${frame}。`,
     '口型与驱动音频严格同步，表情自然，禁止灰底矩形贴片。',
@@ -131,12 +133,20 @@ const GESTURE_SEEDANCE_HINTS: Record<string, string> = {
   celebrate: '双臂小幅张开庆祝，活力 upbeat',
 }
 
+/** 动作或口播点名了要拿出来的东西，就不能再要求空手。 */
+export function motionNamesProp(motionText?: string, scriptHint?: string): boolean {
+  return /蛋挞|食物|美食|吃|咬|喝|手持|举起|展示|掰开|产品|包装|杯|碗|蛋糕|汉堡|薯条|甜品/.test(
+    `${motionText ?? ''}${scriptHint ?? ''}`,
+  )
+}
+
 function motionBlock(
   draft: DigitalHumanDraft,
   segmentMotion?: string,
   gestureOverride?: string,
 ): string {
   const raw = (segmentMotion ?? '').trim()
+  if (raw) return clip(raw, 180)
   const presetId =
     gestureOverride && gestureOverride !== 'none'
       ? gestureOverride
@@ -188,7 +198,9 @@ export function buildDhSeedanceSegmentPrompt(
       `动作：${motion}。`,
       opts?.hasProductFusion
         ? '双参考图自然手持产品。'
-        : '双手空手比划，禁止凭空手持瓶罐化妆品等实物。',
+        : motionNamesProp(opts?.motionText, scriptChunk)
+          ? '必须做出动作里的交互，点名的食物或物品留在手上或嘴边。'
+          : '不要凭空多出与口播无关的瓶罐化妆品。',
       fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
       SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
@@ -202,7 +214,9 @@ export function buildDhSeedanceSegmentPrompt(
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
       opts?.hasProductFusion
         ? '人物与产品自然融合，禁止贴片悬浮。'
-        : '双手空手比划，禁止凭空手持瓶罐化妆品等实物。',
+        : motionNamesProp(opts?.motionText, scriptChunk)
+          ? '必须做出动作里的交互，点名的食物或物品留在手上或嘴边。'
+          : '不要凭空多出与口播无关的瓶罐化妆品。',
       `动作：${motion}。`,
       fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
@@ -217,7 +231,9 @@ export function buildDhSeedanceSegmentPrompt(
       total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
       opts?.hasProductFusion
         ? '人物与抠图产品自然融合，禁止贴片悬浮。'
-        : '双手空手比划，禁止凭空手持瓶罐化妆品等实物。',
+        : motionNamesProp(opts?.motionText, scriptChunk)
+          ? '必须做出动作里的交互，点名的食物或物品留在手上或嘴边。'
+          : '不要凭空多出与口播无关的瓶罐化妆品。',
       `动作：${motion}。`,
       fidelity,
       SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,

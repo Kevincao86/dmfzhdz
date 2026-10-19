@@ -187,14 +187,20 @@ export async function compositePortraitWithBackground(
   return blobToPureBase64(await canvasToBlobJpeg(canvas, 0.93))
 }
 
-const DH_SCENE_FUSION_PROMPT = [
-  '图生图：参考图是左右对照，不是成片构图。',
-  '左半边人物必须原样保留：同一张脸、同一发型发色、同一套衣服和体态，禁止换脸。',
-  '右半边是用户上传的真实环境照：空间、灯光、地面、墙面必须用这张照片，禁止另造场景。',
-  '输出一张竖屏 9:16 照片：该人物真实站在这个空间里，脚踩地面，有透视和景深。',
-  '环境灯光必须打到皮肤、头发和衣服上，人物与环境光影一体。',
-  '禁止左右分屏、禁止拼贴、禁止抠图白边、禁止贴纸悬浮、禁止图层叠加感、禁止文字水印。',
-].join('')
+function fusionPrompt(actionText?: string): string {
+  const action = String(actionText ?? '').replace(/\s+/g, ' ').trim().slice(0, 180)
+  return [
+    '图生图：参考图是左右对照，不是成片构图。',
+    '左半边人物必须原样保留：同一张脸、同一发型发色、同一套衣服和体态，禁止换脸。',
+    '右半边是用户上传的真实环境照：空间、灯光、地面、墙面必须用这张照片，禁止另造场景。',
+    '输出一张竖屏 9:16 照片：该人物真实站在这个空间里，脚踩地面，有透视和景深。',
+    '环境灯光必须打到皮肤、头发和衣服上，人物与地面、墙面、柜台连成一张照片，禁止抠图贴上去。',
+    action
+      ? `这一镜人物正在做：${action}。动作里点名的食物、饮品或物品必须真实出现，拿在手里或送到嘴边，和手有接触阴影。`
+      : '人物自然面对镜头，双手放松。',
+    '禁止左右分屏、禁止拼贴、禁止抠图白边、禁止身体镂空破洞、禁止半透明、禁止贴纸悬浮、禁止文字水印。',
+  ].join('')
+}
 
 async function sideBySideBriefing(portraitPureB64: string, sceneDataUrl: string): Promise<string> {
   const [person, scene] = await Promise.all([
@@ -241,16 +247,19 @@ async function imageResultToPureBase64(imageUrl: string): Promise<string> {
 export async function fusePortraitDeepIntoScene(opts: {
   portraitPureB64: string
   sceneDataUrl: string
+  /** 这一镜要做的动作。点名的食物或物品必须画进画面。 */
+  actionText?: string
 }): Promise<string> {
   const { postAiAgentNativeImage } = await import('../services/ai/aiClient')
   const { compressPortraitDataUrlForLibrary } = await import('./digitalHumanCustomMedia')
   const briefing = await sideBySideBriefing(opts.portraitPureB64, opts.sceneDataUrl)
   const ref = await compressPortraitDataUrlForLibrary(briefing)
+  const prompt = fusionPrompt(opts.actionText)
   const attempts: Array<{ label: string; run: () => ReturnType<typeof postAiAgentNativeImage> }> = [
     {
       label: '通义万相',
       run: () =>
-        postAiAgentNativeImage(DH_SCENE_FUSION_PROMPT, {
+        postAiAgentNativeImage(prompt, {
           exactPrompt: true,
           aspectRatio: '9:16',
           wanxSize: '864x1536',
@@ -262,7 +271,7 @@ export async function fusePortraitDeepIntoScene(opts: {
     {
       label: '豆包',
       run: () =>
-        postAiAgentNativeImage(DH_SCENE_FUSION_PROMPT, {
+        postAiAgentNativeImage(prompt, {
           exactPrompt: true,
           aspectRatio: '9:16',
           doubaoSize: '2K',

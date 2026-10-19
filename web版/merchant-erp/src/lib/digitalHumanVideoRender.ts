@@ -56,7 +56,7 @@ import {
   estimateDhTargetDurationSec,
 } from './digitalHumanSeedancePrompt'
 import { buildBriefFromInput, validateBriefFidelity } from './shortVideoGenBrief'
-import { getAudioDurationSec, splitAudioBlobIntoCount } from './digitalHumanAudioChunks'
+import { getAudioDurationSec, splitAudioBlobByMotionBeats, splitAudioBlobIntoCount } from './digitalHumanAudioChunks'
 import {
   inferGestureFromMotionText,
   motionLineForSegmentIndex,
@@ -124,6 +124,32 @@ function sleep(ms: number): Promise<void> {
 function draftNeedsSceneComposite(_draft: DigitalHumanDraft): boolean {
   void _draft
   return true
+}
+
+function splitScriptByDurations(script: string, durations: number[]): string[] {
+  const text = script.trim()
+  if (!text || durations.length <= 1) return [text || script]
+  const total = durations.reduce((sum, n) => sum + Math.max(0.2, n), 0)
+  const out: string[] = []
+  let cursor = 0
+  for (let i = 0; i < durations.length; i++) {
+    if (i === durations.length - 1) {
+      out.push(text.slice(cursor).trim() || text)
+      break
+    }
+    const take = Math.max(1, Math.round((Math.max(0.2, durations[i]!) / total) * text.length))
+    const window = text.slice(cursor, Math.min(text.length, cursor + take + 8))
+    const punct = Math.max(
+      window.lastIndexOf('。'),
+      window.lastIndexOf('！'),
+      window.lastIndexOf('？'),
+      window.lastIndexOf('，'),
+    )
+    const cut = punct >= Math.floor(take * 0.35) ? punct + 1 : Math.min(take, text.length - cursor)
+    out.push(text.slice(cursor, cursor + cut).trim())
+    cursor += cut
+  }
+  return out.filter((s) => s.length > 0)
 }
 
 function splitScriptAcrossCount(script: string, count: number): string[] {
@@ -538,7 +564,9 @@ async function renderWithOmniHuman(
     segmentAudioBlobs = uploaded.audioBlobs
     scriptChunks = segmentAudioBlobs.map((_, i) => script.split(/\n+/)[i]?.trim() || `[口播段 ${i + 1}]`)
   } else {
-    scriptChunks = chunkScriptForOmniHumanVideo(script)
+    const beats = parseMotionInstructions(draft.motionInstructions)
+    const oneTake = beats.length >= 2 && script.trim().length <= 160
+    scriptChunks = oneTake ? [script.trim()] : chunkScriptForOmniHumanVideo(script)
     for (let i = 0; i < scriptChunks.length; i++) {
       const chunkText = scriptChunks[i] ?? script
       onProgress?.({
@@ -555,6 +583,32 @@ async function renderWithOmniHuman(
         }
       }
       segmentAudioBlobs.push(narration.audioBlob)
+    }
+  }
+
+  let segmentMotionTexts: string[] | null = null
+  if (
+    !useMotion &&
+    motionLines.length >= 2 &&
+    segmentAudioBlobs.length === 1
+  ) {
+    try {
+      const aligned = await splitAudioBlobByMotionBeats(segmentAudioBlobs[0]!, motionLines)
+      if (aligned && aligned.blobs.length >= 2) {
+        segmentAudioBlobs = aligned.blobs
+        segmentMotionTexts = aligned.texts
+        const durs: number[] = []
+        for (const b of aligned.blobs) {
+          try {
+            durs.push(await getAudioDurationSec(b))
+          } catch {
+            durs.push(1)
+          }
+        }
+        scriptChunks = splitScriptByDurations(script, durs)
+      }
+    } catch {
+      /* 切不开则整段口播仍用第一条动作 */
     }
   }
 
@@ -588,7 +642,7 @@ async function renderWithOmniHuman(
   }
 
   let segmentTotal = Math.max(
-    isAudioDrive ? segmentAudioBlobs.length : scriptChunks.length,
+    segmentAudioBlobs.length,
     activeSceneShots && !isAudioDrive ? activeSceneShots.length : 1,
   )
   segmentTotal = Math.min(DH_OMNIHUMAN_MAX_SEGMENTS, Math.max(1, segmentTotal))
@@ -644,8 +698,13 @@ async function renderWithOmniHuman(
     let sceneImageB64 = portraitB64
     const useProductFusion =
       Boolean(productPureB64) && isDhProductFusionSegment(i, segmentTotal)
+    const actionText =
+      segmentMotionTexts?.[i] || motionLineForSegmentIndex(motionLines, i)?.text || ''
+    const photoBg =
+      Boolean(segmentCustomBg) &&
+      (segmentDraft.background === 'custom' || segmentDraft.background === 'store')
     try {
-      if (segmentDraft.background === 'custom' && segmentCustomBg) {
+      if (photoBg && segmentCustomBg) {
         onProgress?.({
           phase: 'generating',
           segmentIndex: i + 1,
@@ -655,6 +714,7 @@ async function renderWithOmniHuman(
         sceneImageB64 = await fusePortraitDeepIntoScene({
           portraitPureB64: portraitB64,
           sceneDataUrl: segmentCustomBg,
+          actionText,
         })
       } else if (draftNeedsSceneComposite(segmentDraft) || segmentCustomBg) {
         sceneImageB64 = await compositePortraitWithBackground(
@@ -673,7 +733,7 @@ async function renderWithOmniHuman(
       return {
         ok: false,
         message:
-          segmentDraft.background === 'custom'
+          photoBg
             ? `第 ${i + 1}/${segmentTotal} 段人物融入环境照失败：${e instanceof Error ? e.message : String(e)}`
             : `第 ${i + 1}/${segmentTotal} 段场景合成失败：${e instanceof Error ? e.message : String(e)}`,
       }
@@ -687,8 +747,8 @@ async function renderWithOmniHuman(
           ? inferGestureFromMotionText(motionLine.text, 'explain')
           : undefined
     const prompt = buildDhOmniHumanPrompt(segmentDraft, {
-      motionText: motionLine?.text,
-      gesturePreset: segmentGesture,
+      motionText: actionText || motionLine?.text,
+      gesturePreset: actionText ? undefined : segmentGesture,
       scriptHint: scriptChunks[i] ?? script,
       hasProductFusion: useProductFusion,
     })

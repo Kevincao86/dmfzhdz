@@ -96,6 +96,54 @@ export async function splitAudioBlobForS2v(
   }
 }
 
+/**
+ * 按动作时间轴切分一整段口播。时间戳按成片比例对齐真实音频长度，
+ * 最后一段收到音频结尾，短于 1 秒的段并入相邻段。
+ */
+export async function splitAudioBlobByMotionBeats(
+  blob: Blob,
+  beats: Array<{ startSec: number; endSec: number; text: string }>,
+): Promise<{ blobs: Blob[]; texts: string[] } | null> {
+  const usable = beats.filter((b) => b.endSec > b.startSec && b.text.trim())
+  if (usable.length < 2 || blob.size < 128) return null
+
+  const AC = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!AC) throw new Error('当前浏览器不支持音频解码')
+  const ctx = new AC()
+  try {
+    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer())
+    const duration = decoded.duration
+    const lastEnd = usable[usable.length - 1]!.endSec
+    const scale = lastEnd > 0.5 ? duration / lastEnd : 1
+    const ranges: Array<{ start: number; end: number; text: string }> = []
+    for (let i = 0; i < Math.min(8, usable.length); i++) {
+      const b = usable[i]!
+      const start = i === 0 ? 0 : Math.max(0, b.startSec * scale)
+      const end = i === usable.length - 1 || i === 7 ? duration : Math.min(duration, b.endSec * scale)
+      if (end - start < 1) {
+        if (ranges.length) ranges[ranges.length - 1]!.end = end
+        else ranges.push({ start: 0, end, text: b.text.trim() })
+        continue
+      }
+      ranges.push({ start, end, text: b.text.trim() })
+    }
+    if (ranges.length < 2) return null
+    const blobs: Blob[] = []
+    const texts: string[] = []
+    for (const r of ranges) {
+      const startSample = Math.max(0, Math.floor(r.start * decoded.sampleRate))
+      const endSample = Math.min(decoded.length, Math.floor(r.end * decoded.sampleRate))
+      if (endSample - startSample < decoded.sampleRate) continue
+      blobs.push(encodeWavFromAudioBuffer(decoded, startSample, endSample))
+      texts.push(r.text)
+    }
+    if (blobs.length < 2) return null
+    return { blobs, texts }
+  } finally {
+    await ctx.close().catch(() => undefined)
+  }
+}
+
 /** 多张环境照：把一整段口播均分成 count 段，每段对应一张场景。每段短于 1.2 秒则不切。 */
 export async function splitAudioBlobIntoCount(blob: Blob, count: number): Promise<Blob[]> {
   const n = Math.max(1, Math.min(8, Math.round(count)))
