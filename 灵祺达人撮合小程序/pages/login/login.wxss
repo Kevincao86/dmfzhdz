@@ -3,31 +3,31 @@
 @import '../../styles/hero-deco.wxss';
 
 .login-page {
-  --lq-primary: #8a5a32;
-  --lq-primary-dark: #6b4324;
-  --lq-primary-deep: #5c3a22;
-  --lq-nav-bar: #f6f1e8;
-  --lq-primary-soft: #c4a27a;
-  --lq-primary-50: #f8f1e6;
-  --lq-primary-100: #ead9c4;
-  --lq-violet: #8a5a32;
-  --lq-gradient: linear-gradient(180deg, #a56b3c 0%, #8a5430 100%);
+  --lq-primary: #14181f;
+  --lq-primary-dark: #14181f;
+  --lq-primary-deep: #14181f;
+  --lq-nav-bar: #f7f3ec;
+  --lq-primary-soft: #a8a29e;
+  --lq-primary-50: #fffdf8;
+  --lq-primary-100: #e7e1d6;
+  --lq-violet: #14181f;
+  --lq-gradient: linear-gradient(180deg, #14181f 0%, #14181f 100%);
   --lq-gradient-header: transparent;
-  --lq-gradient-deep: linear-gradient(180deg, #6b4324 0%, #a56b3c 100%);
-  --lq-gradient-tab: linear-gradient(180deg, #b07a45 0%, #8d5a32 100%);
-  --lq-gradient-tab-track: #f7f1e8;
-  --lq-bg: #f6f1e8;
-  --lq-border: rgba(92, 58, 34, 0.12);
-  --lq-shadow-soft: 0 8rpx 28rpx rgba(92, 58, 34, 0.08);
-  --lq-chip-on-bg: #f8f1e6;
-  --lq-chip-on-border: #e4d3be;
-  --lq-active-tint: rgba(141, 90, 50, 0.12);
-  --lq-home-nav: #f6f1e8;
+  --lq-gradient-deep: linear-gradient(180deg, #14181f 0%, #14181f 100%);
+  --lq-gradient-tab: linear-gradient(180deg, #14181f 0%, #14181f 100%);
+  --lq-gradient-tab-track: #f7f3ec;
+  --lq-bg: #f7f3ec;
+  --lq-border: rgba(20, 24, 31, 0.1);
+  --lq-shadow-soft: 0 8rpx 28rpx rgba(20, 24, 31, 0.06);
+  --lq-chip-on-bg: #fffdf8;
+  --lq-chip-on-border: #e7e1d6;
+  --lq-active-tint: rgba(20, 24, 31, 0.12);
+  --lq-home-nav: #f7f3ec;
   box-sizing: border-box;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #ffffff !important;
+  background: #f7f3ec !important;
 }
 
 .login-life-bg {
@@ -55,14 +55,14 @@
   overflow: hidden;
   padding-bottom: 28rpx;
   flex-shrink: 0;
-  background: #ffffff;
+  background: #f7f3ec;
   min-height: 0;
 }
 
 .login-rule {
   height: 1rpx;
   margin: 8rpx 56rpx 12rpx;
-  background: #ececec;
+  background: #e7e1d6;
 }
 
 .login-hero__bg {
@@ -409,9 +409,9 @@
   align-self: stretch;
   margin: 16rpx 24rpx 0;
   padding: 16rpx 20rpx 14rpx;
-  background: rgba(255, 248, 240, 0.94);
-  border-radius: 20rpx;
-  box-shadow: 0 8rpx 24rpx rgba(44, 24, 16, 0.16);
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .login-legal-copy {
@@ -420,7 +420,7 @@
   font-size: 24rpx;
   font-weight: 600;
   line-height: 1.5;
-  color: #2f1c12;
+  color: #64748b;
 }
 
 .login-icp-row {
@@ -448,7 +448,7 @@
   font-size: 24rpx;
   font-weight: 600;
   line-height: 1.5;
-  color: #2f1c12;
+  color: #64748b;
 }
 
 .login-talent-zone {
@@ -795,7 +795,7 @@
   margin-top: 4rpx;
   padding: 0 0 calc(env(safe-area-inset-bottom) + 12rpx);
   overflow: hidden;
-  background: linear-gradient(180deg, var(--lq-bg) 0%, var(--lq-primary-50) 100%);
+  background: transparent;
   border-radius: 28rpx;
 }
 
@@ -804,11 +804,11 @@
   padding: 16rpx 32rpx;
   font-size: 28rpx;
   font-weight: 700;
-  color: #fff;
+  color: #14181f;
   line-height: 1.2;
-  background: linear-gradient(180deg, #b07a45 0%, #8d5a32 100%);
+  background: #ffffff;
   border-radius: 999rpx;
-  box-shadow: 0 8rpx 20rpx rgba(92, 58, 34, 0.32);
+  box-shadow: 0 8rpx 20rpx rgba(20, 24, 31, 0.06);
 }
 
 .login-legal-row {
@@ -1423,16 +1423,16 @@
   color: #f4f4f5 !important;
 }
 
-/* 方案 E：登录首页固定白底，不跟身份主题换成深色或米色底 */
+/* 登录页固定为小程序现有米色，不跟身份主题改成白底或深色底 */
 .login-page.lq-accent-dark {
-  background: #ffffff !important;
+  background: #f7f3ec !important;
 }
 
 .login-page.lq-accent-dark .login-hero,
 .login-page.lq-accent-dark .login-hero__title {
   color: #111111 !important;
   -webkit-text-fill-color: #111111 !important;
-  background: #ffffff !important;
+  background: #f7f3ec !important;
 }
 
 .login-page.lq-accent-dark .login-hero__sub,
@@ -1473,4 +1473,29 @@
   background: #07c160 !important;
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
+}
+
+.login-page.lq-accent-dark .login-legal-foot {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none;
+}
+
+.login-page.lq-accent-dark .login-legal-copy,
+.login-page.lq-accent-dark .login-icp-text,
+.login-page.lq-accent-dark .login-legal-txt,
+.login-page.lq-accent-dark .login-legal-link {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+}
+
+.login-page.lq-accent-dark .login-legal-link {
+  color: #14181f !important;
+  -webkit-text-fill-color: #14181f !important;
+}
+
+.login-page.lq-accent-dark .login-back-link {
+  color: #14181f !important;
+  -webkit-text-fill-color: #14181f !important;
+  background: #ffffff !important;
 }

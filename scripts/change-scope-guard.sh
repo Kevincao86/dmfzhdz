@@ -134,6 +134,7 @@ list_scopes() {
   talent_footer_lines 达人小程序页脚版权与备案收成两行
   talent_audit_browse  达人小程序审核：首页可先浏览，手机号/头像/昵称改为用户自行登录时再授权
   mp_phone_quick_login 达人小程序审核：登录/注册去掉微信字样，改为手机号快捷登录与快捷注册
+  mp_login_beige       达人小程序登录页改为现有米色底，去掉褐色返回和协议字
   mp_drama_points_gift 达人小程序与星选：AI短剧写出积分消耗；会员权益写出每月赠送积分
   mp_share_menu_contrast 达人小程序分享菜单：主题切换后菜单底色跟随卡片，避免白底白字
   mp_main_pkg_size     达人小程序主包超 2048KB：把仅分包使用的 JS 移进对应分包
@@ -2024,6 +2025,13 @@ PAT
     talent_audit_browse)
       cat <<'PAT'
 灵祺达人撮合小程序/app.js
+change-scope-guard
+PAT
+      ;;
+    mp_login_beige)
+      cat <<'PAT'
+灵祺达人撮合小程序/pages/login/login.wxss
+灵祺达人撮合小程序/pages/login/login.wxml
 change-scope-guard
 PAT
       ;;

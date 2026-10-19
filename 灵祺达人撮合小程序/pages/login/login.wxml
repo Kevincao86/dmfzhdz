@@ -1,4 +1,4 @@
-<page-meta page-style="{{lqPageStyle}}" background-color="#ffffff" background-color-top="#ffffff" background-color-bottom="#ffffff" />
+<page-meta page-style="{{lqPageStyle}}" background-color="#f7f3ec" background-color-top="#f7f3ec" background-color-bottom="#f7f3ec" />
 <view class="{{lqAccentClass}} login-page {{lqThemeClass}}" style="{{lqPageStyle}}">
   <launch-splash />
   <view class="login-hero" style="{{navBandStyle}}">
