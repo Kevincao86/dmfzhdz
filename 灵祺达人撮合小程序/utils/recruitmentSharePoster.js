@@ -256,6 +256,22 @@ function readableOnLight(hex) {
   return luminance > 0.55 ? '#0F172A' : `#${m[1]}`
 }
 
+function drawBlessingSticker(ctx, img, x, y, w, h) {
+  if (!img || w < 40 || h < 40) return false
+  const iw = Number(img.width) || 0
+  const ih = Number(img.height) || 0
+  if (!iw || !ih) return false
+  const scale = Math.min(w / iw, h / ih)
+  const dw = Math.max(1, Math.round(iw * scale))
+  const dh = Math.max(1, Math.round(ih * scale))
+  const dx = Math.round(x)
+  const dy = Math.round(y + Math.max(0, h - dh))
+  const shot = shareThemes.captureTheme(ctx, dx, dy, dw, dh)
+  ctx.drawImage(img, dx, dy, dw, dh)
+  if (shot && shot.reveal) shot.reveal(1)
+  return true
+}
+
 function drawFestivalBlessing(ctx, text, x, y, w, h) {
   const blessing = String(text || '').trim()
   if (!blessing) return
@@ -506,7 +522,7 @@ function drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y) {
   return true
 }
 
-function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFrameImg, qrFallbackContent, brandImg, festivalImg) {
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFrameImg, qrFallbackContent, brandImg, festivalImg, blessingImg) {
   const tmpl = design.template || {}
   const pad = design && design.shareTheme ? 72 : 40
   const cardW = POSTER_W - pad * 2
@@ -581,7 +597,9 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   const panelY = qrY + 6
   const panelH = qrFrameSize + 28 - 12
   const blessing = design && design.shareTheme && design.shareTheme.blessing
-  if (blessing && panelW > 80) {
+  if (blessingImg && drawBlessingSticker(ctx, blessingImg, panelX, panelY, panelW, panelH)) {
+    /* 节日艺术字贴在左下角 */
+  } else if (blessing && panelW > 80) {
     drawFestivalBlessing(ctx, blessing, panelX, panelY, panelW, panelH)
   } else if (panelW > 120 && design.footerPanel) {
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
@@ -693,6 +711,7 @@ function applyShareLook(design, opts) {
     design.accentLight = theme.paper
     design.forceGradientHero = false
     design.festivalFile = `festival-${theme.id}.jpg`
+    design.blessingFile = `blessing-${theme.id}.jpg`
     design.template = Object.assign({}, design.template, {
       outerBg: theme.bg[1],
       bgGradient: theme.bg.concat([theme.paper]),
@@ -761,7 +780,11 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
         canvas,
         design.festivalFile ? posterAssets.festivalAssetCandidates(design.festivalFile) : [],
       ),
-    ]).then(([bgImg, qrFrameImg, platformImg, wxacodeImg, brandImg, festivalImg]) => {
+      loadCanvasImageCandidates(
+        canvas,
+        design.blessingFile ? posterAssets.festivalAssetCandidates(design.blessingFile) : [],
+      ),
+    ]).then(([bgImg, qrFrameImg, platformImg, wxacodeImg, brandImg, festivalImg, blessingImg]) => {
       const useWx = !!(wxDataUrl && wxacodeImg)
       if (!useWx && wxDataUrl) {
         console.warn('[poster] wxacode image load failed, fallback local qr')
@@ -780,6 +803,7 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
         useWx ? '' : qrFallback,
         brandImg,
         festivalImg,
+        blessingImg,
       ).then(() => exportCanvasToFile(canvas))
     })
   })

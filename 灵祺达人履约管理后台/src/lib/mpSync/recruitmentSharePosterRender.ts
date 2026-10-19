@@ -215,6 +215,29 @@ function drawHeroSection(
   drawTagChips(ctx, design.tags.chipLabels, x + 24, y + h - 36, w - 48)
 }
 
+function drawBlessingSticker(
+  ctx: CanvasRenderingContext2D,
+  img: CanvasImageSource,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) {
+  const source = img as HTMLImageElement
+  const iw = Number(source.width) || 0
+  const ih = Number(source.height) || 0
+  if (!iw || !ih || w < 40 || h < 40) return false
+  const scale = Math.min(w / iw, h / ih)
+  const dw = Math.max(1, Math.round(iw * scale))
+  const dh = Math.max(1, Math.round(ih * scale))
+  const dx = Math.round(x)
+  const dy = Math.round(y + Math.max(0, h - dh))
+  const theme = ctx.getImageData(dx, dy, dw, dh)
+  ctx.drawImage(img, dx, dy, dw, dh)
+  tintWhitesWithTheme(ctx, theme, dx, dy, dw, dh, 1)
+  return true
+}
+
 function drawFestivalBlessing(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -439,6 +462,7 @@ export async function renderRecruitmentPosterCanvas(
   const cardW = POSTER_W - pad * 2
   const cardH = POSTER_H - pad * 2
   const festivalImg = design.festivalUrl ? await loadImage(design.festivalUrl) : null
+  const blessingImg = design.blessingUrl ? await loadImage(design.blessingUrl) : null
   const bgImg = festivalImg || (design.forceGradientHero ? null : await loadPosterBackground(tmpl))
   const brandImg = await loadImage(String(input.inviterAvatarUrl || ''))
 
@@ -537,7 +561,9 @@ export async function renderRecruitmentPosterCanvas(
   const panelW = qrX - panelX - 16
   const panelY = qrY + 6
   const panelH = qrFrameSize + 28 - 12
-  if (design.shareBlessing && panelW > 80) {
+  if (blessingImg && drawBlessingSticker(ctx, blessingImg, panelX, panelY, panelW, panelH)) {
+    /* 节日艺术字贴在左下角 */
+  } else if (design.shareBlessing && panelW > 80) {
     drawFestivalBlessing(ctx, design.shareBlessing, panelX, panelY, panelW, panelH)
   } else if (panelW > 120 && design.footerPanel) {
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)

@@ -1,7 +1,4 @@
 {
   "component": true,
-  "styleIsolation": "apply-shared",
-  "usingComponents": {
-    "recruit-share-dock": "/components/recruit-share-dock/index"
-  }
+  "styleIsolation": "apply-shared"
 }

@@ -119,6 +119,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
           themeLabel: theme.label,
           blessing: theme.blessing,
           festivalUrl: `${FESTIVAL_CDN}/festival-${theme.id}.jpg?v=${FESTIVAL_VER}`,
+          blessingUrl: `${FESTIVAL_CDN}/blessing-${theme.id}.jpg?v=blessing20261019c`,
         }
       : undefined)
       .then(({ dataUrl, design }) => {

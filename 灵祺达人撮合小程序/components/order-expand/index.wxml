@@ -4,6 +4,7 @@
   catchtouchmove="noop"
 >
   <view class="order-expand-card {{opened ? 'is-open' : ''}}" style="{{cardStyle}}" catchtap="noop">
+    <view wx:if="{{showShareMenu}}" class="order-expand-share-dismiss" catchtap="onShareMenuClose" />
     <view class="order-expand-card__bar">
       <view class="order-expand-card__x" bindtap="onMask" aria-label="关闭">×</view>
       <view class="order-expand-card__tools">
@@ -12,6 +13,35 @@
           <text>{{favorited ? '已收藏' : '收藏'}}</text>
         </view>
         <view class="order-expand-share-wrap">
+          <view wx:if="{{showShareMenu}}" class="order-expand-share-menu" catchtap="noop">
+            <block wx:if="{{shareCoverPick}}">
+              <view class="order-expand-share-menu__item" bindtap="onShareCoverBack">返回</view>
+              <button class="order-expand-share-menu__item" open-type="share" data-cover="recruit" hover-class="none" bindtap="onShareMenuClose">招募封面</button>
+              <button class="order-expand-share-menu__item" open-type="share" data-cover="poster" hover-class="none" bindtap="onShareMenuClose">海报封面</button>
+            </block>
+            <block wx:else>
+              <view class="order-expand-share-menu__item" bindtap="onShareWechat">
+                <image class="order-expand-share-menu__icon" src="/components/recruit-share-dock/icons/dock-wechat.jpg" mode="aspectFill" />
+                <text>微信好友</text>
+              </view>
+              <view class="order-expand-share-menu__item" data-tab="poster" bindtap="onShareMenuPick">
+                <image class="order-expand-share-menu__icon" src="/components/recruit-share-dock/icons/dock-poster.jpg" mode="aspectFill" />
+                <text>海报分享图</text>
+              </view>
+              <view class="order-expand-share-menu__item" data-tab="code" bindtap="onShareMenuPick">
+                <image class="order-expand-share-menu__icon" src="/components/recruit-share-dock/icons/dock-code.jpg" mode="aspectFill" />
+                <text>小程序分享图</text>
+              </view>
+              <view class="order-expand-share-menu__item" data-tab="web" data-mode="qr" bindtap="onShareMenuPick">
+                <image class="order-expand-share-menu__icon" src="/components/recruit-share-dock/icons/dock-qr.jpg" mode="aspectFill" />
+                <text>二维码分享图</text>
+              </view>
+              <view class="order-expand-share-menu__item" data-tab="web" data-mode="link" bindtap="onShareMenuPick">
+                <image class="order-expand-share-menu__icon" src="/components/recruit-share-dock/icons/dock-link.jpg" mode="aspectFill" />
+                <text>链接分享</text>
+              </view>
+            </block>
+          </view>
           <view class="order-expand-card__tool" bindtap="onShareTap">
             <text class="order-expand-card__tool-icon">↗</text>
             <text>分享</text>
@@ -74,10 +104,4 @@
       </view>
     </view>
   </view>
-  <recruit-share-dock
-    show="{{showShareMenu}}"
-    title="{{title}}"
-    bind:close="onShareMenuClose"
-    bind:open="onOpenShareStudio"
-  />
 </view>

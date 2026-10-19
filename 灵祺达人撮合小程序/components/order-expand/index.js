@@ -67,6 +67,7 @@ Component({
     favorited: false,
     shareCover: '',
     showShareMenu: false,
+    shareCoverPick: false,
     showSharePosterSheet: false,
     sharePosterPath: '',
     sharePosterErr: '',
@@ -115,20 +116,29 @@ Component({
         wx.showToast({ title: '订单加载中', icon: 'none' })
         return
       }
-      this.setData({ showShareMenu: !this.data.showShareMenu })
+      const next = !this.data.showShareMenu
+      this.setData({ showShareMenu: next, shareCoverPick: next ? this.data.shareCoverPick : false })
     },
     onShareMenuClose() {
-      if (this.data.showShareMenu) this.setData({ showShareMenu: false })
+      if (this.data.showShareMenu || this.data.shareCoverPick) {
+        this.setData({ showShareMenu: false, shareCoverPick: false })
+      }
     },
-    onOpenShareStudio(e) {
+    onShareWechat() {
+      this.setData({ shareCoverPick: true })
+    },
+    onShareCoverBack() {
+      this.setData({ shareCoverPick: false })
+    },
+    onShareMenuPick(e) {
       const order = this.posterOrder()
       if (!order) {
         wx.showToast({ title: '订单加载中', icon: 'none' })
         return
       }
-      const detail = (e && e.detail) || {}
-      this.setData({ showShareMenu: false })
-      shareHub.openStudio(order, detail.tab || 'poster', detail.mode || 'link')
+      const ds = (e && e.currentTarget && e.currentTarget.dataset) || {}
+      this.setData({ showShareMenu: false, shareCoverPick: false })
+      shareHub.openStudio(order, ds.tab || 'poster', ds.mode || 'link')
     },
     buildShareMessage(res) {
       const mp = this._mp

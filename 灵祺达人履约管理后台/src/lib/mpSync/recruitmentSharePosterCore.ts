@@ -32,6 +32,7 @@ export type PosterDesignTokens = {
   forceGradientHero?: boolean
   shareThemeLabel?: string
   shareBlessing?: string
+  blessingUrl?: string
   festivalUrl?: string
 }
 
