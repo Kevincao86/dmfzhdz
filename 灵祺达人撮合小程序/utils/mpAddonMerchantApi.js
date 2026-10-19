@@ -218,6 +218,19 @@ async function postMotionImitate(body) {
   })
 }
 
+async function postXiaoyunque(body) {
+  const durationSec = Math.min(60, Math.max(5, Math.round(Number(body && body.durationSec) || 15)))
+  const images = Array.isArray(body && body.imagesBase64) ? body.imagesBase64.filter(Boolean) : []
+  return postSeedanceStart({
+    pipeline: 'xiaoyunque',
+    skip_qwen: true,
+    prompt: body && body.prompt ? body.prompt : '',
+    durationSec,
+    flags: `--dur ${durationSec} --fps 24 --ratio 9:16 --wm false`,
+    images_base64: images,
+  })
+}
+
 function postMuxAudioFile(videoBase64, audioBase64) {
   return new Promise((resolve, reject) => {
     wx.request({
@@ -375,6 +388,7 @@ module.exports = {
   postDouyinLinkForDh,
   fetchVideoAiConfig,
   postMotionImitate,
+  postXiaoyunque,
   postMuxAudioFile,
   postShortVideoWithFailover,
   pollVideoTask,

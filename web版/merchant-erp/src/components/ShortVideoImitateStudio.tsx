@@ -10,7 +10,12 @@ import { postAiChat } from '../services/ai/aiClient'
 import { synthesizeDigitalHumanSpeech } from '../services/digitalHumanTtsApi'
 import { checkMpAddonPointsAffordable } from '../services/mpAddonPointsSpendClient'
 import { runDhMotionImitateJob } from '../lib/dhOmniHumanVideoApi'
-import { formatVideoAiUserError, muxVideoAudioOnServer } from '../services/videoAiApi'
+import {
+  downloadVideoUrlAsBlob,
+  formatVideoAiUserError,
+  muxVideoAudioOnServer,
+  runXiaoyunqueVideoJob,
+} from '../services/videoAiApi'
 
 const VIDEO_MAX_BYTES = 48 * 1024 * 1024
 const VIDEO_MAX_SEC = 60
@@ -62,6 +67,23 @@ function readDataUrl(file: Blob): Promise<string> {
     fr.onerror = () => reject(new Error('读取文件失败'))
     fr.readAsDataURL(file)
   })
+}
+
+function storyboardDurationSec(rows: Shot[]): number {
+  const end = rows.reduce((max, s, i) => Math.max(max, Number(s.endSec) || (i + 1) * 4), 0)
+  return Math.min(VIDEO_MAX_SEC, Math.max(5, Math.ceil(end || 15)))
+}
+
+function storyboardPrompt(who: string, rows: Shot[]): string {
+  return [
+    `【形象锁定】参考图只锁定${who}的脸和衣服。成片必须是这个人出镜，禁止换成别人。`,
+    '【分镜必演】按下面镜头顺序演完。口播必须说出来，要有环境声，禁止无声，禁止只出字幕。竖屏 9:16。',
+    ...rows.map(
+      (s, i) =>
+        `镜头${i + 1}（${s.startSec}–${s.endSec}秒）：画面：${s.visual || '沿用上一段场景'}。动作：${s.action || '按画面自然表演'}。口播：「${s.speech || ''}」。${s.hasBgm ? '这段有背景音。' : '这段不要背景音乐。'}`,
+    ),
+    '不要字幕、水印、Logo。',
+  ].join('\n')
 }
 
 function fallbackShots(durationSec: number, speech: string): Shot[] {
@@ -310,8 +332,8 @@ export default function ShortVideoImitateStudio() {
                 role: 'user',
                 content: [
                   '下面是一条短视频分享文案。不要下载视频，只整理成画面、口播、背景音。',
-                  '只返回 JSON 数组，2 到 4 项，字段：startSec,endSec,visual,speech,hasBgm。',
-                  'visual 写画面，speech 写口播，hasBgm 表示这段有没有背景音。',
+                  '只返回 JSON 数组，2 到 4 项，字段：startSec,endSec,visual,action,speech,hasBgm。',
+                  'visual 写画面，action 写能演出来的动作，speech 写口播，hasBgm 表示这段有没有背景音。',
                   caption || share.slice(0, 500),
                 ].join('\n'),
               },
@@ -322,7 +344,7 @@ export default function ShortVideoImitateStudio() {
           setErr(explainImitateError(e instanceof Error ? e.message : '链接整理失败'))
         }
         setShots(parseShots(text, durationSec || 8, caption))
-        setLinkNote('已按分享文案整理成画面、口播、背景音，可直接改。换人请另外上传 1 分钟内的视频。')
+        setLinkNote('已按分享文案整理成画面、口播、背景音。可以直接开始模仿；要按原片换人，再上传 1 分钟内的视频。')
         return
       }
       const dur = durationSec || (file ? await probeVideoDurationSec(file) : 0) || 8
@@ -348,7 +370,7 @@ export default function ShortVideoImitateStudio() {
               content: [
                 `参考视频约 ${dur.toFixed(1)} 秒。按时间顺序拆成 2 到 4 个镜头。`,
                 caption ? `分享文案：${caption.slice(0, 400)}` : '请根据画面写口播，看不清就留空。',
-                '只返回 JSON 数组，每项字段：startSec,endSec,visual,speech,hasBgm。visual 是画面，speech 是口播，hasBgm 表示有没有背景音。',
+                '只返回 JSON 数组，每项字段：startSec,endSec,visual,action,speech,hasBgm。visual 是画面，action 是动作，speech 是口播，hasBgm 表示有没有背景音。',
               ].join('\n'),
             },
           ],
@@ -396,11 +418,141 @@ export default function ShortVideoImitateStudio() {
     return new File([blob], `${avatar.id}.jpg`, { type: blob.type || 'image/jpeg' })
   }
 
+  async function onRewrite() {
+    setErr('')
+    if (!shots.length) {
+      setErr('请先拆解画面、口播和背景音')
+      return
+    }
+    setBusy(true)
+    setProgress('正在改写口播和动作…')
+    try {
+      const chat = await postAiChat({
+        provider: 'doubao',
+        stream: false,
+        temperature: 0.4,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              '下面是已经拆好的镜头。请改写每一镜的口播和动作：模仿原片的卖点和节奏，不要照抄原句。',
+              '动作写成画面里能演出来的动作。口播写成能直接念的口语。',
+              '只返回 JSON 数组，与输入等长、同顺序。每项只有 speech 和 action。',
+              JSON.stringify(shots.map((s) => ({ visual: s.visual, action: s.action, speech: s.speech }))),
+            ].join('\n'),
+          },
+        ],
+      })
+      const text = chat.content || ''
+      const start = text.indexOf('[')
+      const end = text.lastIndexOf(']')
+      if (start < 0 || end <= start) throw new Error('改写结果不是镜头列表')
+      const arr = JSON.parse(text.slice(start, end + 1)) as unknown[]
+      if (!Array.isArray(arr) || !arr.length) throw new Error('改写结果是空的')
+      setShots((rows) =>
+        rows.map((row, i) => {
+          const o = arr[i] && typeof arr[i] === 'object' ? (arr[i] as Record<string, unknown>) : null
+          if (!o) return row
+          return {
+            ...row,
+            speech: String(o.speech || row.speech),
+            action: String(o.action || row.action),
+          }
+        }),
+      )
+      setProgress('')
+    } catch (e) {
+      setErr(explainImitateError(e instanceof Error ? e.message : '改写失败'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function mixOnto(videoBlob: Blob, est: number): Promise<Blob> {
+    let narration: Blob | null = null
+    const keepOriginalAudio = voiceMode === 'keep' && bgmMode === 'custom' && bgmClips.length > 0
+    if (voiceMode !== 'keep') {
+      setProgress('正在按拆解稿合成声音…')
+      const text = speechText || shots.map((s) => s.speech || s.visual).filter(Boolean).join('。')
+      let referenceAudioBase64: string | undefined
+      if (voiceMode === 'clone') {
+        if (!voiceFile) throw new Error('请上传一段清晰的人声音频，用于模仿声音')
+        const dataUrl = await readDataUrl(voiceFile)
+        referenceAudioBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+      }
+      const voicePreset = CUSTOM_UPLOAD_VOICE_PRESETS.find((v) => v.id === voiceId)
+      const spoken = await synthesizeDigitalHumanSpeech({
+        text: text.slice(0, 480),
+        voicePresetId: voiceMode === 'clone' ? 'v-clone' : voiceId,
+        speechRate: voicePreset?.rate ?? 1,
+        speechPitch: voicePreset?.pitch ?? 1,
+        referenceAudioBase64,
+      })
+      if (!spoken.ok) throw new Error(spoken.message)
+      const binary = atob(spoken.audioBase64.replace(/\s/g, ''))
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      narration = new Blob([bytes], { type: spoken.mimeType || 'audio/mpeg' })
+    }
+    if (narration || (bgmMode === 'custom' && bgmClips.length)) {
+      setProgress('正在混合声音和背景乐…')
+      const wav = await buildMixedWav({
+        narration,
+        originalAudio: keepOriginalAudio ? videoBlob : null,
+        clips: bgmMode === 'custom' ? bgmClips : [],
+        volume: bgmVolume,
+        targetSec: est,
+      })
+      return muxVideoAudioOnServer(videoBlob, wav, { timeoutMs: 180_000 })
+    }
+    return videoBlob
+  }
+
   async function onGenerate() {
     setErr('')
     setResultUrl('')
+    if (!shots.length) {
+      setErr('请先拆解画面、口播和背景音')
+      return
+    }
     if (!videoFile) {
-      setErr('换人需要另外上传 1 分钟内的参考视频。分享链接只呈现画面、口播和背景音。')
+      const est = storyboardDurationSec(shots)
+      const afford = await checkMpAddonPointsAffordable('shortvideo', est)
+      if (!afford.ok) {
+        setErr(afford.message || '积分不足')
+        return
+      }
+      setBusy(true)
+      try {
+        setProgress('准备人物…')
+        const photo = await chosenPhotoFile()
+        const who = useUpload ? '上传照片中的人物' : REAL_AVATARS.find((a) => a.id === presetId)?.name || '所选人物'
+        const imageRaw = await readDataUrl(photo)
+        setProgress('按镜头生成中…')
+        const job = await runXiaoyunqueVideoJob({
+          prompt: storyboardPrompt(who, shots),
+          durationSec: est,
+          aspectRatio: '9:16',
+          images_base64: [imageRaw],
+          onProgress: (label) => setProgress(label.replace(/有声短剧/g, '模仿成片')),
+        })
+        if (!job.ok) {
+          setErr(explainImitateError(formatVideoAiUserError(job.message)))
+          return
+        }
+        const needsMix = voiceMode !== 'keep' || (bgmMode === 'custom' && bgmClips.length > 0)
+        if (!needsMix) {
+          setResultUrl(job.videoUrl)
+        } else {
+          const videoBlob = await downloadVideoUrlAsBlob(job.videoUrl, { maxAttempts: 3 })
+          setResultUrl(URL.createObjectURL(await mixOnto(videoBlob, est)))
+        }
+        setProgress('')
+      } catch (e) {
+        setErr(explainImitateError(e instanceof Error ? e.message : '模仿生成失败'))
+      } finally {
+        setBusy(false)
+      }
       return
     }
     if (videoFile.size > VIDEO_MAX_BYTES) {
@@ -409,10 +561,6 @@ export default function ShortVideoImitateStudio() {
     }
     if (durationSec > VIDEO_MAX_SEC) {
       setErr('参考视频请控制在 1 分钟以内')
-      return
-    }
-    if (!shots.length) {
-      setErr('请先拆解画面、口播和背景音')
       return
     }
     const est = Math.min(VIDEO_MAX_SEC, Math.max(1, Math.ceil(durationSec || 8)))
@@ -449,42 +597,7 @@ export default function ShortVideoImitateStudio() {
         return
       }
       let videoBlob = await fetch(job.videoUrl).then((r) => r.blob())
-      let narration: Blob | null = null
-      const keepOriginalAudio = voiceMode === 'keep' && bgmMode === 'custom' && bgmClips.length > 0
-      if (voiceMode !== 'keep') {
-        setProgress('正在按拆解稿合成声音…')
-        const text = speechText || shots.map((s) => s.visual).join('。')
-        let referenceAudioBase64: string | undefined
-        if (voiceMode === 'clone') {
-          if (!voiceFile) throw new Error('请上传一段清晰的人声音频，用于模仿声音')
-          const dataUrl = await readDataUrl(voiceFile)
-          referenceAudioBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
-        }
-        const voicePreset = CUSTOM_UPLOAD_VOICE_PRESETS.find((v) => v.id === voiceId)
-        const spoken = await synthesizeDigitalHumanSpeech({
-          text: text.slice(0, 480),
-          voicePresetId: voiceMode === 'clone' ? 'v-clone' : voiceId,
-          speechRate: voicePreset?.rate ?? 1,
-          speechPitch: voicePreset?.pitch ?? 1,
-          referenceAudioBase64,
-        })
-        if (!spoken.ok) throw new Error(spoken.message)
-        const binary = atob(spoken.audioBase64.replace(/\s/g, ''))
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        narration = new Blob([bytes], { type: spoken.mimeType || 'audio/mpeg' })
-      }
-      if (narration || (bgmMode === 'custom' && bgmClips.length)) {
-        setProgress('正在混合声音和背景乐…')
-        const wav = await buildMixedWav({
-          narration,
-          originalAudio: keepOriginalAudio ? videoBlob : null,
-          clips: bgmMode === 'custom' ? bgmClips : [],
-          volume: bgmVolume,
-          targetSec: est,
-        })
-        videoBlob = await muxVideoAudioOnServer(videoBlob, wav, { timeoutMs: 180_000 })
-      }
+      videoBlob = await mixOnto(videoBlob, est)
       const url = URL.createObjectURL(videoBlob)
       setResultUrl(url)
       setProgress('')
@@ -499,7 +612,7 @@ export default function ShortVideoImitateStudio() {
     <div className="space-y-3 rounded-xl border border-cyan-200/80 bg-cyan-50/40 p-3">
       <p className="text-sm font-medium text-slate-800">模仿视频</p>
       <p className="text-xs leading-relaxed text-slate-600">
-        分享链接只整理成画面、口播、背景音，不会变成参考视频。换人请另外上传 1 分钟内的视频，再选系统人物或全身照，声音和背景音可以沿用原片，也可以换成自己的。
+        分享链接整理成画面、口播、背景音后，可以直接开始模仿，按镜头生成成片。要按原片换人，再上传 1 分钟内的视频。声音和背景音可以沿用成片，也可以换成自己的。
       </p>
       <label className="block text-xs font-medium text-slate-700">
         分享链接（可选）
@@ -538,7 +651,7 @@ export default function ShortVideoImitateStudio() {
               上传视频
             </button>
           )}
-          <p className="text-[11px] text-slate-500">MP4 / MOV，1 分钟以内，48MB 以内。分享链接不会填进这里。</p>
+          <p className="text-[11px] text-slate-500">换人才需要。MP4 / MOV，1 分钟以内，48MB 以内。不上传也可以按镜头直接生成。</p>
         </div>
         <div className="space-y-2">
           <p className="text-xs font-medium text-slate-700">人物</p>
@@ -598,14 +711,24 @@ export default function ShortVideoImitateStudio() {
           )}
         </div>
       </div>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void onAnalyze()}
-        className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200 disabled:opacity-50"
-      >
-        {busy && (progress.includes('拆') || progress.includes('整理') || progress.includes('分析')) ? '拆解中…' : '拆解画面 / 口播 / 背景音'}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void onAnalyze()}
+          className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200 disabled:opacity-50"
+        >
+          {busy && (progress.includes('拆') || progress.includes('整理') || progress.includes('分析')) ? '拆解中…' : '拆解画面 / 口播 / 背景音'}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void onRewrite()}
+          className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200 disabled:opacity-50"
+        >
+          {busy && progress.includes('改写') ? '改写中…' : 'AI 改写口播 / 动作'}
+        </button>
+      </div>
       {shots.length ? (
         <div className="space-y-2">
           {shots.map((s, i) => (
@@ -631,6 +754,12 @@ export default function ShortVideoImitateStudio() {
                 value={s.visual}
                 onChange={(e) => patchShot(s.id, { visual: e.target.value })}
                 placeholder="画面"
+              />
+              <input
+                className="mt-1 w-full rounded border px-2 py-1"
+                value={s.action}
+                onChange={(e) => patchShot(s.id, { action: e.target.value })}
+                placeholder="动作"
               />
               <textarea
                 className="mt-1 w-full rounded border px-2 py-1"
