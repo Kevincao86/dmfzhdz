@@ -103,6 +103,7 @@ async function postAiChat(messages, opts) {
   }
   if (o.taskType) body.taskType = o.taskType
   if (o.temperature != null) body.temperature = o.temperature
+  if (o.modelFamily) body.modelFamily = o.modelFamily
   if (Array.isArray(o.imageDataUrls) && o.imageDataUrls.length) {
     body.imageDataUrls = o.imageDataUrls
   }
@@ -206,6 +207,43 @@ async function fetchSeedanceStatus(taskId) {
     videoUrl: d.videoUrl ? String(d.videoUrl) : '',
     failReason: d.failReason ? String(d.failReason) : '',
   }
+}
+
+async function postMotionImitate(body) {
+  return postSeedanceStart({
+    pipeline: 'motion_imitate',
+    image_base64: body && body.imageBase64,
+    video_base64: body && body.videoBase64,
+    prompt: body && body.prompt ? body.prompt : '',
+  })
+}
+
+function postMuxAudioFile(videoBase64, audioBase64) {
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: ecs.url('/api/meoo-merchant-ai-video-mux-audio'),
+      method: 'POST',
+      timeout: 180000,
+      responseType: 'arraybuffer',
+      header: Object.assign({ 'Content-Type': 'application/json' }, mpAuthHeaders()),
+      data: { videoBase64, audioBase64 },
+      success(res) {
+        const code = Number(res.statusCode) || 0
+        if (code < 200 || code >= 300 || !res.data) {
+          reject(new Error('声音或背景乐混入失败'))
+          return
+        }
+        const filePath = `${wx.env.USER_DATA_PATH}/imitate-${Date.now()}.mp4`
+        wx.getFileSystemManager().writeFile({
+          filePath,
+          data: res.data,
+          success: () => resolve(filePath),
+          fail: (e) => reject(new Error((e && e.errMsg) || '保存成片失败')),
+        })
+      },
+      fail: (e) => reject(new Error((e && e.errMsg) || '混音请求失败')),
+    })
+  })
 }
 
 async function postShortVideoWithFailover(opts) {
@@ -336,6 +374,8 @@ module.exports = {
   fetchRemoteImageDataUrl,
   postDouyinLinkForDh,
   fetchVideoAiConfig,
+  postMotionImitate,
+  postMuxAudioFile,
   postShortVideoWithFailover,
   pollVideoTask,
   fetchSeedanceStatus,

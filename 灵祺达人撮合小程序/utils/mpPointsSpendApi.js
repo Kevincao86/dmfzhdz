@@ -42,7 +42,7 @@ function readLocalPointsBalance() {
   return { balance: 0, known: false }
 }
 
-function estimatePointsForKind(kind, durationSec) {
+function estimatePointsForKind(kind, durationSec, opts) {
   if (kind === 'video') return estimateVideoPoints(durationSec)
   if (kind === 'article' || kind === 'brief' || kind === 'mix_material_analyze') {
     if (kind === 'article') return 2
@@ -51,6 +51,7 @@ function estimatePointsForKind(kind, durationSec) {
   }
   if (kind === 'shortvideo') {
     const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+    if (opts && opts.motionImitate) return Math.max(65, sec * 65)
     return Math.max(80, sec * 80)
   }
   if (kind === 'cloud_edit') return 80
@@ -116,7 +117,7 @@ async function postAuthAction(body) {
 async function checkPointsAffordable(kind, opts) {
   const durationSec = opts && opts.durationSec != null ? opts.durationSec : undefined
   // 本地预估：余额 - 消耗 < 0 则直接失败（不等服务端）
-  const localNeed = estimatePointsForKind(kind, durationSec)
+  const localNeed = estimatePointsForKind(kind, durationSec, opts)
   if (localNeed > 0) {
     try {
       assertLocalPointsEnough(localNeed)
@@ -135,6 +136,7 @@ async function checkPointsAffordable(kind, opts) {
       action: 'mp_ai_points_afford',
       kind,
       durationSec,
+      ...(opts && opts.motionImitate ? { motionImitate: true } : {}),
       ...mpBillingRoleHint.billingRolePayload(),
     })
     const required = Number(data.pointsRequired || 0)
@@ -289,8 +291,8 @@ async function spendVisualStudioImagePoints(opts) {
   return spendPointsKind(kind, opts)
 }
 
-async function assertAddonAffordable(kind, durationSec) {
-  const result = await checkPointsAffordable(kind, { durationSec })
+async function assertAddonAffordable(kind, durationSec, opts) {
+  const result = await checkPointsAffordable(kind, Object.assign({ durationSec: durationSec }, opts || {}))
   if (!result.ok) {
     const err = new Error(result.message || '积分不足')
     err.code = result.error
@@ -328,6 +330,7 @@ async function spendAddonPoints(kind, opts) {
       action: 'mp_ai_points_spend',
       kind,
       durationSec: opts && opts.durationSec != null ? opts.durationSec : undefined,
+      ...(opts && opts.motionImitate ? { motionImitate: true } : {}),
       idempotencyKey: opts && opts.idempotencyKey ? String(opts.idempotencyKey) : undefined,
       note: opts && opts.note ? String(opts.note) : undefined,
       ...mpBillingRoleHint.billingRolePayload(),

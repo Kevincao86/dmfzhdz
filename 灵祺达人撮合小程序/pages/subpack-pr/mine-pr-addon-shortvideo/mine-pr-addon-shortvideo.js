@@ -10,6 +10,97 @@ const upgradeHint = require('../../../utils/mpAddonUpgradeHint.js')
 const videoGenBrief = require('../../../utils/videoGenBrief.js')
 
 const SMART_EFFECT_LABEL = '智能（按内容自动转场）'
+const IMITATE_VIDEO_MAX = 12 * 1024 * 1024
+const IMITATE_AVATAR_BASE =
+  'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/merchant/digital-human/avatars'
+const IMITATE_AVATARS = [
+  { id: 'av-real-7', name: '浩然' },
+  { id: 'av-real-8', name: '思琪' },
+  { id: 'av-real-9', name: '子墨' },
+  { id: 'av-real-10', name: '静雯' },
+  { id: 'av-real-11', name: '嘉伟' },
+  { id: 'av-real-12', name: '雨桐' },
+].map((item) => ({ ...item, url: `${IMITATE_AVATAR_BASE}/${item.id}.jpg?v=20260702b` }))
+const IMITATE_VOICES = [
+  { id: 'v-custom-female', label: '亲和女声', rate: 1, pitch: 1.02 },
+  { id: 'v-custom-male', label: '稳重男声', rate: 0.94, pitch: 0.96 },
+]
+
+function videoDurationSec(filePath) {
+  return new Promise((resolve) => {
+    if (typeof wx.getVideoInfo !== 'function') {
+      resolve(8)
+      return
+    }
+    wx.getVideoInfo({
+      src: filePath,
+      success: (res) => resolve(Math.min(15, Math.max(1, Math.ceil(Number(res.duration) || 8)))),
+      fail: () => resolve(8),
+    })
+  })
+}
+
+function fileBytes(filePath) {
+  return new Promise((resolve) => {
+    wx.getFileInfo({
+      filePath,
+      success: (res) => resolve(Number(res.size) || 0),
+      fail: () => resolve(0),
+    })
+  })
+}
+
+function pickAudioFile() {
+  return new Promise((resolve, reject) => {
+    wx.chooseMessageFile({
+      count: 1,
+      type: 'file',
+      extension: ['mp3', 'wav', 'm4a', 'aac'],
+      success: (res) => {
+        const file = res.tempFiles && res.tempFiles[0]
+        if (!file || !file.path) {
+          reject(new Error('cancel'))
+          return
+        }
+        resolve({ path: file.path, name: file.name || '音频' })
+      },
+      fail: (e) => reject(new Error((e && e.errMsg) || 'cancel')),
+    })
+  })
+}
+
+function shotsFromSpeech(speech, motion) {
+  const lines = String(speech || '')
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const parts = lines.length ? lines.slice(0, 4) : ['']
+  return parts.map((line, i) => ({
+    id: `shot-${Date.now()}-${i}`,
+    visual: `第 ${i + 1} 段画面`,
+    action: i === 0 && motion ? String(motion).slice(0, 80) : '沿用参考动作',
+    speech: line,
+  }))
+}
+
+function parseShotJson(text, speech, motion) {
+  const raw = String(text || '')
+  const start = raw.indexOf('[')
+  const end = raw.lastIndexOf(']')
+  if (start < 0 || end <= start) return shotsFromSpeech(speech, motion)
+  try {
+    const arr = JSON.parse(raw.slice(start, end + 1))
+    if (!Array.isArray(arr) || !arr.length) return shotsFromSpeech(speech, motion)
+    return arr.slice(0, 4).map((item, i) => ({
+      id: `shot-${Date.now()}-${i}`,
+      visual: String((item && item.visual) || `第 ${i + 1} 段画面`),
+      action: String((item && item.action) || '沿用参考动作'),
+      speech: String((item && item.speech) || ''),
+    }))
+  } catch (_) {
+    return shotsFromSpeech(speech, motion)
+  }
+}
 
 function ensureSmartInPresets(presets) {
   const list = Array.isArray(presets) ? presets.map(String).filter(Boolean) : []
@@ -70,6 +161,25 @@ Page({
     showCloudEdit: true,
     pointsHintGenerate: pointsHints.bannerText('shortvideo', 60),
     pointsHintMix: pointsHints.bannerText('cloud_edit'),
+    genKind: 'text',
+    imitateLink: '',
+    imitateVideoPath: '',
+    imitateVideoName: '',
+    imitateDurationSec: 8,
+    imitateNote: '',
+    imitateShots: [],
+    imitateAvatars: IMITATE_AVATARS,
+    imitateVoices: IMITATE_VOICES,
+    characterMode: 'preset',
+    presetId: 'av-real-7',
+    photoPath: '',
+    voiceMode: 'keep',
+    voiceId: 'v-custom-female',
+    voicePath: '',
+    voiceName: '',
+    bgmMode: 'keep',
+    bgmPath: '',
+    bgmName: '',
   },
   onLoad(options) {
     this._initialPane = String((options && options.pane) || '').trim()
@@ -306,6 +416,275 @@ Page({
           progress: '',
         })
       }
+    } catch (e) {
+      this.setData({ err: String(e.message || e).slice(0, 100) })
+    } finally {
+      this.setData({ busy: false })
+    }
+  },
+  onGenKind(e) {
+    const genKind = e.currentTarget.dataset.kind === 'imitate' ? 'imitate' : 'text'
+    this.setData({
+      genKind,
+      err: '',
+      progress: '',
+      resultUrl: '',
+      pointsHintGenerate:
+        genKind === 'imitate'
+          ? pointsHints.bannerText('motion_imitate', 8)
+          : pointsHints.bannerText('shortvideo', Number(this.data.durationSec) || 15),
+    })
+  },
+  onImitateLink(e) {
+    this.setData({ imitateLink: e.detail.value })
+  },
+  async onPickImitateVideo() {
+    try {
+      const picked = await media.chooseVideo()
+      const size = await fileBytes(picked.path)
+      if (size > IMITATE_VIDEO_MAX) {
+        wx.showToast({ title: '请压缩到 12MB 内', icon: 'none' })
+        return
+      }
+      const durationSec = await videoDurationSec(picked.path)
+      this.setData({
+        imitateVideoPath: picked.path,
+        imitateVideoName: '已选择参考视频',
+        imitateDurationSec: durationSec,
+        imitateShots: [],
+        err: '',
+        pointsHintGenerate: pointsHints.bannerText('motion_imitate', durationSec),
+      })
+    } catch (e) {
+      if (!/cancel/i.test(String(e && e.message))) {
+        wx.showToast({ title: '选择视频失败', icon: 'none' })
+      }
+    }
+  },
+  onShotField(e) {
+    const id = e.currentTarget.dataset.id
+    const field = e.currentTarget.dataset.field
+    const value = e.detail.value
+    this.setData({
+      imitateShots: (this.data.imitateShots || []).map((row) => (row.id === id ? { ...row, [field]: value } : row)),
+    })
+  },
+  onMoveShot(e) {
+    const id = e.currentTarget.dataset.id
+    const dir = Number(e.currentTarget.dataset.dir) || 0
+    const rows = (this.data.imitateShots || []).slice()
+    const i = rows.findIndex((row) => row.id === id)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= rows.length) return
+    const [row] = rows.splice(i, 1)
+    rows.splice(j, 0, row)
+    this.setData({ imitateShots: rows })
+  },
+  onRemoveShot(e) {
+    const id = e.currentTarget.dataset.id
+    this.setData({ imitateShots: (this.data.imitateShots || []).filter((row) => row.id !== id) })
+  },
+  onCharacterMode(e) {
+    this.setData({ characterMode: e.currentTarget.dataset.mode === 'upload' ? 'upload' : 'preset' })
+  },
+  onPreset(e) {
+    this.setData({ presetId: e.currentTarget.dataset.id })
+  },
+  async onPickImitatePhoto() {
+    try {
+      const picked = await media.chooseImage()
+      this.setData({ photoPath: picked.path, characterMode: 'upload' })
+    } catch (e) {
+      if (!/cancel/i.test(String(e && e.message))) wx.showToast({ title: '选择照片失败', icon: 'none' })
+    }
+  },
+  onVoiceMode(e) {
+    const mode = e.currentTarget.dataset.mode
+    this.setData({ voiceMode: mode === 'preset' || mode === 'clone' ? mode : 'keep' })
+  },
+  onVoicePreset(e) {
+    this.setData({ voiceId: e.currentTarget.dataset.id })
+  },
+  async onPickVoice() {
+    try {
+      const file = await pickAudioFile()
+      this.setData({ voicePath: file.path, voiceName: file.name })
+    } catch (e) {
+      if (!/cancel/i.test(String(e && e.message))) wx.showToast({ title: '选择音频失败', icon: 'none' })
+    }
+  },
+  onBgmMode(e) {
+    this.setData({ bgmMode: e.currentTarget.dataset.mode === 'custom' ? 'custom' : 'keep' })
+  },
+  async onPickBgm() {
+    try {
+      const file = await pickAudioFile()
+      this.setData({ bgmPath: file.path, bgmName: file.name, bgmMode: 'custom' })
+    } catch (e) {
+      if (!/cancel/i.test(String(e && e.message))) wx.showToast({ title: '选择音乐失败', icon: 'none' })
+    }
+  },
+  async onImitateAnalyze() {
+    const link = String(this.data.imitateLink || '').trim()
+    if (!link && !this.data.imitateVideoPath) {
+      this.setData({ err: '请先上传视频，或粘贴分享链接' })
+      return
+    }
+    this.setData({ busy: true, err: '', progress: '正在拆解…' })
+    try {
+      let speech = ''
+      let motion = ''
+      let note = ''
+      if (link) {
+        const parsed = await addonApi.postDouyinLinkForDh(link)
+        if (!parsed.ok) {
+          this.setData({ err: parsed.message || '链接解析失败' })
+          return
+        }
+        speech = parsed.script || ''
+        motion = parsed.motionInstructions || ''
+        note = parsed.sourceTitle ? `已读取：${parsed.sourceTitle}` : '已读取链接中的口播'
+        if (!this.data.imitateVideoPath) note += '。换人仍需要上传视频文件。'
+      }
+      let shots = shotsFromSpeech(speech, motion)
+      try {
+        const chat = await addonApi.postAiChat(
+          [
+            {
+              role: 'user',
+              content: [
+                '把下面的口播拆成 2 到 4 个镜头。只返回 JSON 数组，每项字段 visual,action,speech。',
+                speech ? `口播：\n${speech.slice(0, 800)}` : '没有口播，请按参考视频写可编辑的镜头说明。',
+                motion ? `动作：${motion.slice(0, 240)}` : '',
+              ]
+                .filter(Boolean)
+                .join('\n'),
+            },
+          ],
+          { provider: 'tokenmix', modelFamily: 'gemini', temperature: 0.2 },
+        )
+        if (chat.ok) shots = parseShotJson(chat.content, speech, motion)
+      } catch (_) {
+        note = note || '已按口播生成可编辑拆解稿'
+      }
+      this.setData({ imitateShots: shots, imitateNote: note, progress: '' })
+    } catch (e) {
+      this.setData({ err: String(e.message || e).slice(0, 100) })
+    } finally {
+      this.setData({ busy: false })
+    }
+  },
+  async onImitateGenerate() {
+    if (!this.data.imitateVideoPath) {
+      this.setData({ err: '请上传参考视频。分享链接只负责拆口播。' })
+      return
+    }
+    if (!(this.data.imitateShots || []).length) {
+      this.setData({ err: '请先拆解参考视频' })
+      return
+    }
+    if (this.data.characterMode === 'upload' && !this.data.photoPath) {
+      this.setData({ err: '请上传一张全身或半身照片' })
+      return
+    }
+    if (this.data.voiceMode === 'clone' && !this.data.voicePath) {
+      this.setData({ err: '请上传一段清晰人声' })
+      return
+    }
+    if (this.data.bgmMode === 'custom' && !this.data.bgmPath) {
+      this.setData({ err: '请上传背景乐，或改回沿用原片' })
+      return
+    }
+    try {
+      const durationSec = Math.min(15, Math.max(1, Number(this.data.imitateDurationSec) || 8))
+      await mpPointsSpend.assertAddonAffordable('shortvideo', durationSec, { motionImitate: true })
+    } catch (e) {
+      this.setData({ err: String(e.message || '积分不足').slice(0, 100) })
+      return
+    }
+    this._cancelled = false
+    this.setData({ busy: true, err: '', progress: '准备人物…', resultUrl: '' })
+    try {
+      let imageBase64 = ''
+      if (this.data.characterMode === 'upload') {
+        imageBase64 = await media.readFileBase64(this.data.photoPath)
+      } else {
+        const avatar = IMITATE_AVATARS.find((item) => item.id === this.data.presetId) || IMITATE_AVATARS[0]
+        imageBase64 = await media.downloadUrlBase64(avatar.url)
+      }
+      const videoBase64 = await media.readFileBase64(this.data.imitateVideoPath)
+      const who =
+        this.data.characterMode === 'upload'
+          ? '上传照片中的人物'
+          : (IMITATE_AVATARS.find((item) => item.id === this.data.presetId) || {}).name || '所选人物'
+      const prompt = [
+        `将参考视频中的主要出镜人物替换为${who}。保持原视频的动作、口型和场景。`,
+        ...(this.data.imitateShots || []).map(
+          (shot, i) => `镜头${i + 1}：${shot.visual}；动作${shot.action}；口播「${shot.speech || ''}」`,
+        ),
+      ].join('')
+      this.setData({ progress: '动作模仿生成中…' })
+      const start = await addonApi.postMotionImitate({
+        imageBase64: imageBase64.indexOf('data:') === 0 ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`,
+        videoBase64: videoBase64.indexOf('data:') === 0 ? videoBase64 : `data:video/mp4;base64,${videoBase64}`,
+        prompt,
+      })
+      if (!start.ok) {
+        this.setData({ err: start.message || '发起失败' })
+        return
+      }
+      const done = await addonApi.pollVideoTask(addonApi.fetchSeedanceStatus, start.taskId, (label) => {
+        if (!this._cancelled) this.setData({ progress: label })
+      })
+      if (!done.ok) {
+        this.setData({ err: done.message || '生成失败' })
+        return
+      }
+      let resultUrl = done.videoUrl
+      let mixNote = ''
+      if (this.data.voiceMode !== 'keep' || this.data.bgmMode === 'custom') {
+        this.setData({ progress: '正在混入声音或背景乐…' })
+        try {
+          let audioBase64 = ''
+          if (this.data.voiceMode !== 'keep') {
+            const voice = IMITATE_VOICES.find((item) => item.id === this.data.voiceId) || IMITATE_VOICES[0]
+            const speech = (this.data.imitateShots || [])
+              .map((shot) => String(shot.speech || '').trim())
+              .filter(Boolean)
+              .join('\n')
+              .slice(0, 480)
+            const ttsBody = {
+              text: speech || '沿用参考视频里的动作和口播。',
+              voicePresetId: this.data.voiceMode === 'clone' ? 'v-clone' : voice.id,
+              speechRate: voice.rate,
+              speechPitch: voice.pitch,
+            }
+            if (this.data.voiceMode === 'clone') {
+              ttsBody.referenceAudioBase64 = await media.readFileBase64(this.data.voicePath)
+            }
+            const spoken = await addonApi.postDigitalHumanTts(ttsBody)
+            if (!spoken.ok) throw new Error(spoken.message || '语音合成失败')
+            audioBase64 = spoken.audioBase64
+            if (this.data.bgmMode === 'custom') mixNote = '人声已替换。背景乐和人声一起混请用星选网页。'
+          } else {
+            audioBase64 = await media.readFileBase64(this.data.bgmPath)
+            mixNote = '已换成上传的背景乐，原片人声不会保留。'
+          }
+          const videoPure = await media.downloadUrlBase64(done.videoUrl)
+          const mixedPath = await addonApi.postMuxAudioFile(videoPure, audioBase64)
+          resultUrl = mixedPath
+        } catch (mixErr) {
+          mixNote = String(mixErr.message || '混音失败，已保留动作模仿成片').slice(0, 40)
+        }
+      }
+      const charge = await mpPointsSpend.spendAddonPoints('shortvideo', {
+        durationSec: Math.min(15, Math.max(1, Number(this.data.imitateDurationSec) || 8)),
+        motionImitate: true,
+        idempotencyKey: `imitate:${start.taskId || Date.now()}`,
+        note: `motion_imitate:${start.taskId || ''}`,
+      })
+      const charged = charge && charge.pointsCharged > 0 ? `生成完成 · 消耗 ${charge.pointsCharged} 积分` : '生成完成'
+      this.setData({ resultUrl, progress: mixNote ? `${charged} · ${mixNote}` : charged })
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 100) })
     } finally {

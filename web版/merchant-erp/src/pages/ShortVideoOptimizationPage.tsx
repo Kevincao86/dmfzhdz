@@ -22,6 +22,7 @@ import ShortVideoInfiniteCanvas, {
   SCRIPT_SHOT_MEDIA_MAX,
 } from '../components/ShortVideoInfiniteCanvas'
 import ShortVideoMusicStudio from '../components/ShortVideoMusicStudio'
+import ShortVideoImitateStudio from '../components/ShortVideoImitateStudio'
 import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
 import { SHORT_VIDEO_CASES, alignCanvasRowsToCaseDuration, canvasLocalLifeCases } from '../lib/shortVideoCaseGallery'
 import type { ShortVideoMusicTrack } from '../lib/shortVideoMusicLibrary'
@@ -229,7 +230,7 @@ function isSeedance20ModelId(id: string): boolean {
   return /seedance-2-0|seedance-2\.0/i.test(t)
 }
 
-function pickSeedanceImages(genMode: 'text' | 'frames' | 'motion', imgs: string[]): {
+function pickSeedanceImages(genMode: 'text' | 'frames' | 'motion' | 'imitate', imgs: string[]): {
   images_base64?: string[]
   seedance_image_mode: 'auto' | 'first_last' | 'reference' | 'first_only'
 } {
@@ -557,7 +558,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const [hint, setHint] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
-  const [genMode, setGenMode] = useState<'text' | 'frames' | 'motion'>('text')
+  const [genMode, setGenMode] = useState<'text' | 'frames' | 'motion' | 'imitate'>('text')
   const [motionVideo, setMotionVideo] = useState<{ file: File; previewUrl: string } | null>(null)
   const [motionPhoto, setMotionPhoto] = useState<{ file: File; previewUrl: string } | null>(null)
   const [motionCharacterHint, setMotionCharacterHint] = useState('')
@@ -737,6 +738,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     if (cfg?.configLoadError) {
       return `视频配置加载失败：${cfg.configLoadError.slice(0, 120)}`
     }
+    if (genMode === 'imitate') return null
     if (genMode === 'motion') {
       if (!(cfg?.motionImitateConfigured || cfg?.omnihumanConfigured)) {
         return '动作模仿需要火山智能视觉 AK/SK。请在轻量配置后重试。'
@@ -1808,6 +1810,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       URL.revokeObjectURL(resultBlobRef.current)
       resultBlobRef.current = null
     }
+    if (genMode === 'imitate') return
     setResultUrl(null)
     const vErr = genMode === 'motion' ? validateEngine() : validateEngine() ?? validateLongform()
     if (vErr) {
@@ -2545,11 +2548,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           </h1>
           <MpAddonPointsRateBadge
             kind="shortvideo"
-            motionImitate={genMode === 'motion'}
+            motionImitate={genMode === 'motion' || genMode === 'imitate'}
           />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
-          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 音乐配乐 · 案例做同款。探店、套餐、活动用技能出片；店员口播请走数字人。多素材拼接请切「AI混剪」。
+          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 模仿视频 · 音乐配乐 · 案例做同款。探店、套餐、活动用技能出片；店员口播请走数字人。多素材拼接请切「AI混剪」。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -2575,7 +2578,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           <p className="text-sm font-semibold text-slate-800">短视频出片 · Agent 同屏</p>
           <MpAddonPointsRateBadge
             kind="shortvideo"
-            motionImitate={genMode === 'motion'}
+            motionImitate={genMode === 'motion' || genMode === 'imitate'}
           />
         </div>
       )}
@@ -2644,9 +2647,11 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                     <p className="text-sm font-semibold text-slate-900">{VIDEO_ENGINE_LABEL_SEEDANCE}</p>
                     <p className="text-xs text-slate-500">
                       {cfgLoaded
-                        ? genMode === 'motion'
+                        ? genMode === 'motion' || genMode === 'imitate'
                           ? cfg?.motionImitateConfigured || cfg?.omnihumanConfigured
-                            ? VIDEO_ENGINE_HINT_MOTION_IMITATE
+                            ? genMode === 'imitate'
+                              ? '模仿视频 · 拆解参考片后换人、换声音、换背景乐'
+                              : VIDEO_ENGINE_HINT_MOTION_IMITATE
                             : '动作模仿未开通'
                           : cfg?.arkKeyConfigured
                             ? genMode === 'frames'
@@ -2706,6 +2711,21 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                     <button
                       type="button"
                       onClick={() => {
+                        resetOutputs()
+                        setGenMode('imitate')
+                      }}
+                      className={cn(
+                        'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                        genMode === 'imitate'
+                          ? 'bg-cyan-600 text-white'
+                          : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50',
+                      )}
+                    >
+                      模仿视频
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         openInfiniteCanvas()
                       }}
                       className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
@@ -2715,7 +2735,9 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                   </div>
                 </div>
 
-                {genMode === 'motion' ? (
+                {genMode === 'imitate' ? (
+                  <ShortVideoImitateStudio />
+                ) : genMode === 'motion' ? (
                   <div className="space-y-3 rounded-xl border border-cyan-200/80 bg-cyan-50/40 p-3">
                     <p className="text-sm font-medium text-slate-800">动作模仿 · 点名角色替换</p>
                     <p className="text-xs leading-relaxed text-slate-600">

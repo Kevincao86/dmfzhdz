@@ -2,7 +2,7 @@
 <scroll-view class="{{lqAccentClass}} addon-page addon-scroll {{lqThemeClass}} foot-col" scroll-y enhanced show-scrollbar="{{false}}" enable-flex style="{{lqPageStyle}}">
   <view class="addon-mini-hero addon-mini-hero--violet">
     <text class="addon-mini-hero__title">短视频 AI 处理</text>
-    <text class="addon-mini-hero__sub">短视频生成 · AI 混剪</text>
+    <text class="addon-mini-hero__sub">短视频生成 · 模仿视频 · AI 混剪</text>
   </view>
   <view class="addon-tabs">
     <view
@@ -18,6 +18,11 @@
   </view>
 
   <block wx:if="{{mainPane === 'generate' && showShortvideo}}">
+    <view class="addon-chips" style="margin-bottom:16rpx">
+      <view class="addon-chip {{genKind !== 'imitate' ? 'addon-chip--on' : ''}}" data-kind="text" bindtap="onGenKind">文生视频</view>
+      <view class="addon-chip {{genKind === 'imitate' ? 'addon-chip--on' : ''}}" data-kind="imitate" bindtap="onGenKind">模仿视频</view>
+    </view>
+    <block wx:if="{{genKind !== 'imitate'}}">
     <view class="addon-card">
       <text class="addon-card__title">视频 AI 引擎</text>
       <text class="addon-card__sub">即梦 / Seedance（与星选平台同源）</text>
@@ -55,6 +60,79 @@
       <text class="addon-err" wx:if="{{err}}">{{err}}</text>
       <text class="addon-progress" wx:if="{{progress}}">{{progress}}</text>
       <button class="addon-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">开始生成</button>
+      <video wx:if="{{resultUrl}}" class="addon-video" src="{{resultUrl}}" controls />
+      <button wx:if="{{resultUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSaveVideo">保存到相册</button>
+    </view>
+    </block>
+    <view class="addon-card" wx:else>
+      <text class="addon-card__title">模仿视频</text>
+      <text class="addon-card__sub">上传参考视频，或粘贴分享链接拆口播。选系统人物或全身照，声音和背景乐可以沿用原片。</text>
+      <view class="addon-points-tip">{{pointsHintGenerate}}</view>
+      <text class="addon-label">分享链接（可选）</text>
+      <textarea class="addon-textarea addon-textarea--sm" placeholder="抖音分享口令或链接，用来拆口播" value="{{imitateLink}}" bindinput="onImitateLink" maxlength="500" />
+      <button class="addon-btn addon-btn--ghost" bindtap="onPickImitateVideo">{{imitateVideoName || '上传参考视频（12MB 内）'}}</button>
+      <text class="addon-card__sub" wx:if="{{imitateNote}}">{{imitateNote}}</text>
+      <button class="addon-btn addon-btn--ghost" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateAnalyze">拆解画面 / 口播 / 背景乐</button>
+      <view wx:for="{{imitateShots}}" wx:key="id" class="imitate-shot">
+        <view class="imitate-shot__head">
+          <text>镜头 {{index + 1}}</text>
+          <text data-id="{{item.id}}" data-dir="-1" bindtap="onMoveShot">上移</text>
+          <text data-id="{{item.id}}" data-dir="1" bindtap="onMoveShot">下移</text>
+          <text data-id="{{item.id}}" bindtap="onRemoveShot">删除</text>
+        </view>
+        <input class="imitate-input" value="{{item.visual}}" data-id="{{item.id}}" data-field="visual" bindinput="onShotField" placeholder="画面" />
+        <input class="imitate-input" value="{{item.action}}" data-id="{{item.id}}" data-field="action" bindinput="onShotField" placeholder="动作" />
+        <textarea class="addon-textarea addon-textarea--sm" value="{{item.speech}}" data-id="{{item.id}}" data-field="speech" bindinput="onShotField" placeholder="口播，可改" maxlength="200" />
+      </view>
+      <text class="addon-label">人物</text>
+      <view class="addon-chips">
+        <view class="addon-chip {{characterMode === 'preset' ? 'addon-chip--on' : ''}}" data-mode="preset" bindtap="onCharacterMode">系统人物</view>
+        <view class="addon-chip {{characterMode === 'upload' ? 'addon-chip--on' : ''}}" data-mode="upload" bindtap="onCharacterMode">上传全身照</view>
+      </view>
+      <scroll-view wx:if="{{characterMode === 'preset'}}" scroll-x class="imitate-avatars" enhanced show-scrollbar="{{false}}">
+        <view
+          wx:for="{{imitateAvatars}}"
+          wx:key="id"
+          class="imitate-avatar {{presetId === item.id ? 'imitate-avatar--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onPreset"
+        >
+          <image class="imitate-avatar__img" src="{{item.url}}" mode="aspectFill" />
+          <text>{{item.name}}</text>
+        </view>
+      </scroll-view>
+      <block wx:else>
+        <button class="addon-btn addon-btn--ghost" bindtap="onPickImitatePhoto">{{photoPath ? '更换全身照' : '上传全身照'}}</button>
+        <image wx:if="{{photoPath}}" class="addon-thumb" src="{{photoPath}}" mode="aspectFill" />
+      </block>
+      <text class="addon-label">声音</text>
+      <view class="addon-chips">
+        <view class="addon-chip {{voiceMode === 'keep' ? 'addon-chip--on' : ''}}" data-mode="keep" bindtap="onVoiceMode">原片人声</view>
+        <view class="addon-chip {{voiceMode === 'preset' ? 'addon-chip--on' : ''}}" data-mode="preset" bindtap="onVoiceMode">系统音色</view>
+        <view class="addon-chip {{voiceMode === 'clone' ? 'addon-chip--on' : ''}}" data-mode="clone" bindtap="onVoiceMode">模仿我的声音</view>
+      </view>
+      <view class="addon-chips" wx:if="{{voiceMode === 'preset'}}">
+        <view
+          wx:for="{{imitateVoices}}"
+          wx:key="id"
+          class="addon-chip {{voiceId === item.id ? 'addon-chip--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onVoicePreset"
+        >{{item.label}}</view>
+      </view>
+      <button wx:if="{{voiceMode === 'clone'}}" class="addon-btn addon-btn--ghost" bindtap="onPickVoice">{{voiceName || '上传清晰人声'}}</button>
+      <text class="addon-label">背景乐</text>
+      <view class="addon-chips">
+        <view class="addon-chip {{bgmMode === 'keep' ? 'addon-chip--on' : ''}}" data-mode="keep" bindtap="onBgmMode">沿用原片</view>
+        <view class="addon-chip {{bgmMode === 'custom' ? 'addon-chip--on' : ''}}" data-mode="custom" bindtap="onBgmMode">自己的音乐</view>
+      </view>
+      <block wx:if="{{bgmMode === 'custom'}}">
+        <text class="addon-card__sub">小程序按整段混入。要裁开头、接多段，或保留原片人声再配乐，请用星选网页。</text>
+        <button class="addon-btn addon-btn--ghost" bindtap="onPickBgm">{{bgmName || '上传一段音乐'}}</button>
+      </block>
+      <text class="addon-err" wx:if="{{err}}">{{err}}</text>
+      <text class="addon-progress" wx:if="{{progress}}">{{progress}}</text>
+      <button class="addon-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateGenerate">开始模仿</button>
       <video wx:if="{{resultUrl}}" class="addon-video" src="{{resultUrl}}" controls />
       <button wx:if="{{resultUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSaveVideo">保存到相册</button>
     </view>
