@@ -14,7 +14,7 @@ import {
   replaceVideoDurationInFlags,
 } from '../lib/videoModelDuration'
 import { appendAspectToVideoPrompt } from '../lib/shortVideoRenderFlags'
-import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../lib/merchantApiAuth'
 import { fetchPrimaryTenantId } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
@@ -473,7 +473,9 @@ async function fetchVideoPostBinary(
     'Content-Type': 'application/json; charset=utf-8',
     ...(await videoAuthHeaders()),
   }
-  for (const url of merchantBinaryApiFetchUrls(path)) {
+  // 成片后处理是大段 base64 JSON。星选 /api 默认 1MB 会 413；优先走已放开体积的 /erp-api，413 再试下一条。
+  let tooLarge: Response | null = null
+  for (const url of videoApiFetchUrls(path, true)) {
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -482,6 +484,15 @@ async function fetchVideoPostBinary(
         signal: videoFetchSignal(timeoutMs),
       })
       const ct = res.headers.get('content-type') ?? ''
+      if (res.status === 413) {
+        const text = await res.text()
+        tooLarge = new Response(text, {
+          status: 413,
+          statusText: res.statusText,
+          headers: { 'Content-Type': ct || 'text/plain; charset=utf-8' },
+        })
+        continue
+      }
       if (res.status === 404) continue
       if (!res.ok) {
         const text = await res.text()
@@ -504,7 +515,7 @@ async function fetchVideoPostBinary(
       /* try next candidate */
     }
   }
-  return null
+  return tooLarge
 }
 
 async function fetchVideoPostOnUrls(

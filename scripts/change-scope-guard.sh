@@ -1112,6 +1112,7 @@ arkVideoModelDiscovery
 arkVideoModelRouter
 merchantVideoAiGateway
 videoAiApi
+ecs-nginx-talent-fulfillment
 digitalHumanDouyinLinkCore
 digitalHumanTtsApi
 dh-seedance-r2v-local-smoke
