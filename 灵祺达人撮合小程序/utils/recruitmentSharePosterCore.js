@@ -99,12 +99,23 @@ function platformAccent(platform) {
   return PLATFORM_ACCENTS[platform] || '#E63946'
 }
 
+function keepDetailBreaks(text) {
+  return String(text || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/([^\n])【/g, '$1\n【')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 400)
+}
+
 function extractRecruitDetailText(order, info) {
   const meta = order && order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
   const fromMeta = String(meta.recruitDetail || '').trim()
-  if (fromMeta) return fromMeta.replace(/\s+/g, ' ').slice(0, 160)
+  if (fromMeta) return keepDetailBreaks(fromMeta)
   const fromLine = pickLineValue(info, '招募详情')
-  if (fromLine) return fromLine.replace(/\s+/g, ' ').slice(0, 160)
+  if (fromLine) return keepDetailBreaks(fromLine)
   const skip = [
     '招募平台',
     '费用模式',
@@ -124,10 +135,8 @@ function extractRecruitDetailText(order, info) {
       if (!line) return false
       return !skip.some((label) => new RegExp(`^${label}[:：]`).test(line))
     })
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return body.slice(0, 160)
+    .join('\n')
+  return keepDetailBreaks(body)
 }
 
 function resolvePosterThemeColor(design) {

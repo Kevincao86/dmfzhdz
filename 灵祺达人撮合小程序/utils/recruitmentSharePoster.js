@@ -245,6 +245,17 @@ function drawTagChips(ctx, labels, x, y, maxWidth) {
   return y + chipH / 2 + 8
 }
 
+function readableOnLight(hex) {
+  const m = String(hex || '').trim().match(/^#?([0-9a-f]{6})$/i)
+  if (!m) return '#0F172A'
+  const n = parseInt(m[1], 16)
+  const r = (n >> 16) & 255
+  const g = (n >> 8) & 255
+  const b = n & 255
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.55 ? '#0F172A' : `#${m[1]}`
+}
+
 function drawFooterPanel(ctx, x, y, w, h, panel, design) {
   const slogan = String((panel && panel.slogan) || '').trim()
   const highlights = Array.isArray(panel && panel.highlights)
@@ -253,14 +264,10 @@ function drawFooterPanel(ctx, x, y, w, h, panel, design) {
   if (!slogan && !highlights.length) return
 
   const accent = design.accentColor || '#6366F1'
-  const accentLight = design.accentLight || '#EEF2FF'
 
   roundRect(ctx, x, y, w, h, 18)
-  ctx.save()
-  ctx.globalAlpha = design && design.shareTheme ? 0.55 : 1
-  ctx.fillStyle = accentLight
+  ctx.fillStyle = 'rgba(255,255,255,0.94)'
   ctx.fill()
-  ctx.restore()
   roundRect(ctx, x, y, w, h, 18)
   ctx.strokeStyle = accent + '33'
   ctx.lineWidth = 2
@@ -282,7 +289,7 @@ function drawFooterPanel(ctx, x, y, w, h, panel, design) {
   if (slogan) {
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    ctx.fillStyle = accent
+    ctx.fillStyle = readableOnLight(accent)
     ctx.font = 'bold 26px sans-serif'
     const lines = wrapLines(ctx, slogan, w - 32, 2)
     for (let i = 0; i < lines.length; i += 1) {
@@ -309,7 +316,7 @@ function drawFooterPanel(ctx, x, y, w, h, panel, design) {
       ctx.strokeStyle = accent + '44'
       ctx.lineWidth = 1
       ctx.stroke()
-      ctx.fillStyle = '#334155'
+      ctx.fillStyle = '#0F172A'
       ctx.textAlign = 'center'
       ctx.fillText(text, chipX + chipW / 2, chipY + 1)
       chipX += chipW + gap
@@ -541,8 +548,9 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   const qrY = pad + cardH - qrFrameSize - 68
   const detailX = pad + 24
   const detailMaxW = cardW - 48
-  const detailMaxLines = Math.max(2, Math.min(4, Math.floor((qrY - y - 24) / 32)))
-  if (input.detailText && detailMaxLines >= 2 && qrY - y > 48) {
+  const detailBudget = qrY - (y + 12) - 16
+  const detailMaxLines = Math.min(8, Math.floor((detailBudget - 36) / 32))
+  if (input.detailText && detailMaxLines >= 1) {
     y = drawDetailSection(ctx, input.detailText, detailX, y + 12, detailMaxW, detailMaxLines)
   }
   const panelX = pad + 24

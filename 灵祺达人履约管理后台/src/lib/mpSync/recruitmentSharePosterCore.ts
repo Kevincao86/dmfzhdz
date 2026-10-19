@@ -198,15 +198,26 @@ function normalizeFooterPanel(raw: unknown, fallback: PosterFooterPanel): Poster
   }
 }
 
+function keepDetailBreaks(text: string): string {
+  return String(text || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    .replace(/([^\n])【/g, '$1\n【')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, 400)
+}
+
 function extractRecruitDetailText(order: Record<string, unknown>, info: string): string {
   const meta =
     order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
       ? (order.mpPublishMeta as Record<string, unknown>)
       : {}
   const fromMeta = String(meta.recruitDetail || '').trim()
-  if (fromMeta) return fromMeta.replace(/\s+/g, ' ').slice(0, 160)
+  if (fromMeta) return keepDetailBreaks(fromMeta)
   const fromLine = pickLineValue(info, '招募详情')
-  if (fromLine) return fromLine.replace(/\s+/g, ' ').slice(0, 160)
+  if (fromLine) return keepDetailBreaks(fromLine)
   const skip = new Set([
     '招募平台',
     '费用模式',
@@ -226,10 +237,8 @@ function extractRecruitDetailText(order: Record<string, unknown>, info: string):
       if (!line) return false
       return !Array.from(skip).some((label) => new RegExp(`^${label}[:：]`).test(line))
     })
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return body.slice(0, 160)
+    .join('\n')
+  return keepDetailBreaks(body)
 }
 
 export function resolvePosterThemeColor(design: PosterDesignTokens): string {
