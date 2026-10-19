@@ -1364,8 +1364,6 @@ const TALENT_VISIT_FIELDS: Array<{ key: FieldKey; label: string; placeholder: st
 const TALENT_VISIT_KIND =
   '探店达人真人出镜竖屏短剧。主角是到店体验的达人，不是老板独白，不是客人躺平。前 3 秒先亮人设或预期反差，接着门头进店，再亲自体验并给真实反应，最后说清适不适合谁。使用场景只写约会、下班犒劳、朋友局、带家人、一个人也值、第一次到店。禁止职场豪门重生，禁止漫画分格，禁止产品参数广告片，禁止仙侠古装。'
 
-const TALENT_VISIT_BEATS = ['亮人设', '到店核验', '体验打脸', '到店结论'] as const
-
 function presentWorld(world: (typeof WORLDS)[number], talentVisit: boolean) {
   if (!talentVisit) return world
   const copy = TALENT_VISIT_WORLD_COPY[world.id as (typeof TALENT_VISIT_WORLD_IDS)[number]]
@@ -1525,7 +1523,7 @@ function resolveCustomFormula(sceneId: string, draft: CustomHookDraft, fields: P
     id: CUSTOM_FORMULA_ID,
     scene: sceneId,
     name: draft.name.trim() || '自定义钩子',
-    hint: draft.hint.trim() || '自行填写名称、四拍与下方故事',
+    hint: draft.hint.trim() || '自行填写名称与下方故事',
     beats: [
       draft.beats[0].trim() || DEFAULT_CUSTOM_HOOK.beats[0],
       draft.beats[1].trim() || DEFAULT_CUSTOM_HOOK.beats[1],
@@ -4645,7 +4643,7 @@ export default function ShortDramaPage({
                     )}
                   >
                     <span className="block text-sm font-medium">自定义</span>
-                    <span className="mt-0.5 block text-[11px] text-slate-500">自己写钩子名与四拍</span>
+                    <span className="mt-0.5 block text-[11px] text-slate-500">自己写钩子名</span>
                   </button>
                 </div>
                 {formulaId === CUSTOM_FORMULA_ID ? (
@@ -4677,35 +4675,6 @@ export default function ShortDramaPage({
                           placeholder="可选，给自己看的备注"
                         />
                       </label>
-                    </div>
-                    <div>
-                      <p className="mb-1.5 text-xs font-medium text-slate-700">
-                        {talentVisit
-                          ? '四拍结构（亮人设 → 到店核验 → 体验打脸 → 到店结论）'
-                          : '四拍结构（开场 → 升级 → 反转 → 收尾）'}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {(talentVisit ? TALENT_VISIT_BEATS : (['开场', '升级', '反转', '收尾'] as const)).map((label, i) => (
-                          <label key={label} className="space-y-1">
-                            <span className="text-[10px] font-medium text-cyan-800">{i + 1}. {label}</span>
-                            <input
-                              className={fieldCls}
-                              disabled={busy}
-                              value={customHook.beats[i]}
-                              onChange={(e) => {
-                                clearTrial()
-                                const v = e.target.value
-                                setCustomHook((p) => {
-                                  const beats: [string, string, string, string] = [...p.beats]
-                                  beats[i] = v
-                                  return { ...p, beats }
-                                })
-                              }}
-                              placeholder={DEFAULT_CUSTOM_HOOK.beats[i]}
-                            />
-                          </label>
-                        ))}
-                      </div>
                     </div>
                     <p className="text-[11px] leading-snug text-slate-500">
                       下方可改角色、对白、冲突。先确认角色形象，再生成一句话故事。
