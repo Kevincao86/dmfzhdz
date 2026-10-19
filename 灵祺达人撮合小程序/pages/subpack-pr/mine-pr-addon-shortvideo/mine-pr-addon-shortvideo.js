@@ -477,7 +477,7 @@ Page({
       resultUrl: '',
       pointsHintGenerate:
         genKind === 'imitate'
-          ? pointsHints.bannerText('shortvideo', shotPlanSec([]))
+          ? '消耗提醒：按镜头生成 80 积分/秒；上传参考视频换人 50 积分/秒。成片成功后按实际秒数扣。'
           : pointsHints.bannerText('shortvideo', Number(this.data.durationSec) || 15),
     })
   },
@@ -503,7 +503,7 @@ Page({
         imitateDurationSec: durationSec,
         imitateShots: [],
         err: '',
-        pointsHintGenerate: pointsHints.bannerText('motion_imitate', durationSec),
+        pointsHintGenerate: `消耗提醒：上传参考视频换人 50 积分/秒；当前约 ${Math.max(1, Math.ceil(durationSec))} 秒。`,
       })
     } catch (e) {
       if (!/cancel/i.test(String(e && e.message))) {
@@ -708,7 +708,7 @@ Page({
       ? Math.min(IMITATE_VIDEO_MAX_SEC, Math.max(1, Number(this.data.imitateDurationSec) || 8))
       : shotPlanSec(this.data.imitateShots)
     try {
-      await mpPointsSpend.assertAddonAffordable('shortvideo', durationSec, { motionImitate: hasVideo })
+      await mpPointsSpend.assertAddonAffordable('imitate', durationSec, { motionImitate: hasVideo })
     } catch (e) {
       this.setData({ err: String(e.message || '积分不足').slice(0, 100) })
       return
@@ -809,8 +809,10 @@ Page({
           mixNote = String(mixErr.message || '混音失败，已保留动作模仿成片').slice(0, 40)
         }
       }
-      const charge = await mpPointsSpend.spendAddonPoints('shortvideo', {
-        durationSec,
+      const probedBill = await videoInfoDuration(done.videoUrl)
+      const billedSec = probedBill > 0.4 ? probedBill : durationSec
+      const charge = await mpPointsSpend.spendAddonPoints('imitate', {
+        durationSec: billedSec,
         motionImitate: hasVideo,
         idempotencyKey: `imitate:${start.taskId || Date.now()}`,
         note: `${hasVideo ? 'motion_imitate' : 'storyboard'}:${start.taskId || ''}`,

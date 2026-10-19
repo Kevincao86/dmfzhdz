@@ -890,6 +890,7 @@ export type RegistryMpAiPointsSpendEntry = {
     | 'brief'
     | 'mix_material_analyze'
     | 'shortvideo'
+    | 'imitate'
     | 'cloud_edit'
     | 'cloud_edit_smart'
     | 'digital_human'

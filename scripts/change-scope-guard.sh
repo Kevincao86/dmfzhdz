@@ -1892,6 +1892,13 @@ PAT
       cat <<'PAT'
 web版/merchant-erp/src/components/ShortVideoImitateStudio.tsx
 web版/merchant-erp/src/pages/ShortVideoOptimizationPage.tsx
+web版/merchant-erp/src/lib/mpPointsEconomics.ts
+web版/merchant-erp/src/lib/mpAiPointsSpendCore.ts
+web版/merchant-erp/src/lib/mpMembershipQuota.ts
+web版/merchant-erp/src/services/mpAddonPointsSpendClient.ts
+web版/merchant-erp/src/components/MpAddonPointsRateBadge.tsx
+web版/merchant-erp/src/lib/opsRegistryTypes.ts
+web版/merchant-erp/src/services/tenantBillingClient.ts
 灵祺达人撮合小程序/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo.wxml
 灵祺达人撮合小程序/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo.js
 灵祺达人撮合小程序/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo.wxss

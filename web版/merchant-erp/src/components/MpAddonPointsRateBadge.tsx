@@ -5,7 +5,7 @@ import {
 } from '../lib/mpPointsEconomics'
 
 type Props = {
-  kind: Extract<MpPointsUsageKind, 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human'>
+  kind: Extract<MpPointsUsageKind, 'shortvideo' | 'imitate' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human'>
   motionImitate?: boolean
   className?: string
 }

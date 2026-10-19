@@ -2547,8 +2547,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
             短视频 AI 创作台
           </h1>
           <MpAddonPointsRateBadge
-            kind="shortvideo"
-            motionImitate={genMode === 'motion' || genMode === 'imitate'}
+            kind={genMode === 'imitate' ? 'imitate' : 'shortvideo'}
+            motionImitate={genMode === 'motion'}
           />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
@@ -2577,8 +2577,8 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm font-semibold text-slate-800">短视频出片 · Agent 同屏</p>
           <MpAddonPointsRateBadge
-            kind="shortvideo"
-            motionImitate={genMode === 'motion' || genMode === 'imitate'}
+            kind={genMode === 'imitate' ? 'imitate' : 'shortvideo'}
+            motionImitate={genMode === 'motion'}
           />
         </div>
       )}

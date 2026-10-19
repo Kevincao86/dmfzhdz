@@ -41,6 +41,20 @@ export const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 416
 /** 动作模仿成片最低扣费（约 4 秒，65 积分/秒） */
 export const MP_POINTS_MOTION_IMITATE_MIN_CHARGE = 260
 
+/**
+ * 模仿视频 · 按镜头生成。视觉云有声成片成本约 ¥0.80/秒。
+ * 60% 毛利：1 积分覆盖 ¥0.01 成本 → 80 积分/秒。
+ */
+export const MP_POINTS_IMITATE_STORYBOARD_PER_SEC = 80
+export const MP_POINTS_IMITATE_STORYBOARD_MIN_CHARGE = 400
+
+/**
+ * 模仿视频 · 上传参考视频换人。动作模仿成本约 ¥0.50/秒。
+ * 60% 毛利 → 50 积分/秒。
+ */
+export const MP_POINTS_IMITATE_MOTION_PER_SEC = 50
+export const MP_POINTS_IMITATE_MOTION_MIN_CHARGE = 200
+
 /** @deprecated 请用 MP_POINTS_SHORTVIDEO_MIN_CHARGE / MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE */
 export const MP_POINTS_ADDON_VIDEO_MIN_CHARGE = MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE
 
@@ -162,6 +176,7 @@ export type MpPointsUsageKind =
   | 'brief'
   | 'mix_material_analyze'
   | 'shortvideo'
+  | 'imitate'
   | 'cloud_edit'
   | 'cloud_edit_smart'
   | 'digital_human'
@@ -185,6 +200,7 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   brief: 'AI爆款Brief生成',
   mix_material_analyze: 'AI 混剪素材分析',
   shortvideo: '短视频 AI 处理',
+  imitate: '模仿视频',
   cloud_edit: '灵祺 AI 云剪',
   cloud_edit_smart: '智能一键成片',
   digital_human: '数字人口播',
@@ -215,6 +231,7 @@ export function isMpPointsDurationKind(kind: MpPointsUsageKind): boolean {
   return (
     kind === 'video' ||
     kind === 'shortvideo' ||
+    kind === 'imitate' ||
     kind === 'cloud_edit' ||
     kind === 'cloud_edit_smart' ||
     kind === 'digital_human'
@@ -223,9 +240,10 @@ export function isMpPointsDurationKind(kind: MpPointsUsageKind): boolean {
 
 export function isMpPointsAddonGenerationKind(
   kind: MpPointsUsageKind,
-): kind is 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human' {
+): kind is 'shortvideo' | 'imitate' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human' {
   return (
     kind === 'shortvideo' ||
+    kind === 'imitate' ||
     kind === 'cloud_edit' ||
     kind === 'cloud_edit_smart' ||
     kind === 'digital_human'
@@ -244,6 +262,7 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'brief' ||
     k === 'mix_material_analyze' ||
     k === 'shortvideo' ||
+    k === 'imitate' ||
     k === 'cloud_edit' ||
     k === 'cloud_edit_smart' ||
     k === 'digital_human' ||
@@ -293,6 +312,10 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motion
   if (kind === 'cloud_edit') {
     return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
   }
+  if (kind === 'imitate') {
+    const rate = opts?.motionImitate ? MP_POINTS_IMITATE_MOTION_PER_SEC : MP_POINTS_IMITATE_STORYBOARD_PER_SEC
+    return `${rate} 积分/秒`
+  }
   const rate = mpPointsPerSecForKind(kind)
   if (rate != null) {
     if (opts?.motionImitate) {
@@ -304,12 +327,18 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motion
 }
 
 function mpPointsCostForAddonDuration(
-  kind: 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human',
+  kind: 'shortvideo' | 'imitate' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human',
   durationSec: number,
   opts?: { motionImitate?: boolean },
 ): number {
   if (kind === 'cloud_edit') return MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+  if (kind === 'imitate') {
+    if (opts?.motionImitate) {
+      return Math.max(MP_POINTS_IMITATE_MOTION_MIN_CHARGE, sec * MP_POINTS_IMITATE_MOTION_PER_SEC)
+    }
+    return Math.max(MP_POINTS_IMITATE_STORYBOARD_MIN_CHARGE, sec * MP_POINTS_IMITATE_STORYBOARD_PER_SEC)
+  }
   if (opts?.motionImitate && (kind === 'shortvideo' || kind === 'digital_human')) {
     return Math.max(MP_POINTS_MOTION_IMITATE_MIN_CHARGE, sec * MP_POINTS_MOTION_IMITATE_PER_SEC)
   }
@@ -327,6 +356,7 @@ function mpPointsCostForAddonDuration(
 export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: MpPointsCostOpts): number {
   if (
     kind === 'shortvideo' ||
+    kind === 'imitate' ||
     kind === 'cloud_edit' ||
     kind === 'cloud_edit_smart' ||
     kind === 'digital_human'
@@ -521,6 +551,7 @@ export function formatComplianceBillingSuffix(res: {
   }
   if (
     res.billingKind === 'shortvideo' ||
+    res.billingKind === 'imitate' ||
     res.billingKind === 'cloud_edit' ||
     res.billingKind === 'cloud_edit_smart' ||
     res.billingKind === 'digital_human' ||

@@ -8,7 +8,15 @@ import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
 import { extractVideoFramesAtTimesPureBase64 } from '../lib/videoFrameUtils'
 import { postAiChat } from '../services/ai/aiClient'
 import { synthesizeDigitalHumanSpeech } from '../services/digitalHumanTtsApi'
-import { checkMpAddonPointsAffordable } from '../services/mpAddonPointsSpendClient'
+import {
+  checkMpAddonPointsAffordable,
+  formatMpAddonPointsSpendHint,
+  spendMpAddonPoints,
+} from '../services/mpAddonPointsSpendClient'
+import {
+  MP_POINTS_IMITATE_MOTION_PER_SEC,
+  MP_POINTS_IMITATE_STORYBOARD_PER_SEC,
+} from '../lib/mpPointsEconomics'
 import { runDhMotionImitateJob } from '../lib/dhOmniHumanVideoApi'
 import {
   downloadVideoUrlAsBlob,
@@ -506,6 +514,24 @@ export default function ShortVideoImitateStudio() {
     }
   }
 
+  async function billImitate(videoSec: number, motion: boolean): Promise<void> {
+    const sec = Math.max(1, Math.ceil(videoSec || 1))
+    try {
+      const charge = await spendMpAddonPoints({
+        kind: 'imitate',
+        durationSec: sec,
+        motionImitate: motion,
+        idempotencyKey: `imitate:${Date.now()}`,
+        note: motion ? 'imitate:motion' : 'imitate:storyboard',
+      })
+      if (!charge) return
+      const hint = formatMpAddonPointsSpendHint('imitate', charge, sec).replace(/^ · /, '')
+      if (hint) setProgress(hint)
+    } catch (e) {
+      setErr(explainImitateError(e instanceof Error ? e.message : '成片已生成，积分扣减失败'))
+    }
+  }
+
   async function mixOnto(videoBlob: Blob, videoSec: number): Promise<Blob> {
     let narration: Blob | null = null
     const keepOriginalAudio = voiceMode === 'keep' && bgmMode === 'custom' && bgmClips.length > 0
@@ -564,7 +590,7 @@ export default function ShortVideoImitateStudio() {
     }
     if (!videoFile) {
       const est = storyboardDurationSec(shots)
-      const afford = await checkMpAddonPointsAffordable('shortvideo', est)
+      const afford = await checkMpAddonPointsAffordable('imitate', est)
       if (!afford.ok) {
         setErr(afford.message || '积分不足')
         return
@@ -588,14 +614,21 @@ export default function ShortVideoImitateStudio() {
           return
         }
         const needsMix = voiceMode !== 'keep' || (bgmMode === 'custom' && bgmClips.length > 0)
+        let billedSec = est
         if (!needsMix) {
           setResultUrl(job.videoUrl)
+          try {
+            const videoBlob = await downloadVideoUrlAsBlob(job.videoUrl, { maxAttempts: 2 })
+            billedSec = (await probeVideoDurationSec(videoBlob).catch(() => 0)) || est
+          } catch {
+            billedSec = est
+          }
         } else {
           const videoBlob = await downloadVideoUrlAsBlob(job.videoUrl, { maxAttempts: 3 })
-          const videoSec = (await probeVideoDurationSec(videoBlob).catch(() => 0)) || est
-          setResultUrl(URL.createObjectURL(await mixOnto(videoBlob, videoSec)))
+          billedSec = (await probeVideoDurationSec(videoBlob).catch(() => 0)) || est
+          setResultUrl(URL.createObjectURL(await mixOnto(videoBlob, billedSec)))
         }
-        setProgress('')
+        await billImitate(billedSec, false)
       } catch (e) {
         setErr(explainImitateError(e instanceof Error ? e.message : '模仿生成失败'))
       } finally {
@@ -612,7 +645,7 @@ export default function ShortVideoImitateStudio() {
       return
     }
     const est = Math.min(VIDEO_MAX_SEC, Math.max(1, Math.ceil(durationSec || 8)))
-    const afford = await checkMpAddonPointsAffordable('shortvideo', est, { motionImitate: true })
+    const afford = await checkMpAddonPointsAffordable('imitate', est, { motionImitate: true })
     if (!afford.ok) {
       setErr(afford.message || '积分不足')
       return
@@ -649,7 +682,7 @@ export default function ShortVideoImitateStudio() {
       videoBlob = await mixOnto(videoBlob, videoSec)
       const url = URL.createObjectURL(videoBlob)
       setResultUrl(url)
-      setProgress('')
+      await billImitate(videoSec, true)
     } catch (e) {
       setErr(explainImitateError(e instanceof Error ? e.message : '模仿生成失败'))
     } finally {
@@ -661,7 +694,7 @@ export default function ShortVideoImitateStudio() {
     <div className="space-y-3 rounded-xl border border-cyan-200/80 bg-cyan-50/40 p-3">
       <p className="text-sm font-medium text-slate-800">模仿视频</p>
       <p className="text-xs leading-relaxed text-slate-600">
-        分享链接整理成画面、口播、背景音后，可以直接开始模仿，按镜头生成成片。要按原片换人，再上传 1 分钟内的视频。声音和背景音可以沿用成片，也可以换成自己的。
+        分享链接整理成画面、口播、背景音后，可以直接开始模仿，按镜头生成成片。要按原片换人，再上传 1 分钟内的视频。声音和背景音可以沿用成片，也可以换成自己的。成片成功后按实际秒数扣积分：按镜头生成 {MP_POINTS_IMITATE_STORYBOARD_PER_SEC} 积分/秒，上传参考视频换人 {MP_POINTS_IMITATE_MOTION_PER_SEC} 积分/秒。
       </p>
       <label className="block text-xs font-medium text-slate-700">
         分享链接（可选）

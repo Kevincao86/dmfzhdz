@@ -282,6 +282,7 @@ export function spendMpAiPointsWithSnapshot(
   const target = resolveRegistryTargetIdForAccount(data, account, role)
   const split = computeAccountQuotaSpendSplit(data, account, opts.kind, {
     durationSec: opts.durationSec,
+    motionImitate: opts.motionImitate,
     roleHint: opts.roleHint,
   })
 
@@ -375,7 +376,11 @@ export function assertMpAiPointsAffordable(
     }
   }
   // 配额拆分仅作记账辅助；计价以 estimate.required 为准
-  const split = computeAccountQuotaSpendSplit(data, account, kind, opts)
+  const split = computeAccountQuotaSpendSplit(data, account, kind, {
+    durationSec: opts?.durationSec,
+    motionImitate: opts?.motionImitate,
+    roleHint: opts?.roleHint,
+  })
   const points = Math.max(estimate.required, split.pointsRequired)
   if (balance < points) {
     return {

@@ -249,7 +249,7 @@ export function computeQuotaSpendSplit(
   kind: MpPointsUsageKind,
   quotaCell: TierCell,
   usedBefore: number,
-  opts?: { durationSec?: number },
+  opts?: { durationSec?: number; motionImitate?: boolean },
 ): MpQuotaSpendSplit {
   const quotaKey = quotaKeyForUsageKind(role, kind)
   if (kind === 'brief') {
@@ -289,7 +289,7 @@ export function computeQuotaSpendSplit(
     return {
       quotaKey,
       quotaUnitsUsed: 0,
-      pointsRequired: mpPointsCostForUsage(kind, { durationSec }),
+      pointsRequired: mpPointsCostForUsage(kind, { durationSec, motionImitate: opts?.motionImitate }),
       quotaApplied: false,
     }
   }
@@ -354,7 +354,7 @@ export function computeAccountQuotaSpendSplit(
   data: RegistrySnapshot,
   account: MpAccountRow,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number; roleHint?: MpLibraryRole | null },
+  opts?: { durationSec?: number; motionImitate?: boolean; roleHint?: MpLibraryRole | null },
 ): MpQuotaSpendSplit {
   const role = resolvePointsLibraryRole(data, account, opts)
   const target = resolveRegistryTargetIdForAccount(data, account, role)

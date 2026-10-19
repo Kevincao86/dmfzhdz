@@ -7,7 +7,7 @@ import {
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { checkErpPointsAffordable, spendErpPointsForUsage } from './tenantBillingClient'
 
-export type MpAddonGenerationKind = 'shortvideo' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human'
+export type MpAddonGenerationKind = 'shortvideo' | 'imitate' | 'cloud_edit' | 'cloud_edit_smart' | 'digital_human'
 
 export type MpAddonPointsSpendResult = {
   pointsCharged: number
@@ -199,6 +199,7 @@ export function formatMpAddonPointsSpendHint(
       : ''
   const labels: Record<MpAddonGenerationKind, string> = {
     shortvideo: '短视频 AI',
+    imitate: '模仿视频',
     cloud_edit: '云剪',
     cloud_edit_smart: '智能一键成片',
     digital_human: '数字人口播',

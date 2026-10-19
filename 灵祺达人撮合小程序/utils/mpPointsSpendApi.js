@@ -54,6 +54,11 @@ function estimatePointsForKind(kind, durationSec, opts) {
     if (opts && opts.motionImitate) return Math.max(65, sec * 65)
     return Math.max(80, sec * 80)
   }
+  if (kind === 'imitate') {
+    const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+    if (opts && opts.motionImitate) return Math.max(200, sec * 50)
+    return Math.max(400, sec * 80)
+  }
   if (kind === 'cloud_edit') return 80
   if (kind === 'cloud_edit_smart') {
     const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
