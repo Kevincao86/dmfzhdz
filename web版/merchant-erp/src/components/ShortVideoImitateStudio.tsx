@@ -42,6 +42,19 @@ function uid() {
   return `im-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 }
 
+function captionFromShare(text: string): string {
+  const m = text.match(/】\s*([\s\S]*?)(?:https?:\/\/|$)/)
+  return (m?.[1] || '').replace(/\s+/g, ' ').trim().slice(0, 180)
+}
+
+function explainImitateError(raw: string): string {
+  const t = raw.replace(/^upstream_error\s*[—\-:]\s*/i, '').trim()
+  if (/overdue balance|account has an overdue|欠费|余额不足/i.test(raw)) {
+    return '豆包账户欠费，分享链接里的视频没有拉下来。请点「上传视频」选择本地文件；充值火山方舟后可以再拆链接。'
+  }
+  return t || '拆解失败'
+}
+
 function readDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const fr = new FileReader()
@@ -261,7 +274,12 @@ export default function ShortVideoImitateStudio() {
         setProgress('正在读取分享链接里的口播…')
         const parsed = await parseDouyinLinkForDigitalHuman(link.trim())
         if (!parsed.ok) {
-          setErr(parsed.message || '链接解析失败')
+          const caption = captionFromShare(link)
+          if (caption) {
+            setShots(fallbackShots(durationSec || 8, caption))
+            setLinkNote('已按分享文案写了一版镜头，可直接改。')
+          }
+          setErr(explainImitateError(parsed.message || '链接解析失败'))
           return
         }
         speechHint = parsed.script || ''
@@ -332,7 +350,7 @@ export default function ShortVideoImitateStudio() {
       }
       setShots(parseShots(text, dur, speechHint))
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '拆解失败')
+      setErr(explainImitateError(e instanceof Error ? e.message : '拆解失败'))
     } finally {
       setBusy(false)
       setProgress('')
@@ -413,7 +431,7 @@ export default function ShortVideoImitateStudio() {
         onProgress: (label) => setProgress(label),
       })
       if (!job.ok) {
-        setErr(formatVideoAiUserError(job.message))
+        setErr(explainImitateError(formatVideoAiUserError(job.message)))
         return
       }
       let videoBlob = await fetch(job.videoUrl).then((r) => r.blob())
@@ -457,7 +475,7 @@ export default function ShortVideoImitateStudio() {
       setResultUrl(url)
       setProgress('')
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '模仿生成失败')
+      setErr(explainImitateError(e instanceof Error ? e.message : '模仿生成失败'))
     } finally {
       setBusy(false)
     }
@@ -503,10 +521,14 @@ export default function ShortVideoImitateStudio() {
               onClick={() => videoInputRef.current?.click()}
               className="flex h-28 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white text-sm text-slate-500"
             >
-              上传视频
+              {link.trim() ? '链接没变成视频，请上传' : '上传视频'}
             </button>
           )}
-          <p className="text-[11px] text-slate-500">MP4 / MOV，约 3～15 秒，12MB 以内。</p>
+          <p className="text-[11px] text-slate-500">
+            {link.trim() && !videoFile
+              ? '分享链接只带口播。参考视频请从相册上传 MP4 / MOV，约 3～15 秒，12MB 以内。'
+              : 'MP4 / MOV，约 3～15 秒，12MB 以内。'}
+          </p>
         </div>
         <div className="space-y-2">
           <p className="text-xs font-medium text-slate-700">人物</p>

@@ -3124,7 +3124,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                   </>
                 )}
 
-                {(hint || err) && (
+                {genMode !== 'imitate' && (hint || err) && (
                   <div
                     className={cn(
                       'rounded-lg px-3 py-2.5 text-sm',
@@ -3138,7 +3138,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                   </div>
                 )}
 
-                <div className="flex flex-col gap-2">
+                {genMode !== 'imitate' ? <div className="flex flex-col gap-2">
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -3172,7 +3172,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
                   {generateGateReason && !err ? (
                     <p className="text-xs leading-relaxed text-amber-900">{generateGateReason}</p>
                   ) : null}
-                </div>
+                </div> : null}
               </div>
             ) : null}
           </ShortVideoAgentCabin>

@@ -538,7 +538,17 @@ Page({
       if (link) {
         const parsed = await addonApi.postDouyinLinkForDh(link)
         if (!parsed.ok) {
-          this.setData({ err: parsed.message || '链接解析失败' })
+          const raw = String(parsed.message || '链接解析失败')
+          const overdue = /overdue balance|account has an overdue|欠费|余额不足/i.test(raw)
+          const caption = (String(link).match(/】\s*([\s\S]*?)(?:https?:\/\/|$)/) || [])[1]
+          const speech = String(caption || '').replace(/\s+/g, ' ').trim()
+          this.setData({
+            err: overdue
+              ? '豆包账户欠费，分享链接里的视频没有拉下来。请上传本地视频；充值火山方舟后可以再拆链接。'
+              : raw.replace(/^upstream_error\s*[—\-:]\s*/i, ''),
+            imitateShots: speech ? shotsFromSpeech(speech, '') : this.data.imitateShots,
+            imitateNote: speech ? '已按分享文案写了一版镜头，可直接改。' : this.data.imitateNote,
+          })
           return
         }
         speech = parsed.script || ''
