@@ -25,6 +25,31 @@ const COLORS = [
   { id: 'gold', color: '#D97706', index: 5 },
 ]
 
+const FESTIVALS = [
+  { id: 'newyear', label: '元旦', accent: '#C9A227', paper: '#FFFBF2' },
+  { id: 'spring', label: '春节', accent: '#E11D2E', paper: '#FFF7E8' },
+  { id: 'lantern', label: '元宵', accent: '#FF8A3D', paper: '#FFF8EF' },
+  { id: 'valentine', label: '情人节', accent: '#BE185D', paper: '#FFF1F6' },
+  { id: 'women', label: '妇女节', accent: '#DB2777', paper: '#FFF5F8' },
+  { id: 'qingming', label: '清明', accent: '#0F766E', paper: '#F3FBF7' },
+  { id: 'labor', label: '劳动节', accent: '#0F766E', paper: '#F0FDFA' },
+  { id: 'youth', label: '青年节', accent: '#1D4ED8', paper: '#F0F9FF' },
+  { id: 'mother', label: '母亲节', accent: '#9F1239', paper: '#FFF1F2' },
+  { id: 'child', label: '儿童节', accent: '#0284C7', paper: '#F0FDFF' },
+  { id: 'duanwu', label: '端午', accent: '#166534', paper: '#F0FDF4' },
+  { id: 'father', label: '父亲节', accent: '#1E3A5F', paper: '#F8FAFC' },
+  { id: 'qixi', label: '七夕', accent: '#7C3AED', paper: '#FAF5FF' },
+  { id: 'teacher', label: '教师节', accent: '#C2410C', paper: '#FFF7ED' },
+  { id: 'midautumn', label: '中秋', accent: '#FDE68A', paper: '#FFFBEB' },
+  { id: 'national', label: '国庆', accent: '#DC2626', paper: '#FFF7ED' },
+  { id: 'chongyang', label: '重阳', accent: '#B45309', paper: '#FFFBEB' },
+  { id: 'halloween', label: '万圣节', accent: '#F97316', paper: '#FFF7ED' },
+  { id: 'sale', label: '双十一', accent: '#EF4444', paper: '#FFF7ED' },
+  { id: 'dongzhi', label: '冬至', accent: '#1D4ED8', paper: '#EFF6FF' },
+  { id: 'christmas', label: '圣诞', accent: '#166534', paper: '#F0FDF4' },
+  { id: 'countdown', label: '跨年', accent: '#7C3AED', paper: '#F8FAFC' },
+]
+
 function recruitmentWebUrl(id: string) {
   return `https://dr.mofangdianai.com/recruitment/${encodeURIComponent(id)}`
 }
@@ -48,6 +73,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   const [posterLoading, setPosterLoading] = useState(false)
   const [posterErr, setPosterErr] = useState('')
   const [posterStyleIndex, setPosterStyleIndex] = useState(0)
+  const [themeId, setThemeId] = useState('')
   const [posterAccent, setPosterAccent] = useState('#7c3aed')
   const [codeUrl, setCodeUrl] = useState('')
   const [codeErr, setCodeErr] = useState('')
@@ -75,7 +101,10 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     let cancelled = false
     setPosterLoading(true)
     setPosterErr('')
-    void buildRecruitmentSharePosterDataUrl(order, posterStyleIndex)
+    const theme = FESTIVALS.find((item) => item.id === themeId)
+    void buildRecruitmentSharePosterDataUrl(order, posterStyleIndex, theme
+      ? { accentColor: theme.accent, accentLight: theme.paper, themeLabel: theme.label }
+      : undefined)
       .then(({ dataUrl, design }) => {
         if (cancelled) return
         setPosterUrl(dataUrl)
@@ -90,7 +119,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     return () => {
       cancelled = true
     }
-  }, [tab, order, posterStyleIndex])
+  }, [tab, order, posterStyleIndex, themeId])
 
   useEffect(() => {
     if (tab !== 'code' || !orderId) return
@@ -109,7 +138,8 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
 
   useEffect(() => {
     if (tab !== 'web' || webMode !== 'qr' || !webUrl) return
-    const color = COLORS.find((c) => c.index === posterStyleIndex)?.color || '#0f172a'
+    const theme = FESTIVALS.find((item) => item.id === themeId)
+    const color = theme?.accent || '#EA580C'
     let cancelled = false
     void QRCode.toDataURL(webUrl, { width: 360, margin: 1, color: { dark: color, light: '#ffffff' } }).then((url) => {
       if (!cancelled) setQrUrl(url)
@@ -117,14 +147,21 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     return () => {
       cancelled = true
     }
-  }, [tab, webMode, webUrl, posterStyleIndex])
+  }, [tab, webMode, webUrl, themeId])
 
   function pickColor(index: number) {
     if (posterLoading) return
     const preview = resolvePosterDesign(order, index)
+    setThemeId('')
     setPosterStyleIndex(index)
     setPosterUrl('')
     setPosterAccent(resolvePosterThemeColor(preview))
+  }
+
+  function pickTheme(id: string) {
+    setThemeId(id)
+    setPosterUrl('')
+    setQrUrl('')
   }
 
   function copyPayload() {
@@ -151,6 +188,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     a.click()
   }
 
+  const activeTheme = FESTIVALS.find((item) => item.id === themeId) || null
   const tabs: { id: Tab; label: string }[] = [
     { id: 'poster', label: '分享图' },
     { id: 'code', label: '小程序码' },
@@ -214,7 +252,13 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
         {tab === 'code' ? (
           <div className="mt-4 flex flex-col items-center">
             {codeUrl ? (
-              <img src={codeUrl} alt="小程序码" className="h-52 w-52 rounded-xl bg-white object-contain" />
+              <div
+                className="rounded-2xl p-3"
+                style={{ background: activeTheme ? `linear-gradient(160deg, ${activeTheme.accent}, ${activeTheme.paper})` : (COLORS.find((c) => c.index === posterStyleIndex)?.color || '#6366F1') }}
+              >
+                <img src={codeUrl} alt="小程序码" className="h-52 w-52 rounded-xl bg-white object-contain" />
+                {activeTheme ? <p className="mt-2 text-center text-xs font-medium text-white">{activeTheme.label}</p> : null}
+              </div>
             ) : (
               <p className="text-sm text-amber-600">{codeErr || '正在生成小程序码…'}</p>
             )}
@@ -228,7 +272,15 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
               该链接可放在公众号菜单、阅读原文、网站、论坛或微博等所有可以插入网页链接的位置。达人打开后进入星选招募详情报名。
             </p>
             {webMode === 'qr' && qrUrl ? (
-              <img src={qrUrl} alt="网页二维码" className="mx-auto h-52 w-52" />
+              <div className="flex justify-center">
+                <div
+                  className="rounded-2xl p-4"
+                  style={{ background: activeTheme ? `linear-gradient(160deg, ${activeTheme.accent}, ${activeTheme.paper})` : '#fff', border: '1px solid #e2e8f0' }}
+                >
+                  <img src={qrUrl} alt="网页二维码" className="mx-auto h-52 w-52 bg-white" />
+                  {activeTheme ? <p className="mt-2 text-center text-xs" style={{ color: activeTheme.accent }}>{activeTheme.label}</p> : null}
+                </div>
+              </div>
             ) : (
               <p className="break-all rounded-xl bg-slate-100 px-3 py-3 text-sm text-[var(--shell-text)]">
                 {webMode === 'short' ? shortLink || '短链生成中…' : webUrl}
@@ -257,6 +309,23 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
           </div>
         ) : null}
 
+        {tab === 'web' && webMode !== 'qr' ? null : (
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+            <button type="button" className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs ${themeId ? '' : 'border-blue-600 text-blue-600'}`} onClick={() => pickTheme('')}>经典</button>
+            {FESTIVALS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs ${themeId === item.id ? 'border-blue-600 text-blue-600' : ''}`}
+                onClick={() => pickTheme(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {tab === 'web' ? null : (
         <div className="mt-4 flex flex-wrap gap-2">
           {COLORS.map((c) => (
             <button
@@ -269,6 +338,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
             />
           ))}
         </div>
+        )}
 
         <div className="mt-4 flex gap-2">
           {tab === 'web' && webMode !== 'qr' ? (

@@ -28,6 +28,9 @@ export type PosterDesignTokens = {
   inviterSuffix: string
   tags: PosterTags
   footerPanel: PosterFooterPanel
+  frameColor?: string
+  forceGradientHero?: boolean
+  shareThemeLabel?: string
 }
 
 export type PosterTags = {

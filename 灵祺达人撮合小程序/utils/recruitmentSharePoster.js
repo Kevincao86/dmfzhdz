@@ -7,6 +7,7 @@ const posterTemplates = require('./recruitmentSharePosterTemplates.js')
 const posterAssets = require('./recruitPosterAssets.js')
 const shareCopy = require('./recruitmentShareCopy.js')
 const mpApplyWxacode = require('./mpApplyWxacode.js')
+const shareThemes = require('./recruitShareThemes.js')
 
 const POSTER_W = 750
 const POSTER_H = 1200
@@ -384,10 +385,11 @@ function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackCon
 
 function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w, h) {
   const tmpl = design.template || {}
-  roundRect(ctx, x, y, w, h, 20)
+  const heroRadius = design && design.heroRadius != null ? design.heroRadius : 20
+  roundRect(ctx, x, y, w, h, heroRadius)
   ctx.save()
   ctx.clip()
-  if (bgImg) {
+  if (bgImg && !(design && design.forceGradientHero)) {
     ctx.drawImage(bgImg, x, y, w, h)
   } else {
     fillLinearGradient(ctx, x, y, w, h, tmpl.bgGradient)
@@ -431,9 +433,13 @@ function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w
 }
 
 function drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y) {
+  const showLogo = !design || design.showLogo !== false
+  const showBrand = !design || design.showBrand !== false
+  const name = showBrand ? String(input.inviterName || '').trim() : ''
+  if (!showLogo && !name) return false
   const avatarR = 28
   const avatarX = pad + 36
-  const name = String(input.inviterName || '').trim()
+  if (showLogo) {
   ctx.fillStyle = (design && design.accentLight) || '#EEF2FF'
   ctx.beginPath()
   ctx.arc(avatarX, y, avatarR, 0, Math.PI * 2)
@@ -452,24 +458,30 @@ function drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y) {
     ctx.textBaseline = 'middle'
     ctx.fillText(String(name || '招').slice(0, 1), avatarX, y)
   }
+  }
   if (name) {
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
     ctx.fillStyle = '#334155'
     ctx.font = '26px sans-serif'
     const suffix = (design && design.inviterSuffix) || ''
-    ctx.fillText(truncateText(ctx, `${name}${suffix}`, cardW - 120), pad + 84, y)
+    ctx.fillText(truncateText(ctx, `${name}${suffix}`, cardW - (showLogo ? 120 : 72)), showLogo ? pad + 84 : pad + 28, y)
   }
+  return true
 }
 
 function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFrameImg, qrFallbackContent, brandImg) {
   const tmpl = design.template || {}
-  const pad = 40
+  const pad = design && design.shareTheme ? 72 : 40
   const cardW = POSTER_W - pad * 2
   const cardH = POSTER_H - pad * 2
 
-  ctx.fillStyle = tmpl.outerBg || '#E5E7EB'
-  ctx.fillRect(0, 0, POSTER_W, POSTER_H)
+  if (design && design.shareTheme) {
+    shareThemes.paintPosterChrome(ctx, design.shareTheme, POSTER_W, POSTER_H)
+  } else {
+    ctx.fillStyle = (design && design.frameColor) || tmpl.outerBg || '#E5E7EB'
+    ctx.fillRect(0, 0, POSTER_W, POSTER_H)
+  }
 
   const cardRadius = Math.max(0, Number(design && design.cardRadius) || 24)
   roundRect(ctx, pad, pad, cardW, cardH, cardRadius)
@@ -477,9 +489,7 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   ctx.fill()
 
   let y = pad + 36
-  const brandName = String(input.inviterName || '').trim()
-  if (brandName || brandImg) {
-    drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y)
+  if (drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y)) {
     y += 56
   } else {
     y = pad + 24
@@ -496,7 +506,7 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   ctx.textAlign = 'left'
   ctx.fillStyle = '#0F172A'
   ctx.font = 'bold 34px sans-serif'
-  const titleLines = wrapLines(ctx, input.title, cardW - 48, 2)
+  const titleLines = input.title ? wrapLines(ctx, input.title, cardW - 48, 2) : []
   for (let i = 0; i < titleLines.length; i += 1) {
     ctx.fillText(titleLines[i], pad + 24, y + i * 44)
   }
@@ -579,7 +589,7 @@ function exportCanvasToFile(canvas) {
       fileType: 'png',
       success(res) {
         if (res.tempFilePath) {
-          normalizePosterFilePath(res.tempFilePath).then(resolve).catch(() => resolve(res.tempFilePath))
+          uniquifyPosterFile(res.tempFilePath).then(resolve)
           return
         }
         reject(new Error('empty_temp'))
@@ -611,6 +621,48 @@ function exportCanvasToFile(canvas) {
   })
 }
 
+function uniquifyPosterFile(filePath) {
+  const dest = `${wx.env.USER_DATA_PATH}/recruit-poster-${Date.now()}-${Math.floor(Math.random() * 1000)}.png`
+  return new Promise((resolve) => {
+    wx.getFileSystemManager().copyFile({
+      srcPath: filePath,
+      destPath: dest,
+      success: () => resolve(dest),
+      fail: () => resolve(filePath),
+    })
+  })
+}
+
+function applyShareLook(design, opts) {
+  const theme = opts && opts.theme
+  const vis = (opts && opts.visibility) || {}
+  design.showLogo = vis.logo !== false
+  design.showBrand = vis.brand !== false
+  if (opts && opts.heroRadius != null) design.heroRadius = opts.heroRadius
+  if (theme) {
+    design.shareTheme = theme
+    design.frameColor = theme.accent
+    design.accentColor = theme.accent
+    design.accentLight = theme.paper
+    design.forceGradientHero = true
+    design.template = Object.assign({}, design.template, {
+      outerBg: theme.bg[1],
+      bgGradient: theme.bg.concat([theme.paper]),
+      decor: theme.motif === 'firework' ? 'stars' : 'blobs',
+    })
+    return
+  }
+  if (opts && opts.accentColor) {
+    design.frameColor = opts.accentColor
+    design.accentColor = opts.accentColor
+    design.accentLight = opts.accentLight || '#FFFFFF'
+    design.template = Object.assign({}, design.template, {
+      outerBg: opts.accentColor,
+      bgGradient: [opts.accentColor, opts.accentSoft || opts.accentColor, opts.accentLight || '#FFFFFF'],
+    })
+  }
+}
+
 function resolvePosterDesign(order, styleIndex) {
   return posterCore.resolvePosterDesign(order, styleIndex)
 }
@@ -630,14 +682,13 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
   if (brand.logoUrl) input.inviterAvatarUrl = brand.logoUrl
   const design = resolvePosterDesign(shareOrder, styleIndex)
   const vis = opts && opts.visibility
-  if (vis && vis.brand === false) {
-    input.inviterName = ''
-    input.inviterAvatarUrl = ''
-  }
+  if (vis && vis.brand === false) input.inviterName = ''
+  if (vis && vis.logo === false) input.inviterAvatarUrl = ''
   if (vis && vis.title === false) input.title = ''
   if (vis && vis.meta === false) input.rows = []
   if (vis && vis.qr === false) design.hideQr = true
   if (opts && opts.cardRadius != null) design.cardRadius = opts.cardRadius
+  applyShareLook(design, opts)
   let canvas
   try {
     canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })

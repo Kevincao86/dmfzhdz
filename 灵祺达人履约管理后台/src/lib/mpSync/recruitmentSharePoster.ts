@@ -11,12 +11,27 @@ import { renderRecruitmentPosterToDataUrl } from './recruitmentSharePosterRender
 export async function buildRecruitmentSharePosterDataUrl(
   order: Record<string, unknown>,
   styleIndex = 0,
+  opts?: { accentColor?: string; accentLight?: string; themeLabel?: string },
 ): Promise<{ dataUrl: string; design: PosterDesignTokens }> {
   const orderId = String(order.id || '').trim()
   const qrUrl = buildRecruitmentMpPath(orderId) || orderId
   const input = buildPosterInput(order, qrUrl)
   const styleIdx = normalizePosterStyleIndex(styleIndex)
   const design = resolvePosterDesign(order, styleIdx)
+  if (opts && (opts.accentColor || opts.themeLabel)) {
+    if (opts.accentColor) {
+      design.accentColor = opts.accentColor
+      design.frameColor = opts.accentColor
+      design.accentLight = opts.accentLight || design.accentLight
+      design.template = {
+        ...design.template,
+        outerBg: opts.accentLight || design.template.outerBg,
+        bgGradient: [opts.accentColor, opts.accentColor, opts.accentLight || '#FFFFFF'],
+      }
+    }
+    design.forceGradientHero = true
+    design.shareThemeLabel = opts.themeLabel || ''
+  }
 
   let qrDataUrl = ''
   try {

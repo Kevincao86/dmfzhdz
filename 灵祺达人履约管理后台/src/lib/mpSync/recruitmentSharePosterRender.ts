@@ -194,7 +194,7 @@ function drawHeroSection(
   roundRect(ctx, x, y, w, h, 20)
   ctx.save()
   ctx.clip()
-  if (bgImg) {
+  if (bgImg && !design.forceGradientHero) {
     ctx.drawImage(bgImg, x, y, w, h)
   } else {
     fillLinearGradient(ctx, x, y, w, h, tmpl.bgGradient)
@@ -381,15 +381,22 @@ export async function renderRecruitmentPosterCanvas(
   qrImage?: CanvasImageSource | null,
 ): Promise<void> {
   const tmpl = design.template
-  const pad = 40
+  const pad = design.shareThemeLabel ? 72 : 40
   const cardW = POSTER_W - pad * 2
   const cardH = POSTER_H - pad * 2
-  const bgImg = await loadPosterBackground(tmpl)
+  const bgImg = design.forceGradientHero ? null : await loadPosterBackground(tmpl)
   const qrFrameImg = await loadPosterQrFrame(tmpl)
   const brandImg = await loadImage(String(input.inviterAvatarUrl || ''))
 
-  ctx.fillStyle = tmpl.outerBg
+  ctx.fillStyle = design.frameColor || tmpl.outerBg
   ctx.fillRect(0, 0, POSTER_W, POSTER_H)
+  if (design.shareThemeLabel) {
+    ctx.fillStyle = '#FFFFFF'
+    ctx.font = 'bold 26px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(design.shareThemeLabel, POSTER_W / 2, 34)
+  }
 
   roundRect(ctx, pad, pad, cardW, cardH, 24)
   ctx.fillStyle = '#FFFFFF'

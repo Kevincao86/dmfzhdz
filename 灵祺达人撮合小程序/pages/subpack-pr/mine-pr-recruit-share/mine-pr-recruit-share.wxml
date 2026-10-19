@@ -18,8 +18,7 @@
   <view wx:elif="{{tab === 'code'}}" class="stage">
     <view wx:if="{{codeLoading}}" class="hint">正在生成小程序码…</view>
     <view wx:elif="{{codePath}}" class="code-wrap" style="width: {{codePx}}rpx;">
-      <image class="code {{shapeId}}" src="{{codePath}}" mode="aspectFit" />
-      <text wx:if="{{showLogo}}" class="code-cap">{{caption || '长按识别小程序码报名'}}</text>
+      <image class="code" src="{{codePath}}" mode="widthFix" />
     </view>
     <view wx:else class="hint">{{codeErr || '小程序码生成失败'}}</view>
   </view>
@@ -27,7 +26,7 @@
   <view wx:else class="stage stage-web">
     <view class="notice">该链接可放在公众号菜单、阅读原文、网站、论坛或微博等所有可以插入网页链接的位置。达人打开后进入星选招募详情报名。</view>
     <view wx:if="{{webMode !== 'qr'}}" class="link-box">{{webMode === 'short' ? (shortLink || '短链生成中…') : webUrl}}</view>
-    <view wx:else>
+    <view wx:else class="qr-box">
       <view wx:if="{{qrLoading}}" class="hint">正在生成二维码…</view>
       <image wx:elif="{{qrPath}}" class="qr" src="{{qrPath}}" mode="widthFix" />
     </view>
@@ -39,6 +38,17 @@
       <text class="edition {{edition === 'pure' ? 'on' : ''}}" data-id="pure" bindtap="onEdition">纯净版（无额外说明）</text>
     </view>
 
+    <scroll-view wx:if="{{tab !== 'web' || webMode === 'qr'}}" class="theme-scroll" scroll-x>
+      <view class="chip theme-chip {{themeId ? '' : 'on'}}" data-id="" bindtap="onTheme">经典</view>
+      <view
+        wx:for="{{themes}}"
+        wx:key="id"
+        class="chip theme-chip {{item.on ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onTheme"
+      >{{item.label}}</view>
+    </scroll-view>
+
     <view wx:if="{{tab !== 'web'}}" class="tool-tabs">
       <text class="tool {{tab === 'poster' ? 'on' : ''}}">颜色</text>
       <text wx:if="{{tab === 'code'}}" class="tool">尺寸</text>
@@ -48,7 +58,7 @@
       <text class="tool">logo</text>
     </view>
 
-    <view class="swatches">
+    <view wx:if="{{tab !== 'web'}}" class="swatches">
       <view
         wx:for="{{colors}}"
         wx:key="id"
@@ -60,32 +70,32 @@
     </view>
 
     <view wx:if="{{tab === 'code'}}" class="chips">
-      <text wx:for="{{sizes}}" wx:key="id" class="chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onSize">{{item.label}}</text>
+      <view wx:for="{{sizes}}" wx:key="id" class="chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onSize">{{item.label}}</view>
     </view>
     <view wx:if="{{tab !== 'web'}}" class="chips">
-      <text wx:for="{{shapes}}" wx:key="id" class="chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onShape">{{item.label}}</text>
+      <view wx:for="{{shapes}}" wx:key="id" class="chip {{item.on ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onShape">{{item.label}}</view>
     </view>
     <view wx:if="{{tab === 'code'}}">
-      <input class="cap-input" maxlength="24" value="{{caption}}" bindinput="onCaption" placeholder="码下方文案" />
+      <input class="cap-input" maxlength="24" value="{{caption}}" bindinput="onCaption" bindblur="onCaptionDone" placeholder="码下方文案" />
     </view>
     <view wx:if="{{tab === 'poster'}}" class="chips">
-      <text class="chip {{showTitle ? 'on' : ''}}" data-key="showTitle" bindtap="onToggle">标题</text>
-      <text class="chip {{showMeta ? 'on' : ''}}" data-key="showMeta" bindtap="onToggle">信息</text>
-      <text class="chip {{showQr ? 'on' : ''}}" data-key="showQr" bindtap="onToggle">二维码</text>
-      <text class="chip {{showBrand ? 'on' : ''}}" data-key="showBrand" bindtap="onToggle">发布方</text>
+      <view class="chip {{showTitle ? 'on' : ''}}" data-key="showTitle" bindtap="onToggle">标题</view>
+      <view class="chip {{showMeta ? 'on' : ''}}" data-key="showMeta" bindtap="onToggle">信息</view>
+      <view class="chip {{showQr ? 'on' : ''}}" data-key="showQr" bindtap="onToggle">二维码</view>
+      <view class="chip {{showBrand ? 'on' : ''}}" data-key="showBrand" bindtap="onToggle">发布方</view>
     </view>
     <view wx:if="{{tab !== 'web'}}" class="chips">
-      <text class="chip {{showLogo ? 'on' : ''}}" data-key="showLogo" bindtap="onToggle">{{showLogo ? '显示标识' : '隐藏标识'}}</text>
+      <view class="chip {{showLogo ? 'on' : ''}}" data-key="showLogo" bindtap="onToggle">{{showLogo ? '显示标识' : '隐藏标识'}}</view>
     </view>
 
     <view wx:if="{{tab === 'web'}}" class="modes">
-      <text
+      <view
         wx:for="{{webModes}}"
         wx:key="id"
         class="mode {{item.on ? 'on' : ''}}"
         data-id="{{item.id}}"
         bindtap="onWebMode"
-      >{{item.label}}</text>
+      >{{item.label}}</view>
     </view>
 
     <button class="save" bindtap="onPrimary">

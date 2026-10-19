@@ -1,4 +1,5 @@
 const hub = require('../../../utils/recruitShareHub.js')
+const themes = require('../../../utils/recruitShareThemes.js')
 const sharePoster = require('../../../utils/recruitmentSharePoster.js')
 const mpApplyShortLink = require('../../../utils/mpApplyShortLink.js')
 const mpApplyWxacode = require('../../../utils/mpApplyWxacode.js')
@@ -33,6 +34,8 @@ Page({
     webMode: 'link',
     colors: withOn(hub.POSTER_COLORS, 'sunset'),
     colorId: 'sunset',
+    themes: withOn(themes.THEMES, ''),
+    themeId: '',
     styleIndex: 0,
     sizes: withOn(hub.CODE_SIZES, 'm'),
     sizeId: 'm',
@@ -122,33 +125,59 @@ Page({
         colorId: hit.id,
         styleIndex: hit.index,
         colors: withOn(hub.POSTER_COLORS, hit.id),
+        themeId: '',
+        themes: withOn(themes.THEMES, ''),
         posterPath: '',
         qrPath: '',
+        codePath: '',
       },
-      () => {
-        if (this.data.tab === 'poster') this.renderPoster()
-        if (this.data.tab === 'web' && this.data.webMode === 'qr') this.renderWebQr()
-      },
+      () => this.rerenderCurrent(),
     )
+  },
+
+  onTheme(e) {
+    const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
+    this.setData(
+      {
+        themeId: id,
+        themes: withOn(themes.THEMES, id),
+        posterPath: '',
+        qrPath: '',
+        codePath: '',
+      },
+      () => this.rerenderCurrent(),
+    )
+  },
+
+  rerenderCurrent() {
+    if (this.data.tab === 'poster') this.renderPoster()
+    else if (this.data.tab === 'code') this.renderCode()
+    else if (this.data.webMode === 'qr') this.renderWebQr()
   },
 
   onSize(e) {
     const id = e.currentTarget.dataset.id
     const hit = hub.CODE_SIZES.find((s) => s.id === id)
     if (!hit) return
-    this.setData({ sizeId: hit.id, codePx: hit.px, sizes: withOn(hub.CODE_SIZES, hit.id) })
+    this.setData({ sizeId: hit.id, codePx: hit.px, sizes: withOn(hub.CODE_SIZES, hit.id), codePath: '' }, () => {
+      if (this.data.tab === 'code') this.renderCode()
+    })
   },
 
   onShape(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
-    this.setData({ shapeId: id, shapes: withOn(hub.SHAPES, id), posterPath: '' }, () => {
+    this.setData({ shapeId: id, shapes: withOn(hub.SHAPES, id), posterPath: '', codePath: '' }, () => {
       if (this.data.tab === 'poster') this.renderPoster()
+      if (this.data.tab === 'code') this.renderCode()
     })
   },
 
   onCaption(e) {
     this.setData({ caption: String(e.detail.value || '').slice(0, 24) })
+  },
+  onCaptionDone() {
+    if (this.data.tab === 'code') this.renderCode()
   },
 
   onToggle(e) {
@@ -158,19 +187,28 @@ Page({
     patch[key] = !this.data[key]
     this.setData(patch, () => {
       if (this.data.tab === 'poster') this.renderPoster()
+      if (this.data.tab === 'code' && (key === 'showLogo' || key === 'showBrand')) this.renderCode()
     })
   },
 
   posterOpts() {
     const shape = hub.SHAPES.find((s) => s.id === this.data.shapeId) || hub.SHAPES[1]
-    const radius = shape.id === 'round' ? 48 : shape.id === 'square' ? 0 : 24
+    const theme = themes.findTheme(this.data.themeId)
+    const color = hub.POSTER_COLORS.find((c) => c.id === this.data.colorId) || hub.POSTER_COLORS[0]
+    const radius = shape.id === 'round' ? 72 : shape.id === 'square' ? 0 : 28
     return {
       cardRadius: radius,
+      heroRadius: shape.id === 'round' ? 40 : shape.id === 'square' ? 0 : 16,
+      theme,
+      accentColor: theme ? '' : color.color,
+      accentSoft: mixWhite(color.color, 0.38),
+      accentLight: mixWhite(color.color, 0.84),
       visibility: {
-        brand: this.data.showLogo && this.data.showBrand,
-        title: this.data.showTitle,
-        meta: this.data.showMeta,
-        qr: this.data.showQr,
+        brand: !!this.data.showBrand,
+        logo: !!this.data.showLogo,
+        title: !!this.data.showTitle,
+        meta: !!this.data.showMeta,
+        qr: !!this.data.showQr,
       },
     }
   },
@@ -199,6 +237,10 @@ Page({
   renderCode() {
     const order = this.data.order
     if (!order) return
+    const seq = (this._codeSeq || 0) + 1
+    this._codeSeq = seq
+    const color = (hub.POSTER_COLORS.find((c) => c.id === this.data.colorId) || hub.POSTER_COLORS[0]).color
+    const codeSize = this.data.sizeId === 's' ? 260 : this.data.sizeId === 'l' ? 460 : 360
     this.setData({ codeLoading: true, codeErr: '' })
     mpApplyWxacode
       .fetchApplyWxacodeDataUrl(order.id)
@@ -206,8 +248,23 @@ Page({
         if (!dataUrl) throw new Error('小程序码生成失败')
         return writeDataUrl(dataUrl)
       })
-      .then((path) => this.setData({ codePath: path, codeLoading: false }))
+      .then((filePath) =>
+        drawCodeCard({
+          filePath,
+          theme: themes.findTheme(this.data.themeId),
+          color,
+          shapeId: this.data.shapeId,
+          codeSize,
+          caption: this.data.caption,
+          showLogo: this.data.showLogo,
+        }),
+      )
+      .then((path) => {
+        if (this._codeSeq !== seq) return
+        this.setData({ codePath: path, codeLoading: false })
+      })
       .catch((err) => {
+        if (this._codeSeq !== seq) return
         this.setData({
           codeLoading: false,
           codeErr: String((err && err.message) || '小程序码生成失败').slice(0, 40),
@@ -217,10 +274,9 @@ Page({
 
   renderWebQr() {
     const url = this.data.webUrl
-    const color = (hub.POSTER_COLORS.find((c) => c.id === this.data.colorId) || hub.POSTER_COLORS[0]).color
     if (!url) return
     this.setData({ qrLoading: true })
-    drawLinkCard(url, this.data.title, color, this.data.edition)
+    drawLinkCard(url, this.data.title, themes.findTheme(this.data.themeId), this.data.edition)
       .then((path) => this.setData({ qrPath: path, qrLoading: false }))
       .catch(() => this.setData({ qrLoading: false, qrPath: '' }))
   },
@@ -288,39 +344,15 @@ function writeDataUrl(dataUrl) {
   })
 }
 
-function drawLinkCard(url, title, color, edition) {
-  const W = 600
-  const H = edition === 'pure' ? 640 : 760
-  const canvas = wx.createOffscreenCanvas({ type: '2d', width: W, height: H })
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, W, H)
-  ctx.strokeStyle = color
-  ctx.lineWidth = 16
-  ctx.strokeRect(8, 8, W - 16, H - 16)
-  ctx.fillStyle = '#0f172a'
-  ctx.font = 'bold 32px sans-serif'
-  ctx.textAlign = 'center'
-  const name = String(title || '招募').slice(0, 18)
-  if (edition !== 'pure') ctx.fillText(name, W / 2, 72)
-  const UQRCode = require('../../../utils/uqrcode.js')
-  const qr = new UQRCode()
-  qr.data = url
-  qr.size = 420
-  qr.margin = 8
-  qr.backgroundColor = '#ffffff'
-  qr.foregroundColor = color
-  qr.make()
-  qr.canvasContext = ctx
-  ctx.save()
-  ctx.translate(90, edition === 'pure' ? 80 : 110)
-  qr.drawCanvas()
-  ctx.restore()
-  if (edition !== 'pure') {
-    ctx.fillStyle = '#64748b'
-    ctx.font = '24px sans-serif'
-    ctx.fillText('扫码查看招募并报名', W / 2, H - 48)
-  }
+function mixWhite(hex, t) {
+  const n = parseInt(String(hex || '').replace('#', ''), 16)
+  if (!Number.isFinite(n)) return '#FFFFFF'
+  const ch = (c) => Math.round(c + (255 - c) * t).toString(16).padStart(2, '0')
+  return `#${ch((n >> 16) & 255)}${ch((n >> 8) & 255)}${ch(n & 255)}`
+}
+
+function exportCanvas(canvas, W, H, name) {
+  const dest = `${wx.env.USER_DATA_PATH}/${name}-${Date.now()}.png`
   return new Promise((resolve, reject) => {
     wx.canvasToTempFilePath({
       canvas,
@@ -329,9 +361,116 @@ function drawLinkCard(url, title, color, edition) {
       destWidth: W,
       destHeight: H,
       fileType: 'png',
-      success: (res) => (res.tempFilePath ? resolve(res.tempFilePath) : reject(new Error('empty'))),
+      success: (res) => {
+        if (!res.tempFilePath) {
+          reject(new Error('empty'))
+          return
+        }
+        wx.getFileSystemManager().copyFile({
+          srcPath: res.tempFilePath,
+          destPath: dest,
+          success: () => resolve(dest),
+          fail: () => resolve(res.tempFilePath),
+        })
+      },
       fail: reject,
     })
+  })
+}
+
+function drawCodeCard(opts) {
+  const codeSize = opts.codeSize
+  const inset = opts.theme ? 64 : 40
+  const W = codeSize + inset * 2
+  const H = codeSize + inset * 2 + 72
+  const canvas = wx.createOffscreenCanvas({ type: '2d', width: W, height: H })
+  const ctx = canvas.getContext('2d')
+  const radius = opts.shapeId === 'square' ? 8 : 28
+  if (opts.theme) themes.paintFrame(ctx, opts.theme, W, H, inset - 16, radius)
+  else {
+    ctx.fillStyle = opts.color
+    ctx.fillRect(0, 0, W, H)
+    themes.roundRect(ctx, 18, 18, W - 36, H - 64, radius)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+  }
+  return new Promise((resolve, reject) => {
+    const img = canvas.createImage()
+    img.onload = () => {
+      const x = (W - codeSize) / 2
+      const y = (H - 72 - codeSize) / 2
+      ctx.save()
+      ctx.fillStyle = '#FFFFFF'
+      themes.clipShape(ctx, x, y, codeSize, opts.shapeId)
+      ctx.fillRect(x, y, codeSize, codeSize)
+      const pad = opts.shapeId === 'round' ? 18 : 10
+      ctx.drawImage(img, x + pad, y + pad, codeSize - pad * 2, codeSize - pad * 2)
+      ctx.restore()
+      if (opts.showLogo) {
+        ctx.fillStyle = opts.theme ? opts.theme.accent : opts.color
+        ctx.beginPath()
+        ctx.arc(x + codeSize - 8, y + 8, 14, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.fillStyle = '#475569'
+      ctx.font = '22px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(String(opts.caption || '长按识别小程序码报名').slice(0, 18), W / 2, H - 28)
+      exportCanvas(canvas, W, H, 'share-code').then(resolve).catch(reject)
+    }
+    img.onerror = () => reject(new Error('小程序码图片无效'))
+    img.src = opts.filePath
+  })
+}
+
+function drawLinkCard(url, title, theme, edition) {
+  const W = 640
+  const H = 780
+  const qrSize = 400
+  const canvas = wx.createOffscreenCanvas({ type: '2d', width: W, height: H })
+  const ctx = canvas.getContext('2d')
+  const accent = theme ? theme.accent : '#EA580C'
+  if (theme) themes.paintFrame(ctx, theme, W, H, 36, 24)
+  else {
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, W, H)
+    ctx.strokeStyle = accent
+    ctx.lineWidth = 14
+    ctx.strokeRect(18, 18, W - 36, H - 36)
+  }
+  const titleH = edition === 'pure' ? 0 : 64
+  const capH = edition === 'pure' ? 0 : 40
+  const top = Math.round((H - (titleH + qrSize + capH)) / 2)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  if (edition !== 'pure') {
+    ctx.fillStyle = '#0F172A'
+    ctx.font = 'bold 30px sans-serif'
+    ctx.fillText(String(title || '招募').slice(0, 16), W / 2, top + 20)
+  }
+  const UQRCode = require('../../../utils/uqrcode.js')
+  const qr = new UQRCode()
+  qr.data = url
+  qr.size = qrSize
+  qr.margin = 0
+  qr.backgroundColor = '#ffffff'
+  qr.foregroundColor = accent
+  qr.make()
+  qr.canvasContext = ctx
+  const qx = Math.round((W - qrSize) / 2)
+  const qy = top + titleH
+  ctx.save()
+  ctx.translate(qx, qy)
+  return Promise.resolve(qr.drawCanvas()).then(() => {
+    ctx.restore()
+    if (edition !== 'pure') {
+      ctx.fillStyle = '#64748B'
+      ctx.font = '24px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('扫码查看招募并报名', W / 2, qy + qrSize + 28)
+    }
+    return exportCanvas(canvas, W, H, 'share-qr')
   })
 }
 
