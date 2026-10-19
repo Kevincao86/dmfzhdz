@@ -10,6 +10,7 @@ const skillsLib = require('../../utils/shortVideoSkillsMp.js')
 const casesLib = require('../../utils/shortVideoCasesMp.js')
 const musicLib = require('../../utils/shortVideoMusicMp.js')
 const scriptTable = require('../../utils/shortVideoScriptTableMp.js')
+const imitate = require('../../utils/shortvideoImitateMp.js')
 
 const {
   MAIN_TABS,
@@ -156,6 +157,7 @@ Page({
     hasFrame: false,
 
     genMode: 'text',
+    ...imitate.initialData(),
     genPrompt: '',
     storyFiles: [],
 
@@ -440,10 +442,24 @@ Page({
     const genSec = this.estimateShortvideoDurationSec()
     const mixKind = this.isSmartPreset() ? 'cloud_edit_smart' : 'cloud_edit'
     const mixSec = Number(this.data.clipEndSec) || 10
+    const imitateMotion = !!this.data.imitateVideoPath
+    const imitateSec = imitateMotion
+      ? Math.max(1, Math.ceil(Number(this.data.imitateDurationSec) || 8))
+      : Math.max(5, Math.ceil(Number(genSec) || 15))
     const genCost = economics.mpPointsCostForUsage('shortvideo', { durationSec: genSec })
     const mixCost = economics.mpPointsCostForUsage(mixKind, { durationSec: mixSec })
+    const imitateCost = economics.mpPointsCostForUsage('imitate', {
+      durationSec: imitateSec,
+      motionImitate: imitateMotion,
+    })
+    const imitateHint = imitateMotion
+      ? `消耗提醒：上传参考视频换人 50 积分/秒；当前约 ${imitateSec} 秒预计 ${imitateCost} 积分。`
+      : `${imitate.IMITATE_HINT} 未上传参考视频时按镜头秒数预估，最低 400 积分。`
     this.setData({
-      pointsHintGenerate: `消耗提醒：短片生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分。`,
+      pointsHintGenerate:
+        this.data.genMode === 'imitate'
+          ? imitateHint
+          : `消耗提醒：短片生成 ${economics.formatMpPointsRateLabel('shortvideo')}；当前约 ${genSec} 秒预计 ${genCost} 积分。`,
       pointsHintMix: this.isSmartPreset()
         ? `消耗提醒：智能一键成片 ${economics.formatMpPointsRateLabel('cloud_edit_smart')}；当前约 ${mixSec} 秒预计 ${mixCost} 积分。`
         : `消耗提醒：普通混剪 ${economics.formatMpPointsRateLabel('cloud_edit')}；预计 ${mixCost} 积分/条。`,
@@ -1722,4 +1738,6 @@ Page({
     }
     return map[phase] || phase
   },
+
+  ...imitate.pageMethods,
 })

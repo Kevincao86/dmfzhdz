@@ -1904,6 +1904,14 @@ web版/merchant-erp/src/services/tenantBillingClient.ts
 灵祺达人撮合小程序/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo.wxss
 灵祺达人撮合小程序/utils/mpAddonMerchantApi.js
 灵祺达人撮合小程序/utils/mpPointsSpendApi.js
+灵祺ERP小程序/pages/shortvideo-ai/shortvideo-ai.js
+灵祺ERP小程序/pages/shortvideo-ai/shortvideo-ai.wxml
+灵祺ERP小程序/pages/shortvideo-ai/shortvideo-ai.wxss
+灵祺ERP小程序/utils/shortvideoImitateMp.js
+灵祺ERP小程序/utils/mpPointsEconomicsMp.js
+灵祺ERP小程序/utils/erpPointsSpendMp.js
+灵祺ERP小程序/utils/tenantBillingApiMp.js
+灵祺ERP小程序/utils/videoAiMp.js
 change-scope-guard
 PAT
       ;;

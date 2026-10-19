@@ -267,7 +267,13 @@ async function postSeedanceStart(body) {
   for (const p of tries) {
     try {
       const data = await merchantVideoPost(p, body)
-      if (data && data.ok && data.taskId) return { ok: true, taskId: String(data.taskId) }
+      if (data && data.ok && data.taskId) {
+        return {
+          ok: true,
+          taskId: String(data.taskId),
+          modelUsed: data.modelUsed ? String(data.modelUsed) : '',
+        }
+      }
       lastErr = data.message || '视频发起失败'
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
@@ -580,6 +586,78 @@ function saveVideoToAlbum(url) {
   })
 }
 
+async function postXiaoyunque(body) {
+  const durationSec = Math.min(60, Math.max(5, Math.round(Number(body && body.durationSec) || 15)))
+  const images = Array.isArray(body && body.imagesBase64) ? body.imagesBase64.filter(Boolean) : []
+  return postSeedanceStart({
+    pipeline: 'xiaoyunque',
+    skip_qwen: true,
+    prompt: body && body.prompt ? body.prompt : '',
+    durationSec,
+    flags: `--dur ${durationSec} --fps 24 --ratio 9:16 --wm false`,
+    images_base64: images,
+  })
+}
+
+async function postMotionImitate(body) {
+  return postSeedanceStart({
+    pipeline: 'motion_imitate',
+    image_base64: body && body.imageBase64,
+    video_base64: body && body.videoBase64,
+    prompt: body && body.prompt ? body.prompt : '',
+  })
+}
+
+async function postDigitalHumanTts(body) {
+  try {
+    const data = await merchantVideoPost('/api/meoo-digital-human-tts', body)
+    const audioBase64 = String((data && data.audioBase64) || '').trim()
+    if (!audioBase64) return { ok: false, message: (data && (data.message || data.error)) || '未返回音频数据' }
+    return { ok: true, audioBase64 }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '语音合成失败' }
+  }
+}
+
+function postMuxAudioFile(videoBase64, audioBase64) {
+  const b = merchantApi.baseUrl()
+  if (!b) return Promise.reject(new Error('尚未配置商家后台 API 地址'))
+  let token = ''
+  try {
+    token = String(wx.getStorageSync('meoo_access_token') || '').trim()
+  } catch (_) {
+    token = ''
+  }
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: `${b}/api/meoo-merchant-ai-video-mux-audio`,
+      method: 'POST',
+      timeout: 180000,
+      responseType: 'arraybuffer',
+      header: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}`, 'X-Meoo-Access-Token': token } : {}),
+      },
+      data: { videoBase64, audioBase64 },
+      success(res) {
+        const code = Number(res.statusCode) || 0
+        if (code < 200 || code >= 300 || !res.data) {
+          reject(new Error('声音或背景乐混入失败'))
+          return
+        }
+        const filePath = `${wx.env.USER_DATA_PATH}/imitate-${Date.now()}.mp4`
+        wx.getFileSystemManager().writeFile({
+          filePath,
+          data: res.data,
+          success: () => resolve(filePath),
+          fail: (e) => reject(new Error((e && e.errMsg) || '保存成片失败')),
+        })
+      },
+      fail: (e) => reject(new Error((e && e.errMsg) || '混音请求失败')),
+    })
+  })
+}
+
 module.exports = {
   fetchVideoAiConfig,
   postKlingStart,
@@ -587,6 +665,10 @@ module.exports = {
   pollKlingTaskUntilDone,
   pollKlingTaskUntilDoneCancel,
   postSeedanceStart,
+  postXiaoyunque,
+  postMotionImitate,
+  postDigitalHumanTts,
+  postMuxAudioFile,
   fetchSeedanceStatus,
   pollSeedanceUntilDone,
   postLongformVideoPlan,

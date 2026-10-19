@@ -10,6 +10,12 @@ const MP_POINTS_DIGITAL_HUMAN_MIN_CHARGE = 416
 const MP_POINTS_MOTION_IMITATE_PER_SEC = 65
 const MP_POINTS_MOTION_IMITATE_MIN_CHARGE = 260
 
+/** 模仿视频：60% 毛利。按镜头 ¥0.80/秒 → 80 积分/秒；换人 ¥0.50/秒 → 50 积分/秒 */
+const MP_POINTS_IMITATE_STORYBOARD_PER_SEC = 80
+const MP_POINTS_IMITATE_STORYBOARD_MIN_CHARGE = 400
+const MP_POINTS_IMITATE_MOTION_PER_SEC = 50
+const MP_POINTS_IMITATE_MOTION_MIN_CHARGE = 200
+
 const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
 const MP_POINTS_CLOUD_EDIT_MAX_SEC = 60
 
@@ -35,6 +41,7 @@ const MP_POINTS_PER_SEC_BY_KIND = {
 
 const MP_POINTS_USAGE_KIND_LABELS = {
   shortvideo: '短视频处理',
+  imitate: '模仿视频',
   cloud_edit: '灵祺云剪',
   cloud_edit_smart: '一键成片',
   digital_human: '数字人口播',
@@ -53,6 +60,12 @@ function mpPointsPerSecForKind(kind) {
 function mpPointsCostForAddonDuration(kind, durationSec, opts) {
   if (kind === 'cloud_edit') return MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+  if (kind === 'imitate') {
+    if (opts && opts.motionImitate) {
+      return Math.max(MP_POINTS_IMITATE_MOTION_MIN_CHARGE, sec * MP_POINTS_IMITATE_MOTION_PER_SEC)
+    }
+    return Math.max(MP_POINTS_IMITATE_STORYBOARD_MIN_CHARGE, sec * MP_POINTS_IMITATE_STORYBOARD_PER_SEC)
+  }
   if (opts && opts.motionImitate && (kind === 'shortvideo' || kind === 'digital_human')) {
     return Math.max(MP_POINTS_MOTION_IMITATE_MIN_CHARGE, sec * MP_POINTS_MOTION_IMITATE_PER_SEC)
   }
@@ -72,6 +85,7 @@ function mpPointsCostForAddonDuration(kind, durationSec, opts) {
 function mpPointsCostForUsage(kind, opts) {
   if (
     kind === 'shortvideo' ||
+    kind === 'imitate' ||
     kind === 'cloud_edit' ||
     kind === 'cloud_edit_smart' ||
     kind === 'digital_human'
@@ -93,7 +107,12 @@ function mpPointsCostForUsage(kind, opts) {
   return 0
 }
 
-function formatMpPointsRateLabel(kind) {
+function formatMpPointsRateLabel(kind, opts) {
+  if (kind === 'imitate') {
+    return opts && opts.motionImitate
+      ? `${MP_POINTS_IMITATE_MOTION_PER_SEC} 积分/秒`
+      : `${MP_POINTS_IMITATE_STORYBOARD_PER_SEC} 积分/秒`
+  }
   if (kind === 'cloud_edit') {
     return `${MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP} 积分/条（≤${MP_POINTS_CLOUD_EDIT_MAX_SEC} 秒）`
   }

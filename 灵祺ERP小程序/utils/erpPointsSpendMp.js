@@ -24,12 +24,15 @@ function checkAddonPointsAffordable(kind, durationSec, extra) {
   ])
   const sec = flatKinds.has(kind) ? undefined : Math.max(1, Math.ceil(Number(durationSec) || 1))
   const count = extra && extra.count != null ? Number(extra.count) : 1
+  const motionImitate = !!(extra && extra.motionImitate)
   const required = economics.mpPointsCostForUsage(kind, {
     durationSec: sec || 1,
     count,
+    motionImitate,
   })
   const payload = { kind }
   if (sec != null) payload.durationSec = sec
+  if (motionImitate) payload.motionImitate = true
   return billing
     .checkErpPointsAffordable(payload)
     .then((r) => {
@@ -69,6 +72,7 @@ function spendAddonPoints(opts) {
     note: opts.note,
   }
   if (sec != null) payload.durationSec = sec
+  if (opts.motionImitate) payload.motionImitate = true
   return billing.spendErpPointsForUsage(payload).then((r) => ({
     pointsCharged: Math.max(0, Math.floor(Number(r.pointsCharged) || 0)),
     balance: readBalance(r),

@@ -186,6 +186,7 @@ function checkErpPointsAffordable(input) {
   if (input.durationSec != null) {
     payload.durationSec = Math.max(1, Math.ceil(Number(input.durationSec) || 1))
   }
+  if (input.motionImitate) payload.motionImitate = true
   return billingFetch(payload)
 }
 
@@ -197,6 +198,7 @@ function spendErpPointsForUsage(input) {
   if (input.durationSec != null) {
     payload.durationSec = Math.max(1, Math.ceil(Number(input.durationSec) || 1))
   }
+  if (input.motionImitate) payload.motionImitate = true
   if (input.idempotencyKey) payload.idempotencyKey = String(input.idempotencyKey).trim()
   if (input.note) payload.note = String(input.note).trim()
   return billingFetch(payload)
