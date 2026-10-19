@@ -530,7 +530,7 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
 
   let y = pad + 36
   if (drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y)) {
-    y += 56
+    y += 96
   } else {
     y = pad + 24
   }

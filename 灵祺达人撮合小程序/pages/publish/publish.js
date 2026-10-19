@@ -2403,13 +2403,24 @@ Page({
       this.setData({ posterAiBusy: false })
     }
   },
-  onShareAppMessage() {
+  onShareAppMessage(res) {
     const order = this.data.createdOrder
     if (!order) return require('../../utils/mpShare.js').defaultShare('/pages/index/index')
+    const recruitShareCard = require('../../utils/recruitShareCard.js')
     const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
     const share = {
       title: this.data.shareTitle || order.title,
       path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(order.id)}`,
+    }
+    if (recruitShareCard.readShareCoverKind(res) === 'recruit') {
+      return {
+        title: share.title,
+        path: share.path,
+        promise: recruitShareCard.buildShareCardPath(order).then((imageUrl) => {
+          if (imageUrl) return Object.assign({}, share, { imageUrl })
+          return recruitShareCover.attachShareCoverPromise(share, coverUrl)
+        }),
+      }
     }
     return recruitShareCover.attachShareCoverPromise(share, coverUrl)
   },

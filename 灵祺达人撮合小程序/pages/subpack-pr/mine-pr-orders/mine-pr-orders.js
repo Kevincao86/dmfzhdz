@@ -114,13 +114,24 @@ function rowById(rows, id) {
   return (rows || []).find((r) => r && r.mpOrderId === mpOrderId) || null
 }
 
-function buildOrderSharePayload(order) {
+function buildOrderSharePayload(order, res) {
   if (!order || !order.id) return null
+  const recruitShareCard = require('../../../utils/recruitShareCard.js')
   const share = {
     title: shareCopy.buildShareTitle(order) || order.title || '灵祺星选招募',
     path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(order.id)}`,
   }
   const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
+  if (recruitShareCard.readShareCoverKind(res) === 'recruit') {
+    return {
+      title: share.title,
+      path: share.path,
+      promise: recruitShareCard.buildShareCardPath(order).then((imageUrl) => {
+        if (imageUrl) return Object.assign({}, share, { imageUrl })
+        return recruitShareCover.attachShareCoverPromise(share, coverUrl)
+      }),
+    }
+  }
   return recruitShareCover.attachShareCoverPromise(share, coverUrl)
 }
 
@@ -909,8 +920,8 @@ Page({
         wx.showToast({ title: '生成文案失败', icon: 'none' })
       })
   },
-  onShareAppMessage() {
-    const payload = buildOrderSharePayload(this.data.shareOrder)
+  onShareAppMessage(res) {
+    const payload = buildOrderSharePayload(this.data.shareOrder, res)
     if (!payload) return mpShare.defaultShare('/pages/index/index')
     return payload
   },

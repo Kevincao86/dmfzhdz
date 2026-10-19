@@ -493,12 +493,6 @@
       <text class="detail-bottom-v2__fav-label">{{isFavorited ? '已收藏' : '收藏'}}</text>
     </view>
     <view class="detail-bottom-v2__share-wrap">
-      <view class="detail-share-menu-mask" wx:if="{{showShareMenu}}" bindtap="onShareMenuClose"></view>
-      <view wx:if="{{showShareMenu}}" class="detail-share-menu detail-share-menu--bottom" catchtap="noopShareSheetTap">
-        <button class="detail-share-menu__item detail-share-menu__item--primary" open-type="share" data-cover="recruit" bindtap="onShareMenuClose">招募封面</button>
-        <button class="detail-share-menu__item" open-type="share" data-cover="poster" bindtap="onShareMenuClose">海报封面</button>
-        <view class="detail-share-menu__item" bindtap="onSharePickPoster">分享海报</view>
-      </view>
       <view class="detail-bottom-v2__share" bindtap="onShareTap">
         <image class="detail-bottom-v2__share-img" src="/images/detail-v3/btn-share.png" mode="aspectFit" />
         <text class="detail-bottom-v2__share-label">分享</text>
@@ -595,6 +589,13 @@
     <view class="detail-share-sheet-cancel" bindtap="onCloseSharePosterSheet">取消</view>
   </view>
 </view>
+
+<recruit-share-dock
+  show="{{showShareMenu}}"
+  title="{{view.title}}"
+  bind:close="onShareMenuClose"
+  bind:open="onOpenShareStudio"
+/>
 
 <view class="pr-cert-mask" wx:if="{{prCertVisible}}" bindtap="onClosePrCert">
   <view class="pr-cert-dialog" catchtap="noopShareSheetTap">

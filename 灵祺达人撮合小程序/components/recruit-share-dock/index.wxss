@@ -51,9 +51,37 @@
 }
 .dock-label {
   margin-top: 12rpx;
-  font-size: 22rpx;
+  font-size: 20rpx;
   color: #334155;
   text-align: center;
+  line-height: 1.25;
+}
+.cover-pick {
+  padding: 8rpx 24rpx 24rpx;
+}
+.cover-pick-title {
+  display: block;
+  text-align: center;
+  font-size: 26rpx;
+  color: #64748b;
+  margin-bottom: 20rpx;
+}
+.cover-pick-row {
+  display: flex;
+  gap: 20rpx;
+}
+.cover-pick-btn {
+  flex: 1;
+  margin: 0;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 16rpx;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 30rpx;
+}
+.cover-pick-btn::after {
+  border: none;
 }
 .dock-cancel {
   margin: 8rpx 24rpx 0;

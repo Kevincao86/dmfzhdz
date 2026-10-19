@@ -493,7 +493,7 @@ export async function renderRecruitmentPosterCanvas(
   ctx.fillStyle = '#334155'
   ctx.font = '26px sans-serif'
   ctx.fillText(truncateText(ctx, `${input.inviterName}${design.inviterSuffix}`, cardW - 120), pad + 84, y)
-  y += 56
+  y += 96
 
   const heroH = 280
   const heroX = pad + 24

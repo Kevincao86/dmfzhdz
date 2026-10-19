@@ -2,6 +2,7 @@
   "navigationBarTitleText": "招募详情",
   "navigationStyle": "custom",
   "usingComponents": {
-    "launch-splash": "/components/launch-splash/index"
+    "launch-splash": "/components/launch-splash/index",
+    "recruit-share-dock": "/components/recruit-share-dock/index"
   }
 }

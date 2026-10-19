@@ -1,28 +1,35 @@
 <view class="dock-mask" wx:if="{{show}}" bindtap="onClose">
   <view class="dock-sheet" catchtap="noop">
     <text wx:if="{{title}}" class="dock-title">{{title}}</text>
-    <view class="dock-row">
-      <button class="dock-cell dock-btn" open-type="share" hover-class="none" bindtap="onClose">
+    <view wx:if="{{coverPick}}" class="cover-pick">
+      <text class="cover-pick-title">选择微信分享封面</text>
+      <view class="cover-pick-row">
+        <button class="cover-pick-btn" open-type="share" data-cover="recruit" hover-class="none" bindtap="onCoverPicked">招募封面</button>
+        <button class="cover-pick-btn" open-type="share" data-cover="poster" hover-class="none" bindtap="onCoverPicked">海报封面</button>
+      </view>
+    </view>
+    <view wx:else class="dock-row">
+      <view class="dock-cell" bindtap="onWechat">
         <image class="dock-icon-img" src="/components/recruit-share-dock/icons/dock-wechat.jpg" mode="aspectFill" />
         <text class="dock-label">微信好友</text>
-      </button>
+      </view>
       <view class="dock-cell" data-tab="poster" bindtap="onOpen">
         <image class="dock-icon-img" src="/components/recruit-share-dock/icons/dock-poster.jpg" mode="aspectFill" />
         <text class="dock-label">海报分享图</text>
       </view>
       <view class="dock-cell" data-tab="code" bindtap="onOpen">
         <image class="dock-icon-img" src="/components/recruit-share-dock/icons/dock-code.jpg" mode="aspectFill" />
-        <text class="dock-label">小程序码</text>
+        <text class="dock-label">小程序分享图</text>
       </view>
       <view class="dock-cell" data-tab="web" data-mode="qr" bindtap="onOpen">
         <image class="dock-icon-img" src="/components/recruit-share-dock/icons/dock-qr.jpg" mode="aspectFill" />
-        <text class="dock-label">二维码</text>
+        <text class="dock-label">二维码分享图</text>
       </view>
       <view class="dock-cell" data-tab="web" data-mode="link" bindtap="onOpen">
         <image class="dock-icon-img" src="/components/recruit-share-dock/icons/dock-link.jpg" mode="aspectFill" />
-        <text class="dock-label">网页链接</text>
+        <text class="dock-label">链接分享</text>
       </view>
     </view>
-    <view class="dock-cancel" bindtap="onClose">取消</view>
+    <view class="dock-cancel" bindtap="onCancel">{{coverPick ? '返回' : '取消'}}</view>
   </view>
 </view>

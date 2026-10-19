@@ -4,7 +4,6 @@
   catchtouchmove="noop"
 >
   <view class="order-expand-card {{opened ? 'is-open' : ''}}" style="{{cardStyle}}" catchtap="noop">
-    <view wx:if="{{showShareMenu}}" class="order-expand-share-dismiss" catchtap="onShareMenuClose" />
     <view class="order-expand-card__bar">
       <view class="order-expand-card__x" bindtap="onMask" aria-label="关闭">×</view>
       <view class="order-expand-card__tools">
@@ -13,11 +12,6 @@
           <text>{{favorited ? '已收藏' : '收藏'}}</text>
         </view>
         <view class="order-expand-share-wrap">
-          <view wx:if="{{showShareMenu}}" class="order-expand-share-menu" catchtap="noop">
-            <button class="order-expand-share-menu__item order-expand-share-menu__item--primary" open-type="share" data-cover="recruit" hover-class="none" bindtap="onShareMenuClose">招募封面</button>
-            <button class="order-expand-share-menu__item" open-type="share" data-cover="poster" hover-class="none" bindtap="onShareMenuClose">海报封面</button>
-            <view class="order-expand-share-menu__item" bindtap="onSharePickPoster">分享海报</view>
-          </view>
           <view class="order-expand-card__tool" bindtap="onShareTap">
             <text class="order-expand-card__tool-icon">↗</text>
             <text>分享</text>
@@ -80,4 +74,10 @@
       </view>
     </view>
   </view>
+  <recruit-share-dock
+    show="{{showShareMenu}}"
+    title="{{title}}"
+    bind:close="onShareMenuClose"
+    bind:open="onOpenShareStudio"
+  />
 </view>

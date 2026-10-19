@@ -144,6 +144,15 @@ function resolvePosterThemeColor(design) {
   return (tmpl && tmpl.qrRingColor) || (design && design.accentColor) || '#7C3AED'
 }
 
+function formatSignupDeadline(order, info) {
+  const meta = order && order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
+  const raw = String(
+    meta.signupDeadline || (order && (order.deadline || order.signupDeadline)) || pickLineValue(info, '报名截止') || '',
+  ).trim()
+  if (!raw || raw === '—' || raw === '-') return ''
+  return raw.replace('T', ' ').slice(0, 16)
+}
+
 function extractPosterFieldsFromOrder(order) {
   const info = String(order.recruitmentInfo || order.taskDetail || order.merchantRequirements || '')
   const platform = normalizePlatform(
@@ -157,6 +166,7 @@ function extractPosterFieldsFromOrder(order) {
   const inviterName = prRecruitQr.resolvePosterInviterName(order) || ''
   const title = String(order.title || '').trim() || '达人招募'
   const detailText = extractRecruitDetailText(order, info)
+  const deadlineText = formatSignupDeadline(order, info)
   return {
     orderId: String(order.id || '').trim(),
     title,
@@ -174,6 +184,7 @@ function extractPosterFieldsFromOrder(order) {
       { label: '等级要求', value: levelText },
       { label: '粉丝要求', value: fansText },
       { label: '需求城市', value: cityText },
+      { label: '报名截止', value: deadlineText || '未设置' },
     ],
   }
 }

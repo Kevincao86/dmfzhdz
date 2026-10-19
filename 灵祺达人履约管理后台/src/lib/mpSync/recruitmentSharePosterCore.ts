@@ -336,6 +336,16 @@ export function platformAccent(platform: string): string {
   return PLATFORM_ACCENTS[platform] || '#E63946'
 }
 
+function formatSignupDeadline(order: Record<string, unknown>, info: string): string {
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+      ? (order.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const raw = String(meta.signupDeadline || order.deadline || order.signupDeadline || pickLineValue(info, '报名截止') || '').trim()
+  if (!raw || raw === '—' || raw === '-') return ''
+  return raw.replace('T', ' ').slice(0, 16)
+}
+
 export function extractPosterFieldsFromOrder(order: Record<string, unknown>): Omit<PosterInput, 'qrUrl'> {
   const info = String(order.recruitmentInfo || order.taskDetail || order.merchantRequirements || '')
   const platform = normalizePlatform(
@@ -349,12 +359,14 @@ export function extractPosterFieldsFromOrder(order: Record<string, unknown>): Om
   const inviterName = resolveOrderPublisherDisplayName(order, readPrProfile()) || '灵祺星选'
   const title = String(order.title || '').trim() || `${inviterName}·达人招募`
   const detailText = extractRecruitDetailText(order, info)
+  const deadlineText = formatSignupDeadline(order, info)
   const rows: PosterFieldRow[] = [
     { label: '招募平台', value: platform },
     { label: '费用类型', value: feeTypeText },
     { label: '等级要求', value: levelText },
     { label: '粉丝要求', value: fansText },
     { label: '需求城市', value: cityText },
+    { label: '报名截止', value: deadlineText || '未设置' },
   ]
   return {
     orderId: String(order.id || '').trim(),

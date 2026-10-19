@@ -12,6 +12,7 @@ const orderFavorites = require('../../utils/orderFavorites.js')
 const sharePoster = require('../../utils/recruitmentSharePoster.js')
 const recruitShareCover = require('../../utils/recruitShareCover.js')
 const recruitShareCard = require('../../utils/recruitShareCard.js')
+const shareHub = require('../../utils/recruitShareHub.js')
 const mpShare = require('../../utils/mpShare.js')
 
 function openBox() {
@@ -118,6 +119,16 @@ Component({
     },
     onShareMenuClose() {
       if (this.data.showShareMenu) this.setData({ showShareMenu: false })
+    },
+    onOpenShareStudio(e) {
+      const order = this.posterOrder()
+      if (!order) {
+        wx.showToast({ title: '订单加载中', icon: 'none' })
+        return
+      }
+      const detail = (e && e.detail) || {}
+      this.setData({ showShareMenu: false })
+      shareHub.openStudio(order, detail.tab || 'poster', detail.mode || 'link')
     },
     buildShareMessage(res) {
       const mp = this._mp

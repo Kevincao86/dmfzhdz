@@ -693,6 +693,16 @@ Page({
   onShareMenuClose() {
     if (this.data.showShareMenu) this.setData({ showShareMenu: false })
   },
+  onOpenShareStudio(e) {
+    const order = this.data.mpOrder
+    if (!order) {
+      wx.showToast({ title: '订单加载中', icon: 'none' })
+      return
+    }
+    const detail = (e && e.detail) || {}
+    this.setData({ showShareMenu: false })
+    require('../../../utils/recruitShareHub.js').openStudio(order, detail.tab || 'poster', detail.mode || 'link')
+  },
   onSharePickPoster() {
     if (!this.data.mpOrder) {
       wx.showToast({ title: '订单加载中', icon: 'none' })
