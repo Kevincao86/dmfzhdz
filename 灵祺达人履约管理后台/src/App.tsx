@@ -126,6 +126,12 @@ export default function App() {
       <Route path="/orders/:id/video-review/share/:shareToken" element={<PublicVideoReviewSharePage />} />
       <Route path="/applicant-pick-share/:token" element={<PublicApplicantPickSharePage />} />
       <Route path="/orders/:id/applicants/share/:shareToken" element={<PublicApplicantPickSharePage />} />
+      {/* 招募链接免登录，扫码和微信打开直接进入报名页 */}
+      <Route element={<AppShell />}>
+        <Route path="/recruitment/:id" element={<RecruitmentDetailPage />} />
+        <Route path="/recruitment/:id/group-qr" element={<FormRelayGroupQrPage />} />
+        <Route path="/recruitment/:id/apply" element={<RecruitmentApplyPage />} />
+      </Route>
       {/* 公开分享须在 RequireAuth 之前；勿把 /orders/.../share/ 放进 AppShell */}
       <Route
         element={
@@ -135,9 +141,6 @@ export default function App() {
         }
       >
         <Route path="/hall" element={<HallPage />} />
-        <Route path="/recruitment/:id" element={<RecruitmentDetailPage />} />
-        <Route path="/recruitment/:id/group-qr" element={<FormRelayGroupQrPage />} />
-        <Route path="/recruitment/:id/apply" element={<RecruitmentApplyPage />} />
         <Route path="/recommend-talent" element={<Navigate to="/hall?tab=recommend" replace />} />
         <Route path="/publish" element={<PublishPage />} />
         <Route path="/templates" element={<TemplatesPage />} />

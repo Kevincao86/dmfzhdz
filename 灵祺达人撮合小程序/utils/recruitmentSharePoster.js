@@ -398,20 +398,15 @@ function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
   ctx.drawImage(qrImg, x, y, size, size)
 }
 
-function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackContent, revealTheme) {
+function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackContent) {
   const innerSize = Math.round(frameSize * 0.92)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
-  const themeShot = revealTheme ? shareThemes.captureTheme(ctx, x, y, frameSize, frameSize) : null
-
-  if (!revealTheme) {
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fillRect(x, y, frameSize, frameSize)
-  }
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(x, y, frameSize, frameSize)
 
   if (qrImg) {
-    ctx.drawImage(qrImg, revealTheme ? x : innerX, revealTheme ? y : innerY, revealTheme ? frameSize : innerSize, revealTheme ? frameSize : innerSize)
-    if (themeShot) themeShot.reveal(1)
+    ctx.drawImage(qrImg, innerX, innerY, innerSize, innerSize)
     return Promise.resolve()
   }
 
@@ -427,9 +422,7 @@ function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackCon
         '#0f172a',
         '#ffffff',
       )
-    return Promise.resolve(drawn).then(() => {
-      if (themeShot) themeShot.reveal(1)
-    })
+    return Promise.resolve(drawn)
   }
 
   return Promise.resolve()
@@ -613,7 +606,6 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
     qrY,
     qrFrameSize,
     wxacodeImg ? '' : qrFallbackContent,
-    glassy,
   ).then(() => {
     const cx = qrX + qrFrameSize / 2
     const cy = qrY + qrFrameSize / 2

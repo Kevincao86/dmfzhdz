@@ -439,16 +439,12 @@ function drawCodeCard(opts) {
         const x = inset + 8
         const y = inset + 8
         const inner = side - inset * 2 - 16
-        const shot = opts.theme ? themes.captureTheme(ctx, x, y, inner, inner) : null
         ctx.save()
         themes.clipShape(ctx, x, y, inner, opts.shapeId)
-        if (!opts.theme) {
-          ctx.fillStyle = '#FFFFFF'
-          ctx.fillRect(x, y, inner, inner)
-        }
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillRect(x, y, inner, inner)
         ctx.drawImage(img, x, y, inner, inner)
         ctx.restore()
-        if (shot) shot.reveal(1)
         exportCanvas(canvas, side, side, 'share-code').then(resolve).catch(reject)
       }
       img.onerror = () => reject(new Error('小程序码图片无效'))

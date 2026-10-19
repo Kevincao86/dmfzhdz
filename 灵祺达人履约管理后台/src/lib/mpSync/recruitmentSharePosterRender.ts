@@ -431,24 +431,13 @@ function drawStyledQr(
   x: number,
   y: number,
   frameSize: number,
-  revealTheme: boolean,
 ) {
   const innerSize = Math.round(frameSize * QR_INNER_RATIO)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
-  const theme = revealTheme ? ctx.getImageData(x, y, frameSize, frameSize) : null
-  if (!revealTheme) {
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fillRect(x, y, frameSize, frameSize)
-  }
-  ctx.drawImage(
-    qrImage,
-    revealTheme ? x : innerX,
-    revealTheme ? y : innerY,
-    revealTheme ? frameSize : innerSize,
-    revealTheme ? frameSize : innerSize,
-  )
-  if (theme) tintWhitesWithTheme(ctx, theme, x, y, frameSize, frameSize, 1)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(x, y, frameSize, frameSize)
+  ctx.drawImage(qrImage, innerX, innerY, innerSize, innerSize)
 }
 
 export async function renderRecruitmentPosterCanvas(
@@ -569,7 +558,7 @@ export async function renderRecruitmentPosterCanvas(
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
   if (qrImage) {
-    drawStyledQr(ctx, qrImage, qrX, qrY, qrFrameSize, !!festivalImg)
+    drawStyledQr(ctx, qrImage, qrX, qrY, qrFrameSize)
   }
   const cx = qrX + qrFrameSize / 2
   const cy = qrY + qrFrameSize / 2

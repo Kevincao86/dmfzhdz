@@ -284,7 +284,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
                 <img
                   src={codeUrl}
                   alt="小程序码"
-                  className={`relative h-52 w-52 object-contain ${activeTheme ? 'mix-blend-multiply' : 'rounded-xl bg-white'}`}
+                  className="relative h-52 w-52 rounded-xl bg-white object-contain"
                 />
               </div>
             ) : (
