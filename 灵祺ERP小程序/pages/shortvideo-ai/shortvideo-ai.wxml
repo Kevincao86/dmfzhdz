@@ -67,7 +67,7 @@
       </view>
       <view wx:for="{{imitateShots}}" wx:key="id" class="sv-imitate-shot">
         <view class="sv-imitate-shot__head">
-          <text>镜头 {{index + 1}}</text>
+          <text>镜头 {{index + 1}} · {{item.startSec}}–{{item.endSec}}秒</text>
           <text data-id="{{item.id}}" data-dir="-1" bindtap="onMoveShot">上移</text>
           <text data-id="{{item.id}}" data-dir="1" bindtap="onMoveShot">下移</text>
           <text data-id="{{item.id}}" bindtap="onRemoveShot">删除</text>
@@ -120,14 +120,27 @@
         <view class="sv-chip {{bgmMode === 'custom' ? 'cyan' : ''}}" data-mode="custom" bindtap="onBgmMode">自己的音乐</view>
       </view>
       <block wx:if="{{bgmMode === 'custom'}}">
-        <text class="sv-cabin-tip">小程序按整段混入。要裁开头、接多段，或保留原片人声再配乐，请用电脑端。</text>
-        <button class="sv-btn-outline" bindtap="onPickBgm">{{bgmName || '上传一段音乐'}}</button>
+        <text class="sv-cabin-tip">可取段、可接多段。选原片人声时会保留成片原声再配乐。</text>
+        <button class="sv-btn-outline" bindtap="onPickBgm">添加一段音乐</button>
+        <view wx:for="{{bgmClips}}" wx:key="id" class="sv-imitate-shot">
+          <view class="sv-imitate-shot__head">
+            <text>{{item.name}}</text>
+            <text data-id="{{item.id}}" bindtap="onRemoveBgmClip">移除</text>
+          </view>
+          <text>从 {{item.startLabel}}s</text>
+          <slider min="0" max="{{item.durationSec}}" step="0.1" value="{{item.startSec}}" data-id="{{item.id}}" bindchange="onBgmClipStart" activeColor="#0891b2" block-size="16" />
+          <text>到 {{item.endLabel}}s</text>
+          <slider min="0" max="{{item.durationSec}}" step="0.1" value="{{item.endSec}}" data-id="{{item.id}}" bindchange="onBgmClipEnd" activeColor="#0891b2" block-size="16" />
+        </view>
+        <text>音量 {{bgmVolumeLabel}}%</text>
+        <slider min="0" max="1" step="0.05" value="{{bgmVolume}}" bindchange="onBgmVolume" activeColor="#0891b2" block-size="16" />
       </block>
       <view wx:if="{{err || hint}}" class="sv-alert {{err ? 'err' : 'hint'}}">{{err || hint}}</view>
       <text class="sv-cabin-tip" wx:if="{{progress}}">{{progress}}</text>
       <button class="sv-btn-cyan" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateGenerate">开始模仿</button>
       <video wx:if="{{resultUrl}}" class="sv-video" src="{{resultUrl}}" controls />
       <button wx:if="{{resultUrl}}" class="sv-btn-outline" bindtap="saveResultAlbum">保存到相册</button>
+      <canvas type="2d" id="imitate-frame-canvas" class="sv-imitate-frame-canvas" />
     </view>
 
     <view class="sv-cabin" wx:else>

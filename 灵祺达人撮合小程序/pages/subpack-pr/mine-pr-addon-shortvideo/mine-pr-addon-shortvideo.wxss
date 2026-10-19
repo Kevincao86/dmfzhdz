@@ -76,3 +76,11 @@
   border-radius: 12rpx;
   border: 4rpx solid transparent;
 }
+
+.imitate-frame-canvas {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 2px;
+  height: 2px;
+}

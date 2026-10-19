@@ -5,6 +5,8 @@
 const videoAi = require('./videoAiMp.js')
 const vs = require('./visualStudioAiMp.js')
 const erpPoints = require('./erpPointsSpendMp.js')
+const merchantApi = require('./merchantApi.js')
+const studio = require('./imitateStudioMp.js')
 
 const IMITATE_VIDEO_MAX = 48 * 1024 * 1024
 const IMITATE_VIDEO_MAX_SEC = 60
@@ -44,8 +46,9 @@ function initialData() {
     voicePath: '',
     voiceName: '',
     bgmMode: 'keep',
-    bgmPath: '',
-    bgmName: '',
+    bgmClips: [],
+    bgmVolume: 0.35,
+    bgmVolumeLabel: 35,
   }
 }
 
@@ -172,14 +175,6 @@ function pickAudioFile() {
   })
 }
 
-function fitSpeechRate(text, videoSec, baseRate) {
-  const chars = String(text || '').replace(/\s/g, '').length
-  const natural = Math.max(0.8, chars / 4.2)
-  const target = Math.max(0.8, Number(videoSec) || natural)
-  const rate = (Number(baseRate) || 1) * (natural / target)
-  return Math.min(1.4, Math.max(0.8, Math.round(rate * 100) / 100))
-}
-
 function shotPlanSec(shots) {
   let end = 0
   ;(shots || []).forEach((shot, i) => {
@@ -189,50 +184,22 @@ function shotPlanSec(shots) {
   return Math.min(60, Math.max(5, Math.ceil(end || 15)))
 }
 
-function storyboardPrompt(who, shots) {
-  return [
-    `【形象锁定】参考图只锁定${who}的脸和衣服。成片必须是这个人出镜，禁止换成别人。`,
-    '【分镜必演】按下面镜头顺序演完。口播必须说出来，要有环境声，禁止无声，禁止只出字幕。竖屏 9:16。',
-    ...(shots || []).map(
-      (shot, i) =>
-        `镜头${i + 1}：画面：${shot.visual || '沿用上一段场景'}。动作：${shot.action || '按画面自然表演'}。口播：「${shot.speech || ''}」。${shot.hasBgm ? '这段有背景音。' : '这段不要背景音乐。'}`,
-    ),
-    '不要字幕、水印、Logo。',
-  ].join('\n')
-}
-
-function shotsFromSpeech(speech, motion) {
-  const lines = String(speech || '')
-    .split(/\n+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const parts = lines.length ? lines.slice(0, 4) : ['']
-  return parts.map((line, i) => ({
-    id: `shot-${Date.now()}-${i}`,
-    visual: `第 ${i + 1} 段画面`,
-    action: i === 0 && motion ? String(motion).slice(0, 80) : '沿用参考动作',
-    speech: line,
-    hasBgm: true,
-  }))
-}
-
-function parseShotJson(text, speech, motion) {
-  const raw = String(text || '')
-  const start = raw.indexOf('[')
-  const end = raw.lastIndexOf(']')
-  if (start < 0 || end <= start) return shotsFromSpeech(speech, motion)
+async function postDoubaoChat(messages, extra) {
+  const o = extra || {}
+  const body = {
+    provider: 'doubao',
+    messages,
+    stream: false,
+    temperature: o.temperature != null ? o.temperature : 0.2,
+  }
+  if (Array.isArray(o.imageDataUrls) && o.imageDataUrls.length) body.imageDataUrls = o.imageDataUrls
   try {
-    const arr = JSON.parse(raw.slice(start, end + 1))
-    if (!Array.isArray(arr) || !arr.length) return shotsFromSpeech(speech, motion)
-    return arr.slice(0, 4).map((item, i) => ({
-      id: `shot-${Date.now()}-${i}`,
-      visual: String((item && item.visual) || `第 ${i + 1} 段画面`),
-      action: String((item && item.action) || '沿用参考动作'),
-      speech: String((item && item.speech) || ''),
-      hasBgm: Boolean(item && item.hasBgm),
-    }))
-  } catch (_) {
-    return shotsFromSpeech(speech, motion)
+    const data = await merchantApi.merchantRequest('POST', '/api/meoo-ai-chat', body)
+    const content = String((data && (data.content || data.text)) || '').trim()
+    if (!content) return { ok: false, message: 'AI 未返回内容' }
+    return { ok: true, content }
+  } catch (e) {
+    return { ok: false, message: String((e && e.message) || e) }
   }
 }
 
@@ -338,10 +305,34 @@ const pageMethods = {
   async onPickBgm() {
     try {
       const file = await pickAudioFile()
-      this.setData({ bgmPath: file.path, bgmName: file.name, bgmMode: 'custom' })
+      const clip = await studio.makeBgmClip(file.path, file.name)
+      this.setData({ bgmClips: (this.data.bgmClips || []).concat(clip), bgmMode: 'custom' })
     } catch (e) {
       if (!cancelled(e)) wx.showToast({ title: '选择音乐失败', icon: 'none' })
     }
+  },
+  onBgmClipStart(e) {
+    const id = e.currentTarget.dataset.id
+    const startSec = Number(e.detail.value)
+    const row = (this.data.bgmClips || []).find((item) => item.id === id)
+    this.setData({
+      bgmClips: studio.updateClip(this.data.bgmClips, id, {
+        startSec,
+        endSec: Math.max(row ? row.endSec : startSec + 0.2, startSec + 0.2),
+      }),
+    })
+  },
+  onBgmClipEnd(e) {
+    const id = e.currentTarget.dataset.id
+    this.setData({ bgmClips: studio.updateClip(this.data.bgmClips, id, { endSec: Number(e.detail.value) }) })
+  },
+  onRemoveBgmClip(e) {
+    const id = e.currentTarget.dataset.id
+    this.setData({ bgmClips: (this.data.bgmClips || []).filter((item) => item.id !== id) })
+  },
+  onBgmVolume(e) {
+    const bgmVolume = Math.max(0, Math.min(1, Number(e.detail.value) || 0))
+    this.setData({ bgmVolume, bgmVolumeLabel: Math.round(bgmVolume * 100) })
   },
   onToggleShotBgm(e) {
     const id = e.currentTarget.dataset.id
@@ -362,38 +353,46 @@ const pageMethods = {
       this.setData({ err: '参考视频请控制在 1 分钟以内' })
       return
     }
-    this.setData({ busy: true, err: '', progress: '正在整理画面、口播、背景音…' })
+    const hasVideo = !!this.data.imitateVideoPath
+    const dur = hasVideo ? Math.min(IMITATE_VIDEO_MAX_SEC, Math.max(1, Number(this.data.imitateDurationSec) || 8)) : 8
+    this.setData({
+      busy: true,
+      err: '',
+      progress: hasVideo ? '正在按镜头抽帧…' : '正在从分享链接整理画面、口播和背景音…',
+    })
     try {
       const source = caption || link.slice(0, 500)
-      let shots = shotsFromSpeech(source, '')
-      const note = link
-        ? '已按分享文案整理成画面、口播、背景音。分享链接不会变成参考视频。'
-        : '已按视频说明整理成画面、口播、背景音。'
+      let frames = []
+      if (hasVideo) {
+        frames = await studio.extractFrames(this, this.data.imitateVideoPath, studio.sampleTimes(dur))
+        this.setData({ progress: '正在分析画面、口播和背景音…' })
+      }
+      let text = ''
+      const note = hasVideo
+        ? frames.length
+          ? '已按参考视频画面和时间轴整理成镜头。'
+          : '画面抽帧暂不可用，已按视频时长生成可编辑拆解稿。'
+        : '已按分享文案整理成画面、口播、背景音。可以直接开始模仿；要按原片换人，再上传 1 分钟内的视频。'
       try {
-        const chat = await vs.postAiChat(
-          [
-            {
-              role: 'user',
-              content: [
-                '不要下载视频。把下面的内容整理成 2 到 4 个镜头。',
-                '只返回 JSON 数组，每项字段 visual,action,speech,hasBgm。visual 是画面，action 是动作，speech 是口播，hasBgm 表示有没有背景音。',
-                source || '没有分享文案，请写一段可编辑的画面和口播。',
-              ].join('\n'),
-            },
-          ],
-          { provider: 'doubao', temperature: 0.2 },
+        const chat = await postDoubaoChat(
+          [{ role: 'user', content: hasVideo ? studio.videoAnalyzeContent(dur, caption) : studio.shareAnalyzeContent(source) }],
+          {
+            temperature: 0.2,
+            ...(frames.length
+              ? { imageDataUrls: frames.slice(0, 3).map((item) => `data:image/jpeg;base64,${item}`) }
+              : {}),
+          },
         )
-        if (chat.ok) {
-          shots = parseShotJson(chat.content, source, '')
-        } else if (/overdue balance|account has an overdue|欠费|余额不足/i.test(String(chat.message || ''))) {
+        if (chat.ok) text = chat.content
+        else if (/overdue balance|account has an overdue|欠费|余额不足/i.test(String(chat.message || ''))) {
           this.setData({
             err: '豆包这条线路欠费。请到运营台把豆包改成手动，选中备选 1 并保存线路。',
           })
         }
       } catch (_) {
-        /* 豆包失败时仍展示按文案整理的画面、口播、背景音 */
+        /* 豆包失败时仍展示按时长整理的画面、口播、背景音 */
       }
-      this.setData({ imitateShots: shots, imitateNote: note, progress: '' })
+      this.setData({ imitateShots: studio.parseShots(text, dur, source), imitateNote: note, progress: '' })
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 100) })
     } finally {
@@ -468,8 +467,8 @@ const pageMethods = {
       this.setData({ err: '请上传一段清晰人声' })
       return
     }
-    if (this.data.bgmMode === 'custom' && !this.data.bgmPath) {
-      this.setData({ err: '请上传背景乐，或改回沿用原片' })
+    if (this.data.bgmMode === 'custom' && !(this.data.bgmClips || []).length) {
+      this.setData({ err: '请添加一段音乐，或改回沿用原片' })
       return
     }
     const hasVideo = !!this.data.imitateVideoPath
@@ -499,18 +498,13 @@ const pageMethods = {
       if (!hasVideo) {
         this.setData({ progress: '按镜头生成中…' })
         start = await videoAi.postXiaoyunque({
-          prompt: storyboardPrompt(who, this.data.imitateShots),
+          prompt: studio.storyboardPrompt(who, this.data.imitateShots),
           durationSec,
           imagesBase64: [imageData],
         })
       } else {
         const videoBase64 = await readFileBase64(this.data.imitateVideoPath)
-        const prompt = [
-          `将参考视频中的主要出镜人物替换为${who}。保持原视频的动作、口型和场景。`,
-          ...(this.data.imitateShots || []).map(
-            (shot, i) => `镜头${i + 1}：${shot.visual}；动作${shot.action}；口播「${shot.speech || ''}」`,
-          ),
-        ].join('')
+        const prompt = studio.motionPrompt(who, this.data.imitateShots, this.data.voiceMode, this.data.bgmMode)
         this.setData({ progress: '动作模仿生成中…' })
         start = await videoAi.postMotionImitate({
           imageBase64: imageData,
@@ -538,42 +532,26 @@ const pageMethods = {
         return
       }
       let resultUrl = done.videoUrl
-      let mixNote = ''
       if (this.data.voiceMode !== 'keep' || this.data.bgmMode === 'custom') {
-        this.setData({ progress: '正在混入声音或背景乐…' })
-        try {
-          let audioBase64 = ''
-          if (this.data.voiceMode !== 'keep') {
-            const voice = IMITATE_VOICES.find((item) => item.id === this.data.voiceId) || IMITATE_VOICES[0]
-            const speech = (this.data.imitateShots || [])
-              .map((shot) => String(shot.speech || '').trim())
-              .filter(Boolean)
-              .join('\n')
-              .slice(0, 480)
-            const probed = await videoInfoDuration(done.videoUrl)
-            const voiceSec = probed > 0.4 ? probed : durationSec
-            const ttsBody = {
-              text: speech || '沿用参考视频里的动作和口播。',
-              voicePresetId: this.data.voiceMode === 'clone' ? 'v-clone' : voice.id,
-              speechRate: fitSpeechRate(speech, voiceSec, voice.rate),
-              speechPitch: voice.pitch,
-            }
-            if (this.data.voiceMode === 'clone') {
-              ttsBody.referenceAudioBase64 = await readFileBase64(this.data.voicePath)
-            }
-            const spoken = await videoAi.postDigitalHumanTts(ttsBody)
-            if (!spoken.ok) throw new Error(spoken.message || '语音合成失败')
-            audioBase64 = spoken.audioBase64
-            if (this.data.bgmMode === 'custom') mixNote = '人声已替换。背景乐和人声一起混请用电脑端。'
-          } else {
-            audioBase64 = await readFileBase64(this.data.bgmPath)
-            mixNote = '已换成上传的背景乐，原片人声不会保留。'
-          }
-          const videoPure = await downloadUrlBase64(done.videoUrl)
-          resultUrl = await videoAi.postMuxAudioFile(videoPure, audioBase64)
-        } catch (mixErr) {
-          mixNote = String(mixErr.message || '混音失败，已保留成片').slice(0, 40)
-        }
+        const probedMix = await videoInfoDuration(done.videoUrl)
+        const voiceSec = probedMix > 0.4 ? probedMix : durationSec
+        const voice = IMITATE_VOICES.find((item) => item.id === this.data.voiceId) || IMITATE_VOICES[0]
+        this.setData({ progress: '正在按镜头铺口播、拼接背景乐…' })
+        const audioBase64 = await studio.mixImitateAudio({
+          shots: this.data.imitateShots,
+          videoSec: voiceSec,
+          voiceMode: this.data.voiceMode,
+          voice,
+          bgmMode: this.data.bgmMode,
+          bgmClips: this.data.bgmClips,
+          bgmVolume: this.data.bgmVolume,
+          videoUrl: done.videoUrl,
+          readCloneBase64: () => readFileBase64(this.data.voicePath),
+          synthesize: (body) => videoAi.postDigitalHumanTts(body),
+          onProgress: (label) => this.setData({ progress: label }),
+        })
+        const videoPure = await downloadUrlBase64(done.videoUrl)
+        resultUrl = await videoAi.postMuxAudioFile(videoPure, audioBase64)
       }
       const probedBill = await videoInfoDuration(done.videoUrl)
       const billedSec = probedBill > 0.4 ? probedBill : durationSec
@@ -589,7 +567,7 @@ const pageMethods = {
       this.setData({
         resultUrl,
         progress: '',
-        hint: mixNote ? `${charged} · ${mixNote}` : charged,
+        hint: charged,
         pointsBalance: charge && charge.balance != null ? charge.balance : this.data.pointsBalance,
       })
     } catch (e) {

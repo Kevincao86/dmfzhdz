@@ -1290,3 +1290,11 @@
 .sv-imitate-avatar.on .sv-imitate-avatar__img {
   border-color: #0891b2;
 }
+
+.sv-imitate-frame-canvas {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 2px;
+  height: 2px;
+}

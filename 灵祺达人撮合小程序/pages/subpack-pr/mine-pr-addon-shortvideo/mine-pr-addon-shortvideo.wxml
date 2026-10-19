@@ -78,7 +78,7 @@
       </view>
       <view wx:for="{{imitateShots}}" wx:key="id" class="imitate-shot">
         <view class="imitate-shot__head">
-          <text>镜头 {{index + 1}}</text>
+          <text>镜头 {{index + 1}} · {{item.startSec}}–{{item.endSec}}秒</text>
           <text data-id="{{item.id}}" data-dir="-1" bindtap="onMoveShot">上移</text>
           <text data-id="{{item.id}}" data-dir="1" bindtap="onMoveShot">下移</text>
           <text data-id="{{item.id}}" bindtap="onRemoveShot">删除</text>
@@ -131,14 +131,27 @@
         <view class="addon-chip {{bgmMode === 'custom' ? 'addon-chip--on' : ''}}" data-mode="custom" bindtap="onBgmMode">自己的音乐</view>
       </view>
       <block wx:if="{{bgmMode === 'custom'}}">
-        <text class="addon-card__sub">小程序按整段混入。要裁开头、接多段，或保留原片人声再配乐，请用星选网页。</text>
-        <button class="addon-btn addon-btn--ghost" bindtap="onPickBgm">{{bgmName || '上传一段音乐'}}</button>
+        <text class="addon-card__sub">可取段、可接多段。选原片人声时会保留成片原声再配乐。</text>
+        <button class="addon-btn addon-btn--ghost" bindtap="onPickBgm">添加一段音乐</button>
+        <view wx:for="{{bgmClips}}" wx:key="id" class="imitate-shot">
+          <view class="imitate-shot__head">
+            <text>{{item.name}}</text>
+            <text data-id="{{item.id}}" bindtap="onRemoveBgmClip">移除</text>
+          </view>
+          <text>从 {{item.startLabel}}s</text>
+          <slider min="0" max="{{item.durationSec}}" step="0.1" value="{{item.startSec}}" data-id="{{item.id}}" bindchange="onBgmClipStart" activeColor="#0891b2" block-size="16" />
+          <text>到 {{item.endLabel}}s</text>
+          <slider min="0" max="{{item.durationSec}}" step="0.1" value="{{item.endSec}}" data-id="{{item.id}}" bindchange="onBgmClipEnd" activeColor="#0891b2" block-size="16" />
+        </view>
+        <text>音量 {{bgmVolumeLabel}}%</text>
+        <slider min="0" max="1" step="0.05" value="{{bgmVolume}}" bindchange="onBgmVolume" activeColor="#0891b2" block-size="16" />
       </block>
       <text class="addon-err" wx:if="{{err}}">{{err}}</text>
       <text class="addon-progress" wx:if="{{progress}}">{{progress}}</text>
       <button class="addon-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateGenerate">开始模仿</button>
       <video wx:if="{{resultUrl}}" class="addon-video" src="{{resultUrl}}" controls />
       <button wx:if="{{resultUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSaveVideo">保存到相册</button>
+      <canvas type="2d" id="imitate-frame-canvas" class="imitate-frame-canvas" />
     </view>
   </block>
 

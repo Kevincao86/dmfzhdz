@@ -1908,6 +1908,8 @@ web版/merchant-erp/src/services/tenantBillingClient.ts
 灵祺ERP小程序/pages/shortvideo-ai/shortvideo-ai.wxml
 灵祺ERP小程序/pages/shortvideo-ai/shortvideo-ai.wxss
 灵祺ERP小程序/utils/shortvideoImitateMp.js
+灵祺ERP小程序/utils/imitateStudioMp.js
+灵祺达人撮合小程序/utils/imitateStudioMp.js
 灵祺ERP小程序/utils/mpPointsEconomicsMp.js
 灵祺ERP小程序/utils/erpPointsSpendMp.js
 灵祺ERP小程序/utils/tenantBillingApiMp.js
