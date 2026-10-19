@@ -118,12 +118,35 @@ function buildFansRequirementText(f) {
   return min ? `粉丝≥${min}` : ''
 }
 
+function applyFormSeed(recruitTarget) {
+  const target = recruitTarget || 'talent'
+  const kind = applyTemplates.templateKindFromRecruitTarget(target)
+  const activeId = applyTemplates.getActiveTemplateId(kind)
+  const tpl = activeId ? applyTemplates.getTemplateById(activeId) : null
+  if (tpl && Array.isArray(tpl.fields) && tpl.fields.length) {
+    return {
+      applyFormTemplateId: tpl.id,
+      applyFormTemplateName: tpl.name || '',
+      applyFormFields: tpl.fields.map((f) => ({ ...f })),
+    }
+  }
+  if (target === 'shoot' || target === 'edit') {
+    return {
+      applyFormTemplateId: '',
+      applyFormTemplateName: '团队报名默认项',
+      applyFormFields: supplierPublishForm.defaultSupplierApplyFields(target),
+    }
+  }
+  return {
+    applyFormTemplateId: '',
+    applyFormTemplateName: '',
+    applyFormFields: (applyTemplates.emptyCustomTemplate('').fields || []).map((f) => ({ ...f })),
+  }
+}
+
 function emptyForm(recruitTarget) {
   const target = recruitTarget || 'talent'
-  const afFields =
-    target === 'shoot' || target === 'edit'
-      ? supplierPublishForm.defaultSupplierApplyFields(target)
-      : (applyTemplates.emptyCustomTemplate('').fields || []).map((f) => ({ ...f }))
+  const applySeed = applyFormSeed(target)
   return {
     deliveryWindow: 'normal',
     title: '',
@@ -151,9 +174,9 @@ function emptyForm(recruitTarget) {
     fulfillmentLoop: 'closed',
     groupQrImage: '',
     editGroupQrImage: '',
-    applyFormTemplateId: '',
-    applyFormTemplateName: target === 'talent' ? '' : '团队报名默认项',
-    applyFormFields: afFields,
+    applyFormTemplateId: applySeed.applyFormTemplateId,
+    applyFormTemplateName: applySeed.applyFormTemplateName,
+    applyFormFields: applySeed.applyFormFields,
     coverImage: '',
     coverLibraryId: '',
     linkeAttach: prDouyinLinkeTypes.emptyPublishLinkeAttach(),

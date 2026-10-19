@@ -1,5 +1,12 @@
 import type { ApplyField } from './applyFormTemplates'
-import { emptyCustomTemplate, buildEditorRows, validateTemplateFields } from './applyFormTemplates'
+import {
+  emptyCustomTemplate,
+  buildEditorRows,
+  validateTemplateFields,
+  getActiveTemplateId,
+  getTemplateById,
+  templateKindFromRecruitTarget,
+} from './applyFormTemplates'
 import { validateTierPublish, formatTierPriceSummary } from './mpRecruitmentTierQuote'
 import { buildCompactBudgetText } from './recruitmentBudgetDisplay'
 import {
@@ -94,9 +101,35 @@ export type PublishForm = {
 } & LivePublishFields &
   MerchantLocationFormFields
 
+function applyFormSeed(recruitTarget: string) {
+  const kind = templateKindFromRecruitTarget(recruitTarget)
+  const activeId = getActiveTemplateId(kind)
+  const tpl = activeId ? getTemplateById(activeId) : null
+  if (tpl && tpl.fields.length) {
+    return {
+      applyFormTemplateId: tpl.id,
+      applyFormTemplateName: tpl.name || '',
+      applyFormFields: tpl.fields.map((f) => ({ ...f })),
+    }
+  }
+  if (recruitTarget === 'shoot' || recruitTarget === 'edit') {
+    return {
+      applyFormTemplateId: '',
+      applyFormTemplateName: '团队报名默认项',
+      applyFormFields: defaultSupplierApplyFields(recruitTarget),
+    }
+  }
+  const afTpl = emptyCustomTemplate('')
+  return {
+    applyFormTemplateId: '',
+    applyFormTemplateName: '',
+    applyFormFields: (afTpl.fields || []).map((f) => ({ ...f })),
+  }
+}
+
 export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
   const isSupplier = recruitTarget === 'shoot' || recruitTarget === 'edit'
-  const afTpl = emptyCustomTemplate('')
+  const applySeed = applyFormSeed(recruitTarget)
   const supplierFields = emptySupplierPublishFields()
   return {
     deliveryWindow: 'normal',
@@ -123,11 +156,9 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
     fulfillmentLoop: 'closed',
-    applyFormTemplateId: '',
-    applyFormTemplateName: isSupplier ? '团队报名默认项' : '',
-    applyFormFields: isSupplier
-      ? defaultSupplierApplyFields(recruitTarget)
-      : (afTpl.fields || []).map((f) => ({ ...f })),
+    applyFormTemplateId: applySeed.applyFormTemplateId,
+    applyFormTemplateName: applySeed.applyFormTemplateName,
+    applyFormFields: applySeed.applyFormFields,
     ...supplierFields,
     ...emptyLiveFields(),
     linkeAttach: emptyPublishLinkeAttach(),

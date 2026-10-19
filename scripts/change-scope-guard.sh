@@ -148,6 +148,7 @@ list_scopes() {
   recruit_apply_editor 发布招募：达人报名必填信息可打开，并编辑当前报名项
   merchant_ops_talent_head 商家运营方案：同城达人库头部按 5 级及以上统计，不单看小红书
   merchant_mp_erp_sync 商家小程序：达人推荐与智能回复对齐商家 ERP
+  recruit_publish_default_tpl 发招募时带上我的模版里设为当前默认的报名项
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -830,6 +831,13 @@ aiAgentMp
 aiAgentExecutionMp
 pages/ai-agent/ai-agent
 pages/ai-ops-plan/ai-ops-plan
+change-scope-guard
+PAT
+      ;;
+    recruit_publish_default_tpl)
+      cat <<'PAT'
+pages/publish/publish
+publishOrder
 change-scope-guard
 PAT
       ;;
