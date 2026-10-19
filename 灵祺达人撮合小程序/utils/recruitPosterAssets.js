@@ -71,6 +71,24 @@ function posterAssetUrlCandidates(filename) {
   return out
 }
 
+function festivalAssetCandidates(filename) {
+  const rel = `festivals/${String(filename || '').replace(/^\/+/, '')}`
+  if (!filename) return []
+  const out = []
+  const seen = new Set()
+  const add = (base) => {
+    const root = String(base || '').replace(/\/$/, '')
+    if (!root) return
+    const url = `${withCacheBust(`${root}/${rel}`)}&festival=20261019`
+    if (seen.has(url)) return
+    seen.add(url)
+    out.push(url)
+  }
+  add(posterRootCdn())
+  add(posterRootOss())
+  return out
+}
+
 function posterQrFrameCandidates(tmpl) {
   const file = String((tmpl && tmpl.qrFrameFile) || '').trim()
   if (file) return posterAssetUrlCandidates(file)
@@ -82,6 +100,7 @@ module.exports = {
   posterRoot,
   posterAssetUrl,
   posterAssetUrlCandidates,
+  festivalAssetCandidates,
   posterQrFrameCandidates,
   withCacheBust,
 }

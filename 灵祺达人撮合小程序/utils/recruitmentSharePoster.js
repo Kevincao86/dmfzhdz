@@ -352,13 +352,12 @@ function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
 }
 
 function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackContent) {
-  const innerSize = Math.round(frameSize * QR_INNER_RATIO)
+  const innerSize = Math.round(frameSize * 0.92)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
 
-  if (frameImg) {
-    ctx.drawImage(frameImg, x, y, frameSize, frameSize)
-  }
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(x, y, frameSize, frameSize)
 
   if (qrImg) {
     ctx.drawImage(qrImg, innerX, innerY, innerSize, innerSize)
@@ -470,13 +469,16 @@ function drawInviterBrand(ctx, input, design, brandImg, pad, cardW, y) {
   return true
 }
 
-function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFrameImg, qrFallbackContent, brandImg) {
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFrameImg, qrFallbackContent, brandImg, festivalImg) {
   const tmpl = design.template || {}
   const pad = design && design.shareTheme ? 72 : 40
   const cardW = POSTER_W - pad * 2
   const cardH = POSTER_H - pad * 2
 
-  if (design && design.shareTheme) {
+  if (festivalImg) {
+    shareThemes.drawCover(ctx, festivalImg, 0, 0, POSTER_W, POSTER_H)
+  } else if (design && design.shareTheme) {
+    design.forceGradientHero = true
     shareThemes.paintPosterChrome(ctx, design.shareTheme, POSTER_W, POSTER_H)
   } else {
     ctx.fillStyle = (design && design.frameColor) || tmpl.outerBg || '#E5E7EB'
@@ -500,7 +502,7 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   const heroH = 280
   const heroX = pad + 24
   const heroW = cardW - 48
-  drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, heroX, y, heroW, heroH)
+  drawHeroSection(ctx, canvas, input, design, festivalImg || bgImg, platformImg, heroX, y, heroW, heroH)
   y += heroH + 24
 
   ctx.textAlign = 'left'
@@ -644,7 +646,8 @@ function applyShareLook(design, opts) {
     design.frameColor = theme.accent
     design.accentColor = theme.accent
     design.accentLight = theme.paper
-    design.forceGradientHero = true
+    design.forceGradientHero = false
+    design.festivalFile = `festival-${theme.id}.jpg`
     design.template = Object.assign({}, design.template, {
       outerBg: theme.bg[1],
       bgGradient: theme.bg.concat([theme.paper]),
@@ -705,11 +708,15 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
         canvas,
         posterAssets.posterAssetUrlCandidates(tmpl.backgroundFile || tmpl.backgroundUrl),
       ),
-      loadCanvasImageCandidates(canvas, posterAssets.posterQrFrameCandidates(tmpl)),
+      Promise.resolve(null),
       loadCanvasImage(canvas, tags.platformIcon),
       wxLoad,
       loadCanvasImage(canvas, input.inviterAvatarUrl),
-    ]).then(([bgImg, qrFrameImg, platformImg, wxacodeImg, brandImg]) => {
+      loadCanvasImageCandidates(
+        canvas,
+        design.festivalFile ? posterAssets.festivalAssetCandidates(design.festivalFile) : [],
+      ),
+    ]).then(([bgImg, qrFrameImg, platformImg, wxacodeImg, brandImg, festivalImg]) => {
       const useWx = !!(wxDataUrl && wxacodeImg)
       if (!useWx && wxDataUrl) {
         console.warn('[poster] wxacode image load failed, fallback local qr')
@@ -727,6 +734,7 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
         qrFrameImg,
         useWx ? '' : qrFallback,
         brandImg,
+        festivalImg,
       ).then(() => exportCanvasToFile(canvas))
     })
   })

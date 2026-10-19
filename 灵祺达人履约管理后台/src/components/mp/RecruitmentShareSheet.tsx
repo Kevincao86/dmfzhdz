@@ -103,7 +103,12 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     setPosterErr('')
     const theme = FESTIVALS.find((item) => item.id === themeId)
     void buildRecruitmentSharePosterDataUrl(order, posterStyleIndex, theme
-      ? { accentColor: theme.accent, accentLight: theme.paper, themeLabel: theme.label }
+      ? {
+          accentColor: theme.accent,
+          accentLight: theme.paper,
+          themeLabel: theme.label,
+          festivalUrl: `https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/festivals/festival-${theme.id}.jpg?v=festival20261019`,
+        }
       : undefined)
       .then(({ dataUrl, design }) => {
         if (cancelled) return
@@ -254,10 +259,16 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
             {codeUrl ? (
               <div
                 className="rounded-2xl p-3"
-                style={{ background: activeTheme ? `linear-gradient(160deg, ${activeTheme.accent}, ${activeTheme.paper})` : (COLORS.find((c) => c.index === posterStyleIndex)?.color || '#6366F1') }}
+                style={{
+                  backgroundColor: activeTheme?.accent || COLORS.find((c) => c.index === posterStyleIndex)?.color || '#6366F1',
+                  backgroundImage: activeTheme
+                    ? `url(https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/festivals/festival-${activeTheme.id}.jpg?v=festival20261019)`
+                    : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
               >
                 <img src={codeUrl} alt="小程序码" className="h-52 w-52 rounded-xl bg-white object-contain" />
-                {activeTheme ? <p className="mt-2 text-center text-xs font-medium text-white">{activeTheme.label}</p> : null}
               </div>
             ) : (
               <p className="text-sm text-amber-600">{codeErr || '正在生成小程序码…'}</p>

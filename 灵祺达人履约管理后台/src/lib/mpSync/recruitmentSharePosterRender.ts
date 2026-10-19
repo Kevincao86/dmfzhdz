@@ -384,12 +384,23 @@ export async function renderRecruitmentPosterCanvas(
   const pad = design.shareThemeLabel ? 72 : 40
   const cardW = POSTER_W - pad * 2
   const cardH = POSTER_H - pad * 2
-  const bgImg = design.forceGradientHero ? null : await loadPosterBackground(tmpl)
+  const festivalImg = design.festivalUrl ? await loadImage(design.festivalUrl) : null
+  const bgImg = festivalImg || (design.forceGradientHero ? null : await loadPosterBackground(tmpl))
   const qrFrameImg = await loadPosterQrFrame(tmpl)
   const brandImg = await loadImage(String(input.inviterAvatarUrl || ''))
 
+  if (festivalImg) {
+    const iw = festivalImg.width || POSTER_W
+    const ih = festivalImg.height || POSTER_H
+    const ir = iw / Math.max(1, ih)
+    const r = POSTER_W / POSTER_H
+    const dw = ir > r ? POSTER_H * ir : POSTER_W
+    const dh = ir > r ? POSTER_H : POSTER_W / ir
+    ctx.drawImage(festivalImg, (POSTER_W - dw) / 2, (POSTER_H - dh) / 2, dw, dh)
+  } else {
   ctx.fillStyle = design.frameColor || tmpl.outerBg
   ctx.fillRect(0, 0, POSTER_W, POSTER_H)
+  }
   if (design.shareThemeLabel) {
     ctx.fillStyle = '#FFFFFF'
     ctx.font = 'bold 26px sans-serif'

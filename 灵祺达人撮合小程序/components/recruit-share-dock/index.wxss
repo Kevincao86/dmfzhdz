@@ -42,22 +42,11 @@
 .dock-btn::after {
   border: none;
 }
-.dock-icon {
+.dock-icon-img {
   width: 96rpx;
   height: 96rpx;
   border-radius: 28rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 32rpx;
-  font-weight: 700;
 }
-.dock-icon--wx { background: #22c55e; }
-.dock-icon--poster { background: linear-gradient(135deg, #fb7185, #38bdf8); }
-.dock-icon--code { background: #6366f1; }
-.dock-icon--qr { background: #0ea5e9; }
-.dock-icon--link { background: #f59e0b; }
 .dock-label {
   margin-top: 12rpx;
   font-size: 22rpx;

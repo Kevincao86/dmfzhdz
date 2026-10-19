@@ -3,23 +3,23 @@
     <text wx:if="{{title}}" class="dock-title">{{title}}</text>
     <view class="dock-row">
       <button class="dock-cell dock-btn" open-type="share" hover-class="none" bindtap="onClose">
-        <view class="dock-icon dock-icon--wx">微</view>
+        <image class="dock-icon-img" src="/images/share/dock-wechat.jpg" mode="aspectFill" />
         <text class="dock-label">微信好友</text>
       </button>
       <view class="dock-cell" data-tab="poster" bindtap="onOpen">
-        <view class="dock-icon dock-icon--poster">海</view>
+        <image class="dock-icon-img" src="/images/share/dock-poster.jpg" mode="aspectFill" />
         <text class="dock-label">海报分享图</text>
       </view>
       <view class="dock-cell" data-tab="code" bindtap="onOpen">
-        <view class="dock-icon dock-icon--code">码</view>
+        <image class="dock-icon-img" src="/images/share/dock-code.jpg" mode="aspectFill" />
         <text class="dock-label">小程序码</text>
       </view>
       <view class="dock-cell" data-tab="web" data-mode="qr" bindtap="onOpen">
-        <view class="dock-icon dock-icon--qr">码</view>
+        <image class="dock-icon-img" src="/images/share/dock-qr.jpg" mode="aspectFill" />
         <text class="dock-label">二维码</text>
       </view>
       <view class="dock-cell" data-tab="web" data-mode="link" bindtap="onOpen">
-        <view class="dock-icon dock-icon--link">链</view>
+        <image class="dock-icon-img" src="/images/share/dock-link.jpg" mode="aspectFill" />
         <text class="dock-label">网页链接</text>
       </view>
     </view>

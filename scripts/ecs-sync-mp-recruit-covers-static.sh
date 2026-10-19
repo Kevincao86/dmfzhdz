@@ -32,6 +32,11 @@ POSTER_SRC="$MP/assets/recruit-poster-bg"
 if [[ -d "$POSTER_SRC" ]]; then
   sudo cp -f "$POSTER_SRC"/*.png "$STATIC_ROOT/posters/" 2>/dev/null || true
 fi
+FESTIVAL_SRC="$MP/assets/recruit-poster-bg/festivals"
+if [[ -d "$FESTIVAL_SRC" ]]; then
+  sudo mkdir -p "$STATIC_ROOT/festivals"
+  sudo cp -f "$FESTIVAL_SRC"/*.jpg "$STATIC_ROOT/festivals/" 2>/dev/null || true
+fi
 
 for f in hero-talent.png hero-talent-v2-search.png hero-shoot.png hero-edit.png home-banner-clouds.png; do
   if [[ -f "$MP/images/home/$f" ]]; then

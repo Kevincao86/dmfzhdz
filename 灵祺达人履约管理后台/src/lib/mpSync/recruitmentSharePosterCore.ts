@@ -31,6 +31,7 @@ export type PosterDesignTokens = {
   frameColor?: string
   forceGradientHero?: boolean
   shareThemeLabel?: string
+  festivalUrl?: string
 }
 
 export type PosterTags = {

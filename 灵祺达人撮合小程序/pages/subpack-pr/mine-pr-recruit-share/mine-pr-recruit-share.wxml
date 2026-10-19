@@ -17,8 +17,8 @@
 
   <view wx:elif="{{tab === 'code'}}" class="stage">
     <view wx:if="{{codeLoading}}" class="hint">正在生成小程序码…</view>
-    <view wx:elif="{{codePath}}" class="code-wrap" style="width: {{codePx}}rpx;">
-      <image class="code" src="{{codePath}}" mode="widthFix" />
+    <view wx:elif="{{codePath}}" class="code-wrap" style="width: {{codePx}}rpx; height: {{codePx}}rpx;">
+      <image class="code" src="{{codePath}}" mode="aspectFit" />
     </view>
     <view wx:else class="hint">{{codeErr || '小程序码生成失败'}}</view>
   </view>

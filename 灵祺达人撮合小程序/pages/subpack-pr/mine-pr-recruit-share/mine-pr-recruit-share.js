@@ -1,5 +1,6 @@
 const hub = require('../../../utils/recruitShareHub.js')
 const themes = require('../../../utils/recruitShareThemes.js')
+const posterAssets = require('../../../utils/recruitPosterAssets.js')
 const sharePoster = require('../../../utils/recruitmentSharePoster.js')
 const mpApplyShortLink = require('../../../utils/mpApplyShortLink.js')
 const mpApplyWxacode = require('../../../utils/mpApplyWxacode.js')
@@ -378,49 +379,58 @@ function exportCanvas(canvas, W, H, name) {
   })
 }
 
+function loadRemoteImage(canvas, urls) {
+  const list = (urls || []).filter(Boolean)
+  return new Promise((resolve) => {
+    const next = (index) => {
+      if (index >= list.length) {
+        resolve(null)
+        return
+      }
+      const img = canvas.createImage()
+      img.onload = () => resolve(img)
+      img.onerror = () => next(index + 1)
+      img.src = list[index]
+    }
+    next(0)
+  })
+}
+
 function drawCodeCard(opts) {
   const codeSize = opts.codeSize
-  const inset = opts.theme ? 64 : 40
-  const W = codeSize + inset * 2
-  const H = codeSize + inset * 2 + 72
-  const canvas = wx.createOffscreenCanvas({ type: '2d', width: W, height: H })
+  const inset = 36
+  const side = codeSize + inset * 2
+  const canvas = wx.createOffscreenCanvas({ type: '2d', width: side, height: side })
   const ctx = canvas.getContext('2d')
-  const radius = opts.shapeId === 'square' ? 8 : 28
-  if (opts.theme) themes.paintFrame(ctx, opts.theme, W, H, inset - 16, radius)
-  else {
-    ctx.fillStyle = opts.color
-    ctx.fillRect(0, 0, W, H)
-    themes.roundRect(ctx, 18, 18, W - 36, H - 64, radius)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fill()
-  }
-  return new Promise((resolve, reject) => {
-    const img = canvas.createImage()
-    img.onload = () => {
-      const x = (W - codeSize) / 2
-      const y = (H - 72 - codeSize) / 2
-      ctx.save()
+  const radius = opts.shapeId === 'square' ? 0 : opts.shapeId === 'round' ? Math.round(side * 0.08) : 20
+  const urls = opts.theme ? posterAssets.festivalAssetCandidates(`festival-${opts.theme.id}.jpg`) : []
+  return loadRemoteImage(canvas, urls).then((bg) => {
+    if (opts.theme) {
+      themes.paintFrame(ctx, opts.theme, side, side, inset, radius, { image: bg, showLabel: false })
+    } else {
+      ctx.fillStyle = opts.color
+      ctx.fillRect(0, 0, side, side)
+      themes.roundRect(ctx, inset, inset, side - inset * 2, side - inset * 2, radius)
       ctx.fillStyle = '#FFFFFF'
-      themes.clipShape(ctx, x, y, codeSize, opts.shapeId)
-      ctx.fillRect(x, y, codeSize, codeSize)
-      const pad = opts.shapeId === 'round' ? 18 : 10
-      ctx.drawImage(img, x + pad, y + pad, codeSize - pad * 2, codeSize - pad * 2)
-      ctx.restore()
-      if (opts.showLogo) {
-        ctx.fillStyle = opts.theme ? opts.theme.accent : opts.color
-        ctx.beginPath()
-        ctx.arc(x + codeSize - 8, y + 8, 14, 0, Math.PI * 2)
-        ctx.fill()
-      }
-      ctx.fillStyle = '#475569'
-      ctx.font = '22px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(String(opts.caption || '长按识别小程序码报名').slice(0, 18), W / 2, H - 28)
-      exportCanvas(canvas, W, H, 'share-code').then(resolve).catch(reject)
+      ctx.fill()
     }
-    img.onerror = () => reject(new Error('小程序码图片无效'))
-    img.src = opts.filePath
+    return new Promise((resolve, reject) => {
+      const img = canvas.createImage()
+      img.onload = () => {
+        const x = inset + 8
+        const y = inset + 8
+        const inner = side - inset * 2 - 16
+        ctx.save()
+        themes.clipShape(ctx, x, y, inner, opts.shapeId)
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillRect(x, y, inner, inner)
+        ctx.drawImage(img, x, y, inner, inner)
+        ctx.restore()
+        exportCanvas(canvas, side, side, 'share-code').then(resolve).catch(reject)
+      }
+      img.onerror = () => reject(new Error('小程序码图片无效'))
+      img.src = opts.filePath
+    })
   })
 }
 

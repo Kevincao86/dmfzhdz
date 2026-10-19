@@ -126,16 +126,44 @@ function paintPosterChrome(ctx, theme, w, h) {
   ctx.fillText(theme.label, w / 2, 34)
 }
 
-function paintFrame(ctx, theme, w, h, inset, radius) {
-  paintScene(ctx, theme, w, h)
-  roundRect(ctx, inset, inset + 8, w - inset * 2, h - inset * 2 - 28, radius)
+function drawCover(ctx, img, x, y, w, h) {
+  const iw = img && img.width ? img.width : w
+  const ih = img && img.height ? img.height : h
+  const ir = iw / Math.max(1, ih)
+  const r = w / Math.max(1, h)
+  let dw
+  let dh
+  let dx
+  let dy
+  if (ir > r) {
+    dh = h
+    dw = h * ir
+    dx = x + (w - dw) / 2
+    dy = y
+  } else {
+    dw = w
+    dh = w / ir
+    dx = x
+    dy = y + (h - dh) / 2
+  }
+  ctx.drawImage(img, dx, dy, dw, dh)
+}
+
+function paintFrame(ctx, theme, w, h, inset, radius, opts) {
+  const o = opts || {}
+  if (o.image) drawCover(ctx, o.image, 0, 0, w, h)
+  else paintScene(ctx, theme, w, h)
+  const labelH = o.showLabel === false ? 0 : 28
+  roundRect(ctx, inset, inset, w - inset * 2, h - inset * 2 - labelH, radius)
   ctx.fillStyle = '#FFFFFF'
   ctx.fill()
-  ctx.fillStyle = theme.ink
-  ctx.font = 'bold 22px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(theme.label, w / 2, h - 16)
+  if (o.showLabel !== false) {
+    ctx.fillStyle = theme.ink
+    ctx.font = 'bold 22px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(theme.label, w / 2, h - 16)
+  }
 }
 
 function clipShape(ctx, x, y, size, shapeId) {
@@ -156,5 +184,6 @@ module.exports = {
   roundRect,
   paintPosterChrome,
   paintFrame,
+  drawCover,
   clipShape,
 }
