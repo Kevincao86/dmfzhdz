@@ -97,12 +97,13 @@ export async function splitAudioBlobForS2v(
 }
 
 /**
- * 按动作时间轴切分一整段口播。时间戳按成片比例对齐真实音频长度，
- * 最后一段收到音频结尾，短于 1 秒的段并入相邻段。
+ * 按动作时间轴切分一整段口播。时间戳按成片比例对齐真实音频长度。
+ * 短于 minSec 的段并入相邻段，长于 maxSec 的段再切开，方便即梦按段生成。
  */
 export async function splitAudioBlobByMotionBeats(
   blob: Blob,
   beats: Array<{ startSec: number; endSec: number; text: string }>,
+  opts?: { minSec?: number; maxSec?: number },
 ): Promise<{ blobs: Blob[]; texts: string[] } | null> {
   const usable = beats.filter((b) => b.endSec > b.startSec && b.text.trim())
   if (usable.length < 2 || blob.size < 128) return null
@@ -113,19 +114,37 @@ export async function splitAudioBlobByMotionBeats(
   try {
     const decoded = await ctx.decodeAudioData(await blob.arrayBuffer())
     const duration = decoded.duration
+    const minSec = Math.max(1, opts?.minSec ?? 4)
+    const maxSec = Math.max(minSec + 1, opts?.maxSec ?? 15)
     const lastEnd = usable[usable.length - 1]!.endSec
     const scale = lastEnd > 0.5 ? duration / lastEnd : 1
-    const ranges: Array<{ start: number; end: number; text: string }> = []
+    const scaled: Array<{ start: number; end: number; text: string }> = []
     for (let i = 0; i < Math.min(8, usable.length); i++) {
       const b = usable[i]!
       const start = i === 0 ? 0 : Math.max(0, b.startSec * scale)
       const end = i === usable.length - 1 || i === 7 ? duration : Math.min(duration, b.endSec * scale)
-      if (end - start < 1) {
-        if (ranges.length) ranges[ranges.length - 1]!.end = end
-        else ranges.push({ start: 0, end, text: b.text.trim() })
+      if (end > start) scaled.push({ start, end, text: b.text.trim() })
+    }
+    const packed: Array<{ start: number; end: number; text: string }> = []
+    for (const b of scaled) {
+      const prev = packed[packed.length - 1]
+      if (prev && (prev.end - prev.start < minSec || b.end - b.start < minSec) && b.end - prev.start <= maxSec) {
+        prev.end = Math.max(prev.end, b.end)
+        if (b.text && !prev.text.includes(b.text)) prev.text = `${prev.text}；${b.text}`
         continue
       }
-      ranges.push({ start, end, text: b.text.trim() })
+      packed.push({ ...b })
+    }
+    const ranges: Array<{ start: number; end: number; text: string }> = []
+    for (const r of packed) {
+      let cursor = r.start
+      while (cursor < r.end - 0.2) {
+        let end = Math.min(r.end, cursor + maxSec)
+        if (r.end - end < minSec) end = r.end
+        if (end - cursor < 0.8) break
+        ranges.push({ start: cursor, end, text: r.text })
+        cursor = end
+      }
     }
     if (ranges.length < 2) return null
     const blobs: Blob[] = []

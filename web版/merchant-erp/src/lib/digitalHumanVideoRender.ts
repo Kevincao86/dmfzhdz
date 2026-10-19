@@ -1,6 +1,7 @@
 /**
- * 数字人口播高清 MP4：火山 OmniHuman（单图+TTS 音频驱动口型）为主路径。
- * 先抠人融景成首帧，再音频驱动；成片自带口型音轨，无需后期静音混音。
+ * 数字人口播高清 MP4。
+ * 有环境照时：人像、环境照、动作原文打包给即梦参考图生视频，由模型深度融合后出片。
+ * 无环境照时：火山 OmniHuman 单图加口播音频驱动口型。
  */
 import type { DigitalHumanDraft, DigitalHumanWork, FrameMode } from './digitalHumanBroadcast'
 import { normalizeDhTargetDurationSec } from './digitalHumanBroadcast'
@@ -47,16 +48,16 @@ import {
 import { resolveDhSubtitleStyleForBurn } from './digitalHumanPostProcessStyles'
 import {
   compositePortraitWithBackground,
-  fusePortraitDeepIntoScene,
 } from './digitalHumanBackgroundComposite'
 import {
+  buildDhJimengMaterialPrompt,
   buildDhOmniHumanPrompt,
   chunkScriptForOmniHumanVideo,
   DH_OMNIHUMAN_MAX_SEGMENTS,
   estimateDhTargetDurationSec,
 } from './digitalHumanSeedancePrompt'
 import { buildBriefFromInput, validateBriefFidelity } from './shortVideoGenBrief'
-import { getAudioDurationSec, splitAudioBlobByMotionBeats, splitAudioBlobIntoCount } from './digitalHumanAudioChunks'
+import { getAudioDurationSec, splitAudioBlobByMotionBeats, splitAudioBlobForS2v, splitAudioBlobIntoCount } from './digitalHumanAudioChunks'
 import {
   inferGestureFromMotionText,
   motionLineForSegmentIndex,
@@ -91,9 +92,7 @@ export function dhVideoEngineLabel(engine: DhVideoEngine | undefined): string {
   if (engine === 'seedance_product_fusion') {
     return '火山 OmniHuman（人景产品合成）'
   }
-  if (engine === 'seedance_lipsync' || engine === 'seedance') {
-    return '火山 OmniHuman 音频驱动口播'
-  }
+  if (engine === 'seedance') return '即梦视频（人物与场景参考图深度融合）'
   return '火山 OmniHuman 数字人口播'
 }
 
@@ -408,6 +407,73 @@ function isDhUpstreamLimitError(msg: string): boolean {
   )
 }
 
+/** 有环境照：人像和环境照原图打包给即梦，由模型融合出片，再混入口播 */
+const DH_JIMENG_FUSION_MODELS = ['doubao-seedance-2-0-260128', 'doubao-seedance-2-0-fast-260128'] as const
+
+async function runDhJimengMaterialVideo(opts: {
+  portraitPureB64: string
+  sceneDataUrl: string
+  productPureB64?: string | null
+  prompt: string
+  audioBlob: Blob
+  onProgress?: (label: string) => void
+}): Promise<{ ok: true; videoUrl: string; blob: Blob } | { ok: false; message: string }> {
+  let audioSec = 8
+  try {
+    audioSec = await getAudioDurationSec(opts.audioBlob)
+  } catch {
+    audioSec = 8
+  }
+  const dur = Math.max(4, Math.min(15, Math.round(audioSec) || 8))
+  const sceneB64 = await imageUrlToPureBase64(opts.sceneDataUrl)
+  const images = [opts.portraitPureB64, sceneB64]
+  if (opts.productPureB64) images.push(opts.productPureB64)
+  opts.onProgress?.('正在把人物和环境照打包给即梦生成…')
+  let lastMessage = '即梦视频生成失败'
+  for (const model of DH_JIMENG_FUSION_MODELS) {
+    const job = await runShortVideoJobWithFailover({
+      engine: 'seedance',
+      body: {
+        prompt: opts.prompt,
+        flags: `--dur ${dur} --ratio 9:16 --resolution 720p`,
+        images_base64: images,
+        i2v_max_images: images.length,
+        model,
+        lock_model: true,
+        skip_qwen: true,
+        generate_audio: false,
+        seedance_image_mode: 'reference',
+        keep_reference_image: true,
+        i2v_must_use_image: true,
+      },
+      poolModels: [model],
+      allowAutoHalveDuration: false,
+      onProgress: opts.onProgress,
+    })
+    if (!job.ok) {
+      lastMessage = job.message
+      continue
+    }
+    let videoBlob: Blob | null = null
+    try {
+      videoBlob = await assertBlobLooksLikeVideo(await downloadVideoUrlAsBlob(job.videoUrl), '即梦融合')
+    } catch (e) {
+      lastMessage = e instanceof Error ? e.message : String(e)
+      continue
+    }
+    try {
+      const muxed = await muxVideoWithNarrationPreferBrowser(videoBlob, opts.audioBlob, muxVideoAudioOnServer)
+      return { ok: true, videoUrl: job.videoUrl, blob: muxed }
+    } catch (e) {
+      return {
+        ok: false,
+        message: `即梦成片混入口播失败：${e instanceof Error ? e.message : String(e)}`,
+      }
+    }
+  }
+  return { ok: false, message: lastMessage }
+}
+
 function snapDhSeedanceDurationSec(audioSec: number): 5 | 10 | 15 {
   const n = Math.max(5, Math.round(audioSec) || 5)
   if (n <= 5) return 5
@@ -629,6 +695,47 @@ async function renderWithOmniHuman(
     }
   }
 
+  if (!useMotion && (draft.background === 'custom' || (draft.background === 'store' && draft.storeScene))) {
+    const cappedBlobs: Blob[] = []
+    const cappedScripts: string[] = []
+    const cappedMotions: string[] = []
+    for (let i = 0; i < segmentAudioBlobs.length; i++) {
+      const blob = segmentAudioBlobs[i]!
+      let dur = 0
+      try {
+        dur = await getAudioDurationSec(blob)
+      } catch {
+        dur = 0
+      }
+      if (!(dur > 15.2)) {
+        cappedBlobs.push(blob)
+        cappedScripts.push(scriptChunks[i] ?? script)
+        cappedMotions.push(segmentMotionTexts?.[i] ?? '')
+        continue
+      }
+      const parts = await splitAudioBlobForS2v(blob, 15)
+      const partDurs: number[] = []
+      for (const part of parts) {
+        try {
+          partDurs.push(await getAudioDurationSec(part))
+        } catch {
+          partDurs.push(15)
+        }
+      }
+      const pieces = splitScriptByDurations(scriptChunks[i] ?? script, partDurs)
+      parts.forEach((part, j) => {
+        cappedBlobs.push(part)
+        cappedScripts.push(pieces[j] ?? scriptChunks[i] ?? script)
+        cappedMotions.push(segmentMotionTexts?.[i] ?? '')
+      })
+    }
+    if (cappedBlobs.length) {
+      segmentAudioBlobs = cappedBlobs
+      scriptChunks = cappedScripts
+      if (segmentMotionTexts) segmentMotionTexts = cappedMotions
+    }
+  }
+
   let totalAudioSec = 0
   for (const b of segmentAudioBlobs) {
     try {
@@ -663,6 +770,7 @@ async function renderWithOmniHuman(
   const videoBlobs: Blob[] = []
   const sourceUrls: string[] = []
   let usedProductFusion = false
+  let usedJimengFusion = false
   let skipOmniHuman = false
 
   for (let i = 0; i < segmentTotal; i++) {
@@ -703,19 +811,10 @@ async function renderWithOmniHuman(
     const photoBg =
       Boolean(segmentCustomBg) &&
       (segmentDraft.background === 'custom' || segmentDraft.background === 'store')
+    const jimengFusion = Boolean(photoBg && segmentCustomBg && !useMotion)
     try {
-      if (photoBg && segmentCustomBg) {
-        onProgress?.({
-          phase: 'generating',
-          segmentIndex: i + 1,
-          segmentTotal,
-          progress: 12 + Math.round((i / segmentTotal) * 8),
-        })
-        sceneImageB64 = await fusePortraitDeepIntoScene({
-          portraitPureB64: portraitB64,
-          sceneDataUrl: segmentCustomBg,
-          actionText,
-        })
+      if (jimengFusion) {
+        /* 人像和环境照原图交给即梦，不在本地抠图或合成 */
       } else if (draftNeedsSceneComposite(segmentDraft) || segmentCustomBg) {
         sceneImageB64 = await compositePortraitWithBackground(
           portraitB64,
@@ -724,7 +823,7 @@ async function renderWithOmniHuman(
           segmentCustomBg,
         )
       }
-      if (useProductFusion && productPureB64) {
+      if (!jimengFusion && useProductFusion && productPureB64) {
         const fusion = await prepareDhProductFusionAssets(sceneImageB64, productPureB64)
         sceneImageB64 = fusion.sceneWithProductB64
         usedProductFusion = true
@@ -771,6 +870,36 @@ async function renderWithOmniHuman(
         progress: 20 + Math.round((i / segmentTotal) * 55),
       })
       void label
+    }
+    if (jimengFusion && segmentCustomBg) {
+      const jimengPrompt = buildDhJimengMaterialPrompt(segmentDraft, {
+        motionText: actionText || motionLine?.text,
+        scriptHint: scriptChunks[i] ?? script,
+        hasProduct: Boolean(productPureB64),
+        segmentIndex: i,
+        segmentTotal,
+      })
+      const jimeng = await runDhJimengMaterialVideo({
+        portraitPureB64: portraitB64,
+        sceneDataUrl: segmentCustomBg,
+        productPureB64: productPureB64,
+        prompt: jimengPrompt,
+        audioBlob: segmentAudioBlobs[i]!,
+        onProgress: onSegProgress,
+      })
+      if (!jimeng.ok) {
+        return {
+          ok: false,
+          message: sanitizeDhRenderPipelineError(
+            jimeng.message,
+            `第 ${i + 1}/${segmentTotal} 段即梦融合失败`,
+          ),
+        }
+      }
+      videoBlobs.push(jimeng.blob)
+      sourceUrls.push(jimeng.videoUrl)
+      usedJimengFusion = true
+      continue
     }
     let job: { ok: true; videoUrl: string; modelUsed?: string | null } | { ok: false; message: string } =
       useMotion && refVideo
@@ -906,7 +1035,9 @@ async function renderWithOmniHuman(
   if (!finalHasAudio && !useMotion) {
     return {
       ok: false,
-      message: '成片验收失败：MP4 无口播音轨。OmniHuman 应自带音轨，请重试或检查火山视觉任务结果。',
+      message: usedJimengFusion
+        ? '成片验收失败：MP4 无口播音轨。即梦成片应已混入口播，请重试。'
+        : '成片验收失败：MP4 无口播音轨。OmniHuman 应自带音轨，请重试或检查火山视觉任务结果。',
     }
   }
 
@@ -917,9 +1048,11 @@ async function renderWithOmniHuman(
     segmentCount: segmentTotal,
     engine: useMotion
       ? 'motion_imitate'
-      : usedProductFusion
-        ? 'seedance_product_fusion'
-        : 'omnihuman',
+      : usedJimengFusion
+        ? 'seedance'
+        : usedProductFusion
+          ? 'seedance_product_fusion'
+          : 'omnihuman',
     videoProvider: 'volc',
     plannerModel: 'doubao',
   }

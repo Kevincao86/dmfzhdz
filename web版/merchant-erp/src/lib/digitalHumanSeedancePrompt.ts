@@ -161,6 +161,42 @@ function motionBlock(
   return parts.join('，')
 }
 
+/**
+ * 即梦参考图生视频：人像、环境照、产品图原样打包，由模型把人物融进场景再出片。
+ * 不在本地抠图或合成首帧。
+ */
+export function buildDhJimengMaterialPrompt(
+  draft: DigitalHumanDraft,
+  opts?: {
+    motionText?: string
+    scriptHint?: string
+    hasProduct?: boolean
+    segmentIndex?: number
+    segmentTotal?: number
+  },
+): string {
+  const frame = frameDesc(draft)
+  const motion = clip(opts?.motionText?.trim() || '面对镜头自然口播', 100)
+  const spoken = clip(opts?.scriptHint?.trim() || '', 48)
+  const idx = (opts?.segmentIndex ?? 0) + 1
+  const total = opts?.segmentTotal ?? 1
+  const prop = opts?.hasProduct || motionNamesProp(motion, spoken)
+  const body = [
+    '即梦参考图生视频，竖屏9:16，禁止画面文字。',
+    '图1是人物，全程同一张脸、发型和衣服，禁止换脸。',
+    '图2是用户上传的真实环境照，全程作为场景，禁止另造背景。',
+    `把图1人物深度融进图2场景里${frame}口播，从第一帧就站在其中，灯光打到身上，禁止抠图贴片、分屏和身体镂空。`,
+    opts?.hasProduct ? '图3是产品，人物自然拿着它。' : '',
+    `动作：${motion}。`,
+    prop && !opts?.hasProduct ? '动作里点名的食物或物品必须出现在手上或嘴边。' : '',
+    spoken ? `这段口播：${spoken}。` : '',
+    total > 1 ? `第${idx}/${total}段。` : '',
+  ]
+    .filter(Boolean)
+    .join('')
+  return clampSeedanceContentText(sanitizePromptForVideoModel(body), DH_PROMPT_MAX)
+}
+
 /** 单段 Seedance 提示词：紧凑单行，避免方舟 Invalid content.text */
 export function buildDhSeedanceSegmentPrompt(
   draft: DigitalHumanDraft,
