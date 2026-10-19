@@ -755,6 +755,24 @@ export default function ShortVideoImitateStudio() {
         </label>
       ) : null}
       {linkNote ? <p className="text-xs text-cyan-800">{linkNote}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void onAnalyze()}
+          className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200 disabled:opacity-50"
+        >
+          {busy && (progress.includes('拆') || progress.includes('整理') || progress.includes('分析')) ? '拆解中…' : '拆解画面 / 口播 / 背景音'}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void onRewrite()}
+          className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200 disabled:opacity-50"
+        >
+          {busy && progress.includes('改写') ? '改写中…' : 'AI 改写口播 / 动作'}
+        </button>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {source === 'video' ? (
         <div className="space-y-2">
@@ -842,24 +860,6 @@ export default function ShortVideoImitateStudio() {
             </div>
           )}
         </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void onAnalyze()}
-          className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200 disabled:opacity-50"
-        >
-          {busy && (progress.includes('拆') || progress.includes('整理') || progress.includes('分析')) ? '拆解中…' : '拆解画面 / 口播 / 背景音'}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void onRewrite()}
-          className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-cyan-800 ring-1 ring-cyan-200 disabled:opacity-50"
-        >
-          {busy && progress.includes('改写') ? '改写中…' : 'AI 改写口播 / 动作'}
-        </button>
       </div>
       {shots.length ? (
         <div className="space-y-2">
