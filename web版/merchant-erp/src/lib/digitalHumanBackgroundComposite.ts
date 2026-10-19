@@ -186,3 +186,105 @@ export async function compositePortraitWithBackground(
 
   return blobToPureBase64(await canvasToBlobJpeg(canvas, 0.93))
 }
+
+const DH_SCENE_FUSION_PROMPT = [
+  '图生图：参考图是左右对照，不是成片构图。',
+  '左半边人物必须原样保留：同一张脸、同一发型发色、同一套衣服和体态，禁止换脸。',
+  '右半边是用户上传的真实环境照：空间、灯光、地面、墙面必须用这张照片，禁止另造场景。',
+  '输出一张竖屏 9:16 照片：该人物真实站在这个空间里，脚踩地面，有透视和景深。',
+  '环境灯光必须打到皮肤、头发和衣服上，人物与环境光影一体。',
+  '禁止左右分屏、禁止拼贴、禁止抠图白边、禁止贴纸悬浮、禁止图层叠加感、禁止文字水印。',
+].join('')
+
+async function sideBySideBriefing(portraitPureB64: string, sceneDataUrl: string): Promise<string> {
+  const [person, scene] = await Promise.all([
+    loadImageFromPureBase64(portraitPureB64),
+    loadImageFromDataUrl(sceneDataUrl),
+  ])
+  const W = 1400
+  const H = 788
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('浏览器不支持画布导出')
+  ctx.fillStyle = '#0b0d12'
+  ctx.fillRect(0, 0, W, H)
+  const mid = W / 2
+  const pScale = Math.min(mid / Math.max(1, person.width), H / Math.max(1, person.height))
+  const pw = person.width * pScale
+  const ph = person.height * pScale
+  ctx.drawImage(person, (mid - pw) / 2, (H - ph) / 2, pw, ph)
+  const sScale = Math.max(mid / Math.max(1, scene.width), H / Math.max(1, scene.height))
+  const sw = scene.width * sScale
+  const sh = scene.height * sScale
+  ctx.drawImage(scene, mid + (mid - sw) / 2, (H - sh) / 2, sw, sh)
+  const b64 = await blobToPureBase64(await canvasToBlobJpeg(canvas, 0.84))
+  return `data:image/jpeg;base64,${b64}`
+}
+
+async function imageResultToPureBase64(imageUrl: string): Promise<string> {
+  const raw = imageUrl.trim()
+  if (raw.startsWith('data:image/')) {
+    const ix = raw.indexOf('base64,')
+    if (ix >= 0) return raw.slice(ix + 'base64,'.length).replace(/\s/g, '')
+  }
+  const res = await fetch(raw)
+  if (!res.ok) throw new Error('融合图拉取失败')
+  return blobToPureBase64(await res.blob())
+}
+
+/**
+ * 用生图把人物融进上传的环境照，得到可直接交给口型驱动的竖屏首帧。
+ * 失败则抛错，不回退成贴图。
+ */
+export async function fusePortraitDeepIntoScene(opts: {
+  portraitPureB64: string
+  sceneDataUrl: string
+}): Promise<string> {
+  const { postAiAgentNativeImage } = await import('../services/ai/aiClient')
+  const { compressPortraitDataUrlForLibrary } = await import('./digitalHumanCustomMedia')
+  const briefing = await sideBySideBriefing(opts.portraitPureB64, opts.sceneDataUrl)
+  const ref = await compressPortraitDataUrlForLibrary(briefing)
+  const attempts: Array<{ label: string; run: () => ReturnType<typeof postAiAgentNativeImage> }> = [
+    {
+      label: '通义万相',
+      run: () =>
+        postAiAgentNativeImage(DH_SCENE_FUSION_PROMPT, {
+          exactPrompt: true,
+          aspectRatio: '9:16',
+          wanxSize: '864x1536',
+          referenceImageDataUrl: ref,
+          preferredVendor: 'qwen',
+          preferredModelId: 'wan2.7-image-pro',
+        }),
+    },
+    {
+      label: '豆包',
+      run: () =>
+        postAiAgentNativeImage(DH_SCENE_FUSION_PROMPT, {
+          exactPrompt: true,
+          aspectRatio: '9:16',
+          doubaoSize: '2K',
+          referenceImageDataUrl: ref,
+          preferredVendor: 'doubao',
+        }),
+    },
+  ]
+  let lastErr = ''
+  for (const attempt of attempts) {
+    try {
+      const once = await attempt.run()
+      if (!once.ok) {
+        lastErr = once.message
+        continue
+      }
+      const pure = await imageResultToPureBase64(once.imageUrl)
+      if (pure.length > 32) return pure
+      lastErr = '融合图无效'
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(lastErr || '人物未能融入环境照')
+}

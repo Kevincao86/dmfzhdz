@@ -606,7 +606,7 @@ export const BACKGROUND_OPTIONS = [
   { id: 'store', label: '门店实景' },
   { id: 'green', label: '绿幕（可换背景）' },
   { id: 'solid-blue', label: '纯色 · 品牌蓝' },
-  { id: 'custom', label: '自定义图片/视频' },
+  { id: 'custom', label: '背景环境照' },
 ]
 
 /** 视频生成 prompt 中的中文场景描述（勿直接传 option id） */
@@ -621,7 +621,7 @@ export function backgroundPromptForDraft(draft: DigitalHumanDraft): string {
     case 'solid-blue':
       return '品牌蓝色纯色背景，简洁专业，适合口播短视频'
     case 'custom':
-      return '与品牌一致的自定义室内场景，简洁明亮，突出人物'
+      return '真实环境照内，人物与场景光影一体'
     default: {
       const opt = BACKGROUND_OPTIONS.find((b) => b.id === draft.background)
       return opt?.label ?? '专业演播室背景'
@@ -1025,7 +1025,7 @@ export async function upsertDigitalHumanWorkAsync(
   const needsCustomBg =
     row.draft.background === 'custom' ||
     (row.draft.background === 'store' && row.draft.storeScene)
-  if (needsCustomBg && customBg?.startsWith('data:image/')) {
+  if (needsCustomBg && customBg && (customBg.startsWith('data:image/') || customBg.startsWith('DHBG1:'))) {
     await saveWorkCustomBackground(row.id, customBg)
     stored = { ...stored, hasLocalCustomBackground: true }
   } else if (!needsCustomBg) {
@@ -1058,23 +1058,64 @@ export async function loadWorkProductImageDataUrl(work: DigitalHumanWork): Promi
   return loadWorkProductImage(work.id)
 }
 
-/** 加载作品关联的自定义背景图 data URL */
-export async function loadWorkCustomBackgroundDataUrl(work: DigitalHumanWork): Promise<string | null> {
+export const DH_CUSTOM_BACKGROUND_MAX = 4
+const DH_BG_PACK_PREFIX = 'DHBG1:'
+
+/** 多张环境照打包进同一条 IndexedDB 记录；单张仍是 data URL。 */
+export function packCustomBackgroundPayload(urls: string[]): string {
+  const list = urls
+    .map((u) => String(u || '').trim())
+    .filter((u) => u.startsWith('data:image/'))
+    .slice(0, DH_CUSTOM_BACKGROUND_MAX)
+  if (!list.length) return ''
+  if (list.length === 1) return list[0]!
+  return `${DH_BG_PACK_PREFIX}${JSON.stringify(list)}`
+}
+
+export function unpackCustomBackgroundPayload(raw: string | null | undefined): string[] {
+  const s = String(raw || '').trim()
+  if (!s) return []
+  if (s.startsWith(DH_BG_PACK_PREFIX)) {
+    try {
+      const parsed = JSON.parse(s.slice(DH_BG_PACK_PREFIX.length)) as unknown
+      if (!Array.isArray(parsed)) return []
+      return parsed
+        .map((x) => String(x || '').trim())
+        .filter((u) => u.startsWith('data:image/'))
+        .slice(0, DH_CUSTOM_BACKGROUND_MAX)
+    } catch {
+      return []
+    }
+  }
+  if (s.startsWith('data:image/')) return [s]
+  return []
+}
+
+/** 加载作品关联的环境照（自定义可多张；门店实景仍一张） */
+export async function loadWorkCustomBackgroundDataUrls(work: DigitalHumanWork): Promise<string[]> {
   const needsBg =
     work.draft.background === 'custom' ||
     (work.draft.background === 'store' && work.draft.storeScene) ||
     work.hasLocalCustomBackground
-  if (!needsBg) return null
+  if (!needsBg) return []
   const fromIdb = await loadWorkCustomBackground(work.id)
-  if (fromIdb) return fromIdb
+  const packed = unpackCustomBackgroundPayload(fromIdb)
+  if (packed.length) return packed
   if (work.draft.background === 'store' && work.draft.storeScene) {
     try {
-      return await resolveStoreSceneBackgroundDataUrl(work.draft.storeScene)
+      const one = await resolveStoreSceneBackgroundDataUrl(work.draft.storeScene)
+      return one ? [one] : []
     } catch {
-      return null
+      return []
     }
   }
-  return null
+  return []
+}
+
+/** 加载作品关联的自定义背景图 data URL（多张时取第一张） */
+export async function loadWorkCustomBackgroundDataUrl(work: DigitalHumanWork): Promise<string | null> {
+  const list = await loadWorkCustomBackgroundDataUrls(work)
+  return list[0] ?? null
 }
 
 /** 加载作品关联的语音克隆样本 */

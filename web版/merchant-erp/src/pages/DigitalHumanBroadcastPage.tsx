@@ -22,8 +22,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import {
   BACKGROUND_OPTIONS,
+  DH_CUSTOM_BACKGROUND_MAX,
   DH_SCRIPT_TEMPLATES,
   DH_TARGET_DURATION_OPTIONS,
+  packCustomBackgroundPayload,
+  unpackCustomBackgroundPayload,
   fillDhScriptPlaceholders,
   defaultDraft,
   normalizeDhTargetDurationSec,
@@ -109,9 +112,11 @@ import {
   spendMpAddonPoints,
 } from '../services/mpAddonPointsSpendClient'
 import {
+  buildDhExtractFitPrompt,
   buildDhMotionRewritePrompt,
   buildDhScriptGeneratePrompt,
   buildDhScriptRewritePrompt,
+  parseDhExtractFitOutput,
   postDigitalHumanAssistText,
 } from '../lib/digitalHumanAssistAi'
 import { fetchVideoAiConfig } from '../services/videoAiApi'
@@ -165,7 +170,9 @@ export default function DigitalHumanBroadcastPage() {
   const productImageDataUrlRef = useRef<string | null>(null)
   const [productImagePreview, setProductImagePreview] = useState<string | null>(null)
   const customBackgroundDataUrlRef = useRef<string | null>(null)
+  const customBackgroundsRef = useRef<string[]>([])
   const [customBackgroundPreview, setCustomBackgroundPreview] = useState<string | null>(null)
+  const [customBackgroundPreviews, setCustomBackgroundPreviews] = useState<string[]>([])
   const [avatarUploadBusy, setAvatarUploadBusy] = useState(false)
   const [productUploadBusy, setProductUploadBusy] = useState(false)
   const [backgroundUploadBusy, setBackgroundUploadBusy] = useState(false)
@@ -528,6 +535,8 @@ export default function DigitalHumanBroadcastPage() {
   const selectStoreScene = (sceneId: StoreSceneId) => {
     // 只写选中态，不在点击时 fetch 大图（线上 OSS/跨域易 Failed to fetch）
     // dataURL 在提交/预览时由 resolveStoreSceneBackgroundDataUrl 同源优先加载
+    customBackgroundsRef.current = []
+    setCustomBackgroundPreviews([])
     customBackgroundDataUrlRef.current = null
     setCustomBackgroundPreview(storeScenePreviewUrl(sceneId))
     patchDraft({
@@ -547,29 +556,66 @@ export default function DigitalHumanBroadcastPage() {
     })
   }
 
+  const applyCustomBackgrounds = (list: string[], label?: string | null) => {
+    const next = list
+      .filter((u) => u.startsWith('data:image/'))
+      .slice(0, DH_CUSTOM_BACKGROUND_MAX)
+    customBackgroundsRef.current = next
+    customBackgroundDataUrlRef.current = next[0] ?? null
+    setCustomBackgroundPreviews(next)
+    setCustomBackgroundPreview(next[0] ?? null)
+    patchDraft({
+      customBackgroundFileName:
+        label !== undefined
+          ? label
+          : next.length
+            ? next.length === 1
+              ? '1 张环境照'
+              : `${next.length} 张环境照`
+            : null,
+    })
+  }
+
+  const removeCustomBackground = (index: number) => {
+    applyCustomBackgrounds(customBackgroundsRef.current.filter((_, i) => i !== index))
+    setToast('已移除这张环境照')
+  }
+
   const handleBackgroundFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    if (!f) return
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
     void (async () => {
       setBackgroundUploadBusy(true)
       try {
-        if (!f.type.startsWith('image/')) {
-          throw new Error('暂仅支持图片背景，请上传 JPG/PNG')
+        const room = DH_CUSTOM_BACKGROUND_MAX - customBackgroundsRef.current.length
+        if (room <= 0) {
+          throw new Error(`最多上传 ${DH_CUSTOM_BACKGROUND_MAX} 张环境照`)
         }
-        if (f.size > 12 * 1024 * 1024) {
-          throw new Error('背景图过大，请压缩至 12MB 以内')
+        const picked = files.slice(0, room)
+        const added: string[] = []
+        for (const f of picked) {
+          if (!f.type.startsWith('image/')) {
+            throw new Error('暂仅支持图片背景，请上传 JPG/PNG')
+          }
+          if (f.size > 12 * 1024 * 1024) {
+            throw new Error('背景图过大，请压缩至 12MB 以内')
+          }
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const r = new FileReader()
+            r.onload = () =>
+              typeof r.result === 'string' ? resolve(r.result) : reject(new Error('读取失败'))
+            r.onerror = () => reject(new Error('读取失败'))
+            r.readAsDataURL(f)
+          })
+          added.push(await compressPortraitDataUrlForLibrary(dataUrl))
         }
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const r = new FileReader()
-          r.onload = () =>
-            typeof r.result === 'string' ? resolve(r.result) : reject(new Error('读取失败'))
-          r.onerror = () => reject(new Error('读取失败'))
-          r.readAsDataURL(f)
-        })
-        customBackgroundDataUrlRef.current = dataUrl
-        setCustomBackgroundPreview(dataUrl)
-        patchDraft({ customBackgroundFileName: f.name })
-        setToast('自定义背景已上传')
+        const next = [...customBackgroundsRef.current, ...added]
+        applyCustomBackgrounds(next)
+        setToast(
+          next.length > 1
+            ? `已添加环境照，共 ${next.length} 张。生成时人物会融进每张场景。`
+            : '环境照已上传，生成时人物会融进这张场景',
+        )
       } catch (err) {
         setToast(err instanceof Error ? err.message : '背景图上传失败')
       } finally {
@@ -646,11 +692,7 @@ export default function DigitalHumanBroadcastPage() {
     setAiBusy(true)
     try {
       const dur = normalizeDhTargetDurationSec(draft.targetDurationSec)
-      const res = await postDigitalHumanAssistText(
-        buildDhScriptGeneratePrompt(
-          `${topic}。口播成片时长 ${dur} 秒，正文约 ${recommendedDhScriptChars(dur)} 字，不要明显超长或过短。`,
-        ),
-      )
+      const res = await postDigitalHumanAssistText(buildDhScriptGeneratePrompt(topic, dur))
       if (!res.ok) {
         setToast(res.message)
         return
@@ -674,14 +716,17 @@ export default function DigitalHumanBroadcastPage() {
     }
     setAiRewriteBusy(true)
     try {
-      const res = await postDigitalHumanAssistText(buildDhScriptRewritePrompt(original))
+      const dur = normalizeDhTargetDurationSec(draft.targetDurationSec)
+      const res = await postDigitalHumanAssistText(buildDhScriptRewritePrompt(original, dur))
       if (!res.ok) {
         setToast(res.message)
         return
       }
       patchDraft({ script: res.text })
       setToast(
-        res.vendorUsed ? `AI 已改写口播文案（${res.vendorUsed}）` : 'AI 已改写口播文案，请核对后再下一步',
+        res.vendorUsed
+          ? `已按 ${dur} 秒改写口播（${res.vendorUsed}）`
+          : `已按 ${dur} 秒精简口播，请核对后再下一步`,
       )
     } catch (e) {
       setToast(e instanceof Error ? e.message : 'AI 改写失败')
@@ -703,8 +748,9 @@ export default function DigitalHumanBroadcastPage() {
     }
     setAiMotionRewriteBusy(true)
     try {
+      const dur = normalizeDhTargetDurationSec(draft.targetDurationSec)
       const res = await postDigitalHumanAssistText(
-        buildDhMotionRewritePrompt(script, original),
+        buildDhMotionRewritePrompt(script, original, dur),
       )
       if (!res.ok) {
         setToast(res.message)
@@ -712,7 +758,9 @@ export default function DigitalHumanBroadcastPage() {
       }
       patchDraft({ motionInstructions: res.text })
       setToast(
-        res.vendorUsed ? `AI 已改写动作指令（${res.vendorUsed}）` : 'AI 已改写动作指令，请核对后再继续',
+        res.vendorUsed
+          ? `已按 ${dur} 秒改写动作（${res.vendorUsed}）`
+          : `已按 ${dur} 秒精简动作，请核对后再继续`,
       )
     } catch (e) {
       setToast(e instanceof Error ? e.message : 'AI 改写动作失败')
@@ -737,15 +785,32 @@ export default function DigitalHumanBroadcastPage() {
         setToast(res.message || '链接解析失败')
         return
       }
+      const dur = normalizeDhTargetDurationSec(draft.targetDurationSec)
+      let script = res.script
+      let motionInstructions = res.motionInstructions
+      let fitted = false
+      setToast(`已提取原文，正在按 ${dur} 秒精简口播和动作…`)
+      const fit = await postDigitalHumanAssistText(
+        buildDhExtractFitPrompt(res.script, res.motionInstructions, dur),
+      )
+      if (fit.ok) {
+        const parsed = parseDhExtractFitOutput(fit.text)
+        if (parsed) {
+          script = parsed.script
+          motionInstructions = parsed.motion
+          fitted = true
+        }
+      }
       patchDraft({
         driveMode: 'link',
-        script: res.script,
-        motionInstructions: res.motionInstructions,
+        script,
+        motionInstructions,
         douyinLinkUrl: res.normalizedUrl,
       })
       setLinkSourceTitle(res.sourceTitle)
-      const src =
-        res.scriptSource === 'asr'
+      const src = fitted
+        ? `已按 ${dur} 秒精简口播和动作`
+        : res.scriptSource === 'asr'
           ? '已从视频音频识别口播文案'
           : '已提取口播文案'
       setToast(
@@ -1136,9 +1201,11 @@ export default function DigitalHumanBroadcastPage() {
       customAudioBlob: draft.driveMode === 'audio' ? customNarrationBlobRef.current : null,
       productImageDataUrl: draft.productOverlayEnabled ? productImageDataUrlRef.current : null,
       customBackgroundDataUrl:
-        draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)
-          ? customBackgroundDataUrlRef.current
-          : null,
+        draft.background === 'custom'
+          ? packCustomBackgroundPayload(customBackgroundsRef.current)
+          : draft.background === 'store' && draft.storeScene
+            ? customBackgroundDataUrlRef.current
+            : null,
       voiceCloneBlob: draft.voiceId === 'v-clone' ? cloneVoiceBlobRef.current : null,
       referenceVideoBlob:
         draft.avatarKind === 'video_clone' ? customReferenceVideoBlobRef.current : null,
@@ -1199,18 +1266,31 @@ export default function DigitalHumanBroadcastPage() {
       (hydrated.draft.background === 'custom' || hydrated.draft.background === 'store') &&
       (hydrated.hasLocalCustomBackground || hydrated.draft.storeScene)
     ) {
-      const bg =
-        (await loadWorkCustomBackground(hydrated.id)) ??
-        (hydrated.draft.background === 'store' && hydrated.draft.storeScene
-          ? await resolveStoreSceneBackgroundDataUrl(hydrated.draft.storeScene).catch(() => null)
-          : null)
-      customBackgroundDataUrlRef.current = bg
-      setCustomBackgroundPreview(
-        hydrated.draft.background === 'store' && hydrated.draft.storeScene
-          ? storeScenePreviewUrl(hydrated.draft.storeScene)
-          : bg,
-      )
+      const rawBg = await loadWorkCustomBackground(hydrated.id)
+      const packed = unpackCustomBackgroundPayload(rawBg)
+      if (hydrated.draft.background === 'custom' && packed.length) {
+        customBackgroundsRef.current = packed
+        customBackgroundDataUrlRef.current = packed[0] ?? null
+        setCustomBackgroundPreviews(packed)
+        setCustomBackgroundPreview(packed[0] ?? null)
+      } else {
+        const single = packed[0] ?? (rawBg?.startsWith('data:image/') ? rawBg : null)
+        const resolved =
+          hydrated.draft.background === 'store' && hydrated.draft.storeScene
+            ? await resolveStoreSceneBackgroundDataUrl(hydrated.draft.storeScene).catch(() => null)
+            : single
+        customBackgroundsRef.current = []
+        setCustomBackgroundPreviews([])
+        customBackgroundDataUrlRef.current = resolved
+        setCustomBackgroundPreview(
+          hydrated.draft.background === 'store' && hydrated.draft.storeScene
+            ? storeScenePreviewUrl(hydrated.draft.storeScene)
+            : resolved,
+        )
+      }
     } else {
+      customBackgroundsRef.current = []
+      setCustomBackgroundPreviews([])
       customBackgroundDataUrlRef.current = null
       setCustomBackgroundPreview(null)
     }
@@ -2235,6 +2315,8 @@ export default function DigitalHumanBroadcastPage() {
                                     : null,
                             })
                             if (v !== 'custom' && v !== 'store') {
+                              customBackgroundsRef.current = []
+                              setCustomBackgroundPreviews([])
                               customBackgroundDataUrlRef.current = null
                               setCustomBackgroundPreview(null)
                             }
@@ -2254,10 +2336,12 @@ export default function DigitalHumanBroadcastPage() {
                         storeSceneSelecting={null}
                         onSelectStoreScene={selectStoreScene}
                         customBackgroundPreview={customBackgroundPreview}
+                        customBackgroundPreviews={customBackgroundPreviews}
                         backgroundInputRef={backgroundInputRef}
                         backgroundUploadBusy={backgroundUploadBusy}
                         onBackgroundFileChange={handleBackgroundFileChange}
                         onPickBackgroundFile={() => backgroundInputRef.current?.click()}
+                        onRemoveBackground={removeCustomBackground}
                       />
                     </div>
                     <div className="text-sm sm:col-span-2">

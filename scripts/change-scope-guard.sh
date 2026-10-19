@@ -1098,6 +1098,9 @@ public/digital-human
 digitalHumanVideoRender
 ShortVideoOptimizationPage
 digitalHumanBackgroundComposite
+digitalHumanAssistAi
+digitalHumanWorkBlobStore
+digitalHumanAudioChunks
 digitalHumanSeedancePrompt
 digitalHumanPortraitMatting
 digitalHumanPostProcessStyles

@@ -8,6 +8,7 @@ import {
   draftForSceneShot,
   findPresetAvatarForDraft,
   loadWorkCustomBackgroundDataUrl,
+  loadWorkCustomBackgroundDataUrls,
   loadWorkProductImageDataUrl,
   loadWorkVoiceCloneSampleBlob,
 } from './digitalHumanBroadcast'
@@ -44,7 +45,10 @@ import {
   type TimedSubtitleChunk,
 } from './digitalHumanSubtitle'
 import { resolveDhSubtitleStyleForBurn } from './digitalHumanPostProcessStyles'
-import { compositePortraitWithBackground } from './digitalHumanBackgroundComposite'
+import {
+  compositePortraitWithBackground,
+  fusePortraitDeepIntoScene,
+} from './digitalHumanBackgroundComposite'
 import {
   buildDhOmniHumanPrompt,
   chunkScriptForOmniHumanVideo,
@@ -52,7 +56,7 @@ import {
   estimateDhTargetDurationSec,
 } from './digitalHumanSeedancePrompt'
 import { buildBriefFromInput, validateBriefFidelity } from './shortVideoGenBrief'
-import { getAudioDurationSec } from './digitalHumanAudioChunks'
+import { getAudioDurationSec, splitAudioBlobIntoCount } from './digitalHumanAudioChunks'
 import {
   inferGestureFromMotionText,
   motionLineForSegmentIndex,
@@ -120,6 +124,38 @@ function sleep(ms: number): Promise<void> {
 function draftNeedsSceneComposite(_draft: DigitalHumanDraft): boolean {
   void _draft
   return true
+}
+
+function splitScriptAcrossCount(script: string, count: number): string[] {
+  const text = script.trim()
+  const n = Math.max(1, Math.round(count))
+  if (n <= 1 || !text) return [text || script]
+  const size = Math.ceil(text.length / n)
+  const out: string[] = []
+  let rest = text
+  for (let i = 0; i < n; i++) {
+    if (!rest) {
+      out.push(out[out.length - 1] || text)
+      continue
+    }
+    if (i === n - 1) {
+      out.push(rest)
+      break
+    }
+    const window = rest.slice(0, Math.min(rest.length, size + 12))
+    const punct = Math.max(
+      window.lastIndexOf('。'),
+      window.lastIndexOf('！'),
+      window.lastIndexOf('？'),
+      window.lastIndexOf('，'),
+    )
+    const cut = punct >= Math.floor(size * 0.4) ? punct + 1 : Math.min(size, rest.length)
+    const piece = rest.slice(0, cut).trim()
+    out.push(piece || rest.slice(0, cut))
+    rest = rest.slice(cut).trim()
+  }
+  while (out.length < n) out.push(out[out.length - 1] || text)
+  return out.slice(0, n)
 }
 
 async function blobToPureBase64(blob: Blob): Promise<string> {
@@ -446,15 +482,17 @@ async function renderWithOmniHuman(
   }
 
   let customBgDataUrl: string | null = null
+  let customBgList: string[] = []
   if (draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)) {
-    customBgDataUrl = await loadWorkCustomBackgroundDataUrl(work)
+    customBgList = await loadWorkCustomBackgroundDataUrls(work)
+    customBgDataUrl = customBgList[0] ?? (await loadWorkCustomBackgroundDataUrl(work))
     if (!customBgDataUrl) {
       return {
         ok: false,
         message:
           draft.background === 'store'
             ? '已选择门店实景，请返回步骤 3 选择具体场景后重试'
-            : '已选择自定义背景，请返回步骤 3 上传门店/场景图片（JPG/PNG）后重试',
+            : '已选择背景环境照，请返回步骤 3 上传至少一张环境照（JPG/PNG）后重试',
       }
     }
   }
@@ -520,6 +558,23 @@ async function renderWithOmniHuman(
     }
   }
 
+  if (
+    !useMotion &&
+    draft.background === 'custom' &&
+    customBgList.length >= 2 &&
+    segmentAudioBlobs.length === 1
+  ) {
+    try {
+      const parts = await splitAudioBlobIntoCount(segmentAudioBlobs[0]!, customBgList.length)
+      if (parts.length >= 2) {
+        segmentAudioBlobs = parts
+        scriptChunks = splitScriptAcrossCount(script, parts.length)
+      }
+    } catch {
+      /* 切不开则整段配音仍用第一张环境照 */
+    }
+  }
+
   let totalAudioSec = 0
   for (const b of segmentAudioBlobs) {
     try {
@@ -567,6 +622,9 @@ async function renderWithOmniHuman(
     const sceneShot = activeSceneShots?.[i % activeSceneShots.length] ?? null
     const segmentDraft = sceneShot ? draftForSceneShot(draft, sceneShot) : draft
     let segmentCustomBg = customBgDataUrl
+    if (!sceneShot && draft.background === 'custom' && customBgList.length > 1) {
+      segmentCustomBg = customBgList[i % customBgList.length] ?? segmentCustomBg
+    }
     if (sceneShot) {
       segmentCustomBg = await resolveSegmentBackgroundDataUrl(work, segmentDraft, customBgDataUrl)
       if (segmentDraft.background === 'store' && segmentDraft.storeScene && !segmentCustomBg) {
@@ -587,7 +645,18 @@ async function renderWithOmniHuman(
     const useProductFusion =
       Boolean(productPureB64) && isDhProductFusionSegment(i, segmentTotal)
     try {
-      if (draftNeedsSceneComposite(segmentDraft) || segmentCustomBg) {
+      if (segmentDraft.background === 'custom' && segmentCustomBg) {
+        onProgress?.({
+          phase: 'generating',
+          segmentIndex: i + 1,
+          segmentTotal,
+          progress: 12 + Math.round((i / segmentTotal) * 8),
+        })
+        sceneImageB64 = await fusePortraitDeepIntoScene({
+          portraitPureB64: portraitB64,
+          sceneDataUrl: segmentCustomBg,
+        })
+      } else if (draftNeedsSceneComposite(segmentDraft) || segmentCustomBg) {
         sceneImageB64 = await compositePortraitWithBackground(
           portraitB64,
           segmentDraft.background,
@@ -603,7 +672,10 @@ async function renderWithOmniHuman(
     } catch (e) {
       return {
         ok: false,
-        message: `第 ${i + 1}/${segmentTotal} 段场景合成失败：${e instanceof Error ? e.message : String(e)}`,
+        message:
+          segmentDraft.background === 'custom'
+            ? `第 ${i + 1}/${segmentTotal} 段人物融入环境照失败：${e instanceof Error ? e.message : String(e)}`
+            : `第 ${i + 1}/${segmentTotal} 段场景合成失败：${e instanceof Error ? e.message : String(e)}`,
       }
     }
 

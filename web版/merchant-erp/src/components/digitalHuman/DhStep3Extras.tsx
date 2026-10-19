@@ -3,6 +3,7 @@ import { useState, type RefObject } from 'react'
 import { cn } from '../../cn'
 import {
   BACKGROUND_OPTIONS,
+  DH_CUSTOM_BACKGROUND_MAX,
   type DigitalHumanDraft,
   type DhSceneShot,
   newSceneShot,
@@ -57,16 +58,92 @@ export const BACKGROUND_PREVIEW_HINTS: Record<
   },
 }
 
+function CustomBackgroundUploader({
+  draft,
+  previews,
+  backgroundInputRef,
+  backgroundUploadBusy,
+  onBackgroundFileChange,
+  onPickBackgroundFile,
+  onRemoveBackground,
+}: {
+  draft: DigitalHumanDraft
+  previews: string[]
+  backgroundInputRef: RefObject<HTMLInputElement | null>
+  backgroundUploadBusy: boolean
+  onBackgroundFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onPickBackgroundFile: () => void
+  onRemoveBackground?: (index: number) => void
+}) {
+  const full = previews.length >= DH_CUSTOM_BACKGROUND_MAX
+  return (
+    <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
+      <p className="text-xs text-slate-500">
+        可上传最多 {DH_CUSTOM_BACKGROUND_MAX} 张竖版环境照（JPG/PNG）。生成时人物会融进场景：多张时按顺序分段口播；实拍动作模仿使用第一张。
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <input
+          ref={backgroundInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/*"
+          multiple
+          className="hidden"
+          onChange={onBackgroundFileChange}
+        />
+        {previews.map((src, index) => (
+          <div key={`${index}-${src.slice(-24)}`} className="relative">
+            <img
+              src={src}
+              alt={`环境照 ${index + 1}`}
+              className="h-20 w-14 rounded-lg border border-slate-200 object-cover"
+            />
+            {onRemoveBackground ? (
+              <button
+                type="button"
+                aria-label={`移除第 ${index + 1} 张环境照`}
+                onClick={() => onRemoveBackground(index)}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-white"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            ) : null}
+          </div>
+        ))}
+        <button
+          type="button"
+          disabled={backgroundUploadBusy || full}
+          onClick={onPickBackgroundFile}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
+        >
+          <Upload className="h-4 w-4" />
+          {backgroundUploadBusy
+            ? '上传中…'
+            : previews.length
+              ? full
+                ? `已满 ${DH_CUSTOM_BACKGROUND_MAX} 张`
+                : '继续添加'
+              : '上传环境照'}
+        </button>
+        {draft.customBackgroundFileName ? (
+          <span className="truncate text-xs text-slate-500">{draft.customBackgroundFileName}</span>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 type BackgroundSubProps = {
   draft: DigitalHumanDraft
   patchDraft: (p: Partial<DigitalHumanDraft>) => void
   storeSceneSelecting: StoreSceneId | null
   onSelectStoreScene: (id: StoreSceneId) => void
   customBackgroundPreview: string | null
+  customBackgroundPreviews?: string[]
   backgroundInputRef: RefObject<HTMLInputElement | null>
   backgroundUploadBusy: boolean
   onBackgroundFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onPickBackgroundFile: () => void
+  onRemoveBackground?: (index: number) => void
 }
 
 export function DhBackgroundSubContent({
@@ -74,10 +151,12 @@ export function DhBackgroundSubContent({
   storeSceneSelecting,
   onSelectStoreScene,
   customBackgroundPreview,
+  customBackgroundPreviews,
   backgroundInputRef,
   backgroundUploadBusy,
   onBackgroundFileChange,
   onPickBackgroundFile,
+  onRemoveBackground,
 }: BackgroundSubProps) {
   const hint = BACKGROUND_PREVIEW_HINTS[draft.background]
 
@@ -142,43 +221,21 @@ export function DhBackgroundSubContent({
       ) : null}
 
       {draft.background === 'custom' ? (
-        <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
-          <p className="text-xs text-slate-500">
-            上传门店实景、品牌场景等竖版图片（JPG/PNG），合成时将作为口型驱动前的场景背景。
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <input
-              ref={backgroundInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/*"
-              className="hidden"
-              onChange={onBackgroundFileChange}
-            />
-            {customBackgroundPreview ? (
-              <img
-                src={customBackgroundPreview}
-                alt="背景预览"
-                className="h-20 w-14 rounded-lg border border-slate-200 object-cover"
-              />
-            ) : null}
-            <button
-              type="button"
-              disabled={backgroundUploadBusy}
-              onClick={onPickBackgroundFile}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
-            >
-              <Upload className="h-4 w-4" />
-              {backgroundUploadBusy
-                ? '上传中…'
-                : draft.customBackgroundFileName || customBackgroundPreview
-                  ? '更换背景图'
-                  : '上传背景图'}
-            </button>
-            {draft.customBackgroundFileName ? (
-              <span className="truncate text-xs text-slate-500">{draft.customBackgroundFileName}</span>
-            ) : null}
-          </div>
-        </div>
+        <CustomBackgroundUploader
+          draft={draft}
+          previews={
+            customBackgroundPreviews?.length
+              ? customBackgroundPreviews
+              : customBackgroundPreview
+                ? [customBackgroundPreview]
+                : []
+          }
+          backgroundInputRef={backgroundInputRef}
+          backgroundUploadBusy={backgroundUploadBusy}
+          onBackgroundFileChange={onBackgroundFileChange}
+          onPickBackgroundFile={onPickBackgroundFile}
+          onRemoveBackground={onRemoveBackground}
+        />
       ) : null}
     </>
   )

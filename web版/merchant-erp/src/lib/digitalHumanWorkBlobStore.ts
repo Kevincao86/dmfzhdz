@@ -229,11 +229,15 @@ export async function deleteWorkProductImage(workId: string): Promise<void> {
   }
 }
 
-/** 自定义场景背景图（PNG/JPG），避免写入 localStorage */
+function isStoredBackgroundPayload(raw: string): boolean {
+  return raw.startsWith('data:image/') || raw.startsWith('DHBG1:')
+}
+
+/** 自定义场景背景图（单张 data URL，或多张 DHBG1: JSON），避免写入 localStorage */
 export async function saveWorkCustomBackground(workId: string, dataUrl: string): Promise<void> {
   const id = workId.trim()
   const raw = dataUrl.trim()
-  if (!id || !raw.startsWith('data:image/')) throw new Error('背景图无效，无法保存')
+  if (!id || !isStoredBackgroundPayload(raw)) throw new Error('背景图无效，无法保存')
   const db = await openDb()
   await idbPut(db, STORE_CUSTOM_BACKGROUND, id, raw)
 }
@@ -244,7 +248,7 @@ export async function loadWorkCustomBackground(workId: string): Promise<string |
   try {
     const db = await openDb()
     const v = await idbGet<unknown>(db, STORE_CUSTOM_BACKGROUND, id)
-    return typeof v === 'string' && v.startsWith('data:image/') ? v : null
+    return typeof v === 'string' && isStoredBackgroundPayload(v.trim()) ? v.trim() : null
   } catch {
     return null
   }

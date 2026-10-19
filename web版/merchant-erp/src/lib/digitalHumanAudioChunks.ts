@@ -96,6 +96,31 @@ export async function splitAudioBlobForS2v(
   }
 }
 
+/** 多张环境照：把一整段口播均分成 count 段，每段对应一张场景。每段短于 1.2 秒则不切。 */
+export async function splitAudioBlobIntoCount(blob: Blob, count: number): Promise<Blob[]> {
+  const n = Math.max(1, Math.min(8, Math.round(count)))
+  if (n <= 1 || blob.size < 128) return [blob]
+
+  const AC = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!AC) throw new Error('当前浏览器不支持音频解码')
+  const ctx = new AC()
+  try {
+    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer())
+    const totalSamples = decoded.length
+    const part = Math.floor(totalSamples / n)
+    if (part < Math.floor(decoded.sampleRate * 1.2)) return [blob]
+    const segments: Blob[] = []
+    for (let i = 0; i < n; i++) {
+      const start = i * part
+      const end = i === n - 1 ? totalSamples : (i + 1) * part
+      segments.push(encodeWavFromAudioBuffer(decoded, start, end))
+    }
+    return segments.length ? segments : [blob]
+  } finally {
+    await ctx.close().catch(() => undefined)
+  }
+}
+
 export async function fileToAudioBlob(file: File): Promise<Blob> {
   if (!file.type.startsWith('audio/') && !/\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(file.name)) {
     throw new Error('请上传 MP3、WAV 或 M4A 格式的口播音频')
