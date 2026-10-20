@@ -3586,7 +3586,9 @@ export async function streamBuiltinAgentChatFromMessages(
   }
   const url = `${doubaoArkApiV3Root(eff)}/chat/completions`
   let lastDoubaoErr: Error | null = null
-  for (const mid of doubaoChatModelCandidates(eff)) {
+  // 跟非流式一样走账号已开通列表。doubaoChatModelCandidates 会把 2.0 剔掉并写死先打 Character / 1.8，备选账号上这两条是暂停或已关闭。
+  const doubaoStreamModels = await resolveDoubaoLiveChatCandidates(key, eff)
+  for (const mid of doubaoStreamModels) {
     try {
       for await (const d of openAiCompatChatStream({
         url,
