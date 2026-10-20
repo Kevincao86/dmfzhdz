@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isPartnerEdition } from '../lib/appEdition'
+import { buildErpRegistryTenant } from '../lib/buildErpRegistryTenant'
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import { buildMpOrderFromMerchantRecruitment } from '../lib/merchantMpAutoPublish'
+import { submitMerchantRecruitmentWithMpPublish } from '../lib/merchantRecruitmentSubmit'
+import type { RegistryRecruitmentOrder } from '../lib/opsRegistryTypes'
+import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
+import { supabase } from '../lib/supabaseClient'
 import type { TalentPlanCard, TalentPlanSeat } from '../lib/talentPlanRecommend'
 import { profileLinkLabel } from '../lib/talentProfileLink'
 import { requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
@@ -473,6 +480,340 @@ export function TalentPlanChoice({
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+type RosterNotice = {
+  summary: string
+  people: TalentPlanCard[]
+}
+
+function realProfileUrl(raw: string): string {
+  const url = (raw.match(/https?:\/\/[^\s|｜)）]+/) || [])[0] || ''
+  if (!/douyin\.com|xiaohongshu\.com|xhslink\.com|kuaishou\.com/i.test(url)) return ''
+  return url.replace(/[)），。]+$/, '')
+}
+
+async function fetchOnePublicCard(opts: {
+  city: string
+  talentType: string
+  skipNames: string[]
+  seatId: string
+}): Promise<TalentPlanCard | null> {
+  const city = opts.city.trim() || '门店所在城市'
+  const need = opts.talentType.trim() || '本地生活'
+  const skip = opts.skipNames.filter(Boolean).slice(0, 24)
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), 35000)
+  try {
+    const data = await postAiChat(
+      {
+        provider: 'doubao',
+        stream: false,
+        temperature: 0,
+        webSearch: true,
+        messages: [
+          {
+            role: 'system',
+            content: `你是豆包公网达人检索。只补 1 位，区域只限「${city}」，内容贴近「${need}」。不要前言。只写一行：昵称｜城市｜粉丝｜内容方向｜主页。主页只填检索结果里真实的抖音/小红书/快手用户主页，没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+          },
+          { role: 'user', content: `请检索 1 位${city}、${need}达人，并带上能打开的主页。` },
+        ],
+      },
+      { signal: ac.signal },
+    )
+    const line = String(data.content || '')
+      .split(/\n+/)
+      .map((row) => row.replace(/^[\s\d.、\-•*]+/, '').trim())
+      .find((row) => row.includes('｜') || row.includes('|'))
+    if (!line || /暂无/.test(line)) return null
+    const parts = line.split(/[|｜]/).map((part) => part.trim()).filter(Boolean)
+    const nickname = (parts[0] || '').replace(/^昵称[:：]/, '').slice(0, 24)
+    if (nickname.length < 2 || skip.includes(nickname)) return null
+    const direction = parts.find((part, index) => index >= 3 && part !== '无' && !/^https?:/.test(part)) || ''
+    return {
+      seatId: opts.seatId,
+      talentId: `public:${nickname}`,
+      nickname,
+      city: parts[1] || city,
+      platform: '抖音',
+      followers: parseFans(parts[2] || ''),
+      level: '',
+      quoteYuan: null,
+      tags: [],
+      avatarUrl: '',
+      profileLink: realProfileUrl(line),
+      tierLabel: '公网',
+      unitBudgetYuan: 0,
+      talentType: direction || need,
+      source: 'public',
+      reason: direction ? `公网 · ${direction}` : '公网补位',
+    }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function sendTargetedInvites(
+  mpOrderId: string,
+  talentMemberIds: string[],
+): Promise<{ added?: number; newInvites?: { talentMemberId?: string }[] }> {
+  if (!supabase) throw new Error('请先登录后再发定向招募')
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = String(sessionData.session?.access_token || '').trim()
+  if (!token) throw new Error('请先登录后再发定向招募')
+  const payload = JSON.stringify({ action: 'send_invites', mpOrderId, talentMemberIds })
+  let last = '定向邀约没有发出去'
+  for (const url of merchantApiFetchUrls('/api/meoo-ops-mp-targeted-recruit')) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: payload,
+      })
+      const body = (await res.json()) as {
+        ok?: boolean
+        error?: string
+        message?: string
+        added?: number
+        newInvites?: { talentMemberId?: string }[]
+      }
+      if (!res.ok || body.ok === false) {
+        last = body.message || body.error || last
+        continue
+      }
+      return body
+    } catch {
+      /* try next */
+    }
+  }
+  throw new Error(last)
+}
+
+export function TalentChatRoster({
+  cards,
+  city,
+  talentType,
+  storeName,
+  note,
+  onCardsChange,
+}: {
+  cards: TalentPlanCard[]
+  city: string
+  talentType: string
+  storeName: string
+  note: string
+  onCardsChange: (cards: TalentPlanCard[]) => void
+}) {
+  const [replacingId, setReplacingId] = useState('')
+  const [publishing, setPublishing] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState<RosterNotice | null>(null)
+
+  async function replaceOne(card: TalentPlanCard) {
+    if (replacingId || publishing) return
+    setReplacingId(card.seatId)
+    setError('')
+    const skipNames = cards.map((item) => item.nickname).filter(Boolean)
+    const excludedIds = cards
+      .map((item) => item.talentId)
+      .filter((id) => id && !id.startsWith('public:'))
+    const res = await requestTalentPlanRecommend({
+      city,
+      platform: card.platform || '抖音',
+      talentType: talentType || card.talentType || '本地生活',
+      budgetYuan: 5000,
+      headcount: 1,
+      seats: [],
+      excludedIds,
+    })
+    const fromLibrary = (res.cards || []).find(
+      (item) => item.nickname.trim() && !item.empty && !skipNames.includes(item.nickname),
+    )
+    const next = fromLibrary
+      ? { ...fromLibrary, seatId: card.seatId }
+      : await fetchOnePublicCard({
+          city,
+          talentType: talentType || card.talentType,
+          skipNames,
+          seatId: card.seatId,
+        })
+    setReplacingId('')
+    if (!next) {
+      setError('星选库和公网暂时没有可替换的达人')
+      return
+    }
+    onCardsChange(cards.map((item) => (item.seatId === card.seatId ? next : item)))
+    setNotice(null)
+  }
+
+  async function publishTargeted() {
+    if (publishing || replacingId) return
+    setPublishing(true)
+    setError('')
+    setNotice(null)
+    const library = cards.filter((card) => card.source !== 'public' && !card.empty && card.nickname)
+    const publicCards = cards.filter((card) => card.source === 'public' && !card.empty)
+    const inviteIds = [...new Set(library.map((card) => card.memberId).filter((id): id is string => Boolean(id)))]
+    if (!inviteIds.length) {
+      setPublishing(false)
+      setNotice({
+        summary: '这些达人还不在星选库，定向招募发不进站内。请通过主页自行联系。',
+        people: publicCards.length ? publicCards : library,
+      })
+      return
+    }
+    try {
+      const tenant = buildErpRegistryTenant()
+      const tenantMeta = await resolveRecruitmentOrderTenantMeta(supabase)
+      const now = new Date().toLocaleString('zh-CN', { hour12: false })
+      const names = library.map((card) => card.nickname).join('、')
+      const order: RegistryRecruitmentOrder = {
+        id: `RO-AI${Date.now()}`,
+        ...tenantMeta,
+        customerName: tenant?.merchantName || storeName || '灵祺 ERP 商户',
+        storeName: storeName || city || '门店',
+        talentId: '—',
+        talentName: names.slice(0, 80) || '定向达人',
+        fans: inviteIds.length,
+        accountType: '抖音',
+        recruitmentPlatform: '抖音',
+        coopTimes: 0,
+        createdAt: now,
+        status: 'pending',
+        serviceAmount: 0,
+        commissionPct: 0,
+        netAmount: 0,
+        storeAddress: city || storeName || '—',
+        category: talentType || '本地生活',
+        infoSummary: `【定向招募】${storeName || city} · ${talentType || '达人'} · ${names}`,
+        fulfillmentLoop: 'open',
+        orderKind: 'recruitment',
+        autoPublishMp: true,
+      }
+      const mp = buildMpOrderFromMerchantRecruitment(order)
+      mp.recruitCount = inviteIds.length
+      mp.title = `${storeName || '门店'}·定向招募`
+      mp.mpPublishMeta = {
+        ...(mp.mpPublishMeta || {}),
+        recruitScope: 'targeted',
+        targetedStatus: 'inviting',
+      }
+      const published = await submitMerchantRecruitmentWithMpPublish(order, undefined, mp)
+      const invited = await sendTargetedInvites(published.mpOrderId, inviteIds)
+      const invitedIds = new Set((invited.newInvites || []).map((row) => String(row.talentMemberId || '')))
+      const missed = library.filter(
+        (card) => card.memberId && invitedIds.size > 0 && !invitedIds.has(card.memberId),
+      )
+      const people = [...publicCards, ...missed]
+      const invitedCount = invited.added ?? inviteIds.length
+      setNotice({
+        summary: people.length
+          ? `已发布定向招募，站内已邀请 ${invitedCount} 位星选达人。下面这些达人还不在星选库，需要您自行联系。`
+          : `已发布定向招募，已向 ${invitedCount} 位星选达人发出邀约。`,
+        people,
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '定向招募没有发出去')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-violet-100 bg-white p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-900">推荐 {cards.length} 位达人</p>
+        <button
+          type="button"
+          disabled={publishing || Boolean(replacingId) || cards.length === 0}
+          onClick={() => void publishTargeted()}
+          className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {publishing ? '正在发布…' : '定向招募'}
+        </button>
+      </div>
+      {note ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
+      {error ? <p className="mt-2 text-xs text-amber-700">{error}</p> : null}
+      <ul className="mt-3 space-y-2">
+        {cards.map((card) => (
+          <li
+            key={card.seatId}
+            className="flex items-start justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2"
+          >
+            <div className="flex min-w-0 gap-2.5">
+              <TalentAvatar url={card.avatarUrl} name={card.nickname} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-900">
+                  {card.nickname}
+                  <span className="ml-2 text-xs font-normal text-slate-500">
+                    {card.source === 'public' ? '公网' : '星选库'}
+                    {card.city ? ` · ${card.city}` : ''}
+                    {card.followers > 0 ? ` · 粉丝${card.followers}` : ''}
+                  </span>
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {card.quoteYuan != null ? `报价¥${card.quoteYuan}` : card.reason}
+                  {card.tags.length ? ` · ${card.tags.slice(0, 2).join('/')}` : ''}
+                </p>
+                {card.profileLink ? (
+                  <a
+                    href={card.profileLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-0.5 inline-block text-xs text-violet-700 hover:underline"
+                  >
+                    {profileLinkLabel(card.platform, card.profileLink)}
+                  </a>
+                ) : (
+                  <p className="mt-0.5 text-xs text-slate-400">暂无主页</p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={Boolean(replacingId) || publishing}
+              onClick={() => void replaceOne(card)}
+              className="shrink-0 rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {replacingId === card.seatId ? '替换中…' : '替换'}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {notice ? (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
+          <p>{notice.summary}</p>
+          {notice.people.length ? (
+            <ul className="mt-2 space-y-1">
+              {notice.people.map((person) => (
+                <li key={person.seatId}>
+                  {person.nickname}
+                  {person.profileLink ? (
+                    <a
+                      href={person.profileLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ml-2 text-violet-700 underline"
+                    >
+                      打开主页
+                    </a>
+                  ) : (
+                    <span className="ml-2 text-amber-800/80">暂无主页</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

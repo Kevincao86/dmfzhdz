@@ -7,6 +7,7 @@ import { AiAgentThinkingLive } from './AiAgentThinkingLive'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
 import { AiAgentRecruitmentVisualPreview } from './AiAgentRecruitmentVisualPreview'
+import { TalentChatRoster } from './TalentPlanChoice'
 import { AiAgentRecruitmentOrderDetailCard } from './AiAgentRecruitmentOrderDetail'
 import { AiAgentTaxPreview } from './AiAgentTaxPreview'
 
@@ -19,7 +20,7 @@ function formatBubbleTime(ts: number): string {
 }
 
 export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
-  const { quoteMessage } = useAiAgent()
+  const { quoteMessage, patchTalentRoster } = useAiAgent()
   if (m.role === 'task_preview' && m.preview) {
     return (
       <div className="w-full rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-50/95 to-indigo-50/90 p-4 shadow-sm ring-1 ring-violet-100/60">
@@ -161,7 +162,12 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
     !isUser && !isSystem && rawContent ? formatAssistantDisplayText(rawContent) || rawContent : rawContent
   const thinkingText = m.thinkingText?.trim() ?? ''
   const showThinking = !isUser && !isSystem && !displayText && Boolean(thinkingText)
-  const showBody = Boolean(displayText) || showThinking || imgs.length > 0 || videos.length > 0
+  const showBody =
+    Boolean(displayText) ||
+    showThinking ||
+    imgs.length > 0 ||
+    videos.length > 0 ||
+    Boolean(m.talentRoster?.cards.length)
 
   if (isUser) {
     return (
@@ -255,6 +261,16 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
           ) : null}
           {displayText ? (
             <p className="whitespace-pre-wrap">{displayText}</p>
+          ) : null}
+          {m.talentRoster ? (
+            <TalentChatRoster
+              cards={m.talentRoster.cards}
+              city={m.talentRoster.city}
+              talentType={m.talentRoster.talentType}
+              storeName={m.talentRoster.storeName}
+              note={m.talentRoster.note}
+              onCardsChange={(cards) => patchTalentRoster(m.id, cards)}
+            />
           ) : null}
         </div>
         ) : m.isStreaming ? (

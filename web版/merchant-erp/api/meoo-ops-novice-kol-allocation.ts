@@ -13,7 +13,8 @@ import {
   parseTalentPlanRecommendRequest,
   recommendTalentPlan,
 } from '../src/lib/talentPlanRecommend.js'
-import type { RegistryTalentLibraryEntry } from '../src/lib/opsRegistryTypes.js'
+import type { RegistryMpTalentMember, RegistryTalentLibraryEntry } from '../src/lib/opsRegistryTypes.js'
+import { findMemberForLibraryEntry } from '../src/lib/talentLibraryFilters.js'
 import { hydrateRecommendHallAvatarsFromAccounts } from '../src/lib/recommendHallMemberAvatars.js'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
 
@@ -106,7 +107,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         entries,
         ...parsed.value,
       })
-      sendOpsJson(res, 200, { ok: true, ...filled })
+      const members = (
+        Array.isArray(data.mpTalentMembers) ? data.mpTalentMembers : []
+      ) as RegistryMpTalentMember[]
+      const byLibraryId = new Map(entries.map((entry) => [String(entry.id || ''), entry]))
+      const cards = filled.cards.map((card) => {
+        if (!card.talentId || card.empty) return card
+        const entry = byLibraryId.get(card.talentId)
+        if (!entry) return card
+        const member =
+          findMemberForLibraryEntry(entry, members) ||
+          members.find((row) => row && String(row.id) === card.talentId) ||
+          null
+        return member?.id ? { ...card, memberId: String(member.id) } : card
+      })
+      sendOpsJson(res, 200, { ok: true, ...filled, cards })
       return
     }
 

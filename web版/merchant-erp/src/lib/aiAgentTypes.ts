@@ -3,6 +3,16 @@
  */
 
 import type { RecruitmentPlatform } from './recruitmentPlatformOptions'
+import type { TalentPlanCard } from './talentPlanRecommend'
+
+/** 对话里的达人卡片：头像、替换、定向招募都读这份，不靠模型贴链接 */
+export type AiTalentRoster = {
+  cards: TalentPlanCard[]
+  city: string
+  talentType: string
+  storeName: string
+  note: string
+}
 
 /** 系统侧能力授权（后续与租户权限、OAuth 范围对齐） */
 export type AiPermissionId =
@@ -281,6 +291,8 @@ export type AiAgentMessage = {
   toolName?: string
   /** 结构化工具结果（可选） */
   toolResult?: Record<string, unknown>
+  /** 达人推荐卡片（头像、替换、定向招募） */
+  talentRoster?: AiTalentRoster
 }
 
 /** 侧边栏「历史对话」快照（条数由上下文裁剪，最多 10 条） */

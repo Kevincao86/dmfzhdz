@@ -39,6 +39,8 @@ export type TalentPlanCard = {
   source: 'library' | 'public'
   reason: string
   empty?: boolean
+  /** 星选小程序会员 id。没有对应会员时不能站内定向邀约 */
+  memberId?: string
 }
 
 export type TalentBudgetSeatSource = {

@@ -1433,6 +1433,7 @@ aiAgentRecruitmentWizard
 AiAgentRecruitmentVisualPreview
 AiAgentPreviewActions
 AiAgentContext
+AiAgentMessageBubble
 change-scope-guard
 PAT
       ;;

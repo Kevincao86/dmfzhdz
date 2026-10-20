@@ -22,6 +22,7 @@ import type {
   AiProductPlanPreview,
   AiRecruitmentBriefPreview,
   AiTaskPreviewPayload,
+  AiTalentRoster,
   AiTaskType,
 } from '../lib/aiAgentTypes'
 import {
@@ -483,6 +484,8 @@ type AiAgentContextValue = {
   pendingQuote: AiAgentPendingQuote | null
   quoteMessage: (m: AiAgentMessage) => void
   clearPendingQuote: () => void
+  /** 替换某一条推荐里的一位达人后写回卡片 */
+  patchTalentRoster: (messageId: string, cards: TalentPlanCard[]) => void
   /** 有用户发言后的侧边栏：历史对话快照，最多 10 条 */
   archivedSessions: AiAgentArchivedSession[]
   /** 将当前对话存档并回到欢迎空态 */
@@ -628,22 +631,70 @@ function recentDialogueText(msgs: { role: string; content?: string }[]): string 
     .slice(-6000)
 }
 
-function formatLibraryLines(cards: TalentPlanCard[], limit = 8): string {
-  return cards
-    .slice(0, limit)
-    .map((c) => {
-      const bits = [
-        c.city,
-        c.level,
-        c.followers > 0 ? `粉丝${c.followers}` : '',
-        c.quoteYuan != null ? `报价¥${c.quoteYuan}` : '',
-        c.tags.slice(0, 2).join('/'),
-        c.profileLink ? `主页 ${c.profileLink}` : '',
-        /^https:\/\//i.test(c.avatarUrl) ? `头像 ${c.avatarUrl}` : '',
-      ].filter(Boolean)
-      return `- ${c.nickname}（${bits.join(' · ')}）`
+/** 本轮推荐卡片。界面直接渲染，不让模型把主页和头像写成文字。 */
+let pendingTalentRoster: AiTalentRoster | null = null
+
+function parseFollowerCount(raw: string): number {
+  const wan = raw.match(/(\d+(?:\.\d+)?)\s*万/)
+  if (wan) return Math.round(Number(wan[1]) * 10000)
+  const n = raw.match(/(\d{2,})/)
+  return n ? Number(n[1]) : 0
+}
+
+function cardsFromPublicText(text: string, city: string, talentType: string): TalentPlanCard[] {
+  const out: TalentPlanCard[] = []
+  const seen = new Set<string>()
+  for (const line of text.split(/\n+/)) {
+    const row = line.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim()
+    if (!row || /暂无|不拉公网|库内已凑满|没有返回/.test(row)) continue
+    const parts = row.split(/[|｜]/).map((part) => part.trim()).filter(Boolean)
+    if (parts.length < 2) continue
+    const nickname = parts[0]!.replace(/^昵称[:：]/, '').slice(0, 24)
+    if (nickname.length < 2 || seen.has(nickname) || /^达人$|^公网$|^检索$/.test(nickname)) continue
+    const url = (row.match(/https?:\/\/[^\s|｜)）]+/) || [])[0] || ''
+    const profileLink = /douyin\.com|xiaohongshu\.com|xhslink\.com|kuaishou\.com/i.test(url)
+      ? url.replace(/[)），。]+$/, '')
+      : ''
+    const direction = parts.find((part, index) => index >= 3 && !/^https?:/.test(part) && part !== '无') || ''
+    seen.add(nickname)
+    out.push({
+      seatId: `public-${out.length + 1}`,
+      talentId: `public:${nickname}`,
+      nickname,
+      city: parts[1] || city,
+      platform: '抖音',
+      followers: parseFollowerCount(parts[2] || row),
+      level: '',
+      quoteYuan: null,
+      tags: [],
+      avatarUrl: '',
+      profileLink,
+      tierLabel: '公网',
+      unitBudgetYuan: 0,
+      talentType: direction || talentType,
+      source: 'public',
+      reason: direction ? `公网 · ${direction}` : '公网补位',
     })
+  }
+  return out
+}
+
+function rosterIntro(display: string): string {
+  const kept = display
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(
+      (line) =>
+        line &&
+        !/https?:\/\//.test(line) &&
+        !/头像|主页/.test(line) &&
+        !/^【/.test(line) &&
+        !/^\d+\s*[.、]/.test(line),
+    )
     .join('\n')
+    .trim()
+  if (kept.length >= 6 && kept.length <= 180) return kept
+  return '已按方案配好达人。头像和主页在卡片里，不满意可以替换；确认后点定向招募。'
 }
 
 function planMatchNeedles(industry: string, planText: string): string[] {
@@ -808,30 +859,46 @@ async function loadTalentRecommendBlock(userText: string, priorText = ''): Promi
   const matched = sameCity.filter((c) => cardMatchesStore(c, needles))
   const picked = pickLibraryForPlan(matched, headcount, planText)
   const gap = Math.max(0, headcount - picked.length)
-  const libraryLines = formatLibraryLines(picked, headcount)
-  const libraryNote = libraryLines
-    ? libraryLines
-    : sameCity.length && needles.length
-      ? `星选库在「${city || '该区域'}」有达人，但没有明显符合方案要求的人，本次不列入。`
-      : `星选库在「${city || '该区域'}」暂无符合条件的达人。${library.cityNote ? `（${library.cityNote}）` : ''}`
+  const talentType = needles.join('、') || industry || '本地生活到店'
   const skipNames = picked.map((card) => card.nickname).filter(Boolean)
   const publicText =
     gap > 0
       ? await fetchDoubaoPublicTalents(
           city,
-          needles.join('、') || industry,
+          talentType,
           storeName,
           gap,
           `${planClause}${planClause ? '。' : ''}${publicGapNote(planText, picked, headcount)}${skipNames.length ? `不要重复：${skipNames.join('、')}。` : ''}`,
         )
-      : '库内已凑满方案人数，本次不拉公网。'
+      : ''
+  const publicCards = gap > 0 ? cardsFromPublicText(publicText, city, talentType).slice(0, gap) : []
+  const cards = [...picked, ...publicCards]
+  const note =
+    publicCards.length > 0
+      ? `星选库 ${picked.length} 位，公网补了 ${publicCards.length} 位。`
+      : gap > 0
+        ? `星选库 ${picked.length} 位。公网这次没有补到更多同城达人。`
+        : `星选库已配满 ${picked.length} 位。`
+  pendingTalentRoster = cards.length
+    ? {
+        cards,
+        city,
+        talentType,
+        storeName,
+        note,
+      }
+    : null
+  if (!cards.length) {
+    return [
+      '【达人推荐 · 本次】',
+      `区域：${city || '未解析'}（${regionSource}）。门店：${storeName || '未命名'}。方案要求：${talentType}。`,
+      '星选库和公网都没有符合方案的达人。用一两句话说明稍后重试，不要编造名单，不要让用户自己去站外找人。',
+    ].join('\n')
+  }
   return [
     '【达人推荐 · 本次】',
-    `区域：${city || '未解析'}（${regionSource}）。门店：${storeName || '未命名'}。方案要求：${needles.join('、') || industry || '本地生活到店'}。`,
-    `人数：沿用上文方案，共 ${headcount} 位。${planClause ? `方案原话：${planClause}。` : ''}先用星选达人库，库内符合方案的有 ${picked.length} 位，公网只补还差的 ${gap} 位。`,
-    '回答时星选达人库写在前面，作为主名单。公网只写补位，标题用「公网补位」。只使用下面给出的人，城市和类目必须符合方案。库内已有的主页、头像链接原样写出。公网只保留下面出现的主页，没有就写主页未核到。不要编造头像、电话或微信。不要整段拒答，不要让用户自己去蝉妈妈、飞瓜或 MCN。',
-    `【星选达人库】\n${libraryNote}`,
-    `【公网补位】\n${publicText}`,
+    `区域：${city || '未解析'}（${regionSource}）。门店：${storeName || '未命名'}。方案要求：${talentType}。${note}`,
+    '名单已经用卡片展示，含头像、主页、替换和定向招募。正文只写一两句说明，不要罗列达人，不要贴主页或头像链接。',
   ].join('\n')
 }
 
@@ -1167,6 +1234,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       quotedMessageId: m.id,
       role: m.role,
       excerpt,
+    })
+  }, [])
+
+  const patchTalentRoster = useCallback((messageId: string, cards: TalentPlanCard[]) => {
+    setMessages((prev) => {
+      const next = prev.map((m) =>
+        m.id === messageId && m.talentRoster ? { ...m, talentRoster: { ...m.talentRoster, cards } } : m,
+      )
+      messagesRef.current = next
+      return next
     })
   }, [])
 
@@ -2384,6 +2461,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (ownsRun) setAiSending(true)
 
       try {
+        pendingTalentRoster = null
         const placeholder = createAgentMessage('assistant', '')
         placeholder.isStreaming = true
         setStreamingReply({ thinking: '', content: '' })
@@ -2432,6 +2510,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         }
 
         const merchantCtx = await resolveMerchantIntelBlock(taskType, trimmed)
+        const rosterForTurn = pendingTalentRoster
+        if (rosterForTurn) {
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === placeholder.id ? { ...m, talentRoster: rosterForTurn } : m,
+            )
+            messagesRef.current = next
+            return next
+          })
+        }
         const history: AIMessage[] = [
           { role: 'system', content: merchantCtx },
           ...agentMessagesToChatMessages(snapshot, taskType),
@@ -2667,14 +2755,17 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        const roster = pendingTalentRoster
+        pendingTalentRoster = null
         setMessages((prev) => {
           const next = prev.map((m) =>
             m.id === placeholder.id
               ? {
                   ...m,
-                  content: display,
+                  content: roster ? rosterIntro(display) : display,
                   thinkingText: thinking.trim() || m.thinkingText,
                   isStreaming: false,
+                  ...(roster ? { talentRoster: roster } : {}),
                 }
               : m,
           )
@@ -3783,6 +3874,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       pendingQuote,
       quoteMessage,
       clearPendingQuote,
+      patchTalentRoster,
       archivedSessions,
       startNewChat,
       resumeArchivedSession,
@@ -3830,6 +3922,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       pendingQuote,
       quoteMessage,
       clearPendingQuote,
+      patchTalentRoster,
       archivedSessions,
       startNewChat,
       resumeArchivedSession,
