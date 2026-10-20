@@ -638,10 +638,84 @@ function formatLibraryLines(cards: TalentPlanCard[], limit = 8): string {
         c.followers > 0 ? `粉丝${c.followers}` : '',
         c.quoteYuan != null ? `报价¥${c.quoteYuan}` : '',
         c.tags.slice(0, 2).join('/'),
+        c.profileLink ? `主页 ${c.profileLink}` : '',
+        /^https:\/\//i.test(c.avatarUrl) ? `头像 ${c.avatarUrl}` : '',
       ].filter(Boolean)
       return `- ${c.nickname}（${bits.join(' · ')}）`
     })
     .join('\n')
+}
+
+function planMatchNeedles(industry: string, planText: string): string[] {
+  const extras = ['生活', '探店', '足浴', '足疗', '休闲', '养生', '美食']
+  const fromPlan = extras.filter((word) => planText.includes(word) || industry.includes(word))
+  return [...new Set([...requirementNeedles(industry), ...fromPlan])].slice(0, 8)
+}
+
+function planFanQuotas(text: string): { waist: number; head: number } | null {
+  const waist = text.match(/(\d{1,2})\s*位[^。\n]{0,40}?(?:千粉|腰部)/)
+  const head = text.match(/(\d{1,2})\s*位[^。\n]{0,40}?(?:10\s*[wW万]|头部)/)
+  const waistN = Number(waist?.[1] || 0)
+  const headN = Number(head?.[1] || 0)
+  if (waistN < 1 && headN < 1) return null
+  return {
+    waist: waistN > 0 && waistN <= TALENT_HEADCOUNT_CAP ? waistN : 0,
+    head: headN > 0 && headN <= TALENT_HEADCOUNT_CAP ? headN : 0,
+  }
+}
+
+function followerBand(followers: number): 'head' | 'waist' | 'unknown' {
+  if (followers >= 50000) return 'head'
+  if (followers >= 1000) return 'waist'
+  return 'unknown'
+}
+
+function pickLibraryForPlan(cards: TalentPlanCard[], headcount: number, planText: string): TalentPlanCard[] {
+  const quotas = planFanQuotas(planText)
+  if (!quotas) return cards.slice(0, headcount)
+  const picked: TalentPlanCard[] = []
+  const seen = new Set<string>()
+  const take = (list: TalentPlanCard[], n: number) => {
+    let left = n
+    for (const card of list) {
+      if (left <= 0 || picked.length >= headcount) return
+      const key = card.talentId || card.nickname
+      if (seen.has(key)) continue
+      seen.add(key)
+      picked.push(card)
+      left -= 1
+    }
+  }
+  take(
+    cards.filter((card) => followerBand(card.followers) === 'head'),
+    quotas.head,
+  )
+  take(
+    cards.filter((card) => followerBand(card.followers) !== 'head'),
+    quotas.waist || headcount,
+  )
+  return picked
+}
+
+function publicGapNote(planText: string, picked: TalentPlanCard[], headcount: number): string {
+  const quotas = planFanQuotas(planText)
+  if (!quotas) return `还差 ${Math.max(0, headcount - picked.length)} 位，须符合方案里的城市和类目。`
+  const haveHead = picked.filter((card) => followerBand(card.followers) === 'head').length
+  const haveWaist = picked.length - haveHead
+  const needHead = Math.max(0, quotas.head - haveHead)
+  const needWaist = Math.max(0, quotas.waist - haveWaist)
+  return `还差头部 ${needHead} 位、腰部 ${needWaist} 位。头部约 10 万粉，腰部为千粉到万粉。类目和城市必须与方案一致。`
+}
+
+/** 公网检索只保留搜索结果里真实出现的主页，丢掉编造的图片地址。 */
+function keepRealProfileUrls(text: string): string {
+  return text.replace(/https?:\/\/[^\s|｜)）]+/g, (url) =>
+    /douyin\.com\/(?:user|share\/user)\/|v\.douyin\.com\/|iesdouyin\.com\/share\/user\/|xiaohongshu\.com\/user\/|xhslink\.com\/|kuaishou\.com\/(?:profile|fw)\//i.test(
+      url,
+    )
+      ? url
+      : '无',
+  )
 }
 
 async function fetchDoubaoPublicTalents(
@@ -666,17 +740,17 @@ async function fetchDoubaoPublicTalents(
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只写公网能核实的抖音本地生活达人，凑满 ${want} 位，不要少写，也不要改成别的人数。区域只限「${region}」。内容要符合门店要求「${need}」。${planClause ? `方案原话：${planClause}。粉丝档位按这句拆，总人数仍是 ${want} 位。` : ''}每人一行：昵称、城市、粉丝量级、内容方向、为何符合该门店。没有公开依据的不要写。不要编造联系方式。一个都没有就只回答「公网暂无符合条件的达人」。`,
+            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。内容必须符合方案，不要写无关类目。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。主页只填检索结果里真实出现的抖音/小红书/快手用户主页，没有就写无。不要编造头像、电话、微信。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
           },
           {
             role: 'user',
-            content: `门店：${storeName || '未命名'}。经营要求：${need}。请检索${region}、内容方向匹配该门店的达人，列出 ${want} 位。`,
+            content: `门店：${storeName || '未命名'}。经营要求：${need}。请检索${region}、内容方向符合方案的达人，列出 ${want} 位，并带上能打开的主页。`,
           },
         ],
       },
       { signal: ac.signal },
     )
-    const text = String(data.content || '').trim()
+    const text = keepRealProfileUrls(String(data.content || '').trim())
     const cap = Math.min(4200, Math.max(1200, want * 380))
     return text ? text.slice(0, cap) : '公网暂无符合条件的达人。'
   } catch {
@@ -703,8 +777,9 @@ async function appendTalentRecommendBlock(
 
 async function loadTalentRecommendBlock(userText: string, priorText = ''): Promise<string> {
   const named = cityAskedForTalents(userText)
-  let city = named
-  let regionSource = named ? '用户指定' : ''
+  const planCity = cityAskedForTalents(priorText)
+  let city = named || planCity
+  let regionSource = named ? '用户指定' : planCity ? '上文方案' : ''
   if (!city) {
     try {
       city = (await resolveStoreCityFromMerchantStores()).trim()
@@ -714,38 +789,49 @@ async function loadTalentRecommendBlock(userText: string, priorText = ''): Promi
     regionSource = city ? '已绑定门店' : '未解析到'
   }
   const { industry, storeName } = storeTalentRequirement()
-  const needles = requirementNeedles(industry)
+  const planText = `${priorText}\n${userText}`
+  const needles = planMatchNeedles(industry, planText)
   const headcount = talentHeadcountFromDialogue(userText, priorText)
-  const planClause = talentPlanClause(`${priorText}\n${userText}`)
-  const [publicText, library] = await Promise.all([
-    fetchDoubaoPublicTalents(city, industry, storeName, headcount, planClause),
-    requestTalentPlanRecommend({
-      city,
-      platform: '抖音',
-      talentType: industry || '本地生活',
-      budgetYuan: 5000,
-      headcount,
-      seats: [],
-      excludedIds: [],
-    }),
-  ])
+  const planClause = talentPlanClause(planText)
+  const library = await requestTalentPlanRecommend({
+    city,
+    platform: '抖音',
+    talentType: needles.join(' ') || industry || '本地生活',
+    budgetYuan: 5000,
+    headcount,
+    seats: [],
+    excludedIds: [],
+  })
   const sameCity = (library.cards || []).filter(
     (c) => !c.empty && c.nickname.trim() && cardMatchesCity(c, city),
   )
   const matched = sameCity.filter((c) => cardMatchesStore(c, needles))
-  const libraryLines = formatLibraryLines(matched, headcount)
+  const picked = pickLibraryForPlan(matched, headcount, planText)
+  const gap = Math.max(0, headcount - picked.length)
+  const libraryLines = formatLibraryLines(picked, headcount)
   const libraryNote = libraryLines
     ? libraryLines
     : sameCity.length && needles.length
-      ? `星选库在「${city || '该区域'}」有达人，但没有明显符合门店要求「${industry}」的人，本次不列入。`
+      ? `星选库在「${city || '该区域'}」有达人，但没有明显符合方案要求的人，本次不列入。`
       : `星选库在「${city || '该区域'}」暂无符合条件的达人。${library.cityNote ? `（${library.cityNote}）` : ''}`
+  const skipNames = picked.map((card) => card.nickname).filter(Boolean)
+  const publicText =
+    gap > 0
+      ? await fetchDoubaoPublicTalents(
+          city,
+          needles.join('、') || industry,
+          storeName,
+          gap,
+          `${planClause}${planClause ? '。' : ''}${publicGapNote(planText, picked, headcount)}${skipNames.length ? `不要重复：${skipNames.join('、')}。` : ''}`,
+        )
+      : '库内已凑满方案人数，本次不拉公网。'
   return [
     '【达人推荐 · 本次】',
-    `区域：${city || '未解析'}（${regionSource}）。门店：${storeName || '未命名'}。门店要求：${industry || '本地生活到店'}。`,
-    `人数：沿用上文方案，共 ${headcount} 位。${planClause ? `方案原话：${planClause}。` : ''}豆包公网必须按这个人数列全，不要改成 5 位或其它人数。若公网名单不足 ${headcount} 位，先写明方案要 ${headcount} 位、本次核到几位，不要把人数说成方案没写过的数字。`,
-    '作答必须分成「豆包公网」和「星选达人库」两段，只使用下面给出的人。某一路没有就说明该路没有。不要把其他城市的人说成这个区域的达人。不要编造电话或微信。不要整段拒答，不要让用户自己去蝉妈妈、飞瓜或 MCN。',
-    `【豆包公网】\n${publicText}`,
+    `区域：${city || '未解析'}（${regionSource}）。门店：${storeName || '未命名'}。方案要求：${needles.join('、') || industry || '本地生活到店'}。`,
+    `人数：沿用上文方案，共 ${headcount} 位。${planClause ? `方案原话：${planClause}。` : ''}先用星选达人库，库内符合方案的有 ${picked.length} 位，公网只补还差的 ${gap} 位。`,
+    '回答时星选达人库写在前面，作为主名单。公网只写补位，标题用「公网补位」。只使用下面给出的人，城市和类目必须符合方案。库内已有的主页、头像链接原样写出。公网只保留下面出现的主页，没有就写主页未核到。不要编造头像、电话或微信。不要整段拒答，不要让用户自己去蝉妈妈、飞瓜或 MCN。',
     `【星选达人库】\n${libraryNote}`,
+    `【公网补位】\n${publicText}`,
   ].join('\n')
 }
 
