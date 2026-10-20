@@ -1,7 +1,7 @@
 <view class="page">
   <view class="card">
     <text class="title">图片变清晰</text>
-    <text class="sub">先看图，再选择万相超分或千问图像编辑。{{imagePoints}} 积分/张。清晰后的图可点击查看大图。</text>
+    <text class="sub">上传照片后自动变清晰。{{imagePoints}} 积分/张。清晰后的图可点击查看大图。</text>
     <button class="btn" bindtap="onPick">选择图片</button>
     <view class="pair">
       <view class="shot">

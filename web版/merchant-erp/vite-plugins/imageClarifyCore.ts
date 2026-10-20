@@ -64,31 +64,31 @@ export function chooseClarifyRoute(
   if (scene === 'illustration') {
     return {
       route: 'qwen_edit',
-      label: '千问图像编辑',
-      detail: '插画只补清晰度',
+      label: '清晰处理',
+      detail: '保持原画，只让线条更清楚',
       reason,
     }
   }
   if (scene === 'portrait' || scene === 'text' || scene === 'screenshot') {
     return {
       route: 'wanx_sr_1',
-      label: '万相超分',
-      detail: '保持原尺寸，只提高清晰度',
+      label: '清晰处理',
+      detail: '保持原图，只让画面更清楚',
       reason,
     }
   }
   if (blur === 'heavy' || small) {
     return {
       route: 'wanx_sr_2',
-      label: '万相超分',
-      detail: '放大并补充细节',
+      label: '清晰处理',
+      detail: '把模糊的地方补清楚',
       reason,
     }
   }
   return {
     route: 'wanx_sr_1',
-    label: '万相超分',
-    detail: '保持原尺寸，只提高清晰度',
+    label: '清晰处理',
+    detail: '保持原图，只让画面更清楚',
     reason,
   }
 }
@@ -103,24 +103,24 @@ export function describeClarifyRoute(route: ClarifyRoute, reason?: string): Clar
   if (route === 'qwen_edit') {
     return {
       route,
-      label: '千问图像编辑',
-      detail: '插画只补清晰度',
-      reason: reason || '插画适合图像编辑',
+      label: '清晰处理',
+      detail: '保持原画，只让线条更清楚',
+      reason: reason || '这张图按原画变清晰',
     }
   }
   if (route === 'wanx_sr_2') {
     return {
       route,
-      label: '万相超分',
-      detail: '放大并补充细节',
-      reason: reason || '画面偏小或比较糊',
+      label: '清晰处理',
+      detail: '把模糊的地方补清楚',
+      reason: reason || '这张图有点糊，正在补清楚',
     }
   }
   return {
     route: 'wanx_sr_1',
-    label: '万相超分',
-    detail: '保持原尺寸，只提高清晰度',
-    reason: reason || '实拍照片按原图超分',
+    label: '清晰处理',
+    detail: '保持原图，只让画面更清楚',
+    reason: reason || '这张图按原样变清晰',
   }
 }
 
@@ -160,6 +160,19 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+async function fetchTimed(url: string, init: RequestInit, ms = 20_000): Promise<Response> {
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), ms)
+  try {
+    return await fetch(url, { ...init, signal: ac.signal })
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') throw new Error('处理时间有点长，请再试一次')
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function readJson(res: Response): Promise<Record<string, unknown>> {
   const text = await res.text()
   try {
@@ -169,27 +182,16 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   }
 }
 
-async function downloadDataUrl(src: string): Promise<string> {
-  const ac = new AbortController()
-  const timer = setTimeout(() => ac.abort(), 25_000)
-  try {
-    const res = await fetch(src, { signal: ac.signal, redirect: 'follow' })
-    if (!res.ok) throw new Error(`成图下载失败 HTTP ${res.status}`)
-    const buf = Buffer.from(await res.arrayBuffer())
-    if (!buf.length) throw new Error('成图为空')
-    if (buf.length > 8 * 1024 * 1024) throw new Error('成图过大')
-    const ctRaw = (res.headers.get('content-type') || 'image/jpeg').split(';')[0]?.trim() || 'image/jpeg'
-    const ct = /^image\//i.test(ctRaw) ? ctRaw : 'image/jpeg'
-    return `data:${ct};base64,${buf.toString('base64')}`
-  } finally {
-    clearTimeout(timer)
-  }
+function usableImageUrl(src: string): string {
+  const url = src.trim()
+  if (url.startsWith('https://') || url.startsWith('data:image/')) return url
+  throw new Error('成图地址无效')
 }
 
 async function pollDashscope(apiKey: string, taskId: string): Promise<string> {
   const url = `${DASHSCOPE}/api/v1/tasks/${encodeURIComponent(taskId)}`
   for (let i = 0; i < 36; i++) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } })
+    const res = await fetchTimed(url, { headers: { Authorization: `Bearer ${apiKey}` } })
     const data = await readJson(res)
     if (!res.ok) {
       throw new Error(
@@ -201,19 +203,19 @@ async function pollDashscope(apiKey: string, taskId: string): Promise<string> {
     if (status === 'SUCCEEDED') {
       const urls = extractQwenVisionImageUrlsFromPayload(data)
       const first = urls[0]
-      if (!first) throw new Error('超分完成但没有图片')
+      if (!first) throw new Error('清晰处理完成但没有图片')
       return first
     }
     if (status === 'FAILED' || status === 'UNKNOWN') {
       throw new Error(
         (typeof output?.message === 'string' && output.message) ||
           (typeof data.message === 'string' && data.message) ||
-          '超分失败',
+          '清晰处理失败',
       )
     }
     await sleep(i < 8 ? 700 : 1200)
   }
-  throw new Error('超分超时，请稍后重试')
+  throw new Error('处理时间有点长，请再试一次')
 }
 
 async function runWanxSuperResolution(
@@ -221,7 +223,7 @@ async function runWanxSuperResolution(
   imageDataUrl: string,
   factor: 1 | 2,
 ): Promise<string> {
-  const res = await fetch(`${DASHSCOPE}/api/v1/services/aigc/image2image/image-synthesis`, {
+  const res = await fetchTimed(`${DASHSCOPE}/api/v1/services/aigc/image2image/image-synthesis`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -241,18 +243,18 @@ async function runWanxSuperResolution(
   const data = await readJson(res)
   if (!res.ok) {
     throw new Error(
-      (typeof data.message === 'string' && data.message) || `万相超分 HTTP ${res.status}`,
+      (typeof data.message === 'string' && data.message) || `清晰处理失败 HTTP ${res.status}`,
     )
   }
   const output = data.output as Record<string, unknown> | undefined
   const taskId = typeof output?.task_id === 'string' ? output.task_id : ''
-  if (!taskId) throw new Error('万相超分没有返回任务号')
+  if (!taskId) throw new Error('清晰处理没有返回任务号')
   const remote = await pollDashscope(apiKey, taskId)
-  return downloadDataUrl(remote)
+  return usableImageUrl(remote)
 }
 
 async function runQwenImageEdit(apiKey: string, imageDataUrl: string): Promise<string> {
-  const res = await fetch(`${DASHSCOPE}/api/v1/services/aigc/multimodal-generation/generation`, {
+  const res = await fetchTimed(`${DASHSCOPE}/api/v1/services/aigc/multimodal-generation/generation`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -274,14 +276,13 @@ async function runQwenImageEdit(apiKey: string, imageDataUrl: string): Promise<s
   const data = await readJson(res)
   if (!res.ok) {
     throw new Error(
-      (typeof data.message === 'string' && data.message) || `千问图像编辑 HTTP ${res.status}`,
+      (typeof data.message === 'string' && data.message) || `清晰处理失败 HTTP ${res.status}`,
     )
   }
   const urls = extractQwenVisionImageUrlsFromPayload(data)
   const first = urls[0]
-  if (!first) throw new Error('千问图像编辑没有返回图片')
-  if (first.startsWith('data:image/')) return first
-  return downloadDataUrl(first)
+  if (!first) throw new Error('清晰处理没有返回图片')
+  return usableImageUrl(first)
 }
 
 export async function runClarifyImage(
@@ -301,7 +302,7 @@ export async function runClarifyImage(
       return {
         imageUrl,
         choice: describeClarifyRoute('wanx_sr_1', choice.reason),
-        fallbackNote: '千问图像编辑失败，已改用万相超分',
+        fallbackNote: '已换一种方式把图变清晰',
       }
     }
   }

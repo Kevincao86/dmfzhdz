@@ -90,17 +90,17 @@ export default function ImageClarifyPage() {
         setMsg(out.message || '修复失败')
         return
       }
-      if (readMpSessionToken() && !(out.pointsCharged && out.pointsCharged > 0)) {
-        await spendVisualStudioImagePoints({
-          idempotencyKey: `img-clarify-${Date.now()}`,
-          note: '图片变清晰',
-          tier: 'standard',
-        })
-      }
       setChoice(out.choice)
       setResultUrl(out.imageUrl)
       const note = out.fallbackNote ? `${out.fallbackNote}。` : ''
       setMsg(`${note}已完成，本次 ${MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分`)
+      if (readMpSessionToken() && !(out.pointsCharged && out.pointsCharged > 0)) {
+        void spendVisualStudioImagePoints({
+          idempotencyKey: `img-clarify-${Date.now()}`,
+          note: '图片变清晰',
+          tier: 'standard',
+        }).catch(() => {})
+      }
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '修复失败')
     } finally {
@@ -114,7 +114,7 @@ export default function ImageClarifyPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">图片变清晰</h1>
         <p className="mt-1 text-sm text-slate-500">
-          先看图，再选择万相超分或千问图像编辑。每次 {MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分。
+          上传照片后自动变清晰。每次 {MP_POINTS_VISUAL_STUDIO_IMAGE_PER_USE} 积分。
         </p>
       </div>
       <input

@@ -549,15 +549,21 @@ async function postImageClarifyBody(
   let lastErr = 'no_response'
   for (const target of aiChatFetchUrlCandidates('/api/meoo-ai-agent-image')) {
     let res: Response
+    const ac = new AbortController()
+    const timer = window.setTimeout(() => ac.abort(), 90_000)
     try {
       res = await fetch(target, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
+        signal: ac.signal,
       })
     } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
+      const aborted = e instanceof Error && e.name === 'AbortError'
+      lastErr = aborted ? '处理时间有点长，请再试一次' : e instanceof Error ? e.message : String(e)
       continue
+    } finally {
+      window.clearTimeout(timer)
     }
     const text = await res.text()
     let json: Record<string, unknown> | null = null
@@ -596,7 +602,7 @@ export async function postImageClarifyJudge(
     ok: true,
     choice: {
       route,
-      label: String(out.json.label || '万相超分'),
+      label: String(out.json.label || '清晰处理'),
       detail: String(out.json.detail || ''),
       reason: String(out.json.reason || ''),
     },
