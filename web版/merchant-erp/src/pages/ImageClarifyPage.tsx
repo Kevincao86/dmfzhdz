@@ -66,7 +66,7 @@ export default function ImageClarifyPage() {
     setResultUrl('')
     setChoice(null)
     setMsg('')
-    setStage('正在理解这张图…')
+    setStage('正在努力处理中')
     try {
       const afford = await checkVisualStudioImageBatchAffordable(1, 'standard')
       if (!afford.ok) {
@@ -79,7 +79,7 @@ export default function ImageClarifyPage() {
         return
       }
       setChoice(judged.choice)
-      setStage(`选用${judged.choice.label}，${judged.choice.detail}`)
+      setStage('正在努力变清晰，马上就好')
       const out = await postImageClarifyRun(
         sourceData,
         sourceSize.width,

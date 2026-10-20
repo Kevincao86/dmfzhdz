@@ -19,7 +19,7 @@
       </view>
     </view>
     <button class="btn btn--go" loading="{{busy}}" disabled="{{busy || !sourceData}}" bindtap="onClarify">开始变清晰</button>
-    <text wx:if="{{choice}}" class="choice">{{choice}}</text>
+    <text wx:if="{{choice && !busy}}" class="choice">{{choice}}</text>
     <text wx:if="{{msg}}" class="msg">{{msg}}</text>
   </view>
   <site-icp-footer />

@@ -66,7 +66,7 @@ Page({
   },
   async onClarify() {
     if (this.data.busy || !this.data.sourceData) return
-    this.setData({ busy: true, stage: '正在理解这张图…', msg: '', resultUrl: '', choice: '' })
+    this.setData({ busy: true, stage: '正在努力处理中', msg: '', resultUrl: '', choice: '' })
     try {
       await points.assertVisualStudioImageAffordable(1, 'standard')
       const judged = await api.postImageClarify({
@@ -80,7 +80,7 @@ Page({
       if (!choice.route) throw new Error('没有选出可用的变清晰方式')
       this.setData({
         choice: choiceText(choice),
-        stage: `选用${choice.label || '万相超分'}，${choice.detail || '正在变清晰'}`,
+        stage: '正在努力变清晰，马上就好',
       })
       const ran = await api.postImageClarify({
         clarify_phase: 'run',
