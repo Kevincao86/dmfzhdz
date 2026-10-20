@@ -99,9 +99,12 @@ export default function WxOAuthOfficialPanel({ authorizeUrl, className }: Props)
   if (!authorizeUrl) return null
 
   return (
-    <div className={className ?? 'flex flex-col items-center'}>
-      <div id={boxId} className="h-[400px] w-[300px] overflow-hidden rounded-2xl bg-white" />
-      <p className="mt-2 max-w-[300px] text-center text-[11px] leading-relaxed text-slate-400">
+    <div className={className ?? 'flex w-full flex-col items-center'}>
+      {/* 官方 iframe 固定 300×400，内容靠上。缩放到 240 宽并裁掉下方空白，一键登录和二维码都保持居中。 */}
+      <div className="mx-auto flex h-[220px] w-[240px] justify-center overflow-hidden">
+        <div id={boxId} className="h-[400px] w-[300px] origin-top scale-[0.8]" />
+      </div>
+      <p className="mt-2 max-w-[240px] text-center text-[11px] leading-relaxed text-slate-400">
         电脑已登录微信时，会拉起微信请你确认；没打开微信时仍显示二维码。
       </p>
     </div>
