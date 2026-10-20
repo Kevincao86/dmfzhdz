@@ -2094,6 +2094,11 @@ mine.js
 mine-pr-addon-image-clarify
 menuFunctions.js
 ai-image-clarify
+meoo-ai-agent-image.ts
+imageClarifyCore.ts
+aiClient.ts
+mpAddonMerchantApi.js
+visualStudioAiMp.js
 change-scope-guard
 PAT
       ;;

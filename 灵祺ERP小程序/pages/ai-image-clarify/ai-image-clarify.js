@@ -1,15 +1,24 @@
 const vs = require('../../utils/visualStudioAiMp.js')
 const points = require('../../utils/erpPointsSpendMp.js')
 
-const CLARIFY_PROMPT =
-  '这是同一张照片的高清修复。保持画面里的人物、物体、文字、构图和颜色不变，只提高清晰度、锐度和细节，去掉模糊和压缩噪点。不要换脸，不要重画，不要加字，不要改背景。'
+function choiceText(data) {
+  if (!data) return ''
+  const label = data.label || ''
+  const detail = data.detail || ''
+  const reason = data.reason || ''
+  return [label, detail].filter(Boolean).join(' · ') + (reason ? `。${reason}` : '')
+}
 
 Page({
   data: {
     sourcePath: '',
     sourceData: '',
+    sourceW: 0,
+    sourceH: 0,
     resultUrl: '',
     busy: false,
+    stage: '',
+    choice: '',
     msg: '',
     imagePoints: points.VISUAL_STUDIO_IMAGE_POINTS,
   },
@@ -30,12 +39,22 @@ Page({
     })
   },
   readSource(path) {
+    wx.getImageInfo({
+      src: path,
+      success: (info) => this.storeSource(path, info.width, info.height),
+      fail: () => this.storeSource(path, 0, 0),
+    })
+  },
+  storeSource(path, width, height) {
     try {
       const b64 = wx.getFileSystemManager().readFileSync(path, 'base64')
       this.setData({
         sourcePath: path,
         sourceData: `data:image/jpeg;base64,${b64}`,
+        sourceW: width || 0,
+        sourceH: height || 0,
         resultUrl: '',
+        choice: '',
         msg: '',
       })
     } catch (e) {
@@ -53,24 +72,41 @@ Page({
   },
   async onClarify() {
     if (this.data.busy || !this.data.sourceData) return
-    this.setData({ busy: true, msg: '校验积分…', resultUrl: '' })
+    this.setData({ busy: true, stage: '正在理解这张图…', msg: '', resultUrl: '', choice: '' })
     try {
       await points.assertVisualStudioImageAffordable(1, 'standard')
-      this.setData({ msg: '正在按原图提高清晰度…' })
-      const gen = await vs.postAiAgentImage(CLARIFY_PROMPT, {
-        preferredVendor: 'qwen',
-        exactPrompt: true,
-        referenceImage: this.data.sourceData,
+      const judged = await vs.postImageClarify({
+        clarify_phase: 'judge',
+        reference_image: this.data.sourceData,
+        image_width: this.data.sourceW,
+        image_height: this.data.sourceH,
       })
-      if (!gen.ok) throw new Error(gen.message || '修复失败')
-      if (!(gen.pointsCharged > 0)) {
+      if (!judged || !judged.route) throw new Error('没有选出可用的变清晰方式')
+      this.setData({
+        choice: choiceText(judged),
+        stage: `选用${judged.label || '万相超分'}，${judged.detail || '正在变清晰'}`,
+      })
+      const ran = await vs.postImageClarify({
+        clarify_phase: 'run',
+        clarify_route: judged.route,
+        reference_image: this.data.sourceData,
+        image_width: this.data.sourceW,
+        image_height: this.data.sourceH,
+      })
+      if (!ran || !ran.imageUrl) throw new Error('没有返回清晰后的图片')
+      if (!(ran.pointsCharged > 0)) {
         await points.spendVisualStudioImagePoints({
           idempotencyKey: `erp-img-clarify-${Date.now()}`,
           note: '图片变清晰',
           tier: 'standard',
         })
       }
-      this.setData({ resultUrl: gen.imageUrl, msg: `已完成，本次 ${this.data.imagePoints} 积分` })
+      const note = ran.fallbackNote ? `${ran.fallbackNote}。` : ''
+      this.setData({
+        resultUrl: ran.imageUrl,
+        choice: choiceText(ran),
+        msg: `${note}已完成，本次 ${this.data.imagePoints} 积分`,
+      })
     } catch (e) {
       const msg = String((e && e.message) || e || '修复失败')
       this.setData({ msg })
@@ -85,7 +121,7 @@ Page({
         })
       }
     } finally {
-      this.setData({ busy: false })
+      this.setData({ busy: false, stage: '' })
     }
   },
 })

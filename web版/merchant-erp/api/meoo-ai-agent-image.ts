@@ -211,6 +211,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     phase?: unknown
     task_id?: unknown
     image_url?: unknown
+    clarify?: unknown
+    clarify_phase?: unknown
+    clarify_route?: unknown
+    image_width?: unknown
+    image_height?: unknown
   }
   try {
     body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -257,7 +262,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  if (phase !== 'poll' && !prompt) {
+  if (phase !== 'poll' && !prompt && body.clarify !== true) {
     sendMerchantJson(res, 400, { ok: false, error: 'prompt_required' })
     return
   }
@@ -267,7 +272,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const refRaw = typeof body.reference_image === 'string' ? body.reference_image.trim() : ''
-  if (refRaw.length > 2_800_000) {
+  const refLimit = body.clarify === true ? 6_000_000 : 2_800_000
+  if (refRaw.length > refLimit) {
     sendMerchantJson(res, 400, {
       ok: false,
       error: 'reference_image_too_large',
@@ -338,7 +344,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const isMpSession = user.id.startsWith('mp:')
   let erpTenantId: string | undefined
-  const erpPointsKind = wantsProImage ? 'visual_studio_image_pro' : 'agent_image'
+  const clarifyOn = body.clarify === true
+  const erpPointsKind = wantsProImage
+    ? 'visual_studio_image_pro'
+    : clarifyOn
+      ? 'visual_studio_image'
+      : 'agent_image'
 
   // poll：只查任务，积分在完成时扣；start/sync：先校验余额
   if (!isMpSession && phase !== 'poll') {
@@ -360,6 +371,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
     })
     if (gate.ok) erpTenantId = gate.tenantId
+  }
+
+  if (clarifyOn) {
+    const image = referenceImage || ''
+    if (!image.startsWith('data:image/')) {
+      sendMerchantJson(res, 400, { ok: false, error: 'image_required', message: '请上传图片' })
+      return
+    }
+    const width = Math.max(0, Math.floor(Number(body.image_width) || 0))
+    const height = Math.max(0, Math.floor(Number(body.image_height) || 0))
+    const clarifyPhase = body.clarify_phase === 'run' ? 'run' : 'judge'
+    try {
+      const clarify = await import('../vite-plugins/imageClarifyCore.js')
+      if (clarifyPhase === 'judge') {
+        const choice = await clarify.judgeClarifyImage(access.envForChat, image, width, height)
+        sendMerchantJson(res, 200, { ok: true, phase: 'judge', ...choice })
+        return
+      }
+      const picked =
+        clarify.normalizeClarifyRoute(body.clarify_route) ||
+        (await clarify.judgeClarifyImage(access.envForChat, image, width, height)).route
+      const ran = await clarify.runClarifyImage(access.envForChat, image, picked)
+      let pointsCharged: number | undefined
+      let pointsBalance: number | undefined
+      if (!isMpSession && erpTenantId) {
+        const { chargeErpAiPointsAfterSuccess } = await import('./_lib/erpAiApiPointsGate.js')
+        const charge = await chargeErpAiPointsAfterSuccess(auth, 'visual_studio_image', env0, {
+          tenantId: erpTenantId,
+          idempotencyKey: `visual_studio_image:${erpTenantId}:clarify:${Date.now().toString(36)}`,
+          note: '图片变清晰',
+        })
+        if (charge) {
+          pointsCharged = charge.pointsCharged
+          pointsBalance = charge.balance
+        }
+      }
+      sendMerchantJson(res, 200, {
+        ok: true,
+        phase: 'run',
+        imageUrl: ran.imageUrl,
+        route: ran.choice.route,
+        label: ran.choice.label,
+        detail: ran.choice.detail,
+        reason: ran.choice.reason,
+        ...(ran.fallbackNote ? { fallbackNote: ran.fallbackNote } : {}),
+        ...(pointsCharged != null ? { pointsCharged, pointsBalance } : {}),
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('[meoo-ai-agent-image] clarify failed', msg.slice(0, 300))
+      sendMerchantJson(res, 502, {
+        ok: false,
+        error: 'image_clarify_failed',
+        message: msg.slice(0, 400),
+      })
+    }
+    return
   }
 
   try {

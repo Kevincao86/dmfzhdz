@@ -120,6 +120,21 @@ async function postAiChat(messages, opts) {
   return { ok: true, content }
 }
 
+async function postImageClarify(body) {
+  let r
+  try {
+    r = await postPaths(
+      ['/api/meoo-ai-agent-image'],
+      Object.assign({ clarify: true }, body || {}),
+      mpAuthHeaders(),
+    )
+  } catch (e) {
+    return { ok: false, message: String(e && e.message ? e.message : e) }
+  }
+  if (!r.ok) return { ok: false, message: r.message || '变清晰失败' }
+  return { ok: true, data: r.data || {} }
+}
+
 async function postAiAgentImage(prompt, opts) {
   const o = opts || {}
   const body = { prompt: String(prompt || '').trim() }
@@ -383,6 +398,7 @@ module.exports = {
   hasDouyinLinkeToken,
   postDouyinAiAssist,
   postAiChat,
+  postImageClarify,
   postAiAgentImage,
   fetchRemoteImageDataUrl,
   postDouyinLinkForDh,

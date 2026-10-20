@@ -149,6 +149,11 @@ const ASPECT_WANX = {
   carousel: '1440*768',
 }
 
+async function postImageClarify(body) {
+  ensureAuth()
+  return requestJson('/api/meoo-ai-agent-image', Object.assign({ clarify: true }, body || {}), 90000)
+}
+
 async function postAiAgentImage(prompt, opts) {
   ensureAuth()
   const o = opts || {}
@@ -453,6 +458,7 @@ module.exports = {
   PLAYBOOKS,
   INDUSTRIES,
   postAiChat,
+  postImageClarify,
   postAiAgentImage,
   fetchRemoteImageDataUrl,
   fetchCopySuggestions,

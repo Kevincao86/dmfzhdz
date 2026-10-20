@@ -1,7 +1,7 @@
 <view class="page">
   <view class="card">
     <text class="title">图片变清晰</text>
-    <text class="sub">上传模糊照片，按原图提高清晰度。与视觉工坊常规生图同一条接口，{{imagePoints}} 积分/张。</text>
+    <text class="sub">先看图，再选择万相超分或千问图像编辑。{{imagePoints}} 积分/张。清晰后的图可点击查看大图。</text>
     <button class="btn" bindtap="onPick">选择图片</button>
     <view class="pair">
       <view class="shot">
@@ -12,10 +12,14 @@
       <view class="shot">
         <text class="label">清晰后</text>
         <image wx:if="{{resultUrl}}" class="pic" src="{{resultUrl}}" mode="aspectFit" bindtap="onPreview" />
-        <view wx:else class="empty">{{busy ? '处理中…' : '等待生成'}}</view>
+        <view wx:else class="empty {{busy ? 'empty--busy' : ''}}">
+          <view wx:if="{{busy}}" class="scan"></view>
+          <text>{{busy ? (stage || '处理中…') : '等待生成'}}</text>
+        </view>
       </view>
     </view>
     <button class="btn btn--go" loading="{{busy}}" disabled="{{busy || !sourceData}}" bindtap="onClarify">开始变清晰</button>
+    <text wx:if="{{choice}}" class="choice">{{choice}}</text>
     <text wx:if="{{msg}}" class="msg">{{msg}}</text>
   </view>
   <site-icp-footer />
