@@ -118,6 +118,7 @@ export function isArkQuotaHopableError(msg: string): boolean {
   if (/not support.*video|不支持.*视频/i.test(raw)) return true
   if (/does not exist|do not have access|not have access to it|model.*not.*found|unknown model|invalid.*model|endpoint.*not/i.test(raw))
     return true
+  if (/endpoint that is currently closed|temporarily unavailable/i.test(raw)) return true
   return false
 }
 
