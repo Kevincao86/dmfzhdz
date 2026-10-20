@@ -203,10 +203,7 @@ async function fetchRegistryOnce(opts) {
       opts && opts.includeOnly === false
         ? false
         : !!(opts && opts.includeOnly) ||
-          (includeMpOrderIds.length > 0 &&
-            includeMpOrderIds.length <= 30 &&
-            !includePrOwned &&
-            !includeRecommendPool)
+          (includeMpOrderIds.length > 0 && !includePrOwned && !includeRecommendPool)
     if (wantIncludeOnly) body.includeOnly = true
     const raw = includePrOwned
       ? await postHallRegistry(body, registerAuthHeaders())

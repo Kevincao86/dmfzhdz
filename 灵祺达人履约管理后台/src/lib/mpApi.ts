@@ -591,7 +591,6 @@ export async function fetchMpRegistry(opts?: {
     opts?.includeOnly === true ||
     (opts?.includeOnly !== false &&
       includeMpOrderIds.length > 0 &&
-      includeMpOrderIds.length <= 30 &&
       !includePrOwned &&
       !includeRecommendPool)
   const scope = opts?.scope === 'full' ? 'full' : 'hall'

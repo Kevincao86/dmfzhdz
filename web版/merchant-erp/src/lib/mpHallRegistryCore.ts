@@ -590,13 +590,19 @@ export function hallListViewerFromTalent(
   account?: {
     openid?: string | null
     registry_member_id?: string | null
+    login_name?: string | null
+    phone?: string | null
   } | null,
 ): HallListTalentViewer | undefined {
   const memberIds = [
     String(member?.id || '').trim(),
     String(account?.registry_member_id || '').trim(),
   ].filter(Boolean)
-  const contacts = [tailContact(member?.contact)].filter(Boolean)
+  const contacts = [
+    tailContact(member?.contact),
+    tailContact(account?.phone),
+    tailContact(account?.login_name),
+  ].filter(Boolean)
   const wxOpenIds = [
     String(member?.wxOpenId || '').trim(),
     String(account?.openid || '').trim(),
@@ -698,6 +704,60 @@ export function slimMpRecruitmentOrdersForHallList(
     const meta = slimMpPublishMetaForHallList(o.mpPublishMeta)
     if (meta) o.mpPublishMeta = meta
     else delete o.mpPublishMeta
+    return o
+  })
+}
+
+function talentBrowseApplicantStub(row: RegistryMpRecruitmentApplicant): RegistryMpRecruitmentApplicant {
+  return {
+    id: row.id,
+    name: '',
+    platform: row.platform || '',
+    followers: 0,
+    contact: '',
+    appliedAt: row.appliedAt,
+    taskStatus: row.taskStatus,
+    claimedSlotCount: row.claimedSlotCount,
+    assignedIceSlotIds: row.assignedIceSlotIds,
+    aiVerifyStatus: row.aiVerifyStatus,
+    videoStatus: row.videoStatus,
+    completedAt: row.completedAt,
+  }
+}
+
+/** 达人打开招募单：保留本人报名行和人数/认领计数，不把其他报名人的联系方式和成片地址整包下发。 */
+export function slimMpRecruitmentOrdersForTalentBrowse(
+  orders: RegistryMpRecruitmentOrder[],
+  viewer?: HallListTalentViewer,
+): RegistryMpRecruitmentOrder[] {
+  if (!Array.isArray(orders) || !orders.length) return []
+  return orders.map((raw) => {
+    const o = { ...raw }
+    o.applicantCount = resolveApplicantCountFromMp(o)
+    const all = Array.isArray(o.applicants) ? o.applicants : []
+    if (all.length) {
+      o.applicants = all.map((row) =>
+        viewer && applicantMatchesHallViewer(row, viewer) ? row : talentBrowseApplicantStub(row),
+      )
+    }
+    if (Array.isArray(o.iceVideoSlots) && o.iceVideoSlots.length > 0) {
+      o.iceVideoSlots = o.iceVideoSlots.map((slot) => {
+        if (!slot || typeof slot !== 'object') return slot as RegistryIceVideoSlot
+        const s = slot as RegistryIceVideoSlot
+        return {
+          slotId: String(s.slotId || ''),
+          label: String(s.label || ''),
+          downloadUrl: '',
+          assignedApplicantId: s.assignedApplicantId,
+          assignedAt: s.assignedAt,
+          deliverStatus: s.deliverStatus,
+        }
+      })
+    }
+    for (const key of ['groupQrImage', 'editGroupQrImage', 'coverImage'] as const) {
+      const value = String(o[key] || '')
+      if (value.startsWith('data:') && value.length > 256) delete o[key]
+    }
     return o
   })
 }
@@ -969,6 +1029,8 @@ export async function loadMpHallRegistryPayload(opts?: {
   slimPrListApplicants?: boolean
   /** 仅返回 includeMpOrderIds（海报/详情），不合并公开大厅 */
   includeOnly?: boolean
+  /** 达人点开详情：不拉整列站内信 */
+  skipInbox?: boolean
 }): Promise<Record<string, unknown>> {
   const includeMpOrderIds = (opts?.includeMpOrderIds ?? [])
     .map((id) => String(id).trim())
@@ -1014,7 +1076,9 @@ export async function loadMpHallRegistryPayload(opts?: {
           mpGroupQrByOrderId: pg.groupQrByOrderId,
         }
         const needsInboxSlice =
-          missingParts.length === 0 && (!!prOwnerKeys || !!talentAccount || !!talentMember)
+          opts?.skipInbox !== true &&
+          missingParts.length === 0 &&
+          (!!prOwnerKeys || !!talentAccount || !!talentMember)
         if (needsInboxSlice) {
           try {
             const inboxPartial = await fetchRegistryTalentInboxFromDb(supabaseUrl, serviceRole)
@@ -1065,7 +1129,9 @@ export async function loadMpHallRegistryPayload(opts?: {
           }
         }
         const needsInboxSlice =
-          !Array.isArray(partial.mpTalentInbox) && (!!prOwnerKeys || !!talentAccount || !!talentMember)
+          opts?.skipInbox !== true &&
+          !Array.isArray(partial.mpTalentInbox) &&
+          (!!prOwnerKeys || !!talentAccount || !!talentMember)
         if (needsInboxSlice) {
           try {
             const inboxPartial = await fetchRegistryTalentInboxFromDb(supabaseUrl, serviceRole)

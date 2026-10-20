@@ -6,6 +6,44 @@ import { isVercelServerless } from '../src/lib/mpErpRuntime.js'
 import { loadMpHallRegistryPayload, slimMpRecruitmentOrdersForHallList } from '../src/lib/mpHallRegistryCore.js'
 import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
 
+const HALL_LIST_CACHE_MS = 8_000
+
+type HallListCacheEntry = { at: number; json: string }
+const hallListCache = new Map<string, HallListCacheEntry>()
+const hallListInflight = new Map<string, Promise<string>>()
+
+async function hallListResponseJson(includeRecommendPool: boolean): Promise<string> {
+  const key = includeRecommendPool ? 'pool' : 'hall'
+  const hit = hallListCache.get(key)
+  if (hit && Date.now() - hit.at < HALL_LIST_CACHE_MS) return hit.json
+  const pending = hallListInflight.get(key)
+  if (pending) return pending
+  const task = (async () => {
+    const payload = await loadMpHallRegistryPayload({
+      includeRecommendPool,
+    })
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('erp_api_invalid_shape')
+    }
+    if (!Array.isArray(payload.mpRecruitmentOrders)) {
+      payload.mpRecruitmentOrders = []
+    } else {
+      payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForHallList(
+        payload.mpRecruitmentOrders as RegistryMpRecruitmentOrder[],
+      )
+    }
+    const json = JSON.stringify(payload)
+    hallListCache.set(key, { at: Date.now(), json })
+    return json
+  })()
+  hallListInflight.set(key, task)
+  try {
+    return await task
+  } finally {
+    if (hallListInflight.get(key) === task) hallListInflight.delete(key)
+  }
+}
+
 export const config = { maxDuration: 60 }
 
 function sendCors(res: VercelResponse) {
@@ -30,28 +68,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const includeRecommendPool =
       String(req.query?.includeRecommendPool || '').trim() === '1' ||
       String(req.query?.includeRecommendPool || '').toLowerCase() === 'true'
-    const payload = await loadMpHallRegistryPayload({
-      includeRecommendPool,
-    })
-
-    if (!payload || typeof payload !== 'object') {
-      res.status(502).send(
-        JSON.stringify({
-          ok: false,
-          error: 'meoo_ops_mp_hall_registry_failed',
-          detail: 'erp_api_invalid_shape',
-        }),
-      )
-      return
-    }
-    if (!Array.isArray(payload.mpRecruitmentOrders)) {
-      payload.mpRecruitmentOrders = []
-    } else {
-      payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForHallList(
-        payload.mpRecruitmentOrders as RegistryMpRecruitmentOrder[],
-      )
-    }
-    res.status(200).send(JSON.stringify(payload))
+    const json = await hallListResponseJson(includeRecommendPool)
+    res.status(200).send(json)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     const viaProxy = isVercelServerless() && /ecs_proxy|erp_api_proxy|ECONNRESET/i.test(msg)

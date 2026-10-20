@@ -15,6 +15,7 @@ import {
   resolvePublisherDisplayForMpOrder,
   hallListViewerFromTalent,
   slimMpRecruitmentOrdersForHallList,
+  slimMpRecruitmentOrdersForTalentBrowse,
 } from '../src/lib/mpHallRegistryCore.js'
 import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
 import {
@@ -943,10 +944,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             registry_member_id?: string | null
             openid?: string | null
             login_name?: string | null
+            phone?: string | null
           }
         | undefined
-      const skipTalentProfile = body.includePrOwned === true && body.includeRecommendPool !== true
-      if (hallSess && !skipTalentProfile) {
+      const talentBrowseDetail =
+        includeMpOrderIds.length > 0 &&
+        body.includePrOwned !== true &&
+        body.includeRecommendPool !== true &&
+        hallSess?.account?.active_role !== 'pr'
+      const skipTalentProfile =
+        talentBrowseDetail ||
+        hallSess?.account?.active_role === 'pr' ||
+        (body.includePrOwned === true && body.includeRecommendPool !== true)
+      if (hallSess && talentBrowseDetail) {
+        const hallAccount = hallSess.account
+        talentAccount = {
+          lingqi_talent_id: hallAccount.lingqi_talent_id,
+          registry_member_id: hallAccount.registry_member_id,
+          openid: hallAccount.openid,
+          login_name: hallAccount.login_name,
+          phone: hallAccount.phone,
+        }
+      } else if (hallSess && !skipTalentProfile) {
         try {
           const hallAccount = hallSess.account
           const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, hallAccount)
@@ -959,6 +978,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             registry_member_id: hallAccount.registry_member_id,
             openid: hallAccount.openid,
             login_name: hallAccount.login_name,
+            phone: hallAccount.phone,
           }
         } catch {
           /* inbox slice optional */
@@ -966,12 +986,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const includeRecommendPool = body.includeRecommendPool === true
       const includeAllPrOwned = body.includePrOwned === true
-      /** 带指定单号且非 PR 全量/推荐池 → 默认 includeOnly（详情秒开）；显式 false 可关 */
+      /** 带了具体单号就只回这些单。达人浏览即使超过 30 个单号也不回整库。 */
       const includeOnly =
+        talentBrowseDetail ||
         body.includeOnly === true ||
         (body.includeOnly !== false &&
           includeMpOrderIds.length > 0 &&
-          includeMpOrderIds.length <= 30 &&
           !includeAllPrOwned &&
           !includeRecommendPool)
       const payload = await loadMpHallRegistryPayload({
@@ -984,8 +1004,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         prOwnedList: includeAllPrOwned && includeMpOrderIds.length === 0,
         slimPrListApplicants: includeAllPrOwned && includeMpOrderIds.length === 0,
         includeOnly,
+        skipInbox: talentBrowseDetail,
       })
-      if (
+      if (includeOnly && hallSess?.account?.active_role !== 'pr' && Array.isArray(payload.mpRecruitmentOrders)) {
+        payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForTalentBrowse(
+          payload.mpRecruitmentOrders as RegistryMpRecruitmentOrder[],
+          hallListViewerFromTalent(talentMember, talentAccount),
+        )
+      } else if (
         includeMpOrderIds.length === 0 &&
         !includeOnly &&
         Array.isArray(payload.mpRecruitmentOrders)

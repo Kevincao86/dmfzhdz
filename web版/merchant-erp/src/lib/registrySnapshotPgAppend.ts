@@ -404,13 +404,33 @@ export async function readMpRecruitmentOrdersByIdsViaPg(
     }
   | { ok: false; error: string }
 > {
+  const ids = [...new Set(mpOrderIds.map((id) => String(id || '').trim()).filter(Boolean))].slice(0, 120)
+  const cacheKey = ids.slice().sort().join('\n')
+  const pending = detailOrderReadInflight.get(cacheKey)
+  if (pending) return pending
+  const task = readMpRecruitmentOrdersByIdsViaPgNow(ids)
+  detailOrderReadInflight.set(cacheKey, task)
+  void task.finally(() => {
+    if (detailOrderReadInflight.get(cacheKey) === task) detailOrderReadInflight.delete(cacheKey)
+  })
+  return task
+}
+
+const detailOrderReadInflight = new Map<string, ReturnType<typeof readMpRecruitmentOrdersByIdsViaPgNow>>()
+
+async function readMpRecruitmentOrdersByIdsViaPgNow(
+  ids: string[],
+): Promise<
+  | {
+      ok: true
+      orders: RegistryMpRecruitmentOrder[]
+      mpPrUsers: unknown[]
+      groupQrByOrderId: Record<string, string>
+    }
+  | { ok: false; error: string }
+> {
   const cs = readRegistryPgConnectionString()
   if (!cs) return { ok: false, error: 'pg_not_configured' }
-
-  const ids = [...new Set(mpOrderIds.map((id) => String(id || '').trim()).filter(Boolean))].slice(
-    0,
-    120,
-  )
   if (!ids.length) {
     return { ok: true, orders: [], mpPrUsers: [], groupQrByOrderId: {} }
   }

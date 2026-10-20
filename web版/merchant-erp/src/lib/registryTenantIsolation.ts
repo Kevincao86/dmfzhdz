@@ -335,6 +335,21 @@ export function mergeMpRecruitmentOrdersForHallContext(
     return owned
   }
 
+  /** 带了「我的发单」又带了单号时，不能把公开大厅和全部报名人一起返回 */
+  if (includeAllPrOwned && prOwnerKeys && !includeOnly) {
+    const out: RegistryMpRecruitmentOrder[] = []
+    const seen = new Set<string>()
+    for (const o of allOrders) {
+      if (!o?.id) continue
+      const id = String(o.id)
+      if (seen.has(id)) continue
+      if (!includeSet.has(id) && !mpOrderOwnedByPrKeys(o, prOwnerKeys)) continue
+      seen.add(id)
+      out.push(mapManagementOrder(o, prOwnerKeys, true))
+    }
+    return out
+  }
+
   if (includeSet.size > 0 && includeOnly && !includeAllPrOwned) {
     const out: RegistryMpRecruitmentOrder[] = []
     const seen = new Set<string>()
