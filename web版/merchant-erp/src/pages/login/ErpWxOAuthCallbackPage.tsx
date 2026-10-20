@@ -13,10 +13,8 @@ export default function ErpWxOAuthCallbackPage() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.top && window.top !== window.self) {
       window.top.location.replace(window.location.href)
+      return
     }
-  }, [])
-
-  useEffect(() => {
     const code = String(params.get('code') || '').trim()
     const state = String(params.get('state') || '').trim()
     const oauthErr = String(params.get('error_description') || params.get('error') || '').trim()
