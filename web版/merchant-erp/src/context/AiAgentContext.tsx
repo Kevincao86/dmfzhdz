@@ -116,6 +116,7 @@ import {
   parseRegionToCityState,
 } from '../lib/recruitmentCityPicker'
 import { allCitiesFlat } from '../lib/chinaRegion'
+import { extractTalentPlanHeadcount } from '../lib/aiAgentRecruitmentParse'
 import {
   citedFollowerCount,
   citedProfileUrls,
@@ -548,11 +549,11 @@ function quoteAsksTalentDetail(text: string): { quote: string; city: string; bud
   }
 }
 
-/** 「推荐金华的达人」这类话，不是经营数据问答。 */
+/** 「推荐金华的达人」，以及引用方案后只说「帮我推荐」。 */
 function isTalentRecommendAsk(text: string): boolean {
   const x = intentText(text)
-  if (!/达人/.test(x)) return false
-  return /推荐|找|匹配|名单|有哪些|介绍/.test(x)
+  if (/达人/.test(x) && /推荐|找|匹配|名单|有哪些|介绍/.test(x)) return true
+  return /^(?:请)?(?:帮我|给我|为我)?推荐(?:一下|达人|人选|名单)?[。！!]?$/.test(x)
 }
 
 /** 离「推荐/达人」最近的一座城。用户点名优先于前文里的门店城市。 */
@@ -610,7 +611,15 @@ function explicitTalentHeadcount(text: string): number {
 }
 
 function talentHeadcountFromDialogue(userText: string, priorText: string): number {
-  return explicitTalentHeadcount(userText) || explicitTalentHeadcount(priorText) || 5
+  const named = explicitTalentHeadcount(userText) || explicitTalentHeadcount(priorText)
+  if (named > 0) return named
+  const latest = `${userText}\n${priorText}`.slice(-2500)
+  const quotas = planFanQuotas(latest)
+  const split = (quotas?.waist || 0) + (quotas?.head || 0)
+  if (split > 0 && split <= TALENT_HEADCOUNT_CAP) return split
+  const fromPlan = extractTalentPlanHeadcount(latest)
+  if (fromPlan && fromPlan >= 1 && fromPlan <= TALENT_HEADCOUNT_CAP) return fromPlan
+  return 5
 }
 
 function talentPlanClause(text: string): string {
