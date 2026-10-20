@@ -25,6 +25,29 @@
   color: var(--lq-primary-dark, #047857);
 }
 
+.cred-ready-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+
+.cred-edit-btn--ghost {
+  color: #57534e;
+  background: #fff;
+  border-color: #d6d3d1;
+}
+
+.cred-view-value {
+  display: block;
+  margin-top: 8rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #fafaf9;
+  color: #1c1917;
+  font-size: 28rpx;
+}
+
 .cred-edit-btn {
   margin: 0;
   padding: 0 28rpx;

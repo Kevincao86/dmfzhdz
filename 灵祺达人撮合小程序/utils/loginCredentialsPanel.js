@@ -8,6 +8,7 @@ function patchFromAccount(acct) {
     credentialsReady,
     wantWebLogin: false,
     showCredModal: false,
+    showCredView: false,
     modalLoginName: loginName,
     modalPassword: '',
     modalSmsCode: '',
@@ -82,6 +83,12 @@ function createHandlers(auth) {
           credModalErr: '',
         })
       }
+    },
+    onViewCredentials() {
+      this.setData({ showCredView: true })
+    },
+    onCloseCredView() {
+      this.setData({ showCredView: false })
     },
     onEditCredentials() {
       if (!auth.isLoggedIn()) {
