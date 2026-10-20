@@ -258,11 +258,28 @@ function avatarUrlFrom(raw: unknown): string {
   return ''
 }
 
-async function fetchDouyinUserBySecUid(secUid: string): Promise<RawProfileBlob | null> {
-  if (!secUid) return null
-  const apiUrl = `https://www.iesdouyin.com/web/api/v2/user/info/?sec_uid=${encodeURIComponent(secUid)}`
+function douyinUserBlob(u: IesDouyinUserInfo): RawProfileBlob {
+  const uniqueId = String(u.unique_id || '').trim()
+  const shortId = String(u.short_id || '').trim()
+  return {
+    platformNickname: String(u.nickname || '').trim(),
+    platformAccount: uniqueId && uniqueId !== '0' ? uniqueId : shortId !== '0' ? shortId : '',
+    followers: Math.max(0, Number(u.mplatform_followers_count ?? u.follower_count ?? 0) || 0),
+    gender: u.gender === 1 || u.gender === 2 ? u.gender : undefined,
+    signature: String(u.signature || '').trim(),
+    avatarUrl: avatarUrlFrom(u),
+    ipLocation: cleanIpLocation(u.ip_location || u.location_city || u.city),
+    age: ageText(u.user_age),
+    followingCount: Math.max(0, Number(u.following_count) || 0) || undefined,
+    totalFavorited: Math.max(0, Number(u.total_favorited) || 0) || undefined,
+    awemeCount: Math.max(0, Number(u.aweme_count) || 0) || undefined,
+  }
+}
+
+async function fetchDouyinUserInfo(query: string): Promise<RawProfileBlob | null> {
+  if (!query) return null
   try {
-    const res = await fetch(apiUrl, {
+    const res = await fetch(`https://www.iesdouyin.com/web/api/v2/user/info/?${query}`, {
       headers: {
         ...fetchHeaders('douyin', 'mobile'),
         Accept: 'application/json, text/plain, */*',
@@ -272,29 +289,22 @@ async function fetchDouyinUserBySecUid(secUid: string): Promise<RawProfileBlob |
     if (!res.ok) return null
     const j = (await res.json()) as { status_code?: number; user_info?: IesDouyinUserInfo }
     if (j.status_code !== 0 || !j.user_info) return null
-    const u = j.user_info
-    const uniqueId = String(u.unique_id || '').trim()
-    const shortId = String(u.short_id || '').trim()
-    const blob: RawProfileBlob = {
-      platformNickname: String(u.nickname || '').trim(),
-      platformAccount: uniqueId && uniqueId !== '0' ? uniqueId : shortId !== '0' ? shortId : '',
-      followers: Math.max(
-        0,
-        Number(u.mplatform_followers_count ?? u.follower_count ?? 0) || 0,
-      ),
-      gender: u.gender === 1 || u.gender === 2 ? u.gender : undefined,
-      signature: String(u.signature || '').trim(),
-      avatarUrl: avatarUrlFrom(u),
-      ipLocation: cleanIpLocation(u.ip_location || u.location_city || u.city),
-      age: ageText(u.user_age),
-      followingCount: Math.max(0, Number(u.following_count) || 0) || undefined,
-      totalFavorited: Math.max(0, Number(u.total_favorited) || 0) || undefined,
-      awemeCount: Math.max(0, Number(u.aweme_count) || 0) || undefined,
-    }
-    return blob
+    const blob = douyinUserBlob(j.user_info)
+    return blob.platformNickname || blob.platformAccount ? blob : null
   } catch {
     return null
   }
+}
+
+async function fetchDouyinUserByUniqueId(uniqueId: string): Promise<RawProfileBlob | null> {
+  const id = String(uniqueId || '').trim().replace(/^@/, '')
+  if (!/^[A-Za-z0-9._]{2,30}$/.test(id) || id.includes('http')) return null
+  return fetchDouyinUserInfo(`unique_id=${encodeURIComponent(id)}`)
+}
+
+async function fetchDouyinUserBySecUid(secUid: string): Promise<RawProfileBlob | null> {
+  if (!secUid) return null
+  return fetchDouyinUserInfo(`sec_uid=${encodeURIComponent(secUid)}`)
 }
 
 /** 直播用户接口不带网页签名，粉丝/关注/性别/头像比 ies 接口更接近主页。IP 属地和年龄不在这份返回里。 */
@@ -1056,7 +1066,14 @@ export async function runProfileLinkParseCore(
   const raw = String(input.link || '').trim()
   if (!raw) return { ok: false, message: `请先粘贴${platName}主页分享链接` }
 
-  const profileUrl = await resolveProfileUrl(raw, key)
+  let profileUrl = await resolveProfileUrl(raw, key)
+  let presetUser: RawProfileBlob | null = null
+  if (!profileUrl && key === 'douyin') {
+    presetUser = await fetchDouyinUserByUniqueId(raw)
+    if (presetUser?.platformNickname || presetUser?.platformAccount) {
+      profileUrl = `https://www.douyin.com/user/${raw.replace(/^@/, '').trim()}`
+    }
+  }
   if (!profileUrl) {
     return {
       ok: false,
@@ -1065,16 +1082,18 @@ export async function runProfileLinkParseCore(
   }
 
   let html = ''
-  try {
-    html = await fetchProfileHtmlCandidates(profileUrl, key)
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return { ok: false, message: `网络请求失败：${msg.slice(0, 120)}` }
+  if (!presetUser) {
+    try {
+      html = await fetchProfileHtmlCandidates(profileUrl, key)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: `网络请求失败：${msg.slice(0, 120)}` }
+    }
   }
 
-  let user = html ? parseProfileFromHtml(html, key, profileUrl) : null
+  let user = presetUser || (html ? parseProfileFromHtml(html, key, profileUrl) : null)
 
-  if (key === 'douyin') {
+  if (key === 'douyin' && !presetUser) {
     const sec = extractSecUidFromDouyinUrl(profileUrl)
     const apiUser = sec ? await fetchDouyinUserBySecUid(sec) : null
     const liveUser = sec ? await fetchDouyinWebcastBySecUid(sec) : null
