@@ -481,6 +481,13 @@ export type RegistryMpTalentPlatformProfile = {
   alipayAccount: string
   accountTags?: string[]
   recentTradeScreenshot?: string
+  avatarUrl?: string
+  ipLocation?: string
+  age?: string
+  signature?: string
+  followingCount?: string
+  totalFavorited?: string
+  awemeCount?: string
 }
 
 /** 拍摄/剪辑团队扩展资料（小程序与履约 Web 共用） */

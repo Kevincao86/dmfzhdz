@@ -7,6 +7,10 @@ function followersStr(raw: unknown): string {
   return String(raw)
 }
 
+function profileText(raw: object, key: string): string {
+  return String((raw as Record<string, unknown>)[key] ?? '').trim()
+}
+
 function mapPlatformProfile(
   raw: (RegistryMpTalentPlatformProfile & { enabled?: boolean }) | undefined,
   _memberAlipay: string,
@@ -27,6 +31,13 @@ function mapPlatformProfile(
     quotePrice: String(raw.quotePrice || '').trim(),
     accountTags: Array.isArray(raw.accountTags) ? raw.accountTags.map(String) : [],
     recentTradeScreenshot: String((raw as { recentTradeScreenshot?: string }).recentTradeScreenshot || '').trim(),
+    avatarUrl: profileText(raw, 'avatarUrl'),
+    ipLocation: profileText(raw, 'ipLocation'),
+    age: profileText(raw, 'age'),
+    signature: profileText(raw, 'signature'),
+    followingCount: profileText(raw, 'followingCount'),
+    totalFavorited: profileText(raw, 'totalFavorited'),
+    awemeCount: profileText(raw, 'awemeCount'),
   }
 }
 
