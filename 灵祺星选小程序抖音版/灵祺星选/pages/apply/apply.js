@@ -80,37 +80,49 @@ function rememberParsedAvatar(member, platform, url) {
   })
 }
 
+function revealApplyInfo(page, avatar, label) {
+  const patch = { applyInfoReady: true, applyAvatarUrl: avatar || '', applyAvatarLabel: label || '' }
+  if (!avatar) {
+    page.setData(patch)
+    return
+  }
+  wx.getImageInfo({
+    src: avatar,
+    complete: () => page.setData(patch),
+  })
+}
+
 function fillAvatarFromProfileLink(page, member, platform, link, account) {
   const primary = String(link || '').trim()
   const douyinId = platform === '抖音' ? String(account || '').replace(/^@/, '').trim() : ''
-  const show = (avatar) => {
-    if (!avatar) return
-    page.setData({
-      applyAvatarUrl: avatar,
-      applyAvatarLabel: platform === '抖音' ? '抖音头像' : `${platform || '平台'}头像`,
-    })
-    rememberParsedAvatar(member, platform, avatar)
-  }
+  const label = platform === '抖音' ? '抖音头像' : `${platform || '平台'}头像`
   const readAvatar = (parsed) => String((parsed && parsed.avatarUrl) || '').trim()
-  const byAccount = () => {
-    if (!douyinId) return
-    profileLinkParse
-      .parseProfileLink(douyinId, '抖音')
-      .then((parsed) => show(readAvatar(parsed)))
-      .catch(() => {})
+  const finish = (avatar) => {
+    if (avatar) rememberParsedAvatar(member, platform, avatar)
+    revealApplyInfo(page, avatar, avatar ? label : '')
   }
-  if (!primary) {
-    byAccount()
+  const byLink = () => {
+    if (!primary) {
+      finish('')
+      return
+    }
+    profileLinkParse
+      .parseProfileLink(primary, platform)
+      .then((parsed) => finish(readAvatar(parsed)))
+      .catch(() => finish(''))
+  }
+  if (!douyinId) {
+    byLink()
     return
   }
   profileLinkParse
-    .parseProfileLink(primary, platform)
+    .parseProfileLink(douyinId, '抖音')
     .then((parsed) => {
       const avatar = readAvatar(parsed)
-      if (avatar) show(avatar)
-      else byAccount()
+      if (avatar) finish(avatar)
+      else byLink()
     })
-    .catch(() => byAccount())
+    .catch(() => byLink())
 }
 
 function detailUrlAfterApply(mpOrderId) {
@@ -282,6 +294,7 @@ Page({
     applicantCountText: '',
     applyAvatarUrl: '',
     applyAvatarLabel: '',
+    applyInfoReady: true,
     quoteSuggestHint: '',
     quoteSuggesting: false,
     orderBudgetText: '',
@@ -453,10 +466,17 @@ Page({
     if (!patch.provinces?.length) {
       Object.assign(patch, setupRegionState('', ''))
     }
+    const profileLinkForAvatar = String(patch.profileLink || '').trim()
+    const accountForAvatar = String(patch.platformAccount || '').trim()
+    patch.applyInfoReady = !(
+      !isSupplierApply &&
+      !showAvatar.url &&
+      (platform === '抖音' ? accountForAvatar || profileLinkForAvatar : profileLinkForAvatar)
+    )
     this.setData(patch, () => {
       syncApplyRows(this)
       const profileLink = String(patch.profileLink || '').trim()
-      if (!isSupplierApply && !showAvatar.url && (profileLink || patch.platformAccount)) {
+      if (!patch.applyInfoReady) {
         fillAvatarFromProfileLink(this, member, platform, profileLink, patch.platformAccount)
       }
       if (member && orderMeta) {

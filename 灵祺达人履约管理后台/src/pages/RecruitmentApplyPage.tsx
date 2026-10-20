@@ -63,6 +63,16 @@ function applyShowAvatar(member: TalentMember | null, platform: string): { url: 
   return { url: '', label: '' }
 }
 
+function preloadAvatar(url: string) {
+  return new Promise<void>((resolve) => {
+    const img = new Image()
+    img.referrerPolicy = 'no-referrer'
+    img.onload = () => resolve()
+    img.onerror = () => resolve()
+    img.src = url
+  })
+}
+
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
   const [search] = useSearchParams()
@@ -159,6 +169,14 @@ export default function RecruitmentApplyPage() {
   }))
   const [formReady, setFormReady] = useState(false)
   const [parsedAvatar, setParsedAvatar] = useState('')
+  const [avatarReady, setAvatarReady] = useState(() => {
+    if (isSupplierApply) return true
+    if (applyShowAvatar(readMember(), platform).url) return true
+    const fields = applyFieldsFromMember(readMember(), platform)
+    const account = String(fields?.platformAccount || '').replace(/^@/, '').trim()
+    const link = String(fields?.profileLink || '').trim()
+    return !(platform === '抖音' ? account || link : link)
+  })
   const applyAvatar = storedAvatar.url
     ? storedAvatar
     : parsedAvatar
@@ -218,22 +236,20 @@ export default function RecruitmentApplyPage() {
   }, [unlockForm])
 
   useEffect(() => {
-    if (isSupplierApply || storedAvatar.url) return
+    if (isSupplierApply || storedAvatar.url) {
+      setAvatarReady(true)
+      return
+    }
     const link = String(form.profileLink || '').trim()
     const account = String(form.platformAccount || '').replace(/^@/, '').trim()
-    if (!link && !account) return
+    if (!link && !account) {
+      setAvatarReady(true)
+      return
+    }
     let cancelled = false
     void (async () => {
       let url = ''
-      if (link) {
-        try {
-          const parsed = await parseProfileLink(link, platform)
-          url = String(parsed.avatarUrl || '').trim()
-        } catch {
-          url = ''
-        }
-      }
-      if (!url && platform === '抖音' && account) {
+      if (platform === '抖音' && account) {
         try {
           const parsed = await parseProfileLink(account, '抖音')
           url = String(parsed.avatarUrl || '').trim()
@@ -241,20 +257,35 @@ export default function RecruitmentApplyPage() {
           url = ''
         }
       }
-      if (cancelled || !url) return
-      setParsedAvatar(url)
-      const current = readMember()
-      if (!current?.platformProfiles) return
-      const pid = platformIdFromName(platform)
-      const prof = current.platformProfiles[pid]
-      if (!prof || String(prof.avatarUrl || '').trim()) return
-      writeMember({
-        ...current,
-        platformProfiles: {
-          ...current.platformProfiles,
-          [pid]: { ...prof, avatarUrl: url },
-        },
-      })
+      if (!url && link) {
+        try {
+          const parsed = await parseProfileLink(link, platform)
+          url = String(parsed.avatarUrl || '').trim()
+        } catch {
+          url = ''
+        }
+      }
+      if (cancelled) return
+      if (url) {
+        await preloadAvatar(url)
+        if (cancelled) return
+        setParsedAvatar(url)
+        const current = readMember()
+        if (current?.platformProfiles) {
+          const pid = platformIdFromName(platform)
+          const prof = current.platformProfiles[pid]
+          if (prof && !String(prof.avatarUrl || '').trim()) {
+            writeMember({
+              ...current,
+              platformProfiles: {
+                ...current.platformProfiles,
+                [pid]: { ...prof, avatarUrl: url },
+              },
+            })
+          }
+        }
+      }
+      setAvatarReady(true)
     })()
     return () => {
       cancelled = true
@@ -594,6 +625,8 @@ export default function RecruitmentApplyPage() {
               : '达人报名信息'
         }
       >
+        {avatarReady ? (
+          <>
         {applyAvatar.url ? (
           <div className="mb-3 flex items-center gap-3">
             <img
@@ -618,6 +651,10 @@ export default function RecruitmentApplyPage() {
         {visibleRows.map((row) => (
           <ApplyFieldInput key={row.id} row={row} value={fieldValue(row)} lb={lb} form={form} onChange={setField} />
         ))}
+          </>
+        ) : (
+          <p className="text-sm text-slate-400">正在读取抖音头像和报名资料…</p>
+        )}
       </FormSection>
 
       {err ? <p className="text-red-500 text-sm">{err}</p> : null}

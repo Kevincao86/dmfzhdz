@@ -66,6 +66,8 @@
     </view>
     <text wx:if="{{tierFixedPriceHint}}" class="apply-tier-hint">{{tierFixedPriceHint}}</text>
     <text wx:if="{{tierSelfQuoteBanner}}" class="apply-tier-hint apply-tier-hint--warn">{{tierSelfQuoteBanner}}</text>
+    <text wx:if="{{!applyInfoReady}}" class="hint">正在读取抖音头像和报名资料…</text>
+    <block wx:else>
     <view class="apply-avatar-row" wx:if="{{applyAvatarUrl}}">
       <image class="apply-avatar" src="{{applyAvatarUrl}}" mode="aspectFill" />
       <text class="form-label">{{applyAvatarLabel}}</text>
@@ -150,6 +152,7 @@
           bindinput="onField"
         />
       </view>
+    </block>
     </block>
   </view>
 
