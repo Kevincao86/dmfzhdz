@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import DyOAuthOfficialPanel from '@merchant/components/login/DyOAuthOfficialPanel'
+import WxOAuthOfficialPanel from '@merchant/components/login/WxOAuthOfficialPanel'
 import {
   bindConflictCheck,
   bindEmailLogin,
@@ -9,6 +11,7 @@ import {
   rebindPhoneSms,
   sendEmailCode,
   sendRegisterSms,
+  wxOAuthBegin,
 } from '../lib/mpApi'
 import { formatMpApiErr } from '../lib/mpApiErrors'
 import { getAccount, getToken, setSession, type MpAccount } from '../lib/mpSession'
@@ -35,6 +38,9 @@ export default function TalentAccountBindPanel() {
   const [hint, setHint] = useState('')
   const [mergeOpen, setMergeOpen] = useState(false)
   const [mergeLabel, setMergeLabel] = useState('')
+  const [scanBind, setScanBind] = useState<null | { kind: 'wechat' | 'douyin'; url: string }>(null)
+  const [scanErr, setScanErr] = useState('')
+  const [scanLoading, setScanLoading] = useState(false)
 
   const ids = acc?.identities
 
@@ -143,15 +149,18 @@ export default function TalentAccountBindPanel() {
     }
   }
 
-  const startDouyinBind = async () => {
+  const openScanBind = async (kind: 'wechat' | 'douyin') => {
     setErr('')
-    setBusy(true)
+    setScanErr('')
+    setScanLoading(true)
+    setScanBind({ kind, url: '' })
     try {
-      const started = await dyOAuthBegin('talent', true)
-      window.location.href = started.authorizeUrl
+      const started = kind === 'wechat' ? await wxOAuthBegin('talent', true) : await dyOAuthBegin('talent', true)
+      setScanBind({ kind, url: started.authorizeUrl })
     } catch (e) {
-      setErr(formatMpApiErr(e, '抖音绑定暂时无法开始'))
-      setBusy(false)
+      setScanErr(formatMpApiErr(e, kind === 'wechat' ? '微信绑定暂时无法开始' : '抖音绑定暂时无法开始'))
+    } finally {
+      setScanLoading(false)
     }
   }
 
@@ -188,7 +197,11 @@ export default function TalentAccountBindPanel() {
                 setHint('')
                 if (it.id === 'wechat') {
                   setKind(null)
-                  setHint(on ? '微信已绑定' : '请在达人小程序「我的 → 账号绑定」里使用微信一键登录')
+                  if (on) {
+                    setHint('微信已绑定')
+                    return
+                  }
+                  void openScanBind('wechat')
                   return
                 }
                 if (it.id === 'douyin') {
@@ -197,7 +210,7 @@ export default function TalentAccountBindPanel() {
                     setHint('抖音已绑定')
                     return
                   }
-                  void startDouyinBind()
+                  void openScanBind('douyin')
                   return
                 }
                 setKind(it.id)
@@ -226,6 +239,40 @@ export default function TalentAccountBindPanel() {
         </p>
       ) : null}
       {hint ? <p className="mt-2 text-xs text-[var(--shell-muted)]">{hint}</p> : null}
+      {scanBind ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium text-[var(--shell-text)]">
+                {scanBind.kind === 'wechat' ? '绑定微信' : '绑定抖音'}
+              </p>
+              <button
+                type="button"
+                className="text-xs text-[var(--shell-muted)]"
+                onClick={() => {
+                  setScanBind(null)
+                  setScanErr('')
+                }}
+              >
+                关闭
+              </button>
+            </div>
+            {scanLoading ? <p className="py-8 text-center text-sm text-[var(--shell-muted)]">正在打开授权页…</p> : null}
+            {scanErr ? <p className="text-sm text-red-600">{scanErr}</p> : null}
+            {!scanLoading && scanBind.url && scanBind.kind === 'wechat' ? (
+              <WxOAuthOfficialPanel authorizeUrl={scanBind.url} />
+            ) : null}
+            {!scanLoading && scanBind.url && scanBind.kind === 'douyin' ? (
+              <>
+                <DyOAuthOfficialPanel authorizeUrl={scanBind.url} />
+                <p className="mt-2 text-center text-[11px] leading-relaxed text-[var(--shell-muted)]">
+                  请用抖音 App 扫码授权。手机浏览器会尝试拉起抖音；电脑端没有和微信一样的客户端一键确认。
+                </p>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {kind && boundNow && !editing ? (
         <button
           type="button"

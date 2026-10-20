@@ -2200,7 +2200,7 @@ export async function mpAuthDyOAuthBegin(
     portal,
   })
   let authorizeUrl = buildDouyinWebAuthorizeUrl(state, redirectUri)
-  if (opts?.bindAuthUserId && portal === 'merchant') {
+  if (bindAccountId) {
     authorizeUrl += '&is_call_app=1'
   }
   return { authorizeUrl, ticket, expiresAt, redirectUri, clientKey: readDouyinWebClientKey() }
@@ -2224,6 +2224,8 @@ export type MpAuthDyOAuthCompleteResult = {
   }
   /** 已登录商家把扫码结果绑到当前账号，不换登录会话 */
   boundToAuthUser?: boolean
+  /** 已登录星选账号把扫码结果绑到当前达人账号 */
+  boundToLoginAccount?: boolean
 }
 
 async function tryErpSessionFromMpAccount(
@@ -2327,7 +2329,70 @@ async function finishDouyinBindToLoginAccount(
     session_token: token,
   })
   const fixed = await fixedIdentityForAccount(supabaseUrl, serviceRole, account)
-  return { token, account, workIdentity: fixed || workIdentity, isNew: false, portal: 'xingxuan' }
+  return {
+    token,
+    account,
+    workIdentity: fixed || workIdentity,
+    isNew: false,
+    portal: 'xingxuan',
+    boundToLoginAccount: true,
+  }
+}
+
+/** 星选已登录：把网站微信 openid 写到当前达人账号，不另开账号。 */
+async function finishXingxuanWechatBind(
+  supabaseUrl: string,
+  serviceRole: string,
+  rest: ReturnType<typeof restClient>,
+  ticket: string,
+  bindAccountId: string,
+  openid: string,
+  nickname: string,
+  avatarUrl: string,
+): Promise<MpAuthDyOAuthCompleteResult> {
+  const primary = await findAccountById(rest, bindAccountId)
+  if (!primary) throw new Error('account_not_found')
+  const holder = await findAccountByOpenId(rest, openid)
+  if (holder && holder.id !== primary.id) throw new Error('wx_openid_already_bound')
+  let account = primary
+  if (accountWechatOpenId(account) !== openid) {
+    const currentOpenId = String(account.openid || '').trim()
+    const patch: Record<string, unknown> = {
+      openid,
+      wx_nick_name: account.wx_nick_name || nickname || '',
+      wx_avatar_url: account.wx_avatar_url || avatarUrl || '',
+    }
+    if (currentOpenId.startsWith('dyweb_') && !String(account.dy_openid || '').trim()) {
+      patch.dy_openid = currentOpenId
+    }
+    await updateAccount(rest, account.id, patch)
+    account = (await findAccountById(rest, account.id))!
+    const role: MpAccountRole = account.active_role === 'pr' ? 'pr' : 'talent'
+    account = await provisionRegistryForAccount(
+      supabaseUrl,
+      serviceRole,
+      account,
+      role,
+      nickname || account.wx_nick_name || '',
+      avatarUrl || account.wx_avatar_url || '',
+    )
+  }
+  const token = await createSession(rest, account.id)
+  await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(ticket)}`, {
+    status: 'confirmed',
+    openid,
+    account_id: account.id,
+    session_token: token,
+  })
+  const fixed = await fixedIdentityForAccount(supabaseUrl, serviceRole, account)
+  return {
+    token,
+    account,
+    workIdentity: fixed || 'talent',
+    isNew: false,
+    portal: 'xingxuan',
+    boundToLoginAccount: true,
+  }
 }
 
 /** 商家已登录：把网站 openid 写到当前账号，不新建租户、不换会话。 */
@@ -2566,6 +2631,18 @@ export async function mpAuthWxOAuthComplete(
   const bindAuthUserId = String(ticketRow.account_id || '').trim()
   if (bindAuthUserId && portal === 'merchant') {
     return finishMerchantScanBind(rest, parsed.ticket, bindAuthUserId, openid, 'wx')
+  }
+  if (bindAuthUserId && portal !== 'merchant') {
+    return finishXingxuanWechatBind(
+      supabaseUrl,
+      serviceRole,
+      rest,
+      parsed.ticket,
+      bindAuthUserId,
+      openid,
+      oauth.nickname || '',
+      oauth.avatarUrl || '',
+    )
   }
   const isErpPortal = portal === 'merchant'
   const workIdentity = isErpPortal ? 'merchant' : normalizeDyOAuthWorkIdentity(parsed.workIdentity)

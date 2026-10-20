@@ -765,7 +765,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, error: 'missing_code_or_state' })
         return
       }
-      const { token, account, workIdentity, isNew, portal, erpSession, mergeRequired, ticket, subjectLabel, boundToAuthUser } =
+      const { token, account, workIdentity, isNew, portal, erpSession, mergeRequired, ticket, subjectLabel, boundToAuthUser, boundToLoginAccount } =
         await mpAuthDyOAuthComplete(supabaseUrl, serviceRole, code, state)
       if (boundToAuthUser) {
         sendJson(res, 200, { ok: true, bound: true })
@@ -786,6 +786,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         refresh_token: erpSession?.refresh_token,
         loginName: erpSession?.loginName,
         needsPhoneBind: erpSession?.needsPhoneBind,
+        bound: boundToLoginAccount === true,
       })
       return
     }
@@ -800,17 +801,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const portal = portalRaw === 'merchant' ? 'merchant' : 'xingxuan'
       const redirectUri = pickAuthField(req, body, 'redirectUri')
       let bindAuthUserId = ''
-      if (body.bind === true) {
-        if (portal !== 'merchant') {
-          sendJson(res, 400, { ok: false, error: 'wx_web_not_configured' })
-          return
-        }
+      if (body.bind === true && portal === 'merchant') {
         const user = await readAuthUserFromAccessToken(String(body.access_token || ''))
         bindAuthUserId = typeof user?.id === 'string' ? user.id : ''
         if (!bindAuthUserId) {
           sendJson(res, 401, { ok: false, error: 'invalid_session' })
           return
         }
+      } else if (body.bind === true) {
+        const sess = await resolveSession(rest, sessionToken(req, body))
+        if (!sess) {
+          sendJson(res, 401, { ok: false, error: 'invalid_session' })
+          return
+        }
+        bindAuthUserId = sess.account.id
       }
       const out = await mpAuthWxOAuthBegin(supabaseUrl, serviceRole, workIdentity, {
         portal,
@@ -828,7 +832,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, error: 'missing_code_or_state' })
         return
       }
-      const { token, account, workIdentity, isNew, portal, erpSession, boundToAuthUser } = await mpAuthWxOAuthComplete(
+      const { token, account, workIdentity, isNew, portal, erpSession, boundToAuthUser, boundToLoginAccount } =
+        await mpAuthWxOAuthComplete(
         supabaseUrl,
         serviceRole,
         code,
@@ -850,6 +855,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         refresh_token: erpSession?.refresh_token,
         loginName: erpSession?.loginName,
         needsPhoneBind: erpSession?.needsPhoneBind,
+        bound: boundToLoginAccount === true,
       })
       return
     }

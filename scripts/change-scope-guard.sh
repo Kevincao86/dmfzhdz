@@ -454,6 +454,7 @@ meoo-ops-mp-auth.ts
 change-scope-guard
 mpApi.ts
 DyOAuthCallbackPage
+WxOAuthCallbackPage
 PAT
       ;;
     ai_vision_workshop)

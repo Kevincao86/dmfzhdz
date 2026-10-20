@@ -38,7 +38,7 @@ export default function WxOAuthCallbackPage() {
         if (cancelled) return
         const workIdentity = parseWorkIdentity(r.workIdentity || r.account.workIdentity)
         await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
-        nav('/hall', { replace: true })
+        nav(r.bound ? '/profile' : '/hall', { replace: true })
       } catch (e) {
         if (!cancelled) setErr(formatMpApiErr(e, '微信扫码登录失败'))
       }

@@ -27,10 +27,8 @@ export default function DyOAuthCallbackPage() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.top && window.top !== window.self) {
       window.top.location.replace(window.location.href)
+      return
     }
-  }, [])
-
-  useEffect(() => {
     const mode = resolveDyOAuthCallbackMode(params)
     if (mode.kind === 'error') {
       setView('error')
@@ -55,6 +53,10 @@ export default function DyOAuthCallbackPage() {
         }
         const workIdentity = parseWorkIdentity(r.workIdentity)
         await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
+        if (r.bound) {
+          nav('/profile', { replace: true })
+          return
+        }
         if (r.account.needsPhoneBind) {
           nav(`/login?role=${workIdentity}&bind=1`, { replace: true })
           return

@@ -208,14 +208,16 @@ async function postDyOAuth(body: Record<string, unknown>) {
   throw new Error(lastErr)
 }
 
-export async function wxOAuthBegin(workIdentity: string) {
+export async function wxOAuthBegin(workIdentity: string, bind = false) {
   const redirectUri =
     typeof window !== 'undefined' ? `${window.location.origin}/login/wx-oauth` : ''
+  const token = getToken()
   const data = await postDyOAuth({
     action: 'wx_oauth_begin',
     workIdentity,
     portal: 'xingxuan',
     redirectUri,
+    ...(bind && token ? { bind: true, sessionToken: token } : {}),
   })
   const authorizeUrl = String(data.authorizeUrl || '')
   if (!authorizeUrl) throw new Error('未获取到微信授权链接')
@@ -239,6 +241,7 @@ export async function wxOAuthComplete(code: string, state: string) {
     token,
     workIdentity: String(data.workIdentity || 'talent'),
     account: data.account as MpAccount,
+    bound: data.bound === true,
   }
 }
 
@@ -289,6 +292,7 @@ export async function dyOAuthComplete(code: string, state: string) {
     token,
     workIdentity: String(data.workIdentity || 'talent'),
     account: data.account as MpAccount,
+    bound: data.bound === true,
   }
 }
 
