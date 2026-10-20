@@ -20,7 +20,13 @@ export type ArkDiscoveredModel = {
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000
-const listCache = new Map<string, { expiresAt: number; ids: string[] }>()
+
+type ArkListedModel = { id: string; status: string; name: string }
+
+const listCache = new Map<string, { expiresAt: number; rows: ArkListedModel[] }>()
+/** 最近一次拉取到的状态。Shutdown 不进入候选；Retiring 排在仍开通的后面。 */
+const listedModelStatus = new Map<string, string>()
+const listedModelName = new Map<string, string>()
 
 function cacheKey(apiKey: string, baseUrl: string): string {
   return `${baseUrl}::${apiKey.slice(0, 8)}::${apiKey.length}`
@@ -33,7 +39,7 @@ function labelForModelId(id: string): string {
   const videoHit = DOUBAO_VIDEO_CATALOG.find((e) => normalizeArkVideoModelParam(e.modelId) === norm)
   if (videoHit) return videoHit.label
   if (/^ep-/i.test(norm)) return `接入点 ${norm}`
-  return norm
+  return listedModelName.get(norm) || norm
 }
 
 /** 语言生文（Brief / 运营文稿）；排除视频、生图、纯视觉 VL、向量、语音 */
@@ -75,15 +81,25 @@ export function isArkListableVectorModelId(id: string): boolean {
   return classifyArkModelId(id) === 'vector'
 }
 
-function parseModelsPage(j: unknown): { ids: string[]; hasMore: boolean; after?: string } {
+function isArkListedModelShutdown(status: string): boolean {
+  return /shutdown/i.test(status)
+}
+
+function parseModelsPage(j: unknown): { rows: ArkListedModel[]; hasMore: boolean; after?: string } {
   const root = j && typeof j === 'object' ? (j as Record<string, unknown>) : {}
   const data = root.data
-  const rows = Array.isArray(data) ? data : []
-  const ids: string[] = []
-  for (const row of rows) {
+  const rawRows = Array.isArray(data) ? data : []
+  const rows: ArkListedModel[] = []
+  for (const row of rawRows) {
     if (!row || typeof row !== 'object') continue
-    const id = String((row as { id?: unknown }).id ?? '').trim()
-    if (id && !ids.includes(id)) ids.push(normalizeArkVideoModelParam(id))
+    const rec = row as { id?: unknown; status?: unknown; name?: unknown }
+    const id = normalizeArkVideoModelParam(String(rec.id ?? '').trim())
+    if (!id || rows.some((item) => item.id === id)) continue
+    rows.push({
+      id,
+      status: String(rec.status ?? '').trim(),
+      name: String(rec.name ?? '').trim(),
+    })
   }
   const hasMore = root.has_more === true
   const after =
@@ -91,10 +107,10 @@ function parseModelsPage(j: unknown): { ids: string[]; hasMore: boolean; after?:
       ? root.last_id
       : typeof (root as { after?: unknown }).after === 'string'
         ? String((root as { after: string }).after)
-        : ids.length
-          ? ids[ids.length - 1]
+        : rows.length
+          ? rows[rows.length - 1]!.id
           : undefined
-  return { ids, hasMore, after }
+  return { rows, hasMore, after }
 }
 
 /** 分页拉取账号全部已开通模型 ID */
@@ -109,10 +125,10 @@ export async function fetchArkAccountAllModelIds(input: {
   const ck = cacheKey(key, root)
   if (!input.forceRefresh) {
     const hit = listCache.get(ck)
-    if (hit && hit.expiresAt > Date.now()) return hit.ids
+    if (hit && hit.expiresAt > Date.now()) return usableListedIds(hit.rows)
   }
 
-  const all: string[] = []
+  const all: ArkListedModel[] = []
   let after: string | undefined
   try {
     for (let page = 0; page < 30; page++) {
@@ -125,18 +141,32 @@ export async function fetchArkAccountAllModelIds(input: {
       if (!res.ok) break
       const j = await res.json()
       const pageParsed = parseModelsPage(j)
-      for (const id of pageParsed.ids) {
-        if (!all.includes(id)) all.push(id)
+      for (const row of pageParsed.rows) {
+        if (!all.some((item) => item.id === row.id)) all.push(row)
       }
       if (!pageParsed.hasMore || !pageParsed.after) break
       after = pageParsed.after
     }
-    listCache.set(ck, { expiresAt: Date.now() + CACHE_TTL_MS, ids: all })
-    return all
+    rememberListedStatus(all)
+    listCache.set(ck, { expiresAt: Date.now() + CACHE_TTL_MS, rows: all })
+    return usableListedIds(all)
   } catch {
-    listCache.set(ck, { expiresAt: Date.now() + 60_000, ids: all })
-    return all
+    rememberListedStatus(all)
+    listCache.set(ck, { expiresAt: Date.now() + 60_000, rows: all })
+    return usableListedIds(all)
   }
+}
+
+function rememberListedStatus(rows: readonly ArkListedModel[]): void {
+  for (const row of rows) {
+    listedModelStatus.set(row.id, row.status)
+    if (row.name) listedModelName.set(row.id, row.name)
+  }
+}
+
+/** 已关闭的接入点不能对话，拉列表时直接去掉。 */
+function usableListedIds(rows: readonly ArkListedModel[]): string[] {
+  return rows.filter((row) => !isArkListedModelShutdown(row.status)).map((row) => row.id)
 }
 
 export async function discoverArkAccountModels(input: {
@@ -167,6 +197,9 @@ export async function discoverArkAccountModels(input: {
     else if (capability === 'video') video.push(row)
   }
 
+  const chatOrder = sortArkChatModelsForBrief(chat.map((item) => item.id))
+  chat.sort((a, b) => chatOrder.indexOf(a.id) - chatOrder.indexOf(b.id))
+
   return { all, chat, vision, vector, video }
 }
 
@@ -182,25 +215,41 @@ export function isArkBriefDeprioritizedChatModelId(id: string): boolean {
   return CHAT_DEPRIORITIZED_PATTERNS.some((re) => re.test(m))
 }
 
+/** 仍开通且有额度的语言模型靠前；2.0 pro / Character 额度经常是 0，退到后面。Retiring 排在同档仍开通版本之后。 */
 function chatModelBriefTier(id: string): number {
   const m = id.toLowerCase()
-  if (CHAT_DEPRIORITIZED_PATTERNS.some((re) => re.test(m))) return 900
-  if (/deepseek-r1|deepseek-v3|deepseek-r1-distill/i.test(m)) return 850
-  if (/2-0-lite|2\.0-lite/.test(m)) return 1
-  if (/2-0-pro|2\.0-pro/.test(m)) return 2
-  if (/1-6-flash|1\.6-flash/.test(m)) return 3
-  if (/2-0-mini|2\.0-mini/.test(m)) return 4
-  if (/2-1-pro|2\.1-pro/.test(m)) return 25
-  if (/glm-4/.test(m)) return 5
-  if (/kimi-k2|kimi-k/.test(m)) return 6
-  if (/doubao-pro-32k|doubao-pro-256k/.test(m)) return 8
-  if (/doubao-lite-32k|doubao-lite-128k/.test(m)) return 9
-  if (/1-5-pro|1\.5-pro/.test(m)) return 12
-  if (/2-0-code|2\.0-code/.test(m)) return 16
-  if (isArkVideoEndpointId(id)) return 20
-  if (/doubao-pro/.test(m)) return 25
-  if (/doubao-lite/.test(m)) return 26
-  return 50
+  let tier = 50
+  if (CHAT_DEPRIORITIZED_PATTERNS.some((re) => re.test(m))) tier = 900
+  else if (/deepseek-r1|deepseek-v3|deepseek-r1-distill/i.test(m)) tier = 850
+  else if (/2-0-pro|2\.0-pro/.test(m)) tier = 80
+  else if (/2-0-lite|2\.0-lite/.test(m)) tier = 1
+  else if (/2-0-mini|2\.0-mini/.test(m)) tier = 2
+  else if (/2-1-lite|2\.1-lite/.test(m)) tier = 3
+  else if (/deepseek-v4.*flash/.test(m)) tier = 4
+  else if (/glm-5/.test(m)) tier = 5
+  else if (/seed-evolving/.test(m)) tier = 6
+  else if (/2-0-code|2\.0-code/.test(m)) tier = 7
+  else if (/2-1-turbo|2\.1-turbo/.test(m)) tier = 8
+  else if (/2-1-pro|2\.1-pro/.test(m)) tier = 9
+  else if (/deepseek-v4/.test(m)) tier = 10
+  else if (/translation/.test(m)) tier = 40
+  else if (/1-6-flash|1\.6-flash/.test(m)) tier = 200
+  else if (/1-6|1\.6/.test(m)) tier = 210
+  else if (/glm-4/.test(m)) tier = 30
+  else if (/kimi-k2|kimi-k/.test(m)) tier = 31
+  else if (/doubao-pro-32k|doubao-pro-256k/.test(m)) tier = 32
+  else if (/doubao-lite-32k|doubao-lite-128k/.test(m)) tier = 33
+  else if (/1-5-pro|1\.5-pro/.test(m)) tier = 34
+  else if (isArkVideoEndpointId(id)) tier = 60
+  else if (/doubao-pro/.test(m)) tier = 35
+  else if (/doubao-lite/.test(m)) tier = 36
+  if (/retiring/i.test(listedModelStatus.get(normalizeArkVideoModelParam(id)) ?? '')) tier += 300
+  return tier
+}
+
+function modelRecency(id: string): number {
+  const m = id.match(/(\d{6})\d{0,2}$/)
+  return m ? Number(m[1]) : 0
 }
 
 export function isDoubaoBriefExcludedChatModelId(id: string): boolean {
@@ -215,6 +264,8 @@ export function sortArkChatModelsForBrief(ids: readonly string[]): string[] {
     const ta = chatModelBriefTier(a)
     const tb = chatModelBriefTier(b)
     if (ta !== tb) return ta - tb
+    const ra = modelRecency(b) - modelRecency(a)
+    if (ra !== 0) return ra
     return a.toLowerCase().localeCompare(b.toLowerCase())
   })
 }
