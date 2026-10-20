@@ -1,0 +1,22 @@
+<view class="page">
+  <view class="card">
+    <text class="title">图片变清晰</text>
+    <text class="sub">上传模糊照片，按原图提高清晰度。与视觉工坊常规生图同一条接口，8 积分/张。</text>
+    <button class="btn" bindtap="onPick">选择图片</button>
+    <view class="pair">
+      <view class="shot">
+        <text class="label">原图</text>
+        <image wx:if="{{sourcePath}}" class="pic" src="{{sourcePath}}" mode="aspectFit" />
+        <view wx:else class="empty">尚未选择</view>
+      </view>
+      <view class="shot">
+        <text class="label">清晰后</text>
+        <image wx:if="{{resultUrl}}" class="pic" src="{{resultUrl}}" mode="aspectFit" bindtap="onPreview" />
+        <view wx:else class="empty">{{busy ? '处理中…' : '等待生成'}}</view>
+      </view>
+    </view>
+    <button class="btn btn--go" loading="{{busy}}" disabled="{{busy || !sourceData}}" bindtap="onClarify">开始变清晰</button>
+    <text wx:if="{{msg}}" class="msg">{{msg}}</text>
+  </view>
+  <site-icp-footer />
+</view>

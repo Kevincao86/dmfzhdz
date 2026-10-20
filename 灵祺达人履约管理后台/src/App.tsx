@@ -80,6 +80,7 @@ const ShortDramaAddonPage = lazy(async () => {
   }
 })
 const AiImageAddonPage = lazy(() => import('@merchant/pages/AiImageStudioPage'))
+const ImageClarifyAddonPage = lazy(() => import('@merchant/pages/ImageClarifyPage'))
 
 function AddonPageFallback() {
   return (
@@ -232,6 +233,7 @@ export default function App() {
           <Route path="ai-drama" element={<LazyAddonPage><ShortDramaAddonPage /></LazyAddonPage>} />
           <Route path="digital-human" element={<LazyAddonPage><DigitalHumanAddonPage /></LazyAddonPage>} />
           <Route path="ai-image" element={<LazyAddonPage><AiImageAddonPage /></LazyAddonPage>} />
+          <Route path="image-clarify" element={<LazyAddonPage><ImageClarifyAddonPage /></LazyAddonPage>} />
         </Route>
       </Route>
       <Route path="*" element={<RootRedirect />} />

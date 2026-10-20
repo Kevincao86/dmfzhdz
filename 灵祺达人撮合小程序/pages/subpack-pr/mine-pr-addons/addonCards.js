@@ -13,6 +13,15 @@ const AI_ADDONS = [
     url: '/pages/subpack-pr/mine-pr-addon-visual-studio/mine-pr-addon-visual-studio',
   },
   {
+    key: 'imageClarify',
+    perm: 'visualStudio',
+    title: '图片变清晰',
+    sub: '模糊照片按原图提高清晰度',
+    glyph: '清',
+    tone: 'indigo',
+    url: '/pages/subpack-pr/mine-pr-addon-image-clarify/mine-pr-addon-image-clarify',
+  },
+  {
     key: 'brief',
     perm: 'brief',
     title: '爆款 Brief 生成',

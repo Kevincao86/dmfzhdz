@@ -16,6 +16,7 @@ import { isPartnerEdition } from './lib/appEdition'
 /** 重页面按路由拆包：避免 3.7MB 主包拖成两分钟白屏 */
 const AiAgentPage = lazy(() => import('./pages/AiAgentPage'))
 const AiImageStudioPage = lazy(() => import('./pages/AiImageStudioPage'))
+const ImageClarifyPage = lazy(() => import('./pages/ImageClarifyPage'))
 const AiOperationContentPage = lazy(() => import('./pages/AiOperationContentPage'))
 const BriefContentShell = lazy(() => import('./pages/BriefContentShell'))
 const BriefGenRecordsPage = lazy(() => import('./pages/BriefGenRecordsPage'))
@@ -183,6 +184,7 @@ export default function App() {
                     <Route path="operation/ai-ops-plan" element={<AiOpsPlanPage />} />
                     <Route path="ai-create/record-workshop" element={<PartnerRecordWorkshopRoute />} />
                     <Route path="ai-image" element={<AiImageStudioPage />} />
+                    <Route path="ai-image-clarify" element={<ImageClarifyPage />} />
                     <Route
                       path="ai-operation/article"
                       element={<Navigate to="/ai-operation/content" replace />}

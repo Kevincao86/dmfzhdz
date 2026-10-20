@@ -66,6 +66,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { path: '/operation/ai-ops-plan', label: 'AI 运营方案' },
       { path: '/ai-image', label: 'AI 视觉工坊' },
+      { path: '/ai-image-clarify', label: '图片变清晰' },
       { path: '/ai-operation/content', label: '爆款 Brief 生成' },
       { path: '/ai-operation/video-check', label: '短视频AI处理' },
       { path: '/ai-operation/digital-human', label: '数字人口播' },

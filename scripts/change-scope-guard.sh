@@ -134,6 +134,7 @@ list_scopes() {
   hall_card_height     星选招募大厅商单卡片同一行拉成一样高
   mp_step_circle       达人小程序参与流程序号保持正圆，说明换行时不拉成椭圆
   douyin_profile_parse 抖音主页解析：IP属地、头像、关注获赞作品简介，标签可超出内置词，报名优先抖音头像
+  image_clarify        AI 创作新增图片变清晰：星选、商家网页与达人小程序同一入口
   poster_row_wrap      分享海报字段按宽度自动换行，不再把费用类型裁成省略号
   mp_login_email_account 达人小程序：验证码登录增加邮箱；账号密码不限制为纯数字
   mp_profile_trade_tags 达人我的信息：交易示例改小图；打开资料时保留账号标签
@@ -2076,6 +2077,21 @@ register.wxml
 register.wxss
 applyTemplateRuntime.js
 applicationDisplay.js
+change-scope-guard
+PAT
+      ;;
+    image_clarify)
+      cat <<'PAT'
+ImageClarifyPage.tsx
+nav.ts
+web版/merchant-erp/src/App.tsx
+embedPages.ts
+MerchantEmbedShell.tsx
+灵祺达人履约管理后台/src/App.tsx
+addonCards.js
+app.json
+mine.js
+mine-pr-addon-image-clarify
 change-scope-guard
 PAT
       ;;
