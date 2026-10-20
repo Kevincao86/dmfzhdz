@@ -21,10 +21,8 @@ export default function WxOAuthCallbackPage() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.top && window.top !== window.self) {
       window.top.location.replace(window.location.href)
+      return
     }
-  }, [])
-
-  useEffect(() => {
     const code = String(params.get('code') || '').trim()
     const state = String(params.get('state') || '').trim()
     const oauthErr = String(params.get('error_description') || params.get('error') || '').trim()
@@ -40,10 +38,6 @@ export default function WxOAuthCallbackPage() {
         if (cancelled) return
         const workIdentity = parseWorkIdentity(r.workIdentity || r.account.workIdentity)
         await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
-        if (r.account.needsPhoneBind) {
-          nav(`/login?role=${workIdentity}&bind=1`, { replace: true })
-          return
-        }
         nav('/hall', { replace: true })
       } catch (e) {
         if (!cancelled) setErr(formatMpApiErr(e, '微信扫码登录失败'))

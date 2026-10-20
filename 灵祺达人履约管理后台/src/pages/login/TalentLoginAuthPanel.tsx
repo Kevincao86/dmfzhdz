@@ -22,7 +22,7 @@ import {
   smsLogin,
 } from '../../lib/mpApi'
 import { workIdentityToAccountRole } from '../../lib/mpWorkIdentity'
-import type { MpAccount } from '../../lib/mpSession'
+import { getToken, type MpAccount } from '../../lib/mpSession'
 
 export type LoginTab = 'password' | 'sms' | 'email' | 'scan' | 'register'
 export type ScanChannel = 'wechat' | 'douyin'
@@ -302,10 +302,15 @@ export default function TalentLoginAuthPanel({
           )}
           {showErr ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{showErr}</p> : null}
           <button type="submit" disabled={!agreed} className={primaryBtn}>绑定并进入</button>
+          {getToken() ? (
+            <button type="button" className="w-full text-sm font-medium text-violet-700 hover:underline" onClick={() => nav('/hall')}>
+              暂不绑定，先进入
+            </button>
+          ) : null}
         </form>
       ) : null}
 
-      {tab === 'sms' || tab === 'email' || tab === 'scan' ? (
+      {!bindOpen && (tab === 'sms' || tab === 'email' || tab === 'scan') ? (
         <button
           type="button"
           className="mb-4 text-sm font-medium text-violet-700 hover:underline"
@@ -315,7 +320,7 @@ export default function TalentLoginAuthPanel({
         </button>
       ) : null}
 
-      {tab === 'password' ? (
+      {!bindOpen ? (tab === 'password' ? (
         <form className="space-y-4" onSubmit={onSubmit}>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="tf-login-name">
@@ -501,8 +506,9 @@ export default function TalentLoginAuthPanel({
             </div>
           )}
         </>
-      )}
+      )) : null}
 
+      {!bindOpen ? (
       <LoginAltMethods
         activeId={tab === 'scan' ? scanChannel : tab === 'sms' || tab === 'email' ? tab : undefined}
         onSelect={(id) => {
@@ -533,6 +539,7 @@ export default function TalentLoginAuthPanel({
           { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
         ]}
       />
+      ) : null}
       {agreeNeed && !agreed ? (
         <p className="mt-2 text-center text-xs text-amber-700">{LOGIN_AGREE_REQUIRED}</p>
       ) : null}
