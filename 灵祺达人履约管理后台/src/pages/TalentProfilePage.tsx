@@ -52,17 +52,32 @@ export function ProfileEnvelope({
   children: ReactNode
 }) {
   const [phase, setPhase] = useState<'closed' | 'open' | 'shut'>('closed')
+  const [parted, setParted] = useState(false)
   useEffect(() => {
     if (open) {
       setPhase('open')
-      return
+      setParted(false)
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (reduce) {
+        setParted(true)
+        return
+      }
+      let raf2 = 0
+      const raf1 = window.requestAnimationFrame(() => {
+        raf2 = window.requestAnimationFrame(() => setParted(true))
+      })
+      return () => {
+        window.cancelAnimationFrame(raf1)
+        window.cancelAnimationFrame(raf2)
+      }
     }
+    setParted(false)
     setPhase((cur) => (cur === 'closed' ? 'closed' : 'shut'))
   }, [open])
   useEffect(() => {
     if (phase !== 'shut') return
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const timer = window.setTimeout(() => setPhase('closed'), reduce ? 0 : 620)
+    const timer = window.setTimeout(() => setPhase('closed'), reduce ? 0 : 460)
     return () => window.clearTimeout(timer)
   }, [phase])
 
@@ -81,72 +96,58 @@ export function ProfileEnvelope({
         </div>
       </div>
       <style>{`
-        .lq-env-stage { perspective: 1400px; }
-        .lq-env-pocket {
-          position: relative;
-          width: min(32rem, 100%);
-          background: #e6d3b8;
-          border-radius: 18px;
-          padding: 46px 12px 14px;
-          box-shadow: 0 24px 60px rgba(28, 25, 23, 0.28);
-          transform-style: preserve-3d;
-        }
-        .lq-env-flap {
-          position: absolute;
-          left: 0;
-          right: 0;
-          top: 0;
-          height: 64px;
-          background: linear-gradient(#f3e6d2, #d8c2a2);
-          clip-path: polygon(0 0, 100% 0, 50% 100%);
-          transform-origin: top center;
-          z-index: 4;
-          pointer-events: none;
-        }
+        .lq-env-pocket { position: relative; width: min(32rem, 100%); }
         .lq-env-letter {
           position: relative;
           z-index: 1;
-          max-height: 74vh;
+          max-height: 78vh;
           overflow: auto;
           background: #fff;
-          border-radius: 14px;
+          border-radius: 16px;
           padding: 16px;
-          transform-origin: top center;
+          box-shadow: 0 18px 48px rgba(28, 25, 23, 0.22);
         }
-        .lq-env-stage--open .lq-env-flap { animation: lq-flap-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-        .lq-env-stage--open .lq-env-letter { animation: lq-letter-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-        .lq-env-stage--shut .lq-env-flap { animation: lq-flap-shut 0.55s ease forwards; }
-        .lq-env-stage--shut .lq-env-letter { animation: lq-letter-shut 0.55s ease forwards; }
-        @keyframes lq-flap-open {
-          0% { transform: rotateX(0deg); }
-          100% { transform: rotateX(-78deg); }
+        .lq-env-cover {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          width: calc(50% + 1px);
+          background: #e7d4b8;
+          z-index: 2;
+          pointer-events: none;
+          will-change: transform;
+          transition: transform 0.46s cubic-bezier(0.22, 0.82, 0.24, 1);
         }
-        @keyframes lq-letter-open {
-          0% { transform: scaleY(0.06); opacity: 0.2; }
-          42% { transform: scaleY(0.55); opacity: 1; }
-          100% { transform: scaleY(1); opacity: 1; }
-        }
-        @keyframes lq-flap-shut {
-          from { transform: rotateX(-78deg); }
-          to { transform: rotateX(0deg); }
-        }
-        @keyframes lq-letter-shut {
-          from { transform: scaleY(1); opacity: 1; }
-          to { transform: scaleY(0.08); opacity: 0; }
+        .lq-env-cover--left { left: 0; border-radius: 16px 0 0 16px; transform: translate3d(0, 0, 0); }
+        .lq-env-cover--right { right: 0; border-radius: 0 16px 16px 0; transform: translate3d(0, 0, 0); }
+        .lq-env-cover--left.is-parted { transform: translate3d(-105%, 0, 0); }
+        .lq-env-cover--right.is-parted { transform: translate3d(105%, 0, 0); }
+        .lq-env-seal {
+          position: absolute;
+          left: 50%;
+          top: 0;
+          z-index: 3;
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: #fff;
+          object-fit: contain;
+          box-shadow: 0 4px 12px rgba(28, 25, 23, 0.12);
+          pointer-events: none;
+          transform: translate3d(-50%, -40%, 0);
         }
         @media (prefers-reduced-motion: reduce) {
-          .lq-env-flap, .lq-env-letter { animation: none !important; }
+          .lq-env-cover, .lq-env-seal { transition: none; }
         }
       `}</style>
       {phase !== 'closed' ? (
-        <div className="lq-env-stage fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
-          <div
-            className={`lq-env-pocket ${phase === 'shut' ? 'lq-env-stage--shut' : 'lq-env-stage--open'}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="lq-env-flap" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
+          <div className="lq-env-pocket" onClick={(e) => e.stopPropagation()}>
             <div className="lq-env-letter text-sm">
-              <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
+              <div className="mb-3 flex items-center gap-2 text-base font-semibold text-stone-900">
+                {logo ? <img src={logo} alt="" className="h-7 w-7 rounded-lg bg-white object-contain" /> : null}
+                <span>{title}</span>
+              </div>
               <div className="space-y-3">{children}</div>
               <div className="mt-4 flex justify-end gap-2">
                 <button type="button" className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700" onClick={onClose}>
@@ -162,6 +163,9 @@ export function ProfileEnvelope({
                 </button>
               </div>
             </div>
+            <div className={`lq-env-cover lq-env-cover--left ${parted ? 'is-parted' : ''}`} />
+            <div className={`lq-env-cover lq-env-cover--right ${parted ? 'is-parted' : ''}`} />
+            {logo ? <img className={`lq-env-seal ${parted ? 'is-parted' : ''}`} src={logo} alt="" /> : null}
           </div>
         </div>
       ) : null}

@@ -25,7 +25,8 @@
     <text class="env-sum">{{wxNickName || '未填写昵称'}}</text>
     <view class="env-mask" wx:if="{{sectionOpenWx}}" data-key="wx" bindtap="onCloseSection"></view>
     <view class="env-sheet">
-    <view class="env-dialog-flap"></view>
+    <view class="env-cover env-cover--left"></view>
+<view class="env-cover env-cover--right"></view>
     <view class="env-letter">
     <view class="wx-profile">
       <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
@@ -68,7 +69,8 @@
     <text class="env-sum">{{contact || '未填写电话'}}{{city ? ' · ' + city : ''}}</text>
     <view class="env-mask" wx:if="{{sectionOpenContact}}" data-key="contact" bindtap="onCloseSection"></view>
     <view class="env-sheet">
-    <view class="env-dialog-flap"></view>
+    <view class="env-cover env-cover--left"></view>
+<view class="env-cover env-cover--right"></view>
     <view class="env-letter">
     <view class="form-row">
       <text class="form-label">联系电话 *</text>
@@ -147,7 +149,8 @@
     <text class="env-sum">{{supplierProfile.teamName || '未填写团队'}}</text>
     <view class="env-mask" wx:if="{{sectionOpenTeam}}" data-key="team" bindtap="onCloseSection"></view>
     <view class="env-sheet">
-    <view class="env-dialog-flap"></view>
+    <view class="env-cover env-cover--left"></view>
+<view class="env-cover env-cover--right"></view>
     <view class="env-letter">
     <view class="form-row">
       <text class="form-label">团队名称 *</text>
@@ -292,7 +295,9 @@
 
     <view class="env-mask" wx:if="{{item.enabled && item.expanded}}" data-id="{{item.id}}" catchtap="onClosePlatform"></view>
     <view class="env-sheet" wx:if="{{item.enabled && item.expanded}}">
-      <view class="env-dialog-flap"></view>
+      <view class="env-cover env-cover--left"></view>
+      <view class="env-cover env-cover--right"></view>
+      <image class="env-seal" src="{{item.icon}}" mode="aspectFit" />
       <view class="env-letter">
       <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
       <view class="form-row">

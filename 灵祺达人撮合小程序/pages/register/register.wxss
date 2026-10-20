@@ -533,36 +533,55 @@ button.cred-edit-btn[size='mini'] {
   top: 10vh;
   max-height: 78vh;
   overflow: visible;
-  background: #e6d3b8;
-  border-radius: 28rpx;
-  padding: 72rpx 16rpx 16rpx;
-  box-shadow: 0 24rpx 64rpx rgba(28, 25, 23, 0.18);
-  perspective: 900px;
+  background: transparent;
+  padding: 0;
 }
 
-.env-dialog-flap {
+.env-cover {
   position: absolute;
-  left: 0;
-  right: 0;
   top: 0;
+  bottom: 0;
+  width: 51%;
+  background: #e7d4b8;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.env-cover--left {
+  left: 0;
+  border-radius: 28rpx 0 0 28rpx;
+  animation: env-split-l 0.46s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
+}
+
+.env-cover--right {
+  right: 0;
+  border-radius: 0 28rpx 28rpx 0;
+  animation: env-split-r 0.46s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
+}
+
+.env-seal {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 72rpx;
   height: 72rpx;
-  background: linear-gradient(180deg, #f3e6d2, #d8c2a2);
-  border-radius: 28rpx 28rpx 0 0;
-  transform-origin: top center;
-  z-index: 4;
-  animation: env-flap-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  margin-left: -36rpx;
+  margin-top: -28rpx;
+  border-radius: 18rpx;
+  background: #fff;
+  z-index: 3;
+  pointer-events: none;
 }
 
 .env-letter {
   position: relative;
   z-index: 1;
-  max-height: 68vh;
+  max-height: 78vh;
   overflow-y: auto;
   background: #fff;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  transform-origin: top center;
-  animation: env-letter-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  border-radius: 28rpx;
+  padding: 28rpx;
+  box-shadow: 0 24rpx 64rpx rgba(28, 25, 23, 0.18);
 }
 
 .env-save-row {
@@ -577,40 +596,48 @@ button.cred-edit-btn[size='mini'] {
 }
 
 .paper-page .cred-modal {
-  overflow: visible;
-  perspective: 800px;
-  background: #e6d3b8;
-  padding-top: 72rpx;
+  overflow: hidden;
+  background: #fff;
+}
+
+.paper-page .cred-modal::before,
+.paper-page .cred-modal::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 51%;
+  background: #e7d4b8;
+  z-index: 5;
+  pointer-events: none;
 }
 
 .paper-page .cred-modal::before {
-  content: '';
-  position: absolute;
   left: 0;
+  border-radius: 24rpx 0 0 24rpx;
+  animation: env-split-l 0.46s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
+}
+
+.paper-page .cred-modal::after {
   right: 0;
-  top: 0;
-  height: 56rpx;
-  background: linear-gradient(180deg, #f3e6d2, #d8c2a2);
-  border-radius: 24rpx 24rpx 0 0;
-  transform-origin: top center;
-  animation: env-flap-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  border-radius: 0 24rpx 24rpx 0;
+  animation: env-split-r 0.46s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
 }
 
-@keyframes env-flap-open {
-  0% { transform: rotateX(0deg); }
-  100% { transform: rotateX(-78deg); }
+@keyframes env-split-l {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-105%, 0, 0); }
 }
 
-@keyframes env-letter-open {
-  0% { transform: scaleY(0.06); opacity: 0.2; }
-  42% { transform: scaleY(0.55); opacity: 1; }
-  100% { transform: scaleY(1); opacity: 1; }
+@keyframes env-split-r {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(105%, 0, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .env-dialog-flap,
-  .env-letter,
-  .paper-page .cred-modal::before {
+  .env-cover,
+  .paper-page .cred-modal::before,
+  .paper-page .cred-modal::after {
     animation: none;
   }
 }
