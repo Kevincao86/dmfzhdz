@@ -902,7 +902,7 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
                     <span>{orderFavorited ? '已收藏' : '收藏商单'}</span>
                   </button>
                 ) : null}
-                {role === 'talent' ? (
+                {role === 'talent' || role === 'pr' ? (
                   <BtnOutline disabled={sharing} onClick={() => void onShare()}>
                     {sharing ? '生成中…' : '分享招募'}
                   </BtnOutline>
