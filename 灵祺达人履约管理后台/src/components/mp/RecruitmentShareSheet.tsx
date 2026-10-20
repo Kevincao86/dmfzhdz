@@ -10,7 +10,8 @@ import {
   resolvePosterDesign,
   resolvePosterThemeColor,
 } from '../../lib/mpSync/recruitmentSharePoster'
-import { fetchMpApplyShortLink, fetchMpApplyWxacode } from '../../lib/mpApi'
+import { fetchMpApplyShortLink, fetchMpApplyWxacode, fetchMpWxPcShareTicket } from '../../lib/mpApi'
+import { resolveOrderCoverUrl } from '../../lib/mpSync/recruitCoverLibrary'
 
 type Tab = 'poster' | 'code' | 'web'
 type WebMode = 'link' | 'text' | 'qr' | 'short'
@@ -63,6 +64,50 @@ function recruitmentWebUrl(id: string) {
   return `https://dr.mofangdianai.com/recruitment/${encodeURIComponent(id)}`
 }
 
+const SHARE_THUMB_FALLBACK =
+  'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/share/recruit-card-bg.jpg?v=20261010c'
+
+function httpsThumb(order: Record<string, unknown>): string {
+  const url = resolveOrderCoverUrl(order)
+  return /^https:\/\//i.test(url) ? url : SHARE_THUMB_FALLBACK
+}
+
+type WxOpenSdk = {
+  ready?: boolean
+  onReady?: () => void
+  shareMiniProgram: (opts: Record<string, unknown>) => Promise<{ errcode?: number; errmsg?: string }>
+}
+
+function loadWxOpenSdk(): Promise<WxOpenSdk> {
+  const w = window as Window & { wxopensdk?: WxOpenSdk }
+  const ready = (sdk: WxOpenSdk) =>
+    new Promise<WxOpenSdk>((resolve) => {
+      if (sdk.ready || !sdk.onReady) resolve(sdk)
+      else sdk.onReady = () => resolve(sdk)
+    })
+  if (w.wxopensdk) return ready(w.wxopensdk)
+  return new Promise((resolve, reject) => {
+    const finish = () => {
+      const sdk = w.wxopensdk
+      if (!sdk) reject(new Error('微信分享组件没有加载出来'))
+      else void ready(sdk).then(resolve)
+    }
+    const existing = document.querySelector('script[data-wxopensdk]')
+    if (existing) {
+      existing.addEventListener('load', finish, { once: true })
+      if (w.wxopensdk) finish()
+      return
+    }
+    const s = document.createElement('script')
+    s.src = 'https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxopensdk.js'
+    s.async = true
+    s.dataset.wxopensdk = '1'
+    s.onload = finish
+    s.onerror = () => reject(new Error('微信分享组件加载失败'))
+    document.head.appendChild(s)
+  })
+}
+
 type Props = {
   text: string
   title?: string
@@ -88,6 +133,8 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   const [codeUrl, setCodeUrl] = useState('')
   const [codeErr, setCodeErr] = useState('')
   const [qrUrl, setQrUrl] = useState('')
+  const [wxBusy, setWxBusy] = useState<'' | 'chat' | 'timeline'>('')
+  const [wxHint, setWxHint] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -197,6 +244,34 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     setCopied(ok)
   }
 
+  async function onWechatShare(scene: 'chat' | 'timeline') {
+    if (!orderId || wxBusy) return
+    setWxBusy(scene)
+    setWxHint(scene === 'timeline' ? '正在打开微信朋友圈…' : '正在打开微信…')
+    try {
+      const ticket = await fetchMpWxPcShareTicket(orderId)
+      const sdk = await loadWxOpenSdk()
+      const cardTitle = String(order.title || title || 'AI按城市品类匹配商单').trim()
+      const result = await sdk.shareMiniProgram({
+        appid: ticket.appid,
+        userName: ticket.userName,
+        txt: cardTitle,
+        thumburl: httpsThumb(order),
+        path: ticket.path.replace(/^\//, ''),
+        scene,
+        ticket: ticket.ticket,
+        timeout: 15000,
+      })
+      const code = Number(result?.errcode ?? 0)
+      if (code) setWxHint(result?.errmsg || `微信没有发出去（${code}）`)
+      else setWxHint(scene === 'timeline' ? '已发到微信，请在朋友圈确认' : '已发到微信，请在聊天窗口确认')
+    } catch (e) {
+      setWxHint(e instanceof Error ? e.message : '微信分享没有发出去')
+    } finally {
+      setWxBusy('')
+    }
+  }
+
   function onDownload(url: string, name: string) {
     if (!url) return
     const a = document.createElement('a')
@@ -239,6 +314,28 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
             ×
           </button>
         </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            disabled={Boolean(wxBusy)}
+            className="rounded-xl bg-[#07c160] px-2 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            onClick={() => void onWechatShare('chat')}
+          >
+            {wxBusy === 'chat' ? '正在打开微信…' : '发送给微信好友或群'}
+          </button>
+          <button
+            type="button"
+            disabled={Boolean(wxBusy)}
+            className="rounded-xl border border-[#07c160] px-2 py-2.5 text-sm font-medium text-[#07c160] disabled:opacity-50"
+            onClick={() => void onWechatShare('timeline')}
+          >
+            {wxBusy === 'timeline' ? '正在打开微信…' : '分享到朋友圈'}
+          </button>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-500">
+          {wxHint || '电脑需已登录并解锁微信。手机请用下方小程序码或短链。'}
+        </p>
 
         <div className="mt-4 flex gap-1 border-b border-[var(--shell-border)]">
           {tabs.map((t) => (

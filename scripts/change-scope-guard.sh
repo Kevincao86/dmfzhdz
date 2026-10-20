@@ -128,6 +128,7 @@ list_scopes() {
   mp_multi_identity    达人/拍摄/剪辑最多3个：管理库有达人时优先显示达人并自动带上已有身份；报名按商单自动用对应身份
   mp_hall_browse       达人浏览招募单：点开只回这一单并裁报名明细，大厅列表短缓存，避免千人同时打开卡顿
   mp_apply_fast        达人报名：只锁这一张招募单，旧单首次报名后移出整份注册表，避免百人同时报名排队写整库
+  xingxuan_wx_share    星选分享招募：电脑微信发给好友或群、发到朋友圈，卡片与达人小程序同一张商单
   mp_login_email_account 达人小程序：验证码登录增加邮箱；账号密码不限制为纯数字
   mp_profile_trade_tags 达人我的信息：交易示例改小图；打开资料时保留账号标签
   pr_applicant_shot_thumb 报名达人：后台截图显示小图，点击查看大图
@@ -2015,6 +2016,15 @@ meoo-ops-mp-hall-registry.ts
 mpRecruitmentApplyFast.ts
 mpRecruitmentApplyCore.ts
 mpRecruitmentOrderRowStore.ts
+change-scope-guard
+PAT
+      ;;
+    xingxuan_wx_share)
+      cat <<'PAT'
+meoo-ops-mp-auth.ts
+wechatPcOpenShare.ts
+RecruitmentShareSheet.tsx
+mpApi.ts
 change-scope-guard
 PAT
       ;;

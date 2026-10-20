@@ -111,6 +111,7 @@ import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
 import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
 import { generateRecruitmentApplyShortLink } from '../src/lib/mpRecruitmentApplyShortLink.js'
 import { generateRecruitmentApplyWxacodeDataUrl } from '../src/lib/mpRecruitmentWxacode.js'
+import { createPcOpenShareTicket } from '../src/lib/wechatPcOpenShare.js'
 
 export const config = { maxDuration: 60 }
 
@@ -1912,6 +1913,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         const status = msg === 'wx_not_configured' ? 503 : 500
+        sendJson(res, status, { ok: false, error: msg })
+      }
+      return
+    }
+
+    if (action === 'mp_wx_pc_share_ticket') {
+      const mpOrderId = String(body.mpOrderId || body.orderId || pickAuthField(req, body, 'mpOrderId') || '').trim()
+      if (!mpOrderId) {
+        sendJson(res, 400, { ok: false, error: 'missing_mp_order_id' })
+        return
+      }
+      try {
+        const out = await createPcOpenShareTicket(mpOrderId)
+        sendJson(res, 200, { ok: true, mpOrderId, ...out })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        const status = msg === 'wx_web_not_configured' ? 503 : 500
         sendJson(res, status, { ok: false, error: msg })
       }
       return

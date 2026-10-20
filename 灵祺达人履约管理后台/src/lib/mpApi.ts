@@ -1206,6 +1206,19 @@ export async function fetchMpApplyWxacode(mpOrderId: string) {
   }
 }
 
+/** 电脑微信分享商单卡片：一次性 ticket，路径与小程序转发相同 */
+export async function fetchMpWxPcShareTicket(mpOrderId: string) {
+  const data = await mpAuthRequest('mp_wx_pc_share_ticket', {
+    mpOrderId: String(mpOrderId || '').trim(),
+  })
+  return {
+    ticket: String(data.ticket || '').trim(),
+    appid: String(data.appid || '').trim(),
+    userName: String(data.userName || '').trim(),
+    path: String(data.path || '').trim(),
+  }
+}
+
 export async function registerPrUser(prUser: Record<string, unknown>) {
   return postMpWithFallback(
     ['/api/meoo-ops-mp-pr-user-register', '/api/ops-sync/mp-pr-users/register'],
