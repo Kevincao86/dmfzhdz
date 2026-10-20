@@ -330,9 +330,12 @@ export default function ProfilePage() {
                 to={id === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${id}`}
                 className="rounded-full border border-dashed border-stone-300 px-3 py-1 text-xs text-stone-700"
               >
-                +{id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
+                {id === 'shoot' ? '新增拍摄身份' : id === 'edit' ? '新增剪辑身份' : '新增达人身份'}
               </Link>
             ))}
+          {readOwnedWorkIdentities().length < 3 ? (
+            <span className="text-xs text-slate-400">可新增身份</span>
+          ) : null}
         </div>
       ) : null}
 

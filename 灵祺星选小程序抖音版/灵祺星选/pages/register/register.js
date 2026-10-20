@@ -90,6 +90,27 @@ function collapseAllPlatforms() {
   return out
 }
 
+const IDENTITY_CHIP_LABEL = { talent: '达人', shoot: '拍摄', edit: '剪辑' }
+const IDENTITY_ADD_LABEL = { talent: '达人身份', shoot: '拍摄身份', edit: '剪辑身份' }
+const PROFILE_PULL_TTL_MS = 5 * 60 * 1000
+let profilePulledAt = 0
+
+function identityBarState(activeId) {
+  if (userProfile.readIdentity() === 'pr') {
+    return { identityChips: [], canAddIdentity: false }
+  }
+  const owned = userProfile.readOwnedIdentities()
+  const active = activeId || userProfile.readIdentity()
+  return {
+    identityChips: owned.map((id) => ({
+      id,
+      label: IDENTITY_CHIP_LABEL[id] || id,
+      active: id === active,
+    })),
+    canAddIdentity: owned.length < 3,
+  }
+}
+
 Page({
   behaviors: [require('../../behaviors/mpDefaultShare')],
   data: {
@@ -193,25 +214,15 @@ Page({
     this.syncIdentityBar(workIdentity)
   },
   syncIdentityBar(activeId) {
-    if (userProfile.readIdentity() === 'pr') {
-      this.setData({ identityChips: [], canAddIdentity: false })
-      return
-    }
-    const labels = { talent: '达人', shoot: '拍摄', edit: '剪辑' }
-    const owned = userProfile.readOwnedIdentities()
     const active = activeId || this._formIdentity || userProfile.readIdentity()
-    this.setData({
-      identityChips: owned.map((id) => ({ id, label: labels[id] || id, active: id === active })),
-      canAddIdentity: owned.length < 3,
-    })
+    this.setData(identityBarState(active))
   },
   onAddIdentity() {
     const owned = userProfile.readOwnedIdentities()
     const missing = ['talent', 'shoot', 'edit'].filter((id) => !owned.includes(id))
     if (!missing.length) return
-    const labels = { talent: '达人', shoot: '拍摄', edit: '剪辑' }
     wx.showActionSheet({
-      itemList: missing.map((id) => `新增${labels[id]}`),
+      itemList: missing.map((id) => `新增${IDENTITY_ADD_LABEL[id] || id}`),
       success: (res) => {
         const id = missing[res.tapIndex]
         if (!id) return
@@ -222,25 +233,40 @@ Page({
     })
   },
   async onShow() {
-    const workIdentity = userProfile.readIdentity()
-    if (auth.isLoggedIn() && !this._formDirty) {
-      try {
-        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
-      } catch (_) {}
-      try {
-        const registryProfileSync = require('../../utils/registryProfileSync.js')
-        await registryProfileSync.pullRegistryProfileAfterLogin()
-      } catch (_) {}
-    }
-    const acct = auth.readAccount()
-    if (acct && !this._formDirty) accountMemberSync.syncTalentMemberFromAccount(acct)
-    if (!this._formDirty) this.hydrateMemberFormFromStorage()
-    const formIdentity = this._formIdentity || workIdentity
-    const patch = loginCredPanel.patchFromAccount(acct)
-    patch.workIdentity = formIdentity
-    patch.isSupplier = formIdentity === 'shoot' || formIdentity === 'edit'
-    this.setData(patch)
+    const formIdentity = this._formIdentity || userProfile.readIdentity()
     this.syncIdentityBar(formIdentity)
+    const acct = auth.readAccount()
+    const credPatch = loginCredPanel.patchFromAccount(acct)
+    credPatch.workIdentity = formIdentity
+    credPatch.isSupplier = formIdentity === 'shoot' || formIdentity === 'edit'
+    this.setData(credPatch)
+    const pulledFresh = profilePulledAt && Date.now() - profilePulledAt < PROFILE_PULL_TTL_MS
+    if (pulledFresh || this._formDirty || this._profilePulling) return
+    this._profilePulling = true
+    try {
+      if (auth.isLoggedIn()) {
+        try {
+          await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+        } catch (_) {}
+        try {
+          const registryProfileSync = require('../../utils/registryProfileSync.js')
+          await registryProfileSync.pullRegistryProfileAfterLogin()
+          profilePulledAt = Date.now()
+        } catch (_) {}
+      }
+    } finally {
+      this._profilePulling = false
+    }
+    if (this._formDirty) return
+    const acct2 = auth.readAccount()
+    if (acct2) accountMemberSync.syncTalentMemberFromAccount(acct2)
+    this.hydrateMemberFormFromStorage()
+    const nextIdentity = this._formIdentity || userProfile.readIdentity()
+    const cred2 = loginCredPanel.patchFromAccount(auth.readAccount())
+    cred2.workIdentity = nextIdentity
+    cred2.isSupplier = nextIdentity === 'shoot' || nextIdentity === 'edit'
+    this.setData(cred2)
+    this.syncIdentityBar(nextIdentity)
   },
   syncSupplierUi(profile) {
     const p = supplierTeamProfile.normalizeSupplierProfile(profile)
@@ -327,6 +353,7 @@ Page({
         wxOpenId: patch.wxOpenId || wx.wxOpenId || '',
       })
     }
+    Object.assign(patch, identityBarState(workIdentity))
     this.setData(patch)
     if (isSupplier) this.syncSupplierUi(supplierProf)
   },
@@ -771,6 +798,7 @@ Page({
       }
       this.applyIdentityIdLabels(workId)
       this._formDirty = false
+      profilePulledAt = 0
       syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, collapseAllPlatforms())
       notifySavedAndBack(cloudWarn)
     } finally {

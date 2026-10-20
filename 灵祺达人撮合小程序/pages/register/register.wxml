@@ -12,6 +12,7 @@
       class="identity-chip {{item.active ? 'identity-chip--on' : ''}}"
     >{{item.label}}</view>
     <view class="identity-chip identity-chip--add" wx:if="{{canAddIdentity}}" bindtap="onAddIdentity">+</view>
+    <text class="identity-add-hint" wx:if="{{canAddIdentity}}">可新增身份</text>
   </view>
 
   <view class="card">

@@ -315,6 +315,7 @@
 .identity-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 16rpx;
   margin: 0 24rpx 20rpx;
 }
@@ -340,4 +341,25 @@
   padding-right: 0;
   font-size: 36rpx;
   line-height: 1;
+}
+
+.identity-add-hint {
+  font-size: 22rpx;
+  line-height: 1.2;
+  color: #a8a29e;
+}
+
+button.cred-edit-btn[size='mini'] {
+  display: inline-block !important;
+  box-sizing: border-box !important;
+  width: auto;
+  min-width: 168rpx;
+  height: 64rpx !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 24rpx !important;
+  border-width: 2rpx !important;
+  line-height: 60rpx !important;
+  text-align: center !important;
+  font-size: 24rpx !important;
 }
