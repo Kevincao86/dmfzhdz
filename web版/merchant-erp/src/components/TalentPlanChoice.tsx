@@ -8,7 +8,12 @@ import { submitMerchantRecruitmentWithMpPublish } from '../lib/merchantRecruitme
 import type { RegistryRecruitmentOrder } from '../lib/opsRegistryTypes'
 import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import { supabase } from '../lib/supabaseClient'
-import type { TalentPlanCard, TalentPlanSeat } from '../lib/talentPlanRecommend'
+import {
+  talentCardMatchesCloseWords,
+  talentCloseWords,
+  type TalentPlanCard,
+  type TalentPlanSeat,
+} from '../lib/talentPlanRecommend'
 import { profileLinkLabel } from '../lib/talentProfileLink'
 import { requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
 import { postAiChat } from '../services/ai/aiClient'
@@ -634,8 +639,13 @@ export function TalentChatRoster({
       seats: [],
       excludedIds,
     })
+    const closeWords = talentCloseWords(talentType)
     const fromLibrary = (res.cards || []).find(
-      (item) => item.nickname.trim() && !item.empty && !skipNames.includes(item.nickname),
+      (item) =>
+        item.nickname.trim() &&
+        !item.empty &&
+        !skipNames.includes(item.nickname) &&
+        talentCardMatchesCloseWords(item, closeWords),
     )
     const next = fromLibrary
       ? { ...fromLibrary, seatId: card.seatId }

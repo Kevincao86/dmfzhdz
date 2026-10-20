@@ -70,6 +70,48 @@ function asPlatform(raw: string): RegistryTalentLibraryEntry['platform'] {
   return '抖音'
 }
 
+/** 门店类目近义词。命中任一算接近，不用「生活」「探店」凑人数。 */
+const CLOSE_CATEGORY_GROUPS: Array<{ keys: string[]; words: string[] }> = [
+  { keys: ['足疗', '足浴', '洗浴', '按摩'], words: ['足疗', '足浴', '洗浴', '按摩', 'SPA', '养生', '休闲娱乐', '休闲'] },
+  { keys: ['休闲娱乐'], words: ['休闲娱乐', '休闲', '娱乐', '足疗', '足浴', 'KTV', '酒吧', '剧本杀', '密室', '洗浴', '养生'] },
+  { keys: ['丽人', '美发', '美甲', '美睫', '美容'], words: ['丽人', '美发', '美甲', '美睫', '美容', '美妆'] },
+  { keys: ['餐饮', '美食', '火锅', '烧烤'], words: ['餐饮', '美食', '火锅', '烧烤'] },
+  { keys: ['亲子'], words: ['亲子', '母婴', '儿童'] },
+  { keys: ['母婴'], words: ['母婴', '亲子'] },
+  { keys: ['医疗', '医美', '口腔'], words: ['医疗', '医美', '口腔', '齿科'] },
+  { keys: ['宠物'], words: ['宠物'] },
+  { keys: ['运动', '健身'], words: ['运动', '健身'] },
+  { keys: ['酒店', '旅游', '民宿'], words: ['酒店', '旅游', '民宿'] },
+  { keys: ['生活服务', '家政'], words: ['生活服务', '家政', '保洁'] },
+]
+
+export function talentCloseWords(industry: string): string[] {
+  const parts = String(industry || '')
+    .split(/[/、,，|>]+/u)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2 && !/本地生活|到店|其他|推广/.test(part))
+  const words = new Set<string>()
+  for (const part of parts) {
+    let hit = false
+    for (const group of CLOSE_CATEGORY_GROUPS) {
+      if (!group.keys.some((key) => part.includes(key))) continue
+      hit = true
+      for (const word of group.words) words.add(word)
+    }
+    if (!hit) words.add(part)
+  }
+  return [...words].slice(0, 16)
+}
+
+export function talentCardMatchesCloseWords(
+  card: Pick<TalentPlanCard, 'nickname' | 'reason' | 'level' | 'tags'>,
+  words: string[],
+): boolean {
+  if (!words.length) return true
+  const blob = [card.nickname, card.reason, card.level, ...(card.tags || [])].join(' ')
+  return words.some((word) => word && blob.includes(word))
+}
+
 export function tierKeyFromLabel(tier: string): KolTierKey {
   const s = tier.trim()
   if (/5\+|V5\+|以上/.test(s)) return 'v5plus'

@@ -116,7 +116,7 @@ import {
   parseRegionToCityState,
 } from '../lib/recruitmentCityPicker'
 import { allCitiesFlat } from '../lib/chinaRegion'
-import type { TalentPlanCard } from '../lib/talentPlanRecommend'
+import { talentCardMatchesCloseWords, talentCloseWords, type TalentPlanCard } from '../lib/talentPlanRecommend'
 import { requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
 import { resolveStoreCityFromMerchantStores } from '../services/aiAgentRecruitmentAllocation'
 import {
@@ -572,26 +572,12 @@ function storeTalentRequirement(): { industry: string; storeName: string } {
   return { industry, storeName }
 }
 
-function requirementNeedles(industry: string): string[] {
-  return industry
-    .split(/[/、,，|>\s]+/u)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 2 && !/本地生活|到店|服务|其他/.test(s))
-    .slice(0, 6)
-}
-
 function cardMatchesCity(card: TalentPlanCard, city: string): boolean {
   const short = city.replace(/市$/, '').trim()
   if (short.length < 2) return true
   const label = String(card.city || '').replace(/市$/, '').trim()
   if (!label) return false
   return label.includes(short) || short.includes(label)
-}
-
-function cardMatchesStore(card: TalentPlanCard, needles: string[]): boolean {
-  if (!needles.length) return true
-  const blob = [card.nickname, card.reason, ...(card.tags || [])].join(' ')
-  return needles.some((n) => blob.includes(n))
 }
 
 const TALENT_HEADCOUNT_CAP = 20
@@ -679,28 +665,8 @@ function cardsFromPublicText(text: string, city: string, talentType: string): Ta
   return out
 }
 
-function rosterIntro(display: string): string {
-  const kept = display
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(
-      (line) =>
-        line &&
-        !/https?:\/\//.test(line) &&
-        !/头像|主页/.test(line) &&
-        !/^【/.test(line) &&
-        !/^\d+\s*[.、]/.test(line),
-    )
-    .join('\n')
-    .trim()
-  if (kept.length >= 6 && kept.length <= 180) return kept
-  return '已按方案配好达人。头像和主页在卡片里，不满意可以替换；确认后点定向招募。'
-}
-
-function planMatchNeedles(industry: string, planText: string): string[] {
-  const extras = ['生活', '探店', '足浴', '足疗', '休闲', '养生', '美食']
-  const fromPlan = extras.filter((word) => planText.includes(word) || industry.includes(word))
-  return [...new Set([...requirementNeedles(industry), ...fromPlan])].slice(0, 8)
+function rosterIntro(roster: AiTalentRoster): string {
+  return roster.note
 }
 
 function planFanQuotas(text: string): { waist: number; head: number } | null {
@@ -841,13 +807,14 @@ async function loadTalentRecommendBlock(userText: string, priorText = ''): Promi
   }
   const { industry, storeName } = storeTalentRequirement()
   const planText = `${priorText}\n${userText}`
-  const needles = planMatchNeedles(industry, planText)
+  const closeWords = talentCloseWords(industry)
   const headcount = talentHeadcountFromDialogue(userText, priorText)
   const planClause = talentPlanClause(planText)
+  const talentType = industry || '本地生活到店'
   const library = await requestTalentPlanRecommend({
     city,
     platform: '抖音',
-    talentType: needles.join(' ') || industry || '本地生活',
+    talentType,
     budgetYuan: 5000,
     headcount,
     seats: [],
@@ -856,10 +823,9 @@ async function loadTalentRecommendBlock(userText: string, priorText = ''): Promi
   const sameCity = (library.cards || []).filter(
     (c) => !c.empty && c.nickname.trim() && cardMatchesCity(c, city),
   )
-  const matched = sameCity.filter((c) => cardMatchesStore(c, needles))
+  const matched = sameCity.filter((c) => talentCardMatchesCloseWords(c, closeWords))
   const picked = pickLibraryForPlan(matched, headcount, planText)
   const gap = Math.max(0, headcount - picked.length)
-  const talentType = needles.join('、') || industry || '本地生活到店'
   const skipNames = picked.map((card) => card.nickname).filter(Boolean)
   const publicText =
     gap > 0
@@ -875,10 +841,10 @@ async function loadTalentRecommendBlock(userText: string, priorText = ''): Promi
   const cards = [...picked, ...publicCards]
   const note =
     publicCards.length > 0
-      ? `星选库 ${picked.length} 位，公网补了 ${publicCards.length} 位。`
+      ? `星选库接近要求的有 ${picked.length} 位，公网补了 ${publicCards.length} 位。`
       : gap > 0
-        ? `星选库 ${picked.length} 位。公网这次没有补到更多同城达人。`
-        : `星选库已配满 ${picked.length} 位。`
+        ? `星选库接近要求的有 ${picked.length} 位。公网这次没有补到更多同城达人。`
+        : `星选库已按门店类目配满 ${picked.length} 位。`
   pendingTalentRoster = cards.length
     ? {
         cards,
@@ -2762,7 +2728,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             m.id === placeholder.id
               ? {
                   ...m,
-                  content: roster ? rosterIntro(display) : display,
+                  content: roster ? rosterIntro(roster) : display,
                   thinkingText: thinking.trim() || m.thinkingText,
                   isStreaming: false,
                   ...(roster ? { talentRoster: roster } : {}),
