@@ -88,22 +88,24 @@ function collapseAllPlatforms() {
 }
 
 const IDENTITY_CHIP_LABEL = { talent: '达人', shoot: '拍摄', edit: '剪辑' }
-const IDENTITY_ADD_LABEL = { talent: '达人身份', shoot: '拍摄身份', edit: '剪辑身份' }
 const PROFILE_PULL_TTL_MS = 5 * 60 * 1000
 let profilePulledAt = 0
 
 function identityBarState(activeId) {
   if (userProfile.readIdentity() === 'pr') {
-    return { identityChips: [], canAddIdentity: false, showIdentityBack: false }
+    return { identityChips: [], addIdentityChips: [], canAddIdentity: false, showIdentityBack: false }
   }
   const owned = userProfile.readOwnedIdentities()
   const active = activeId || userProfile.readIdentity()
-    return {
+  return {
     identityChips: owned.map((id) => ({
       id,
       label: IDENTITY_CHIP_LABEL[id] || id,
       active: id === active,
     })),
+    addIdentityChips: ['talent', 'shoot', 'edit']
+      .filter((id) => !owned.includes(id))
+      .map((id) => ({ id, label: `+${IDENTITY_CHIP_LABEL[id] || id}` })),
     canAddIdentity: owned.length < 3,
     showIdentityBack: Boolean(active) && !owned.includes(active),
   }
@@ -239,22 +241,15 @@ Page({
     this._formDirty = false
     this.hydrateMemberFormFromStorage()
   },
-  onAddIdentity() {
+  onAddIdentity(e) {
+    const id = e.currentTarget.dataset.id
     const owned = userProfile.readOwnedIdentities()
-    const missing = ['talent', 'shoot', 'edit'].filter((id) => !owned.includes(id))
-    if (!missing.length) return
-    wx.showActionSheet({
-      itemList: missing.map((id) => `新增${IDENTITY_ADD_LABEL[id] || id}`),
-      success: (res) => {
-        const id = missing[res.tapIndex]
-        if (!id) return
-        const prev = this._formIdentity || userProfile.readIdentity()
-        if (owned.includes(prev)) this._identityReturnTo = prev
-        this._formIdentity = id
-        this._formDirty = false
-        this.hydrateMemberFormFromStorage()
-      },
-    })
+    if (!id || owned.includes(id)) return
+    const prev = this._formIdentity || userProfile.readIdentity()
+    if (owned.includes(prev)) this._identityReturnTo = prev
+    this._formIdentity = id
+    this._formDirty = false
+    this.hydrateMemberFormFromStorage()
   },
   async onShow() {
     const formIdentity = this._formIdentity || userProfile.readIdentity()
@@ -613,44 +608,25 @@ Page({
   onEnvHold() {},
   partSection(key) {
     const openKey = key === 'wx' ? 'sectionOpenWx' : key === 'contact' ? 'sectionOpenContact' : 'sectionOpenTeam'
-    const partKey = key === 'wx' ? 'sectionPartWx' : key === 'contact' ? 'sectionPartContact' : 'sectionPartTeam'
-    if (this._envShut) clearTimeout(this._envShut)
     const opened = {}
     opened[openKey] = true
-    opened[partKey] = false
     opened.envScrollLock = true
-    this.setData(opened, () => {
-      this._envShut = setTimeout(() => {
-        const parted = {}
-        parted[partKey] = true
-        this.setData(parted)
-      }, 40)
-    })
+    this.setData(opened)
   },
   shutSection(key, platformId) {
-    if (this._envShut) clearTimeout(this._envShut)
     if (key === 'platform') {
-      this.setData({ envelopePartId: '' })
-      this._envShut = setTimeout(() => {
-        const expanded = { ...this.data.platformExpanded, [platformId]: false }
-        syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
-        const still = !!(this.data.sectionOpenWx || this.data.sectionOpenContact || this.data.sectionOpenTeam)
-        this.setData({ envScrollLock: still })
-      }, 480)
+      const expanded = { ...this.data.platformExpanded, [platformId]: false }
+      syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
+      const still = !!(this.data.sectionOpenWx || this.data.sectionOpenContact || this.data.sectionOpenTeam)
+      this.setData({ envScrollLock: still, envelopePartId: '' })
       return
     }
-    const partKey = key === 'wx' ? 'sectionPartWx' : key === 'contact' ? 'sectionPartContact' : 'sectionPartTeam'
     const openKey = key === 'wx' ? 'sectionOpenWx' : key === 'contact' ? 'sectionOpenContact' : 'sectionOpenTeam'
-    const shut = {}
-    shut[partKey] = false
-    this.setData(shut)
-    this._envShut = setTimeout(() => {
-      const hide = {}
-      hide[openKey] = false
-      const platOpen = Object.keys(this.data.platformExpanded || {}).some((k) => this.data.platformExpanded[k])
-      hide.envScrollLock = platOpen
-      this.setData(hide)
-    }, 480)
+    const hide = {}
+    hide[openKey] = false
+    const platOpen = Object.keys(this.data.platformExpanded || {}).some((k) => this.data.platformExpanded[k])
+    hide.envScrollLock = platOpen
+    this.setData(hide)
   },
   onOpenSection(e) {
     const key = e.currentTarget.dataset.key
@@ -669,13 +645,15 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     const prof = (this.data.platformProfiles && this.data.platformProfiles[id]) || {}
-    if (!prof.enabled) return
-    if (this._envShut) clearTimeout(this._envShut)
+    let profiles = this.data.platformProfiles
+    if (!prof.enabled) {
+      this.markFormDirty()
+      profiles = { ...profiles }
+      profiles[id] = { ...talentPlatforms.emptyProfile(), ...prof, enabled: true }
+    }
     const expanded = { ...this.data.platformExpanded, [id]: true }
-    syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
-    this.setData({ envelopePartId: '', envScrollLock: true }, () => {
-      this._envShut = setTimeout(() => this.setData({ envelopePartId: id }), 40)
-    })
+    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, expanded)
+    this.setData({ envScrollLock: true })
   },
   onPreviewTradeExample() {
     wx.previewImage({ urls: ['/images/trade-screenshot-example.jpg'] })

@@ -30,18 +30,6 @@ const PLATFORM_LOGO: Record<string, string> = {
   weixin_video: '/platforms/wechat.png',
 }
 
-function envelopePaper(side: 'left' | 'right') {
-  return (
-    <svg key={side} className="lq-env-svg" viewBox="0 0 404 470" preserveAspectRatio="none" aria-hidden>
-      <rect x="0" y="28" width="404" height="442" rx="26" fill="#f3e8d6" />
-      <path d="M16 56 Q202 236 388 56 V40 Q388 28 374 28 H30 Q16 28 16 42 Z" fill="#eadcc6" />
-      <path d="M16 56 Q202 236 388 56" fill="none" stroke="#c6ae90" strokeWidth="2" />
-      <path d="M10 168 L186 432" fill="none" stroke="#d8c2a6" strokeWidth="1.5" />
-      <path d="M394 168 L218 432" fill="none" stroke="#d8c2a6" strokeWidth="1.5" />
-    </svg>
-  )
-}
-
 let profileEnvelopeScrollLocks = 0
 
 function retainProfileScrollLock() {
@@ -57,6 +45,7 @@ export function ProfileEnvelope({
   title,
   summary,
   logo,
+  actionLabel,
   open,
   saving,
   onEdit,
@@ -67,6 +56,7 @@ export function ProfileEnvelope({
   title: string
   summary: string
   logo?: string
+  actionLabel?: string
   open: boolean
   saving?: boolean
   onEdit: () => void
@@ -74,43 +64,14 @@ export function ProfileEnvelope({
   onSave: () => void
   children: ReactNode
 }) {
-  const [phase, setPhase] = useState<'closed' | 'open' | 'shut'>('closed')
-  const [parted, setParted] = useState(false)
   const layerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (open) {
-      setPhase('open')
-      setParted(false)
-      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      if (reduce) {
-        setParted(true)
-        return
-      }
-      let raf2 = 0
-      const raf1 = window.requestAnimationFrame(() => {
-        raf2 = window.requestAnimationFrame(() => setParted(true))
-      })
-      return () => {
-        window.cancelAnimationFrame(raf1)
-        window.cancelAnimationFrame(raf2)
-      }
-    }
-    setParted(false)
-    setPhase((cur) => (cur === 'closed' ? 'closed' : 'shut'))
+    if (!open) return
+    return retainProfileScrollLock()
   }, [open])
   useEffect(() => {
-    if (phase !== 'shut') return
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const timer = window.setTimeout(() => setPhase('closed'), reduce ? 0 : 460)
-    return () => window.clearTimeout(timer)
-  }, [phase])
-  useEffect(() => {
-    if (phase === 'closed') return
-    return retainProfileScrollLock()
-  }, [phase])
-  useEffect(() => {
     const layer = layerRef.current
-    if (!layer || phase === 'closed') return
+    if (!layer || !open) return
     const onWheel = (event: WheelEvent) => {
       const letter = layer.querySelector('.lq-env-letter')
       if (!(letter instanceof HTMLElement) || !letter.contains(event.target as Node)) {
@@ -124,7 +85,7 @@ export function ProfileEnvelope({
     }
     layer.addEventListener('wheel', onWheel, { passive: false })
     return () => layer.removeEventListener('wheel', onWheel)
-  }, [phase])
+  }, [open])
 
   return (
     <section>
@@ -136,19 +97,15 @@ export function ProfileEnvelope({
             <div className="truncate text-xs text-stone-500">{summary || '未填写'}</div>
           </div>
           <button type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={onEdit}>
-            修改
+            {actionLabel || '修改'}
           </button>
         </div>
       </div>
       <style>{`
-        .lq-env-pocket { position: relative; width: min(32rem, 100%); }
         html.lq-env-scroll-lock,
-        html.lq-env-scroll-lock body {
-          overflow: hidden;
-        }
+        html.lq-env-scroll-lock body { overflow: hidden; }
         .lq-env-letter {
-          position: relative;
-          z-index: 1;
+          width: min(32rem, 100%);
           max-height: 78vh;
           overflow: auto;
           overscroll-behavior: contain;
@@ -157,69 +114,25 @@ export function ProfileEnvelope({
           padding: 16px;
           box-shadow: 0 18px 48px rgba(28, 25, 23, 0.22);
         }
-        .lq-env-half {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-          width: 50%;
-          overflow: hidden;
-          z-index: 2;
-          pointer-events: none;
-          will-change: transform;
-          transition: transform 0.5s cubic-bezier(0.22, 0.82, 0.24, 1);
-        }
-        .lq-env-half--left { left: 0; }
-        .lq-env-half--right { right: 0; }
-        .lq-env-half--left.is-parted { transform: translate3d(-108%, 0, 0); }
-        .lq-env-half--right.is-parted { transform: translate3d(108%, 0, 0); }
-        .lq-env-svg { position: absolute; top: 0; height: 100%; width: 200%; }
-        .lq-env-half--left .lq-env-svg { left: 0; }
-        .lq-env-half--right .lq-env-svg { left: -100%; }
-        .lq-env-seal {
-          position: absolute;
-          left: 50%;
-          top: 42%;
-          z-index: 3;
-          width: 52px;
-          height: 52px;
-          padding: 5px;
-          border-radius: 50%;
-          border: 2px solid #d6c4a8;
-          background: #fff;
-          object-fit: contain;
-          box-shadow: 0 6px 16px rgba(90, 62, 30, 0.12);
-          pointer-events: none;
-          transform: translate3d(-50%, -50%, 0);
-          transition: top 0.5s cubic-bezier(0.22, 0.82, 0.24, 1), transform 0.5s cubic-bezier(0.22, 0.82, 0.24, 1);
-        }
-        .lq-env-seal.is-parted { top: 0; transform: translate3d(-50%, -42%, 0); }
-        @media (prefers-reduced-motion: reduce) {
-          .lq-env-half, .lq-env-seal { transition: none; }
-        }
       `}</style>
-      {phase !== 'closed' ? (
+      {open ? (
         <div ref={layerRef} className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
-          <div className="lq-env-pocket" onClick={(e) => e.stopPropagation()}>
-            <div className="lq-env-letter text-sm">
-              <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
-              <div className="space-y-3">{children}</div>
-              <div className="mt-4 flex justify-end gap-2">
-                <button type="button" className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700" onClick={onClose}>
-                  取消
-                </button>
-                <button
-                  type="button"
-                  disabled={saving}
-                  className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                  onClick={onSave}
-                >
-                  {saving ? '保存中…' : '保存'}
-                </button>
-              </div>
+          <div className="lq-env-letter text-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
+            <div className="space-y-3">{children}</div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700" onClick={onClose}>
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                onClick={onSave}
+              >
+                {saving ? '保存中…' : '保存'}
+              </button>
             </div>
-            <div className={`lq-env-half lq-env-half--left ${parted ? 'is-parted' : ''}`}>{envelopePaper('left')}</div>
-            <div className={`lq-env-half lq-env-half--right ${parted ? 'is-parted' : ''}`}>{envelopePaper('right')}</div>
-            {logo ? <img className={`lq-env-seal ${parted ? 'is-parted' : ''}`} src={logo} alt="" /> : null}
           </div>
         </div>
       ) : null}
@@ -270,7 +183,6 @@ function TalentProfileForm() {
   const acc = getAccount()
   const [member, setMember] = useState<TalentMember>(initialMember)
   const [activePlatform, setActivePlatform] = useState('douyin')
-  const [openWx, setOpenWx] = useState(false)
   const [openContact, setOpenContact] = useState(false)
   const [openLogin, setOpenLogin] = useState(false)
   const [openPlat, setOpenPlat] = useState<Record<string, boolean>>({})
@@ -402,7 +314,6 @@ function TalentProfileForm() {
   }
 
   function closeSavedSection(section: 'all' | 'wx' | 'contact' | 'login' | 'platform', platformId?: string) {
-    if (section === 'wx') setOpenWx(false)
     if (section === 'contact') setOpenContact(false)
     if (section === 'login') setOpenLogin(false)
     if (section === 'platform' && platformId) {
@@ -587,6 +498,31 @@ function TalentProfileForm() {
         <p className="text-sm text-slate-400">达人 ID：{member.lingqiTalentId}</p>
       ) : null}
 
+      <section className="rounded-2xl border border-stone-200 bg-[#fbf7f1] px-4 py-3 shadow-sm text-sm">
+        <div className="text-sm font-semibold text-stone-900">微信信息</div>
+        <label className="mt-3 block">
+          <span className="text-slate-400">昵称 *</span>
+          <input
+            required
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+            value={member.wxNickName || ''}
+            onFocus={focus.onFocus}
+            onChange={(e) => patchMember({ wxNickName: e.target.value })}
+            placeholder="用于登录与身份展示"
+          />
+        </label>
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            disabled={saving}
+            className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            onClick={() => void onSave('wx')}
+          >
+            {saving ? '保存中…' : '保存'}
+          </button>
+        </div>
+      </section>
+
       <ProfileEnvelope
         title="修改密码"
         summary={hasPassword ? '账号密码已设置' : '未设置登录密码'}
@@ -622,28 +558,6 @@ function TalentProfileForm() {
               setPassword(e.target.value)
             }}
             placeholder={hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}
-          />
-        </label>
-      </ProfileEnvelope>
-
-      <ProfileEnvelope
-        title="微信信息"
-        summary={member.wxNickName || '未填写昵称'}
-        open={openWx}
-        saving={saving}
-        onEdit={() => setOpenWx(true)}
-        onClose={() => setOpenWx(false)}
-        onSave={() => void onSave('wx')}
-      >
-        <label className="block">
-          <span className="text-slate-400">昵称 *</span>
-          <input
-            required
-            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
-            value={member.wxNickName || ''}
-            onFocus={focus.onFocus}
-            onChange={(e) => patchMember({ wxNickName: e.target.value })}
-            placeholder="用于登录与身份展示"
           />
         </label>
       </ProfileEnvelope>
@@ -730,10 +644,23 @@ function TalentProfileForm() {
                 ? `${row.platformNickname || '已启用'}${row.followers ? ` · 粉丝 ${row.followers}` : ''}`
                 : '未启用'
             }
+            actionLabel={row?.enabled ? '修改' : '开启'}
             open={opened}
             saving={saving}
             onEdit={() => {
               setActivePlatform(p.id)
+              if (!row?.enabled) {
+                setMember((m) => {
+                  const cur = m.platformProfiles[p.id] || emptyAllProfiles()[p.id]
+                  return {
+                    ...m,
+                    platformProfiles: {
+                      ...m.platformProfiles,
+                      [p.id]: { ...cur, enabled: true },
+                    },
+                  }
+                })
+              }
               setOpenPlat({ [p.id]: true })
             }}
             onClose={() => setOpenPlat({})}
