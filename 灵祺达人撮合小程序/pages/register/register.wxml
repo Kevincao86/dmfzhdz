@@ -10,14 +10,16 @@
       wx:for="{{identityChips}}"
       wx:key="id"
       class="identity-chip {{item.active ? 'identity-chip--on' : ''}}"
+      data-identity="{{item.id}}"
+      catchtap="onPickIdentity"
     >{{item.label}}</view>
     <view
       wx:for="{{addIdentityChips}}"
       wx:for-item="addItem"
       wx:key="id"
       class="identity-chip identity-chip--add"
-      data-id="{{addItem.id}}"
-      bindtap="onAddIdentity"
+      data-identity="{{addItem.id}}"
+      catchtap="onPickIdentity"
     >{{addItem.label}}</view>
     <view class="identity-back" wx:if="{{showIdentityBack}}" bindtap="onBackIdentity">返回上一身份</view>
   </view>
@@ -466,12 +468,6 @@
       </view>
       </view>
     </view>
-  </view>
-
-  <view class="card submit-wrap">
-    <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
-      保存资料
-    </button>
   </view>
 
   <view class="account-session-actions">

@@ -102,7 +102,7 @@ export function ProfileEnvelope({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {onView ? (
-              <button type="button" className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-semibold text-stone-700" onClick={onView}>
+              <button type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={onView}>
                 查看
               </button>
             ) : null}
@@ -996,14 +996,6 @@ function TalentProfileForm() {
       })}
 
       {msg ? <p className="text-sm text-amber-400">{msg}</p> : null}
-      <button
-        type="button"
-        disabled={saving}
-        className="px-6 py-2.5 rounded-lg bg-violet-600 font-medium disabled:opacity-50"
-        onClick={() => void onSave()}
-      >
-        {saving ? '保存中…' : '保存资料'}
-      </button>
       {shotPreview ? (
         <button
           type="button"

@@ -340,9 +340,6 @@ export default function SupplierProfilePage() {
       </ProfileEnvelope>
 
       {msg ? <p className="text-sm text-amber-400">{msg}</p> : null}
-      <button type="button" disabled={saving} className="px-6 py-2.5 rounded-lg bg-violet-600 font-medium disabled:opacity-50" onClick={() => void onSave()}>
-        {saving ? '保存中…' : '保存资料'}
-      </button>
     </div>
   )
 }

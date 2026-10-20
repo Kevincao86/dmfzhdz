@@ -242,12 +242,21 @@ Page({
     this._formDirty = false
     this.hydrateMemberFormFromStorage()
   },
-  onAddIdentity(e) {
-    const id = e.currentTarget.dataset.id
+  onPickIdentity(e) {
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.identity) || '')
+    if (id !== 'talent' && id !== 'shoot' && id !== 'edit') return
     const owned = userProfile.readOwnedIdentities()
-    if (!id || owned.includes(id)) return
-    const prev = this._formIdentity || userProfile.readIdentity()
-    if (owned.includes(prev)) this._identityReturnTo = prev
+    const current = this._formIdentity || userProfile.readIdentity()
+    if (id === current) return
+    if (owned.includes(id)) {
+      this._identityReturnTo = ''
+      this._formIdentity = id
+      this._formDirty = false
+      userProfile.writeIdentity(id)
+      this.hydrateMemberFormFromStorage()
+      return
+    }
+    if (owned.includes(current)) this._identityReturnTo = current
     this._formIdentity = id
     this._formDirty = false
     this.hydrateMemberFormFromStorage()

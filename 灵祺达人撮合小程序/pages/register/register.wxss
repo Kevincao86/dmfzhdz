@@ -175,22 +175,21 @@
   flex-shrink: 0;
 }
 
-.platform-detail-btn {
+.platform-detail-btn,
+.platform-detail-btn--view {
   display: flex;
   align-items: center;
-  gap: 2rpx;
-  padding: 8rpx 14rpx;
-  font-size: 22rpx;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 56rpx;
+  padding: 0 28rpx;
+  font-size: 24rpx;
   font-weight: 600;
-  color: #6366f1;
-  background: #eef2ff;
+  line-height: 52rpx;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 2rpx solid #ddd6fe;
   border-radius: 999rpx;
-}
-
-.platform-detail-btn--view {
-  color: #57534e;
-  background: #fff;
-  border: 2rpx solid #d6d3d1;
 }
 
 .platform-detail-arrow {
@@ -461,11 +460,14 @@
   line-height: 1.4;
 }
 
-button.cred-edit-btn.cred-edit-btn--ghost[size='mini'] {
-  min-width: 112rpx;
-  color: #57534e !important;
-  background: #fff !important;
-  border-color: #d6d3d1 !important;
+button.cred-edit-btn.cred-edit-btn--ghost[size='mini'],
+.paper-page.lq-accent-on button.cred-edit-btn,
+.paper-page.lq-accent-dark button.cred-edit-btn {
+  min-width: 168rpx;
+  color: #6d28d9 !important;
+  -webkit-text-fill-color: #6d28d9 !important;
+  background: #f5f3ff !important;
+  border-color: #ddd6fe !important;
 }
 
 button.cred-edit-btn[size='mini'] {
@@ -473,12 +475,12 @@ button.cred-edit-btn[size='mini'] {
   box-sizing: border-box !important;
   width: auto;
   min-width: 168rpx;
-  height: 64rpx !important;
+  height: 56rpx !important;
   min-height: 0 !important;
   margin: 0 !important;
-  padding: 0 24rpx !important;
+  padding: 0 28rpx !important;
   border-width: 2rpx !important;
-  line-height: 60rpx !important;
+  line-height: 52rpx !important;
   text-align: center !important;
   font-size: 24rpx !important;
 }
@@ -510,9 +512,9 @@ button.cred-edit-btn[size='mini'] {
 }
 
 .env-btn--view {
-  color: #57534e;
-  background: #fff;
-  border-color: #d6d3d1;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border-color: #ddd6fe;
 }
 
 .env-letter--view input,
