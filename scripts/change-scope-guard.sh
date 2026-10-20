@@ -131,6 +131,7 @@ list_scopes() {
   xingxuan_wx_share    星选分享招募：电脑微信发给好友或群、发到朋友圈，卡片与达人小程序同一张商单
   share_poster_qr_white 分享海报小程序码白底略透明，星选与达人小程序同一张海报
   pr_detail_share      星选 PR 版招募详情不能报名，但仍可打开分享招募
+  hall_card_height     星选招募大厅商单卡片同一行拉成一样高
   poster_row_wrap      分享海报字段按宽度自动换行，不再把费用类型裁成省略号
   mp_login_email_account 达人小程序：验证码登录增加邮箱；账号密码不限制为纯数字
   mp_profile_trade_tags 达人我的信息：交易示例改小图；打开资料时保留账号标签
@@ -2043,6 +2044,12 @@ PAT
     pr_detail_share)
       cat <<'PAT'
 RecruitmentDetailPage.tsx
+change-scope-guard
+PAT
+      ;;
+    hall_card_height)
+      cat <<'PAT'
+灵祺达人履约管理后台/src/index.css
 change-scope-guard
 PAT
       ;;
