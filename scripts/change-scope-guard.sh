@@ -2092,6 +2092,8 @@ addonCards.js
 app.json
 mine.js
 mine-pr-addon-image-clarify
+menuFunctions.js
+ai-image-clarify
 change-scope-guard
 PAT
       ;;

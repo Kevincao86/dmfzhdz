@@ -179,6 +179,13 @@ const FUNCTION_SECTIONS = [
       },
       {
         kind: 'link',
+        url: '/pages/ai-image-clarify/ai-image-clarify',
+        title: '图片变清晰',
+        desc: '模糊照片按原图提高清晰度',
+        iconKey: 'frame',
+      },
+      {
+        kind: 'link',
         url: '/pages/ai-content/ai-content',
         title: '爆款 Brief 生成',
         desc: '文章话题与探店 Brief',

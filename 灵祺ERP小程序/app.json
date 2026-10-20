@@ -345,6 +345,13 @@
       ]
     },
     {
+      "root": "pages/ai-image-clarify",
+      "name": "ai-image-clarify",
+      "pages": [
+        "ai-image-clarify"
+      ]
+    },
+    {
       "root": "pages/ai-content",
       "name": "ai-content",
       "pages": [
