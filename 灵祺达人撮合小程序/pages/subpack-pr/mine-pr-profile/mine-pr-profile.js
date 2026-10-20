@@ -55,6 +55,8 @@ Page({
     orgPlaceholder: '请输入公司或机构全称',
     lingqiPrIdLabel: '',
     submitting: false,
+    sectionOpen: '',
+    envelopeViewKey: '',
     ...loginCredPanel.patchFromAccount(null),
   },
   ...credHandlers,
@@ -182,41 +184,63 @@ Page({
     onCityPick(this, e)
     this.setData({ 'form.city': this.data.city })
   },
-  async onSave() {
+  onEnvHold() {},
+  onOpenSection(e) {
+    const key = e.currentTarget.dataset.key
+    const mode = e.currentTarget.dataset.mode || 'edit'
+    if (!key) return
+    this.setData({ sectionOpen: key, envelopeViewKey: mode === 'view' ? key : '' })
+  },
+  onCloseSection() {
+    this.setData({ sectionOpen: '', envelopeViewKey: '' })
+  },
+  async onSave(e) {
+    const section = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.section) || 'all'
     const f = { ...this.data.form }
     const org =
       f.accountType === 'personal'
         ? String(f.personalName || '').trim()
         : String(f.companyName || '').trim()
-    if (!org) {
+    const wx = wxAccount.readWxAccount()
+    const nick = String(f.wxNickName || (wx && wx.wxNickName) || '').trim()
+    const needOrg = section === 'org' || section === 'all'
+    const needWx = section === 'wx' || section === 'all'
+    const needContact = section === 'contact' || section === 'all'
+    if (needOrg && !org) {
       wx.showToast({
         title: f.accountType === 'personal' ? '请填写个人名称' : '请填写公司/机构名称',
         icon: 'none',
       })
       return
     }
-    const wx = wxAccount.readWxAccount()
-    const nick = String(f.wxNickName || (wx && wx.wxNickName) || '').trim()
-    const contactErr = validateBasicContactFields({
-      wxNickName: nick,
-      contactPhone: f.contactPhone,
-      wechatId: f.wechatId,
-    })
-    if (contactErr) {
-      wx.showToast({ title: contactErr, icon: 'none' })
+    if (needWx && !nick) {
+      wx.showToast({ title: '请填写昵称', icon: 'none' })
       return
     }
-    if (!String(f.contactName || '').trim() && f.accountType === 'company') {
+    if (needContact) {
+      const contactErr = validateBasicContactFields({
+        wxNickName: nick || '已填',
+        contactPhone: f.contactPhone,
+        wechatId: f.wechatId,
+      })
+      if (contactErr && contactErr !== '请填写昵称') {
+        wx.showToast({ title: contactErr, icon: 'none' })
+        return
+      }
+    }
+    if (needOrg && !String(f.contactName || '').trim() && f.accountType === 'company') {
       wx.showToast({ title: '请填写联系人', icon: 'none' })
       return
     }
     if (f.accountType === 'personal' && !String(f.contactName || '').trim()) {
       f.contactName = org
     }
-    const regionErr = validateRegion(this.data.province, this.data.city)
-    if (regionErr) {
-      wx.showToast({ title: regionErr, icon: 'none' })
-      return
+    if (needContact) {
+      const regionErr = validateRegion(this.data.province, this.data.city)
+      if (regionErr) {
+        wx.showToast({ title: regionErr, icon: 'none' })
+        return
+      }
     }
     const prev = userProfile.readPrProfile()
     const acct = auth.readAccount()
@@ -336,7 +360,12 @@ Page({
       if (!cloudWarn) summary = '资料已保存并同步云端'
       else summary = cloudWarn
       if (credNote) summary = summary ? `${summary}；${credNote}` : credNote
-      notifySavedAndBack(summary || '您的资料已保存。')
+      if (section === 'all') {
+        notifySavedAndBack(summary || '您的资料已保存。')
+      } else {
+        this.setData({ sectionOpen: '', envelopeViewKey: '' })
+        wx.showToast({ title: cloudWarn ? String(cloudWarn).slice(0, 20) : '已保存', icon: cloudWarn ? 'none' : 'success' })
+      }
     } finally {
       this.setData({ submitting: false })
     }

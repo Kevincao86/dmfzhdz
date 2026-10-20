@@ -148,3 +148,106 @@
 .type-switch-item.active .type-switch-label {
   color: var(--lq-primary-dark);
 }
+
+.env .section-head {
+  margin-bottom: 0;
+}
+
+.env-sum {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.env-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
+}
+
+.env-btn {
+  margin: 0;
+  padding: 0 28rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 2rpx solid #ddd6fe;
+  border-radius: 999rpx;
+  box-sizing: border-box;
+}
+
+button.env-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  min-width: 0 !important;
+  padding: 0 28rpx !important;
+}
+
+button.env-btn::after {
+  border: none;
+}
+
+.env-btn--save {
+  color: #fff;
+  background: #6d28d9;
+  border-color: #6d28d9;
+}
+
+.env-save-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.env-sheet {
+  display: none;
+}
+
+.env--open .env-sheet {
+  display: block;
+  position: fixed;
+  z-index: 301;
+  left: 40rpx;
+  right: 40rpx;
+  top: 12vh;
+  max-height: 76vh;
+  overflow: visible;
+  background: transparent;
+  padding: 0;
+}
+
+.env-mask {
+  position: fixed;
+  z-index: 300;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.env-letter {
+  max-height: 76vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 32rpx 28rpx 28rpx;
+  box-sizing: border-box;
+}
+
+.env-letter--view input,
+.env-letter--view textarea,
+.env-letter--view picker,
+.env-letter--view .type-switch,
+.env-letter--view .pr-logo-actions {
+  pointer-events: none;
+}
