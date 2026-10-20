@@ -130,6 +130,10 @@ Page({
     sectionOpenWx: false,
     sectionOpenContact: false,
     sectionOpenTeam: false,
+    sectionPartWx: false,
+    sectionPartContact: false,
+    sectionPartTeam: false,
+    envelopePartId: '',
     editMode: true,
     provinces: [],
     cities: [],
@@ -603,31 +607,66 @@ Page({
     if (!cur.enabled) expanded[id] = false
     syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, expanded)
   },
+  partSection(key) {
+    const openKey = key === 'wx' ? 'sectionOpenWx' : key === 'contact' ? 'sectionOpenContact' : 'sectionOpenTeam'
+    const partKey = key === 'wx' ? 'sectionPartWx' : key === 'contact' ? 'sectionPartContact' : 'sectionPartTeam'
+    if (this._envShut) clearTimeout(this._envShut)
+    const opened = {}
+    opened[openKey] = true
+    opened[partKey] = false
+    this.setData(opened, () => {
+      this._envShut = setTimeout(() => {
+        const parted = {}
+        parted[partKey] = true
+        this.setData(parted)
+      }, 40)
+    })
+  },
+  shutSection(key, platformId) {
+    if (this._envShut) clearTimeout(this._envShut)
+    if (key === 'platform') {
+      this.setData({ envelopePartId: '' })
+      this._envShut = setTimeout(() => {
+        const expanded = { ...this.data.platformExpanded, [platformId]: false }
+        syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
+      }, 480)
+      return
+    }
+    const partKey = key === 'wx' ? 'sectionPartWx' : key === 'contact' ? 'sectionPartContact' : 'sectionPartTeam'
+    const openKey = key === 'wx' ? 'sectionOpenWx' : key === 'contact' ? 'sectionOpenContact' : 'sectionOpenTeam'
+    const shut = {}
+    shut[partKey] = false
+    this.setData(shut)
+    this._envShut = setTimeout(() => {
+      const hide = {}
+      hide[openKey] = false
+      this.setData(hide)
+    }, 480)
+  },
   onOpenSection(e) {
     const key = e.currentTarget.dataset.key
-    if (key === 'wx') this.setData({ sectionOpenWx: true })
-    else if (key === 'contact') this.setData({ sectionOpenContact: true })
-    else if (key === 'team') this.setData({ sectionOpenTeam: true })
+    if (key === 'wx' || key === 'contact' || key === 'team') this.partSection(key)
   },
   onCloseSection(e) {
     const key = e.currentTarget.dataset.key
-    if (key === 'wx') this.setData({ sectionOpenWx: false })
-    else if (key === 'contact') this.setData({ sectionOpenContact: false })
-    else if (key === 'team') this.setData({ sectionOpenTeam: false })
+    if (key === 'wx' || key === 'contact' || key === 'team') this.shutSection(key)
   },
   onClosePlatform(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
-    const expanded = { ...this.data.platformExpanded, [id]: false }
-    syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
+    this.shutSection('platform', id)
   },
   onOpenPlatform(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
     const prof = (this.data.platformProfiles && this.data.platformProfiles[id]) || {}
     if (!prof.enabled) return
+    if (this._envShut) clearTimeout(this._envShut)
     const expanded = { ...this.data.platformExpanded, [id]: true }
     syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
+    this.setData({ envelopePartId: '' }, () => {
+      this._envShut = setTimeout(() => this.setData({ envelopePartId: id }), 40)
+    })
   },
   onPreviewTradeExample() {
     wx.previewImage({ urls: ['/images/trade-screenshot-example.jpg'] })
@@ -883,20 +922,12 @@ Page({
       this.applyIdentityIdLabels(workId)
       this._formDirty = false
       profilePulledAt = 0
-      const expanded = section === 'all'
-        ? collapseAllPlatforms()
-        : section === 'platform' && platformId
-          ? { ...this.data.platformExpanded, [platformId]: false }
-          : this.data.platformExpanded
+      const expanded = section === 'all' ? collapseAllPlatforms() : this.data.platformExpanded
       syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, expanded)
       if (section === 'all') {
         notifySavedAndBack(cloudWarn)
       } else {
-        const closePatch = {}
-        if (section === 'wx') closePatch.sectionOpenWx = false
-        if (section === 'contact') closePatch.sectionOpenContact = false
-        if (section === 'team') closePatch.sectionOpenTeam = false
-        if (Object.keys(closePatch).length) this.setData(closePatch)
+        this.shutSection(section, platformId)
         if (cloudWarn) wx.showToast({ title: '已存本机，云端未同步', icon: 'none' })
         else wx.showToast({ title: '已保存', icon: 'success' })
       }

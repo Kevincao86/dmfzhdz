@@ -537,40 +537,56 @@ button.cred-edit-btn[size='mini'] {
   padding: 0;
 }
 
-.env-cover {
+.env-half {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 51%;
-  background: #e7d4b8;
+  width: 50%;
   z-index: 2;
   pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 200% 100%;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20404%20470%22%3E%3Crect%20x%3D%220%22%20y%3D%2228%22%20width%3D%22404%22%20height%3D%22442%22%20rx%3D%2226%22%20fill%3D%22%23f3e8d6%22%2F%3E%3Cpath%20d%3D%22M16%2056%20Q202%20236%20388%2056%20V40%20Q388%2028%20374%2028%20H30%20Q16%2028%2016%2042%20Z%22%20fill%3D%22%23eadcc6%22%2F%3E%3Cpath%20d%3D%22M16%2056%20Q202%20236%20388%2056%22%20fill%3D%22none%22%20stroke%3D%22%23c6ae90%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M10%20168%20L186%20432%22%20fill%3D%22none%22%20stroke%3D%22%23d8c2a6%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M394%20168%20L218%20432%22%20fill%3D%22none%22%20stroke%3D%22%23d8c2a6%22%20stroke-width%3D%221.5%22%2F%3E%3C%2Fsvg%3E");
+  transition: transform 0.5s cubic-bezier(0.22, 0.82, 0.24, 1);
 }
 
-.env-cover--left {
+.env-half--left {
   left: 0;
-  border-radius: 28rpx 0 0 28rpx;
-  animation: env-split-l 0.46s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
+  background-position: left center;
 }
 
-.env-cover--right {
+.env-half--right {
   right: 0;
-  border-radius: 0 28rpx 28rpx 0;
-  animation: env-split-r 0.46s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
+  background-position: right center;
+}
+
+.env-half--left.is-parted {
+  transform: translate3d(-108%, 0, 0);
+}
+
+.env-half--right.is-parted {
+  transform: translate3d(108%, 0, 0);
 }
 
 .env-seal {
   position: absolute;
   left: 50%;
-  top: 0;
-  width: 72rpx;
-  height: 72rpx;
-  margin-left: -36rpx;
-  margin-top: -28rpx;
-  border-radius: 18rpx;
+  top: 42%;
+  width: 84rpx;
+  height: 84rpx;
+  margin-left: -42rpx;
+  margin-top: -42rpx;
+  border-radius: 50%;
+  border: 2rpx solid #d6c4a8;
   background: #fff;
   z-index: 3;
   pointer-events: none;
+  transition: top 0.5s cubic-bezier(0.22, 0.82, 0.24, 1), margin-top 0.5s cubic-bezier(0.22, 0.82, 0.24, 1);
+}
+
+.env-seal.is-parted {
+  top: 0;
+  margin-top: -24rpx;
 }
 
 .env-letter {
@@ -606,38 +622,42 @@ button.cred-edit-btn[size='mini'] {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 51%;
-  background: #e7d4b8;
+  width: 50%;
   z-index: 5;
   pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 200% 100%;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20404%20470%22%3E%3Crect%20x%3D%220%22%20y%3D%2228%22%20width%3D%22404%22%20height%3D%22442%22%20rx%3D%2226%22%20fill%3D%22%23f3e8d6%22%2F%3E%3Cpath%20d%3D%22M16%2056%20Q202%20236%20388%2056%20V40%20Q388%2028%20374%2028%20H30%20Q16%2028%2016%2042%20Z%22%20fill%3D%22%23eadcc6%22%2F%3E%3Cpath%20d%3D%22M16%2056%20Q202%20236%20388%2056%22%20fill%3D%22none%22%20stroke%3D%22%23c6ae90%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22M10%20168%20L186%20432%22%20fill%3D%22none%22%20stroke%3D%22%23d8c2a6%22%20stroke-width%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M394%20168%20L218%20432%22%20fill%3D%22none%22%20stroke%3D%22%23d8c2a6%22%20stroke-width%3D%221.5%22%2F%3E%3C%2Fsvg%3E");
 }
 
 .paper-page .cred-modal::before {
   left: 0;
-  border-radius: 24rpx 0 0 24rpx;
-  animation: env-split-l 0.46s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
+  background-position: left center;
+  animation: env-split-l 0.5s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
 }
 
 .paper-page .cred-modal::after {
   right: 0;
-  border-radius: 0 24rpx 24rpx 0;
-  animation: env-split-r 0.46s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
+  background-position: right center;
+  animation: env-split-r 0.5s cubic-bezier(0.22, 0.82, 0.24, 1) forwards;
 }
 
 @keyframes env-split-l {
   from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-105%, 0, 0); }
+  to { transform: translate3d(-108%, 0, 0); }
 }
 
 @keyframes env-split-r {
   from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(105%, 0, 0); }
+  to { transform: translate3d(108%, 0, 0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .env-cover,
+  .env-half,
+  .env-seal,
   .paper-page .cred-modal::before,
   .paper-page .cred-modal::after {
+    transition: none;
     animation: none;
   }
 }

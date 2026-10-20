@@ -30,6 +30,18 @@ const PLATFORM_LOGO: Record<string, string> = {
   weixin_video: '/platforms/wechat.png',
 }
 
+function envelopePaper(side: 'left' | 'right') {
+  return (
+    <svg key={side} className="lq-env-svg" viewBox="0 0 404 470" preserveAspectRatio="none" aria-hidden>
+      <rect x="0" y="28" width="404" height="442" rx="26" fill="#f3e8d6" />
+      <path d="M16 56 Q202 236 388 56 V40 Q388 28 374 28 H30 Q16 28 16 42 Z" fill="#eadcc6" />
+      <path d="M16 56 Q202 236 388 56" fill="none" stroke="#c6ae90" strokeWidth="2" />
+      <path d="M10 168 L186 432" fill="none" stroke="#d8c2a6" strokeWidth="1.5" />
+      <path d="M394 168 L218 432" fill="none" stroke="#d8c2a6" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
 export function ProfileEnvelope({
   title,
   summary,
@@ -107,47 +119,51 @@ export function ProfileEnvelope({
           padding: 16px;
           box-shadow: 0 18px 48px rgba(28, 25, 23, 0.22);
         }
-        .lq-env-cover {
+        .lq-env-half {
           position: absolute;
           top: 0;
           bottom: 0;
-          width: calc(50% + 1px);
-          background: #e7d4b8;
+          width: 50%;
+          overflow: hidden;
           z-index: 2;
           pointer-events: none;
           will-change: transform;
-          transition: transform 0.46s cubic-bezier(0.22, 0.82, 0.24, 1);
+          transition: transform 0.5s cubic-bezier(0.22, 0.82, 0.24, 1);
         }
-        .lq-env-cover--left { left: 0; border-radius: 16px 0 0 16px; transform: translate3d(0, 0, 0); }
-        .lq-env-cover--right { right: 0; border-radius: 0 16px 16px 0; transform: translate3d(0, 0, 0); }
-        .lq-env-cover--left.is-parted { transform: translate3d(-105%, 0, 0); }
-        .lq-env-cover--right.is-parted { transform: translate3d(105%, 0, 0); }
+        .lq-env-half--left { left: 0; }
+        .lq-env-half--right { right: 0; }
+        .lq-env-half--left.is-parted { transform: translate3d(-108%, 0, 0); }
+        .lq-env-half--right.is-parted { transform: translate3d(108%, 0, 0); }
+        .lq-env-svg { position: absolute; top: 0; height: 100%; width: 200%; }
+        .lq-env-half--left .lq-env-svg { left: 0; }
+        .lq-env-half--right .lq-env-svg { left: -100%; }
         .lq-env-seal {
           position: absolute;
           left: 50%;
-          top: 0;
+          top: 42%;
           z-index: 3;
-          width: 44px;
-          height: 44px;
-          border-radius: 12px;
+          width: 52px;
+          height: 52px;
+          padding: 5px;
+          border-radius: 50%;
+          border: 2px solid #d6c4a8;
           background: #fff;
           object-fit: contain;
-          box-shadow: 0 4px 12px rgba(28, 25, 23, 0.12);
+          box-shadow: 0 6px 16px rgba(90, 62, 30, 0.12);
           pointer-events: none;
-          transform: translate3d(-50%, -40%, 0);
+          transform: translate3d(-50%, -50%, 0);
+          transition: top 0.5s cubic-bezier(0.22, 0.82, 0.24, 1), transform 0.5s cubic-bezier(0.22, 0.82, 0.24, 1);
         }
+        .lq-env-seal.is-parted { top: 0; transform: translate3d(-50%, -42%, 0); }
         @media (prefers-reduced-motion: reduce) {
-          .lq-env-cover, .lq-env-seal { transition: none; }
+          .lq-env-half, .lq-env-seal { transition: none; }
         }
       `}</style>
       {phase !== 'closed' ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
           <div className="lq-env-pocket" onClick={(e) => e.stopPropagation()}>
             <div className="lq-env-letter text-sm">
-              <div className="mb-3 flex items-center gap-2 text-base font-semibold text-stone-900">
-                {logo ? <img src={logo} alt="" className="h-7 w-7 rounded-lg bg-white object-contain" /> : null}
-                <span>{title}</span>
-              </div>
+              <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
               <div className="space-y-3">{children}</div>
               <div className="mt-4 flex justify-end gap-2">
                 <button type="button" className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700" onClick={onClose}>
@@ -163,8 +179,8 @@ export function ProfileEnvelope({
                 </button>
               </div>
             </div>
-            <div className={`lq-env-cover lq-env-cover--left ${parted ? 'is-parted' : ''}`} />
-            <div className={`lq-env-cover lq-env-cover--right ${parted ? 'is-parted' : ''}`} />
+            <div className={`lq-env-half lq-env-half--left ${parted ? 'is-parted' : ''}`}>{envelopePaper('left')}</div>
+            <div className={`lq-env-half lq-env-half--right ${parted ? 'is-parted' : ''}`}>{envelopePaper('right')}</div>
             {logo ? <img className={`lq-env-seal ${parted ? 'is-parted' : ''}`} src={logo} alt="" /> : null}
           </div>
         </div>
