@@ -7,8 +7,8 @@
   <view wx:if="{{credentialsReady}}" class="cred-ready-row">
     <text class="cred-ready-text">账号密码已设置</text>
     <view class="cred-ready-actions">
-      <button class="cred-edit-btn cred-edit-btn--ghost" size="mini" bindtap="onViewCredentials">查看</button>
-      <button class="cred-edit-btn" size="mini" bindtap="onEditCredentials">修改</button>
+      <view class="env-btn cred-edit-btn" bindtap="onViewCredentials">查看</view>
+      <view class="env-btn cred-edit-btn" bindtap="onEditCredentials">修改</view>
     </view>
   </view>
 
