@@ -65,12 +65,9 @@ function syncUiFromProfiles(page, profiles, douyinLevelIndex, expandedMap) {
   })
 }
 
-function buildInitialExpanded(profiles) {
+function buildInitialExpanded() {
   const out = {}
-  for (const p of talentPlatforms.TALENT_PLATFORMS) {
-    const prof = profiles && profiles[p.id]
-    out[p.id] = !!(prof && prof.enabled && !talentPlatforms.profileFilled(prof))
-  }
+  for (const p of talentPlatforms.TALENT_PLATFORMS) out[p.id] = false
   return out
 }
 
@@ -130,6 +127,9 @@ Page({
     douyinLevels: DOUYIN_LEVELS,
     douyinLevelIndex: 0,
     submitting: false,
+    sectionOpenWx: false,
+    sectionOpenContact: false,
+    sectionOpenTeam: false,
     editMode: true,
     provinces: [],
     cities: [],
@@ -603,13 +603,18 @@ Page({
     if (!cur.enabled) expanded[id] = false
     syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, expanded)
   },
-  onTogglePlatformDetail(e) {
+  onOpenSection(e) {
+    const key = e.currentTarget.dataset.key
+    if (key === 'wx') this.setData({ sectionOpenWx: true })
+    else if (key === 'contact') this.setData({ sectionOpenContact: true })
+    else if (key === 'team') this.setData({ sectionOpenTeam: true })
+  },
+  onOpenPlatform(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
     const prof = (this.data.platformProfiles && this.data.platformProfiles[id]) || {}
     if (!prof.enabled) return
-    this.markFormDirty()
-    const expanded = { ...this.data.platformExpanded, [id]: !this.data.platformExpanded[id] }
+    const expanded = { ...this.data.platformExpanded, [id]: true }
     syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
   },
   onPreviewTradeExample() {
@@ -728,8 +733,43 @@ Page({
     }
     return null
   },
-  async onSubmit() {
-    const errMsg = this.validateAll()
+  validateSection(section, platformId) {
+    if (section === 'wx') {
+      if (!String(this.data.wxNickName || '').trim()) return '请填写微信昵称'
+      return null
+    }
+    if (section === 'contact') {
+      if (!String(this.data.contact || '').trim()) return '请填写联系电话'
+      if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
+      const gender = String(this.data.gender || '').trim()
+      if (gender !== '男' && gender !== '女') return '请选择性别'
+      return validateRegion(this.data.province, this.data.city)
+    }
+    if (section === 'team') {
+      return supplierTeamProfile.validateSupplierProfile(this.data.workIdentity, this.data.supplierProfile, {
+        wxNickName: this.data.wxNickName,
+        contact: this.data.contact,
+        wechatId: this.data.wechatId,
+        alipayAccount: this.data.alipayAccount,
+        gender: this.data.gender,
+        province: this.data.province,
+        city: this.data.city,
+      })
+    }
+    if (section === 'platform') {
+      const plat = talentPlatforms.TALENT_PLATFORMS.find((x) => x.id === platformId)
+      if (!plat) return '请选择平台'
+      const prof = (this.data.platformProfiles || {})[platformId]
+      if (!prof || !prof.enabled) return `请先开启${plat.name}`
+      const err = validatePlatformProfile(plat.name, prof)
+      return err ? `${plat.name}：${err}` : null
+    }
+    return this.validateAll()
+  },
+  async onSubmit(e) {
+    const section = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.section) || 'all'
+    const platformId = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || ''
+    const errMsg = section === 'all' ? this.validateAll() : this.validateSection(section, platformId)
     if (errMsg) {
       wx.showToast({ title: errMsg, icon: 'none' })
       return
@@ -831,8 +871,23 @@ Page({
       this.applyIdentityIdLabels(workId)
       this._formDirty = false
       profilePulledAt = 0
-      syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, collapseAllPlatforms())
-      notifySavedAndBack(cloudWarn)
+      const expanded = section === 'all'
+        ? collapseAllPlatforms()
+        : section === 'platform' && platformId
+          ? { ...this.data.platformExpanded, [platformId]: false }
+          : this.data.platformExpanded
+      syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, expanded)
+      if (section === 'all') {
+        notifySavedAndBack(cloudWarn)
+      } else {
+        const closePatch = {}
+        if (section === 'wx') closePatch.sectionOpenWx = false
+        if (section === 'contact') closePatch.sectionOpenContact = false
+        if (section === 'team') closePatch.sectionOpenTeam = false
+        if (Object.keys(closePatch).length) this.setData(closePatch)
+        if (cloudWarn) wx.showToast({ title: '已存本机，云端未同步', icon: 'none' })
+        else wx.showToast({ title: '已保存', icon: 'success' })
+      }
     } finally {
       this.setData({ submitting: false })
     }

@@ -16,11 +16,15 @@
     <view class="identity-back" wx:if="{{showIdentityBack}}" bindtap="onBackIdentity">返回上一身份</view>
   </view>
 
-  <view class="card">
+  <view class="card env {{sectionOpenWx ? 'env--open' : 'env--shut'}}">
+    <view class="env-flap"></view>
     <view class="section-head">
       <view class="section-head-dot" />
       <text class="section-title">微信信息</text>
+      <view class="env-btn" wx:if="{{!sectionOpenWx}}" data-key="wx" bindtap="onOpenSection">修改</view>
     </view>
+    <text class="env-sum" wx:if="{{!sectionOpenWx}}">{{wxNickName || '未填写昵称'}}</text>
+    <view class="env-sheet">
     <view class="wx-profile">
       <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
         <image class="wx-avatar" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
@@ -43,15 +47,26 @@
         <text class="wx-identity-id" wx:elif="{{lingqiTalentIdLabel}}">{{lingqiTalentIdLabel}}</text>
       </view>
     </view>
+    <view class="env-save-row">
+      <button class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="wx" bindtap="onSubmit">保存</button>
+    </view>
+    </view>
   </view>
 
-  <include src="../../partials/login-cred-panel.wxml" />
+  <view class="env {{showCredModal ? 'env--open' : 'env--shut'}}">
+    <view class="env-flap"></view>
+    <include src="../../partials/login-cred-panel.wxml" />
+  </view>
 
-  <view class="card apply-form">
+  <view class="card apply-form env {{sectionOpenContact ? 'env--open' : 'env--shut'}}">
+    <view class="env-flap"></view>
     <view class="section-head">
       <view class="section-head-dot" />
       <text class="section-title">联系信息</text>
+      <view class="env-btn" wx:if="{{!sectionOpenContact}}" data-key="contact" bindtap="onOpenSection">修改</view>
     </view>
+    <text class="env-sum" wx:if="{{!sectionOpenContact}}">{{contact || '未填写电话'}}{{city ? ' · ' + city : ''}}</text>
+    <view class="env-sheet">
     <view class="form-row">
       <text class="form-label">联系电话 *</text>
       <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
@@ -112,13 +127,21 @@
         </picker>
       </view>
     </view>
+    <view class="env-save-row">
+      <button class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="contact" bindtap="onSubmit">保存</button>
+    </view>
+    </view>
   </view>
 
-  <view class="card apply-form" wx:if="{{isSupplier}}">
+  <view class="card apply-form env {{sectionOpenTeam ? 'env--open' : 'env--shut'}}" wx:if="{{isSupplier}}">
+    <view class="env-flap"></view>
     <view class="section-head">
       <view class="section-head-dot" />
       <text class="section-title">团队基本信息</text>
+      <view class="env-btn" wx:if="{{!sectionOpenTeam}}" data-key="team" bindtap="onOpenSection">修改</view>
     </view>
+    <text class="env-sum" wx:if="{{!sectionOpenTeam}}">{{supplierProfile.teamName || '未填写团队'}}</text>
+    <view class="env-sheet">
     <view class="form-row">
       <text class="form-label">团队名称 *</text>
       <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" placeholder="如：某某跟拍工作室" value="{{supplierProfile.teamName}}" data-k="teamName" bindinput="onSupplierField" />
@@ -217,21 +240,27 @@
       <text class="form-label">接云剪任务</text>
       <switch checked="{{supplierProfile.acceptsIce}}" color="#6366f1" data-k="acceptsIce" bindchange="onSupplierSwitch" />
     </view>
+    <view class="env-save-row">
+      <button class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="team" bindtap="onSubmit">保存</button>
+    </view>
+    </view>
   </view>
 
-  <view class="card apply-form platform-card" wx:for="{{platformSections}}" wx:key="id" wx:if="{{!isSupplier}}">
+  <view class="card apply-form platform-card env {{item.expanded ? 'env--open' : 'env--shut'}}" wx:for="{{platformSections}}" wx:key="id" wx:if="{{!isSupplier}}">
+    <view class="env-flap">
+      <image class="env-flap-logo" src="{{item.icon}}" mode="aspectFit" />
+    </view>
     <view class="platform-card-head">
       <image class="platform-card-icon" src="{{item.icon}}" mode="aspectFit" />
       <text class="platform-card-title">{{item.name}}</text>
       <view class="platform-card-actions">
         <view
-          wx:if="{{item.enabled}}"
+          wx:if="{{item.enabled && !item.expanded}}"
           class="platform-detail-btn"
           data-id="{{item.id}}"
-          catchtap="onTogglePlatformDetail"
+          catchtap="onOpenPlatform"
         >
-          <text>{{item.expanded ? '收起' : '查看详情'}}</text>
-          <text class="platform-detail-arrow {{item.expanded ? 'platform-detail-arrow--up' : ''}}">›</text>
+          <text>修改</text>
         </view>
         <switch
           class="platform-card-switch"
@@ -255,7 +284,7 @@
       >{{tagName}}</text>
     </view>
 
-    <block wx:if="{{item.enabled && item.expanded}}">
+    <view class="env-sheet" wx:if="{{item.enabled}}">
       <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
       <view class="form-row">
         <text class="form-label">{{item.labels.profileLink}} *</text>
@@ -401,7 +430,10 @@
           </view>
         </view>
       </view>
-    </block>
+      <view class="env-save-row">
+        <button class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="platform" data-id="{{item.id}}" bindtap="onSubmit">保存</button>
+      </view>
+    </view>
   </view>
 
   <view class="card submit-wrap">

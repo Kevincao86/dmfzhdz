@@ -473,3 +473,126 @@ button.cred-edit-btn[size='mini'] {
   text-align: center !important;
   font-size: 24rpx !important;
 }
+
+.env {
+  perspective: 900px;
+}
+
+.env-flap {
+  height: 22rpx;
+  margin: 0 48rpx 8rpx;
+  background: #ead9c2;
+  border-radius: 0 0 46% 46%;
+  transform-origin: top center;
+  transition: transform 0.46s cubic-bezier(0.22, 0.82, 0.24, 1);
+  position: relative;
+}
+
+.env--open .env-flap {
+  transform: rotateX(175deg);
+}
+
+.env-flap-logo {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 44rpx;
+  height: 44rpx;
+  margin-left: -22rpx;
+  margin-top: -18rpx;
+  border-radius: 12rpx;
+  background: #fff;
+}
+
+.env .section-head {
+  margin-bottom: 0;
+}
+
+.env-btn {
+  margin: 0 0 0 auto;
+  padding: 0 28rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 2rpx solid #ddd6fe;
+  border-radius: 999rpx;
+}
+
+.env-btn--save {
+  margin-left: 0;
+  color: #fff;
+  background: #7c3aed;
+  border-color: #7c3aed;
+}
+
+.env-btn--save::after {
+  border: none;
+}
+
+.env-sum {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #78716c;
+  line-height: 1.4;
+}
+
+.env-sheet {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-12rpx);
+  transition: max-height 0.5s cubic-bezier(0.22, 0.82, 0.24, 1), opacity 0.35s ease, transform 0.45s cubic-bezier(0.22, 0.82, 0.24, 1);
+  pointer-events: none;
+}
+
+.env--open .env-sheet {
+  max-height: 3600rpx;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.env-save-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16rpx;
+}
+
+.paper-page .cred-modal-mask {
+  display: none;
+}
+
+.paper-page .cred-modal {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  width: auto;
+  margin: 0 24rpx 24rpx;
+  transform-origin: top center;
+  animation: env-unfold 0.46s cubic-bezier(0.22, 0.82, 0.24, 1);
+}
+
+@keyframes env-unfold {
+  from {
+    transform: rotateX(-72deg);
+    opacity: 0.35;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .env-flap,
+  .env-sheet,
+  .paper-page .cred-modal {
+    transition: none;
+    animation: none;
+  }
+}

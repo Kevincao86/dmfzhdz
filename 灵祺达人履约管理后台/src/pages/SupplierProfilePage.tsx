@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ProfileEnvelope } from './TalentProfilePage'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
 import { useProtectedForm } from '../hooks/useProtectedForm'
@@ -54,6 +55,8 @@ export default function SupplierProfilePage() {
   })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [openContact, setOpenContact] = useState(false)
+  const [openTeam, setOpenTeam] = useState(false)
   const { lockForm, unlockForm, fieldFocusProps, lockedRef: formLockedRef } = useProtectedForm()
   const focus = fieldFocusProps()
 
@@ -103,11 +106,34 @@ export default function SupplierProfilePage() {
     patchSp({ [field]: cur })
   }
 
-  async function onSave() {
-    const err = validateSupplierProfile(workId, sp, member)
-    if (err) {
-      setMsg(err)
-      return
+  async function onSave(section: 'all' | 'contact' | 'team' = 'all') {
+    if (section === 'contact') {
+      if (!String(member.wxNickName || '').trim()) {
+        setMsg('请填写昵称')
+        return
+      }
+      if (!String(member.contact || '').trim()) {
+        setMsg('请填写联系电话')
+        return
+      }
+      if (!String(member.wechatId || '').trim()) {
+        setMsg('请填写微信号')
+        return
+      }
+      if (!String(member.alipayAccount || '').trim()) {
+        setMsg('请填写支付宝账号')
+        return
+      }
+      if (!String(member.province || '').trim() || !String(member.city || '').trim()) {
+        setMsg('请选择省市')
+        return
+      }
+    } else {
+      const err = validateSupplierProfile(workId, sp, member)
+      if (err) {
+        setMsg(err)
+        return
+      }
     }
     setSaving(true)
     setMsg('')
@@ -137,8 +163,12 @@ export default function SupplierProfilePage() {
       writeMember(saved as never)
       noteOwnedWorkIdentity(workId)
       unlockForm()
+      if (section === 'contact') setOpenContact(false)
+      if (section === 'team') setOpenTeam(false)
       setMsg('已保存并同步云端')
     } catch (e) {
+      if (section === 'contact') setOpenContact(false)
+      if (section === 'team') setOpenTeam(false)
       setMsg(`已保存本机；云端同步失败：${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setSaving(false)
@@ -195,7 +225,14 @@ export default function SupplierProfilePage() {
       </div>
       {teamId ? <p className="text-sm text-amber-500 font-mono">{teamId}</p> : null}
 
-      <section className="pub-form-card space-y-3 text-sm">
+      <ProfileEnvelope
+        title="联系信息"
+        summary={`${member.wxNickName || '未填写昵称'}${member.city ? ` · ${member.city}` : ''}`}
+        open={openContact}
+        saving={saving}
+        onEdit={() => setOpenContact(true)}
+        onSave={() => void onSave('contact')}
+      >
         <label className="block">
           <span className="text-slate-400">昵称 *</span>
           <input
@@ -206,18 +243,6 @@ export default function SupplierProfilePage() {
             onChange={(e) => patchMember({ wxNickName: e.target.value })}
             placeholder="用于登录与身份展示"
           />
-        </label>
-        <label className="block">
-          <span className="text-slate-400">团队名称 *</span>
-          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.teamName} onFocus={focus.onFocus} onChange={(e) => patchSp({ teamName: e.target.value })} />
-        </label>
-        <label className="block">
-          <span className="text-slate-400">主体类型</span>
-          <select className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.entityType} onFocus={focus.onFocus} onChange={(e) => patchSp({ entityType: e.target.value })}>
-            {ENTITY_TYPES.map((e) => (
-              <option key={e.id} value={e.id}>{e.label}</option>
-            ))}
-          </select>
         </label>
         <label className="block">
           <span className="text-slate-400">联系电话 *</span>
@@ -232,6 +257,28 @@ export default function SupplierProfilePage() {
           <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={member.alipayAccount || ''} onFocus={focus.onFocus} onChange={(e) => patchMember({ alipayAccount: e.target.value })} />
         </label>
         <RegionSelect province={member.province || ''} city={member.city || ''} onChange={(province, city) => patchMember({ province, city })} />
+      </ProfileEnvelope>
+
+      <ProfileEnvelope
+        title="团队基本信息"
+        summary={sp.teamName || '未填写团队'}
+        open={openTeam}
+        saving={saving}
+        onEdit={() => setOpenTeam(true)}
+        onSave={() => void onSave('team')}
+      >
+        <label className="block">
+          <span className="text-slate-400">团队名称 *</span>
+          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.teamName} onFocus={focus.onFocus} onChange={(e) => patchSp({ teamName: e.target.value })} />
+        </label>
+        <label className="block">
+          <span className="text-slate-400">主体类型</span>
+          <select className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.entityType} onFocus={focus.onFocus} onChange={(e) => patchSp({ entityType: e.target.value })}>
+            {ENTITY_TYPES.map((e) => (
+              <option key={e.id} value={e.id}>{e.label}</option>
+            ))}
+          </select>
+        </label>
         <div>
           <span className="text-slate-400">擅长品类 *</span>
           <div className="flex flex-wrap gap-2 mt-2">
@@ -291,7 +338,7 @@ export default function SupplierProfilePage() {
           <span className="text-slate-400">作品集链接 *</span>
           <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.portfolioLink} onFocus={focus.onFocus} onChange={(e) => patchSp({ portfolioLink: e.target.value })} />
         </label>
-      </section>
+      </ProfileEnvelope>
 
       {msg ? <p className="text-sm text-amber-400">{msg}</p> : null}
       <button type="button" disabled={saving} className="px-6 py-2.5 rounded-lg bg-violet-600 font-medium disabled:opacity-50" onClick={() => void onSave()}>

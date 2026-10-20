@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
 import { useProtectedForm } from '../hooks/useProtectedForm'
@@ -21,6 +21,83 @@ import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
 import { validateRegion } from '../lib/mpSync/regionPicker'
 import { uploadContentImage } from '../lib/mpContentUpload'
 import { readWxAccount, writeWxAccount } from '../lib/mpSync/wxAccount'
+
+const PLATFORM_LOGO: Record<string, string> = {
+  douyin: '/platforms/douyin.png',
+  xiaohongshu: '/platforms/xiaohongshu.png',
+  kuaishou: '/platforms/kuaishou-local.png',
+  dianping: '/platforms/dianping.png',
+  weixin_video: '/platforms/wechat.png',
+}
+
+export function ProfileEnvelope({
+  title,
+  summary,
+  logo,
+  open,
+  saving,
+  onEdit,
+  onSave,
+  children,
+}: {
+  title: string
+  summary: string
+  logo?: string
+  open: boolean
+  saving?: boolean
+  onEdit: () => void
+  onSave: () => void
+  children: ReactNode
+}) {
+  return (
+    <section className="relative [perspective:900px]">
+      <div
+        className={`pointer-events-none relative mx-8 h-4 origin-top rounded-b-[46%] bg-[#ead9c2] transition-transform duration-500 ease-[cubic-bezier(0.22,0.82,0.24,1)] motion-reduce:transition-none ${open ? '[transform:rotateX(175deg)]' : ''}`}
+      >
+        {logo ? (
+          <img
+            src={logo}
+            alt=""
+            className="absolute left-1/2 top-0 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white object-contain shadow"
+          />
+        ) : null}
+      </div>
+      <div className="relative z-[1] -mt-1 rounded-2xl border border-[#eadcc8] bg-[#fbf7f1] px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          {logo ? <img src={logo} alt="" className="h-9 w-9 rounded-xl bg-white object-contain" /> : null}
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-stone-900">{title}</div>
+            {!open ? <div className="truncate text-xs text-stone-500">{summary || '未填写'}</div> : null}
+          </div>
+          {!open ? (
+            <button type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={onEdit}>
+              修改
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.22,0.82,0.24,1)] motion-reduce:transition-none ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+      >
+        <div className={open ? 'overflow-hidden' : 'pointer-events-none overflow-hidden'}>
+          <div className="space-y-3 rounded-b-2xl border border-t-0 border-[#eadcc8] bg-white px-4 py-3 text-sm">
+            {children}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={saving}
+                className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                onClick={onSave}
+              >
+                {saving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
 
 function memberFromStorage(): TalentMember | null {
   const prev = readMember()
@@ -65,6 +142,10 @@ function TalentProfileForm() {
   const acc = getAccount()
   const [member, setMember] = useState<TalentMember>(initialMember)
   const [activePlatform, setActivePlatform] = useState('douyin')
+  const [openWx, setOpenWx] = useState(false)
+  const [openContact, setOpenContact] = useState(false)
+  const [openLogin, setOpenLogin] = useState(false)
+  const [openPlat, setOpenPlat] = useState<Record<string, boolean>>({})
   const [loginName, setLoginName] = useState(acc?.loginName || '')
   const [password, setPassword] = useState('')
   const [hasPassword, setHasPassword] = useState(!!acc?.hasPassword)
@@ -192,39 +273,89 @@ function TalentProfileForm() {
     }
   }
 
-  async function onSave() {
-    const enabled = TALENT_PLATFORMS.filter((p) => member.platformProfiles[p.id]?.enabled)
-    if (!enabled.length) {
-      setMsg('请至少启用并填写一个平台资料')
-      return
+  function closeSavedSection(section: 'all' | 'wx' | 'contact' | 'login' | 'platform', platformId?: string) {
+    if (section === 'wx') setOpenWx(false)
+    if (section === 'contact') setOpenContact(false)
+    if (section === 'login') setOpenLogin(false)
+    if (section === 'platform' && platformId) {
+      setOpenPlat((s) => ({ ...s, [platformId]: false }))
     }
-    for (const p of enabled) {
-      const prf = member.platformProfiles[p.id]
-      const err = validatePlatformProfile(prf, labels(p.name))
-      if (err) {
-        setMsg(`${p.name}：${err}`)
-        setActivePlatform(p.id)
+  }
+
+  async function onSave(section: 'all' | 'wx' | 'contact' | 'login' | 'platform' = 'all', platformId?: string) {
+    if (section === 'wx') {
+      if (!String(member.wxNickName || '').trim()) {
+        setMsg('请填写昵称')
         return
       }
-    }
-    const contactErr = validateBasicContactFields({
-      wxNickName: member.wxNickName,
-      contact: member.contact,
-      wechatId: member.wechatId,
-    })
-    if (contactErr) {
-      setMsg(contactErr)
-      return
-    }
-    const gender = String(member.gender || '').trim()
-    if (gender !== '男' && gender !== '女') {
-      setMsg('请选择性别')
-      return
-    }
-    const regionErr = validateRegion(member.province || '', member.city || '')
-    if (regionErr) {
-      setMsg(regionErr)
-      return
+    } else if (section === 'contact') {
+      if (!String(member.contact || '').trim()) {
+        setMsg('请填写联系电话')
+        return
+      }
+      if (!String(member.wechatId || '').trim()) {
+        setMsg('请填写微信号')
+        return
+      }
+      const gender = String(member.gender || '').trim()
+      if (gender !== '男' && gender !== '女') {
+        setMsg('请选择性别')
+        return
+      }
+      const regionErr = validateRegion(member.province || '', member.city || '')
+      if (regionErr) {
+        setMsg(regionErr)
+        return
+      }
+    } else if (section === 'platform') {
+      const p = TALENT_PLATFORMS.find((x) => x.id === platformId)
+      if (!p) {
+        setMsg('请选择平台')
+        return
+      }
+      const prf = member.platformProfiles[p.id]
+      if (prf?.enabled) {
+        const err = validatePlatformProfile(prf, labels(p.name))
+        if (err) {
+          setMsg(`${p.name}：${err}`)
+          return
+        }
+      }
+    } else if (section === 'all') {
+      const enabled = TALENT_PLATFORMS.filter((p) => member.platformProfiles[p.id]?.enabled)
+      if (!enabled.length) {
+        setMsg('请至少启用并填写一个平台资料')
+        return
+      }
+      for (const p of enabled) {
+        const prf = member.platformProfiles[p.id]
+        const err = validatePlatformProfile(prf, labels(p.name))
+        if (err) {
+          setMsg(`${p.name}：${err}`)
+          setActivePlatform(p.id)
+          setOpenPlat((s) => ({ ...s, [p.id]: true }))
+          return
+        }
+      }
+      const contactErr = validateBasicContactFields({
+        wxNickName: member.wxNickName,
+        contact: member.contact,
+        wechatId: member.wechatId,
+      })
+      if (contactErr) {
+        setMsg(contactErr)
+        return
+      }
+      const gender = String(member.gender || '').trim()
+      if (gender !== '男' && gender !== '女') {
+        setMsg('请选择性别')
+        return
+      }
+      const regionErr = validateRegion(member.province || '', member.city || '')
+      if (regionErr) {
+        setMsg(regionErr)
+        return
+      }
     }
     setSaving(true)
     setMsg('')
@@ -239,7 +370,7 @@ function TalentProfileForm() {
     }
     writeMember(saved)
     let credWarn = ''
-    if (getToken() && loginName.trim()) {
+    if ((section === 'all' || section === 'login') && getToken() && loginName.trim()) {
       try {
         const { account } = await setLoginCredentials(loginName.trim(), password)
         persistAccount(account)
@@ -261,8 +392,10 @@ function TalentProfileForm() {
       noteOwnedWorkIdentity('talent')
       unlockForm()
       remoteHydratedRef.current = false
+      closeSavedSection(section, platformId)
       setMsg(credWarn ? `${credWarn}；资料已同步云端` : '已保存并同步云端')
     } catch (e) {
+      closeSavedSection(section, platformId)
       setMsg(
         credWarn
           ? `${credWarn}；资料已保存本机；云端同步失败：${e instanceof Error ? e.message : String(e)}`
@@ -329,7 +462,14 @@ function TalentProfileForm() {
         <p className="text-sm text-slate-400">达人 ID：{member.lingqiTalentId}</p>
       ) : null}
 
-      <section className="pub-form-card space-y-3 text-sm">
+      <ProfileEnvelope
+        title="修改密码"
+        summary={hasPassword ? '账号密码已设置' : '未设置登录密码'}
+        open={openLogin}
+        saving={saving}
+        onEdit={() => setOpenLogin(true)}
+        onSave={() => void onSave('login')}
+      >
         <p className="text-slate-400 text-xs">登录账号（选填）— 设置后可用账号密码登录，与微信绑定同一灵祺 ID</p>
         <label className="block">
           <span className="text-slate-400">手机号</span>
@@ -358,9 +498,16 @@ function TalentProfileForm() {
             placeholder={hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}
           />
         </label>
-      </section>
+      </ProfileEnvelope>
 
-      <section className="pub-form-card space-y-3 text-sm">
+      <ProfileEnvelope
+        title="微信信息"
+        summary={member.wxNickName || '未填写昵称'}
+        open={openWx}
+        saving={saving}
+        onEdit={() => setOpenWx(true)}
+        onSave={() => void onSave('wx')}
+      >
         <label className="block">
           <span className="text-slate-400">昵称 *</span>
           <input
@@ -372,6 +519,16 @@ function TalentProfileForm() {
             placeholder="用于登录与身份展示"
           />
         </label>
+      </ProfileEnvelope>
+
+      <ProfileEnvelope
+        title="联系信息"
+        summary={`${member.contact || '未填写电话'}${member.city ? ` · ${member.city}` : ''}`}
+        open={openContact}
+        saving={saving}
+        onEdit={() => setOpenContact(true)}
+        onSave={() => void onSave('contact')}
+      >
         <label className="block">
           <span className="text-slate-400">联系电话 *</span>
           <input
@@ -430,22 +587,31 @@ function TalentProfileForm() {
           onDefaultFill={onRegionDefaultFill}
           onFocus={lockForm}
         />
-      </section>
+      </ProfileEnvelope>
 
-      <div className="flex flex-wrap gap-2">
-        {TALENT_PLATFORMS.map((p) => (
-          <button
+      {TALENT_PLATFORMS.map((p) => {
+        const row = member.platformProfiles[p.id]
+        const opened = !!openPlat[p.id]
+        return (
+          <ProfileEnvelope
             key={p.id}
-            type="button"
-            className={`px-3 py-1.5 rounded-full text-sm ${activePlatform === p.id ? 'bg-violet-600' : 'bg-white/10'}`}
-            onClick={() => setActivePlatform(p.id)}
+            title={p.name}
+            logo={PLATFORM_LOGO[p.id]}
+            summary={
+              row?.enabled
+                ? `${row.platformNickname || '已启用'}${row.followers ? ` · 粉丝 ${row.followers}` : ''}`
+                : '未启用'
+            }
+            open={opened}
+            saving={saving}
+            onEdit={() => {
+              setActivePlatform(p.id)
+              setOpenPlat({ [p.id]: true })
+            }}
+            onSave={() => void onSave('platform', p.id)}
           >
-            {p.name}
-          </button>
-        ))}
-      </div>
-
-      <section className="pub-form-card space-y-3 text-sm">
+            {opened && p.id === activePlatform ? (
+              <>
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -668,7 +834,11 @@ function TalentProfileForm() {
             })}
           </div>
         </div>
-      </section>
+              </>
+            ) : null}
+          </ProfileEnvelope>
+        )
+      })}
 
       {msg ? <p className="text-sm text-amber-400">{msg}</p> : null}
       <button
