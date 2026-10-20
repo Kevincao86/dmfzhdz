@@ -154,11 +154,11 @@ export function ProfileEnvelope({
       `}</style>
       {open ? (
         <div ref={layerRef} className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <div className="relative w-full min-w-0 max-w-lg" onClick={(e) => e.stopPropagation()}>
             {logo ? <img className="lq-env-pop-logo" src={logo} alt="" /> : null}
             <div className="lq-env-letter text-sm">
             <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
-            <fieldset disabled={!!readOnly} className={readOnly ? 'lq-env-view m-0 min-w-0 border-0 p-0' : 'm-0 min-w-0 border-0 p-0'}>
+            <fieldset disabled={!!readOnly} className={readOnly ? 'lq-env-view m-0 w-full min-w-0 border-0 p-0' : 'm-0 w-full min-w-0 border-0 p-0'}>
               <div className="space-y-3">{children}</div>
             </fieldset>
             <div className="mt-4 flex justify-end gap-2">
