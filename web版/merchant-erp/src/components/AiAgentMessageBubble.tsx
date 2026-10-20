@@ -271,7 +271,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
               note={m.talentRoster.note}
               seenIds={m.talentRoster.seenIds}
               seenNames={m.talentRoster.seenNames}
-              onCardsChange={(cards, seen) => patchTalentRoster(m.id, cards, seen)}
+              onCardsChange={(cards, seen, note) => patchTalentRoster(m.id, cards, seen, note)}
             />
           ) : null}
         </div>

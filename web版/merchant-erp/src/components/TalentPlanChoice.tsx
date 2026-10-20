@@ -12,11 +12,14 @@ import {
   citedFollowerCount,
   citedProfileUrls,
   displayTalentProfileLink,
+  fillExploreTalentSeeds,
   formatFollowerCount,
   isBrandPublicAccount,
   nicknamesConfirmedExplore,
   publicTalentJumpLink,
   searchConfirmsExploreCreator,
+  talentCardFromPublicSeed,
+  talentRosterNote,
   talentCardMatchesCloseWords,
   talentCloseWords,
   type TalentPlanCard,
@@ -670,12 +673,11 @@ export function TalentChatRoster({
   note: string
   seenIds?: string[]
   seenNames?: string[]
-  onCardsChange: (cards: TalentPlanCard[], seen: { ids: string[]; names: string[] }) => void
+  onCardsChange: (cards: TalentPlanCard[], seen: { ids: string[]; names: string[] }, note?: string) => void
 }) {
   const [replacingId, setReplacingId] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [checking, setChecking] = useState(false)
-  const [hideNote, setHideNote] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<RosterNotice | null>(null)
   const seenIdSet = useRef(
@@ -723,7 +725,6 @@ export function TalentChatRoster({
         return [{ ...card, exploreVerified: true }]
       })
       setChecking(false)
-      if (next.length < current.length) setHideNote(true)
       const changed =
         next.length !== current.length ||
         next.some((card, index) => card.exploreVerified !== current[index]?.exploreVerified)
@@ -747,45 +748,27 @@ export function TalentChatRoster({
     setChecking(true)
     void (async () => {
       try {
-      const people = await fetchPublicTalentsUntil({
-        city,
-        talentType: talentType || '本地生活',
-        platform: '抖音',
-        count: wanted - current.length,
-        skipNames: current.map((card) => card.nickname),
-      })
-      if (cancelled) return
-      const latest = cardsRef.current
-      const have = new Set(latest.map((card) => card.nickname))
-      const extra = people.filter((person) => person.nickname && !have.has(person.nickname))
-      if (!extra.length) return
-      const base: TalentPlanCard = {
-        seatId: 'public-fill',
-        talentId: '',
-        nickname: '',
-        city,
-        platform: '抖音',
-        followers: 0,
-        level: '',
-        quoteYuan: null,
-        tags: [],
-        avatarUrl: '',
-        profileLink: '',
-        tierLabel: '公网',
-        unitBudgetYuan: 0,
-        talentType: talentType || '本地生活',
-        source: 'public',
-        reason: '',
-      }
-      const next = [
-        ...latest,
-        ...extra.map((person, index) => ({
-          ...publicCard(person, base, city, '抖音'),
-          seatId: `public-fill-${index + 1}`,
-        })),
-      ]
-      setHideNote(true)
-      onCardsChangeRef.current(next, { ids: [...seenIdSet.current], names: [...seenNameSet.current] })
+        const seeds = await fillExploreTalentSeeds({
+          city,
+          industry: talentType || '本地生活',
+          gap: wanted - current.length,
+          skipNames: current.map((card) => card.nickname),
+        })
+        if (cancelled) return
+        const latest = cardsRef.current
+        const have = new Set(latest.map((card) => card.nickname))
+        const extra = seeds.filter((seed) => seed.nickname && !have.has(seed.nickname))
+        if (!extra.length) return
+        const next = [
+          ...latest,
+          ...extra.map((seed, index) => talentCardFromPublicSeed(seed, `public-fill-${index + 1}`, talentType || '本地生活')),
+        ]
+        const libraryCount = next.filter((card) => card.source !== 'public').length
+        onCardsChangeRef.current(
+          next,
+          { ids: [...seenIdSet.current], names: [...seenNameSet.current] },
+          talentRosterNote(wanted, libraryCount, next.length - libraryCount),
+        )
       } finally {
         if (!cancelled) setChecking(false)
       }
@@ -938,8 +921,7 @@ export function TalentChatRoster({
           {publishing ? '正在发布…' : '定向招募'}
         </button>
       </div>
-      {note && !hideNote && shown.length === cards.length ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
-      {checking ? <p className="mt-1 text-xs text-slate-500">正在逐个检索这些达人是不是本地生活探店账号…</p> : null}
+      {checking ? <p className="mt-1 text-xs text-slate-500">正在按方案人数继续检索探店达人…</p> : null}
       {error ? <p className="mt-2 text-xs text-amber-700">{error}</p> : null}
       <ul className="mt-3 space-y-2">
         {shown.map((card) => (

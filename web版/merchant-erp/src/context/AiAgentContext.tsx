@@ -118,11 +118,9 @@ import {
 import { allCitiesFlat } from '../lib/chinaRegion'
 import { extractTalentPlanHeadcount } from '../lib/aiAgentRecruitmentParse'
 import {
-  citedFollowerCount,
-  citedProfileUrls,
-  isBrandPublicAccount,
-  nicknamesConfirmedExplore,
-  publicTalentJumpLink,
+  fillExploreTalentSeeds,
+  talentCardFromPublicSeed,
+  talentRosterNote,
   talentCardMatchesCloseWords,
   talentCloseWords,
   type TalentPlanCard,
@@ -499,6 +497,7 @@ type AiAgentContextValue = {
     messageId: string,
     cards: TalentPlanCard[],
     seen?: { ids: string[]; names: string[] },
+    note?: string,
   ) => void
   /** 有用户发言后的侧边栏：历史对话快照，最多 10 条 */
   archivedSessions: AiAgentArchivedSession[]
@@ -643,67 +642,8 @@ function talentHeadcountFromDialogue(userText: string, priorText: string, quoted
   return 5
 }
 
-function talentPlanClause(text: string): string {
-  const flat = text.replace(/\s+/g, ' ')
-  const matched = flat.match(/(?:邀请|招募|安排)\s*\d{1,2}\s*位[^。\n]{0,180}/)
-  return matched ? matched[0].slice(0, 220) : ''
-}
-
 /** 本轮推荐卡片。界面直接渲染，不让模型把主页和头像写成文字。 */
 let pendingTalentRoster: AiTalentRoster | null = null
-
-function searchFooters(text: string): { body: string; footer: string } {
-  const marks = ['【检索到的主页】', '【检索摘录】']
-  let cut = text.length
-  for (const mark of marks) {
-    const index = text.indexOf(mark)
-    if (index >= 0 && index < cut) cut = index
-  }
-  if (cut === text.length) return { body: text, footer: '' }
-  return { body: text.slice(0, cut), footer: text.slice(cut) }
-}
-
-function cardsFromPublicText(text: string, city: string, talentType: string): TalentPlanCard[] {
-  const cited = citedProfileUrls(text)
-  const out: TalentPlanCard[] = []
-  const seen = new Set<string>()
-  for (const line of searchFooters(text).body.split(/\n+/)) {
-    const row = line.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim()
-    if (!row || /暂无|不拉公网|库内已凑满|没有返回/.test(row)) continue
-    const parts = row.split(/[|｜]/).map((part) => part.trim()).filter(Boolean)
-    if (parts.length < 2) continue
-    const nickname = parts[0]!.replace(/^昵称[:：]/, '').slice(0, 24)
-    if (nickname.length < 2 || seen.has(nickname) || /^达人$|^公网$|^检索$/.test(nickname)) continue
-    const url = (row.match(/https?:\/\/[^\s|｜)）]+/) || [])[0] || ''
-    const profileLink = publicTalentJumpLink(nickname, url, cited)
-    const profileVerified = Boolean(profileLink) && !/\/search\//.test(profileLink)
-    const direction = parts.find((part, index) => index >= 3 && !/^https?:/.test(part) && part !== '无') || ''
-    const followers = citedFollowerCount(nickname, text)
-    if (isBrandPublicAccount(nickname, direction)) continue
-    seen.add(nickname)
-    out.push({
-      seatId: `public-${out.length + 1}`,
-      talentId: `public:${nickname}`,
-      nickname,
-      city: parts[1] || city,
-      platform: '抖音',
-      followers,
-      followersVerified: followers > 0,
-      level: '',
-      quoteYuan: null,
-      tags: [],
-      avatarUrl: '',
-      profileLink,
-      profileVerified,
-      tierLabel: '公网',
-      unitBudgetYuan: 0,
-      talentType: direction || talentType,
-      source: 'public',
-      reason: direction ? `公网 · ${direction}` : '公网补位',
-    })
-  }
-  return out
-}
 
 function rosterIntro(roster: AiTalentRoster): string {
   return roster.note
@@ -754,71 +694,6 @@ function pickLibraryForPlan(cards: TalentPlanCard[], headcount: number, planText
   return picked
 }
 
-function publicGapNote(planText: string, picked: TalentPlanCard[], headcount: number): string {
-  const quotas = planFanQuotas(planText)
-  if (!quotas) return `还差 ${Math.max(0, headcount - picked.length)} 位，须符合方案里的城市和类目。`
-  const haveHead = picked.filter((card) => followerBand(card.followers) === 'head').length
-  const haveWaist = picked.length - haveHead
-  const needHead = Math.max(0, quotas.head - haveHead)
-  const needWaist = Math.max(0, quotas.waist - haveWaist)
-  return `还差头部 ${needHead} 位、腰部 ${needWaist} 位。头部约 10 万粉，腰部为千粉到万粉。类目和城市必须与方案一致。`
-}
-
-/** 模型自己写的主页一律丢掉，只留【检索到的主页】里出现过的链接。 */
-function keepRealProfileUrls(text: string): string {
-  const cited = new Set(citedProfileUrls(text).map((url) => url.replace(/\/+$/, '')))
-  const { body, footer } = searchFooters(text)
-  const kept = body.replace(/https?:\/\/[^\s|｜)）]+/g, (url) => {
-    const cleaned = url.replace(/[)），。]+$/, '').replace(/\/+$/, '')
-    return cited.has(cleaned) ? url : '无'
-  })
-  return `${kept}${footer}`
-}
-
-async function fetchDoubaoPublicTalents(
-  city: string,
-  industry: string,
-  storeName: string,
-  count: number,
-  planClause: string,
-): Promise<string> {
-  const region = city || '已绑定门店所在城市'
-  const need = industry || '本地生活到店'
-  const want = Math.min(TALENT_HEADCOUNT_CAP, Math.max(1, count))
-  const ac = new AbortController()
-  const timer = setTimeout(() => ac.abort(), 35000)
-  try {
-    const data = await postAiChat(
-      {
-        provider: 'doubao',
-        stream: false,
-        temperature: 0,
-        webSearch: true,
-        messages: [
-          {
-            role: 'system',
-            content: `你是豆包公网达人检索。只补星选达人库不够的名额。这一轮必须写出 ${want} 行，一行一位，不能少，也不要把人数改成 3 或 5。区域只限「${region}」。先找本地生活探店达人，昵称里不必出现「探店」。不要品牌官方号、旗舰店、专卖店、门店自己的号、企业号。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。内容方向写检索到的实际内容，不要为了过关改成探店。粉丝一栏一律写无，不要自己估算。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
-          },
-          {
-            role: 'user',
-            content: `门店：${storeName || '未命名'}。经营要求：${need}。请检索${region}、内容方向符合方案的达人，列出 ${want} 位，并带上能打开的主页。`,
-          },
-        ],
-      },
-      { signal: ac.signal },
-    )
-    const text = keepRealProfileUrls(String(data.content || '').trim())
-    const cap = Math.min(4200, Math.max(1200, want * 380))
-    const { body, footer } = searchFooters(text)
-    const clipped = body.slice(0, cap).trim()
-    return clipped ? `${clipped}${footer}` : '公网暂无符合条件的达人。'
-  } catch {
-    return '豆包公网本次没有返回可用名单。'
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
 async function appendTalentRecommendBlock(
   base: string,
   userText?: string,
@@ -835,60 +710,19 @@ async function appendTalentRecommendBlock(
   }
 }
 
-/** 公网一轮往往只过几位。没补满方案人数就换一批继续检索，连续两轮没有新增才停。 */
 async function fillPublicExploreCards(opts: {
   city: string
   talentType: string
-  storeName: string
   gap: number
-  planText: string
-  libraryCards: TalentPlanCard[]
-  planClause: string
   skipNames: string[]
 }): Promise<TalentPlanCard[]> {
-  if (opts.gap <= 0) return []
-  const kept: TalentPlanCard[] = []
-  const seen = new Set(opts.skipNames.filter(Boolean))
-  let dry = 0
-  for (let round = 0; round < 4 && kept.length < opts.gap; round += 1) {
-    const left = opts.gap - kept.length
-    const ask = Math.min(TALENT_HEADCOUNT_CAP, Math.max(left, Math.min(12, left + 4)))
-    const skip = [...seen].slice(0, 40)
-    const publicText = await fetchDoubaoPublicTalents(
-      opts.city,
-      opts.talentType,
-      opts.storeName,
-      ask,
-      `${opts.planClause}${opts.planClause ? '。' : ''}${publicGapNote(opts.planText, opts.libraryCards, opts.gap + opts.libraryCards.length)}${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
-    )
-    const parsed = cardsFromPublicText(publicText, opts.city, opts.talentType).filter(
-      (card) => card.nickname && !seen.has(card.nickname),
-    )
-    if (!parsed.length) {
-      dry += 1
-      if (dry >= 2) break
-      continue
-    }
-    for (const card of parsed) seen.add(card.nickname)
-    const confirmed = await nicknamesConfirmedExplore(
-      parsed.map((card) => card.nickname),
-      opts.city,
-    )
-    let added = 0
-    for (const card of parsed) {
-      if (kept.length >= opts.gap) break
-      if (!confirmed.has(card.nickname)) continue
-      kept.push({ ...card, exploreVerified: true })
-      added += 1
-    }
-    if (added === 0) {
-      dry += 1
-      if (dry >= 2) break
-    } else {
-      dry = 0
-    }
-  }
-  return kept
+  const seeds = await fillExploreTalentSeeds({
+    city: opts.city,
+    industry: opts.talentType,
+    gap: opts.gap,
+    skipNames: opts.skipNames,
+  })
+  return seeds.map((seed, index) => talentCardFromPublicSeed(seed, `public-${index + 1}`, opts.talentType))
 }
 
 async function loadTalentRecommendBlock(userText: string, priorText = '', quotedFull = ''): Promise<string> {
@@ -908,7 +742,6 @@ async function loadTalentRecommendBlock(userText: string, priorText = '', quoted
   const planText = [quotedFull, priorText, userText].filter(Boolean).join('\n')
   const closeWords = talentCloseWords(industry)
   const headcount = talentHeadcountFromDialogue(userText, priorText, quotedFull)
-  const planClause = talentPlanClause(planText)
   const talentType = industry || '本地生活到店'
   const library = await requestTalentPlanRecommend({
     city,
@@ -928,21 +761,11 @@ async function loadTalentRecommendBlock(userText: string, priorText = '', quoted
   const publicCards = await fillPublicExploreCards({
     city,
     talentType,
-    storeName,
     gap,
-    planText,
-    libraryCards: picked,
-    planClause,
     skipNames: picked.map((card) => card.nickname).filter(Boolean),
   })
   const cards = [...picked, ...publicCards]
-  const asked = `方案要 ${headcount} 位。`
-  const note =
-    publicCards.length > 0
-      ? `${asked}星选库接近要求的有 ${picked.length} 位，公网补了 ${publicCards.length} 位。`
-      : gap > 0
-        ? `${asked}星选库接近要求的有 ${picked.length} 位。公网这次没有补到更多同城达人。`
-        : `${asked}星选库已按门店类目配满 ${picked.length} 位。`
+  const note = talentRosterNote(headcount, picked.length, publicCards.length)
   pendingTalentRoster = cards.length
     ? {
         cards,
@@ -1307,15 +1130,17 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const patchTalentRoster = useCallback(
-    (messageId: string, cards: TalentPlanCard[], seen?: { ids: string[]; names: string[] }) => {
+    (messageId: string, cards: TalentPlanCard[], seen?: { ids: string[]; names: string[] }, note?: string) => {
       setMessages((prev) => {
         const next = prev.map((m) =>
           m.id === messageId && m.talentRoster
             ? {
                 ...m,
+                content: note || m.content,
                 talentRoster: {
                   ...m.talentRoster,
                   cards,
+                  ...(note ? { note } : {}),
                   ...(seen ? { seenIds: seen.ids, seenNames: seen.names } : {}),
                 },
               }

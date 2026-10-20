@@ -3780,7 +3780,7 @@ async function runPublicWebSearch(query: string): Promise<string> {
       if (/牛仔裤|羊毛大衣|搜狗搜索|高级搜索|汉语词语|近义词/.test(line)) continue
       const compact = line.replace(/\s+/g, '')
       if (!lines.includes(compact)) lines.push(compact)
-      if (lines.length >= 6) break
+      if (lines.length >= 12) break
     }
     const body = lines.length ? lines.map((line, index) => `${index + 1}. ${line}`).join('\n') : '这一条检索没有公开结果'
     return appendCitedProfiles(body, profileUrlsInHtml(html))
@@ -3790,11 +3790,15 @@ async function runPublicWebSearch(query: string): Promise<string> {
 }
 
 function webSearchQueries(user: string) {
+  const explicit = [...user.matchAll(/搜索：([^。\n；;]+)/g)]
+    .map((item) => item[1]?.replace(/请列出.*$/, '').replace(/只列出.*$/, '').trim() || '')
+    .filter((query) => query.length >= 2)
+  if (explicit.length) return [...new Set(explicit)].slice(0, 2)
   const name = (user.match(/店名：([^\n]+)/) || [])[1]?.trim() || ''
   const city = ((user.match(/城市：([^\n]+)/) || [])[1] || '').replace(/市$/u, '').trim()
   if (/达人|探店博主/.test(user)) {
     const place = city || searchCore(user)
-    const queries = [`${place} 抖音 探店达人`.trim(), `${place} 抖音 达人 名单`.trim()]
+    const queries = [`${place} 抖音 探店达人`.trim(), `${place} 抖音 本地生活 探店博主`.trim()]
     return queries.filter((query, index) => query.length >= 2 && queries.indexOf(query) === index).slice(0, 2)
   }
   const core = searchCore(name || user)
@@ -3814,7 +3818,6 @@ async function doubaoFunctionWebSearch(
     const block = await runPublicWebSearch(query)
     if (!block || (/没有公开结果|检索没有结果|检索超时|检索词为空/.test(block.split('【检索到的主页】')[0] || '') && !block.includes('【检索到的主页】'))) continue
     blocks.push(block)
-    break
   }
   const notes = blocks.join('\n')
   const cited = (notes.split('【检索到的主页】')[1] || '').match(/https?:\/\/\S+/g) || []
@@ -3826,7 +3829,7 @@ async function doubaoFunctionWebSearch(
   const talentAsk = /达人|探店博主/.test(`${system}\n${user}`)
   const grounded = notes
     ? talentAsk
-      ? `${user}\n\n联网检索结果：\n${notes}\n只根据检索结果列出达人。每行：昵称｜城市｜无｜等级｜内容方向。粉丝不要自己写数字。主页只能原样复制【检索到的主页】里的链接，没有就写无，不要自己编链接。不要编造电话或微信。`
+      ? `${user}\n\n联网检索结果：\n${notes}\n只根据检索结果列出能看出在做探店的达人。不够就少写，禁止凑数。每行：昵称｜城市｜无｜内容方向。粉丝不要自己写数字。主页只能原样复制【检索到的主页】里的链接，没有就写无，不要自己编链接。不要编造电话或微信。`
       : `${user}\n\n联网检索结果：\n${notes}\n只根据这些检索结果回答。有套餐和价格就写出来。`
     : user
   const text = await openAiStyleChat(
@@ -3849,16 +3852,24 @@ export async function callDoubaoWebSearch(
   system: string,
   user: string,
 ): Promise<{ text: string; modelUsed: string }> {
-  const model =
-    [doubaoChatModelId(env), 'doubao-seed-2-0-lite-260215'].find((id) => doubaoWebSearchModel(id)) ||
-    'doubao-seed-2-0-lite-260215'
-  try {
-    const text = await postDoubaoResponsesSearch(apiKey, env, model, system, user, true)
-    return { text, modelUsed: model }
-  } catch {
-    const text = await doubaoFunctionWebSearch(apiKey, env, model, system, user)
-    return { text, modelUsed: model }
+  const models = [
+    ...new Set(
+      [doubaoChatModelId(env), 'doubao-seed-2-0-lite-260215', 'doubao-seed-2-0-lite-260428'].filter((id) =>
+        doubaoWebSearchModel(id),
+      ),
+    ),
+  ]
+  const model = models[0] || 'doubao-seed-2-0-lite-260215'
+  for (const id of models.length ? models : [model]) {
+    try {
+      const text = await postDoubaoResponsesSearch(apiKey, env, id, system, user, true)
+      if (text.trim()) return { text, modelUsed: id }
+    } catch {
+      /* 换下一个已开通的联网模型 */
+    }
   }
+  const text = await doubaoFunctionWebSearch(apiKey, env, model, system, user)
+  return { text, modelUsed: model }
 }
 
 export async function merchantAgentChatFromMessages(

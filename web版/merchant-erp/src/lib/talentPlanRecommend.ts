@@ -175,19 +175,26 @@ export function isBrandPublicAccount(nickname: string, direction = ''): boolean 
   return BRAND_ACCOUNT_RE.test(`${name}${direction}`)
 }
 
-/** 只认豆包这次检索写出的「是｜依据」。昵称里有没有「探店」不算。 */
+/** 只认豆包这次检索写出的探店结论。昵称里有没有「探店」不算。 */
 export function exploreSearchSaysYes(text: string): boolean {
-  const body = String(text || '').split('【检索')[0] || ''
-  const line = body
+  const body = String(text || '').split('【检索')[0].replace(/\*\*/g, '').trim()
+  if (!body) return false
+  const lines = body
     .split(/\n+/)
-    .map((row) => row.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim())
-    .find((row) => /^(是|否)/.test(row))
-  if (!line || !/^是(?:[|｜:：,，\s]|$)/.test(line)) return false
-  const basis = line.replace(/^是[|｜:：,，\s]*/, '').trim()
-  if (basis.length < 8) return false
-  if (/^(本地生活)?探店达人[。！!]?$/.test(basis)) return false
-  if (/不是探店|非探店|不算探店|并非探店/.test(basis)) return false
-  return /探店|到店|打卡/.test(basis)
+    .map((row) => row.replace(/^[\s\d.、\-•*]+/, '').trim())
+    .filter(Boolean)
+  const head = lines.find((row) => /^(是|否)/.test(row)) || ''
+  if (/^否/.test(head)) return false
+  const basis = head.replace(/^是[|｜:：,，\s]*/, '').trim()
+  if (/不是探店|非探店|不算探店|并非探店/.test(basis || body)) return false
+  const evidence = `${head}\n${body}`
+  if (!/探店|到店|打卡/.test(evidence)) return false
+  if (/^是/.test(head)) {
+    if (basis.length < 8) return false
+    if (/^(本地生活)?探店达人[。！!]?$/.test(basis)) return false
+    return true
+  }
+  return /该账号|这个账号|博主|达人/.test(body) && /探店|到店打卡|到店拍摄/.test(body) && body.length >= 12
 }
 
 /** 对这一位达人单独联网检索，确认是不是本地生活探店账号。 */
@@ -250,9 +257,164 @@ export async function nicknamesConfirmedExplore(
       if (await searchConfirmsExploreCreator(name, city, signal)) confirmed.add(name)
     }
   }
-  const workers = Math.min(4, unique.length)
+  const workers = Math.min(6, unique.length)
   if (workers > 0) await Promise.all(Array.from({ length: workers }, () => worker()))
   return confirmed
+}
+
+export type PublicTalentSeed = {
+  nickname: string
+  city: string
+  direction: string
+  sourceText: string
+  rawUrl: string
+}
+
+/** 先搜同城探店名单，再按类目和区县补。实测这两类检索词才能凑出人数。 */
+export function exploreFillQueries(city: string, industry: string): string[] {
+  const region = String(city || '本地').replace(/市$/, '').trim() || '本地'
+  const angles = talentCloseWords(industry).filter((word) => word.length >= 2 && word !== '休闲' && word !== '娱乐')
+  const head = [
+    `${region} 抖音 探店达人`,
+    `${region} 抖音 本地生活 探店博主`,
+    `${region} 抖音 美食探店博主`,
+    `${region} 各县市区 抖音 探店达人`,
+    `${region} 抖音 吃喝玩乐 探店`,
+  ]
+  const angled = angles.slice(0, 3).map((word) => `${region} 抖音 ${word} 探店达人`)
+  return [...new Set([...head, ...angled])].slice(0, 8)
+}
+
+const PUBLIC_NAME_SKIP = /^(达人|公网|检索|粉丝|探店|本地生活|抖音|昵称|城市|无|主页|内容|实际内容|等级|推荐)$/
+
+function publicRosterBody(text: string): string {
+  const marks = ['【检索到的主页】', '【检索摘录】']
+  let cut = text.length
+  for (const mark of marks) {
+    const index = text.indexOf(mark)
+    if (index >= 0 && index < cut) cut = index
+  }
+  return text.slice(0, cut)
+}
+
+export function parsePublicTalentSeeds(text: string, fallbackCity: string): PublicTalentSeed[] {
+  const sourceText = String(text || '')
+  const out: PublicTalentSeed[] = []
+  const seen = new Set<string>()
+  for (const line of publicRosterBody(sourceText).split(/\n+/)) {
+    const row = line.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim()
+    if (!row || /暂无|不拉公网|库内已凑满|没有返回|公网暂无/.test(row)) continue
+    if (/不对|没有这个|不确定|剩下|重新看/.test(row)) continue
+    const parts = row.split(/[|｜]/).map((part) => part.trim()).filter(Boolean)
+    if (parts.length < 2) continue
+    let nickname = parts[0]!.replace(/^昵称[:：]/, '')
+    const city = parts[1] || fallbackCity
+    const direction = parts.find((part, index) => index >= 3 && !/^https?:/.test(part) && part !== '无') || ''
+    nickname = nickname.replace(/[（(].*$/, '').trim().slice(0, 24)
+    if (nickname.length < 3 || seen.has(nickname) || PUBLIC_NAME_SKIP.test(nickname)) continue
+    if (isBrandPublicAccount(nickname, `${direction}${row}`)) continue
+    seen.add(nickname)
+    const rawUrl = (row.match(/https?:\/\/[^\s|｜)）]+/) || [])[0] || ''
+    out.push({ nickname, city, direction, sourceText, rawUrl })
+  }
+  return out
+}
+
+export async function searchPublicTalentBatch(opts: {
+  query: string
+  city: string
+  count: number
+  skipNames: string[]
+  signal?: AbortSignal
+}): Promise<string> {
+  const want = Math.min(12, Math.max(1, opts.count))
+  const skip = opts.skipNames.filter(Boolean).slice(0, 40)
+  const ac = new AbortController()
+  const onAbort = () => ac.abort()
+  opts.signal?.addEventListener('abort', onAbort, { once: true })
+  const timer = setTimeout(() => ac.abort(), 32000)
+  try {
+    const data = await postAiChat(
+      {
+        provider: 'doubao',
+        stream: false,
+        temperature: 0,
+        webSearch: true,
+        messages: [
+          {
+            role: 'system',
+            content: `你是豆包公网达人检索。请联网搜索「${opts.query}」。只写检索结果里能看出本人在做本地生活探店的抖音账号，昵称不必含有「探店」。不要品牌官方号、旗舰店、专卖店、门店自己的号、企业号，不要拿不确定的人凑数。检索里有几位就写几位，禁止为了写满 ${want} 行而编造。${skip.length ? `不要重复：${skip.join('、')}。` : ''}每人一行：昵称｜城市｜无｜实际内容｜主页。粉丝写无。主页只能原样复制检索结果里的用户主页，没有就写无。一个都没有就只回答「公网暂无」。`,
+          },
+          {
+            role: 'user',
+            content: `城市：${opts.city || ''}\n搜索：${opts.query}。只列出检索能确认的探店达人，目标 ${want} 位，不够就少写。`,
+          },
+        ],
+      },
+      { signal: ac.signal },
+    )
+    return String(data.content || '').trim()
+  } catch {
+    return ''
+  } finally {
+    clearTimeout(timer)
+    opts.signal?.removeEventListener('abort', onAbort)
+  }
+}
+
+/** 换检索词继续补，直到人数够，或 8 个不同检索词都用完。 */
+export async function fillExploreTalentSeeds(opts: {
+  city: string
+  industry: string
+  gap: number
+  skipNames?: string[]
+  signal?: AbortSignal
+  queries?: string[]
+  searchBatch?: (query: string, count: number, skip: string[], signal?: AbortSignal) => Promise<string>
+  confirmNames?: (names: string[], city: string, signal?: AbortSignal) => Promise<Set<string>>
+}): Promise<PublicTalentSeed[]> {
+  const gap = Math.max(0, Math.min(20, opts.gap))
+  if (!gap) return []
+  const queries = (opts.queries?.length ? opts.queries : exploreFillQueries(opts.city, opts.industry)).slice(0, 8)
+  const searchBatch =
+    opts.searchBatch ||
+    ((query: string, count: number, skip: string[], signal?: AbortSignal) =>
+      searchPublicTalentBatch({ query, city: opts.city, count, skipNames: skip, signal }))
+  const confirmNames =
+    opts.confirmNames ||
+    ((names: string[], city: string, signal?: AbortSignal) => nicknamesConfirmedExplore(names, city, signal))
+  const kept: PublicTalentSeed[] = []
+  const seen = new Set((opts.skipNames || []).map((name) => name.trim()).filter(Boolean))
+  for (let index = 0; index < queries.length && kept.length < gap; index += 2) {
+    if (opts.signal?.aborted) break
+    const wave = queries.slice(index, index + 2)
+    const left = gap - kept.length
+    const ask = Math.min(12, Math.max(left, Math.min(8, left + 3)))
+    const skip = [...seen].slice(0, 40)
+    const texts = await Promise.all(
+      wave.map((query) => searchBatch(query, ask, skip, opts.signal).catch(() => '')),
+    )
+    const fresh: PublicTalentSeed[] = []
+    for (const text of texts) {
+      for (const seed of parsePublicTalentSeeds(text, opts.city)) {
+        if (seen.has(seed.nickname)) continue
+        seen.add(seed.nickname)
+        fresh.push(seed)
+      }
+    }
+    if (!fresh.length) continue
+    const confirmed = await confirmNames(
+      fresh.map((seed) => seed.nickname),
+      opts.city,
+      opts.signal,
+    )
+    for (const seed of fresh) {
+      if (kept.length >= gap) break
+      if (!confirmed.has(seed.nickname)) continue
+      kept.push(seed)
+    }
+  }
+  return kept
 }
 
 /** 只认检索摘录里和该昵称写在一起的粉丝数，不认模型名单里的数字。 */
@@ -278,6 +440,39 @@ export function formatFollowerCount(count: number): string {
     return `${text}万`
   }
   return String(Math.round(count))
+}
+
+export function talentCardFromPublicSeed(seed: PublicTalentSeed, seatId: string, talentType: string): TalentPlanCard {
+  const followers = citedFollowerCount(seed.nickname, seed.sourceText)
+  const profileLink = publicTalentJumpLink(seed.nickname, seed.rawUrl, citedProfileUrls(seed.sourceText))
+  return {
+    seatId,
+    talentId: `public:${seed.nickname}`,
+    nickname: seed.nickname,
+    city: seed.city,
+    platform: '抖音',
+    followers,
+    followersVerified: followers > 0,
+    level: '',
+    quoteYuan: null,
+    tags: [],
+    avatarUrl: '',
+    profileLink,
+    profileVerified: Boolean(profileLink) && !/\/search\//.test(profileLink),
+    tierLabel: '公网',
+    unitBudgetYuan: 0,
+    talentType: seed.direction || talentType,
+    source: 'public',
+    exploreVerified: true,
+    reason: seed.direction ? `公网 · ${seed.direction}` : '公网补位',
+  }
+}
+
+export function talentRosterNote(headcount: number, libraryCount: number, publicCount: number): string {
+  const asked = `方案要 ${headcount} 位。`
+  if (publicCount > 0) return `${asked}星选库接近要求的有 ${libraryCount} 位，公网补了 ${publicCount} 位。`
+  if (libraryCount < headcount) return `${asked}星选库接近要求的有 ${libraryCount} 位。公网这次没有补到更多同城达人。`
+  return `${asked}星选库已按门店类目配满 ${libraryCount} 位。`
 }
 
 export function tierKeyFromLabel(tier: string): KolTierKey {
