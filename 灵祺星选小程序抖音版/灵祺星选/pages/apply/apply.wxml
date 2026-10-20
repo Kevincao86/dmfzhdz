@@ -69,6 +69,10 @@
     </view>
     <text wx:if="{{tierFixedPriceHint}}" class="apply-tier-hint">{{tierFixedPriceHint}}</text>
     <text wx:if="{{tierSelfQuoteBanner}}" class="apply-tier-hint apply-tier-hint--warn">{{tierSelfQuoteBanner}}</text>
+    <view class="apply-avatar-row" wx:if="{{applyAvatarUrl}}">
+      <image class="apply-avatar" src="{{applyAvatarUrl}}" mode="aspectFill" />
+      <text class="form-label">{{applyAvatarLabel}}</text>
+    </view>
 
     <block wx:for="{{applyRows}}" wx:key="id">
       <view class="form-row" wx:if="{{item.bindKey === 'province'}}">

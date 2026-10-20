@@ -26,7 +26,8 @@ import { isValidVisitTimeRange } from '../lib/mpSync/visitScheduleRuntime'
 import type { ApplyRow } from '../lib/mpSync/applyFormTemplates'
 import { labels, normalizePlatform } from '../lib/mpSync/platformLabels'
 import { DOUYIN_LEVELS } from '../lib/mpSync/platformForm'
-import { readMember, writeMember } from '../lib/mpSync/talentMember'
+import { readMember, writeMember, type TalentMember } from '../lib/mpSync/talentMember'
+import { platformIdFromName } from '../lib/mpSync/talentPlatformProfiles'
 import { pushNotification } from '../lib/mpSync/messagesStore'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { isEditTeamIceMpOrder, isIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
@@ -52,6 +53,17 @@ import {
   parseYuan,
 } from '../lib/mpSync/mpRecruitmentTierQuote'
 import { useProtectedForm } from '../hooks/useProtectedForm'
+
+function applyShowAvatar(member: TalentMember | null, platform: string): { url: string; label: string } {
+  const profiles = member?.platformProfiles
+  const douyinAvatar = String(profiles?.douyin?.avatarUrl || '').trim()
+  if (douyinAvatar) return { url: douyinAvatar, label: '抖音头像' }
+  const platformAvatar = String(profiles?.[platformIdFromName(platform)]?.avatarUrl || '').trim()
+  if (platformAvatar) return { url: platformAvatar, label: `${platform}头像` }
+  const wxAvatar = String(member?.wxAvatarUrl || '').trim()
+  if (wxAvatar) return { url: wxAvatar, label: '头像' }
+  return { url: '', label: '' }
+}
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -138,6 +150,7 @@ export default function RecruitmentApplyPage() {
   }, [orderId])
 
   const member = readMember()
+  const applyAvatar = isSupplierApply ? { url: '', label: '' } : applyShowAvatar(member, platform)
   const canSyncMember = isSupplierApply
     ? supplierMemberSyncAvailable(member, supplierWorkId)
     : memberSyncAvailable(member, platform)
@@ -533,6 +546,17 @@ export default function RecruitmentApplyPage() {
               : '达人报名信息'
         }
       >
+        {applyAvatar.url ? (
+          <div className="mb-3 flex items-center gap-3">
+            <img
+              src={applyAvatar.url}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="h-16 w-16 rounded-full object-cover bg-stone-100"
+            />
+            <span className="text-sm text-slate-500">{applyAvatar.label}</span>
+          </div>
+        ) : null}
         {tierFixedPriceHint ? (
           <p className="mb-3 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{tierFixedPriceHint}</p>
         ) : null}

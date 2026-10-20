@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const memberStore = require('../../utils/talentMember.js')
+const talentPlatforms = require('../../utils/talentPlatformProfiles.js')
 const auth = require('../../utils/auth.js')
 const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
 const regionPicker = require('../../utils/regionPicker.js')
@@ -53,6 +54,18 @@ const {
   persistApplicantToMemberProfile,
 } = applyFormState
 const DOUYIN_LEVELS = platformForm.DOUYIN_LEVELS
+
+function applyShowAvatar(member, platform) {
+  const profiles = (member && member.platformProfiles) || {}
+  const douyinAvatar = String((profiles.douyin && profiles.douyin.avatarUrl) || '').trim()
+  if (douyinAvatar) return { url: douyinAvatar, label: '抖音头像' }
+  const pid = talentPlatforms.platformIdFromName(platform)
+  const platformAvatar = String((profiles[pid] && profiles[pid].avatarUrl) || '').trim()
+  if (platformAvatar) return { url: platformAvatar, label: `${platform || '平台'}头像` }
+  const wxAvatar = String((member && member.wxAvatarUrl) || '').trim()
+  if (wxAvatar) return { url: wxAvatar, label: '头像' }
+  return { url: '', label: '' }
+}
 
 function detailUrlAfterApply(mpOrderId) {
   return `/pages/subpack-core/detail/detail?id=${encodeURIComponent(String(mpOrderId || '').trim())}&applied=1&from=apply`
@@ -221,6 +234,8 @@ Page({
     canReclaim: false,
     recruitCountText: '',
     applicantCountText: '',
+    applyAvatarUrl: '',
+    applyAvatarLabel: '',
     quoteSuggestHint: '',
     quoteSuggesting: false,
     orderBudgetText: '',
@@ -355,6 +370,7 @@ Page({
     const countTexts = loadedMp
       ? buildApplyRecruitCountTexts(loadedMp, { isIce: isIceForStats })
       : { recruitCountText: '', applicantCountText: '' }
+    const showAvatar = isSupplierApply ? { url: '', label: '' } : applyShowAvatar(member, platform)
     const patch = {
       mpOrderId,
       merchantOrderNo,
@@ -378,6 +394,8 @@ Page({
       canReclaim,
       recruitCountText: countTexts.recruitCountText,
       applicantCountText: countTexts.applicantCountText,
+      applyAvatarUrl: showAvatar.url,
+      applyAvatarLabel: showAvatar.label,
       orderBudgetText: loadedMp ? String(loadedMp.budgetText || loadedMp.reward || '') : '',
       customFields: {},
       ...(memberFields ||
