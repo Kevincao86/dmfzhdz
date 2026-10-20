@@ -444,7 +444,7 @@ export default function StoreAnalysisPage() {
           type="button"
           disabled={loading || syncing || analyzing || !summary}
           onClick={() => void onAnalyze()}
-          title={estimatedAiPoints > 0 ? `按区间估算毛利计费，预计消耗 ${estimatedAiPoints} 积分` : undefined}
+          title={estimatedAiPoints > 0 ? `预计消耗 ${estimatedAiPoints} 积分` : undefined}
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
         >
           {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -681,7 +681,7 @@ export default function StoreAnalysisPage() {
                 type="button"
                 disabled={analyzing}
                 onClick={() => void onAnalyze()}
-                title={estimatedAiPoints > 0 ? `按区间估算毛利计费，预计消耗 ${estimatedAiPoints} 积分` : undefined}
+                title={estimatedAiPoints > 0 ? `预计消耗 ${estimatedAiPoints} 积分` : undefined}
                 className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
               >
                 {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
