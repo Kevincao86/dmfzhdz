@@ -418,6 +418,79 @@ export async function searchPublicTalentBatch(opts: {
   }
 }
 
+function bareTalentName(name: string): string {
+  return name.replace(/[（(].*$/, '').trim()
+}
+
+const EXPLORE_LIST_SYSTEM = (query: string, want: number, skip: string[]) =>
+  `你是豆包公网达人检索。请联网搜索「${query}」。只写检索结果里能看出本人在做本地生活探店的抖音账号，昵称不必含有「探店」。不要品牌官方号、旗舰店、专卖店、门店自己的号、企业号，不要拿不确定的人凑数。检索里有几位就写几位，禁止为了写满 ${want} 行而编造。${skip.length ? `不要重复：${skip.join('、')}。` : ''}每人一行：昵称｜城市｜无｜实际内容｜主页。粉丝写无。主页只能原样复制检索结果里的用户主页，没有就写无。一个都没有就只回答「公网暂无」。`
+
+/** 服务端直接联网补位。不走对话网关，避免系统提示把名单截成几位。 */
+export async function runDoubaoExploreFill(
+  search: (system: string, user: string) => Promise<string>,
+  opts: { city: string; industry: string; gap: number; skipNames?: string[] },
+): Promise<PublicTalentSeed[]> {
+  const city = opts.city
+  const aliases = new Set<string>()
+  const skipNames = [...new Set((opts.skipNames || []).flatMap((name) => {
+    const trimmed = name.trim()
+    const bare = bareTalentName(trimmed)
+    return [trimmed, bare].filter(Boolean)
+  }))]
+  async function judge(name: string): Promise<{ yes: boolean; text: string }> {
+    const text = await search(EXPLORE_JUDGE_SYSTEM(name), `搜索：抖音 ${name} ${city || ''} 探店`)
+    return { yes: exploreSearchSaysYes(text), text }
+  }
+  return fillExploreTalentSeeds({
+    city,
+    industry: opts.industry,
+    gap: opts.gap,
+    skipNames,
+    searchBatch: async (query, count, skip) => {
+      const want = Math.min(12, Math.max(1, count))
+      return search(
+        EXPLORE_LIST_SYSTEM(query, want, skip),
+        `城市：${city || ''}\n搜索：${query}。只列出检索能确认的探店达人，目标 ${want} 位，不够就少写。`,
+      )
+    },
+    confirmNames: async (names) => {
+      const unique = [...new Set(names.map((item) => item.trim()).filter((item) => item && !isBrandPublicAccount(item) && !aliases.has(item) && !aliases.has(bareTalentName(item))))]
+      const ok = new Set<string>()
+      let cursor = 0
+      async function worker() {
+        while (cursor < unique.length) {
+          const name = unique[cursor]
+          cursor += 1
+          if (!name) continue
+          let yesCount = 0
+          let noCount = 0
+          let yesText = ''
+          for (let attempt = 0; attempt < 3 && yesCount < 2 && noCount < 2; attempt += 1) {
+            const verdict = await judge(name).catch(() => ({ yes: false, text: '' }))
+            if (verdict.yes) {
+              yesCount += 1
+              yesText = verdict.text
+            } else {
+              noCount += 1
+            }
+          }
+          if (yesCount < 2) continue
+          for (const alias of exploreOperatorNames(yesText)) {
+            if (alias !== name && alias !== bareTalentName(name)) aliases.add(alias)
+          }
+          if (!aliases.has(name) && !aliases.has(bareTalentName(name))) ok.add(name)
+        }
+      }
+      const workers = Math.min(6, unique.length)
+      if (workers > 0) await Promise.all(Array.from({ length: workers }, () => worker()))
+      for (const alias of aliases) {
+        ok.delete(alias)
+      }
+      return ok
+    },
+  })
+}
+
 /** 换检索词继续补，直到人数够，或 12 个不同检索词都用完。 */
 export async function fillExploreTalentSeeds(opts: {
   city: string

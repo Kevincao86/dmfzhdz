@@ -12,7 +12,6 @@ import {
   citedFollowerCount,
   citedProfileUrls,
   displayTalentProfileLink,
-  fillExploreTalentSeeds,
   formatFollowerCount,
   isBrandPublicAccount,
   nicknamesConfirmedExplore,
@@ -26,7 +25,7 @@ import {
   type TalentPlanSeat,
 } from '../lib/talentPlanRecommend'
 import { profileLinkLabel } from '../lib/talentProfileLink'
-import { requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
+import { requestPublicExploreFill, requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
 import { postAiChat } from '../services/ai/aiClient'
 
 function TalentAvatar({ url, name }: { url: string; name: string }) {
@@ -743,21 +742,29 @@ export function TalentChatRoster({
     const wanted = Number((note.match(/方案要\s*(\d{1,2})\s*位/) || [])[1] || 0)
     const current = cardsRef.current
     if (!wanted || wanted > 20 || current.length >= wanted) return
-    toppedUp.current = true
     let cancelled = false
+    toppedUp.current = true
     setChecking(true)
     void (async () => {
       try {
-        const seeds = await fillExploreTalentSeeds({
+        const filled = await requestPublicExploreFill({
           city,
           industry: talentType || '本地生活',
           gap: wanted - current.length,
           skipNames: current.map((card) => card.nickname),
         })
         if (cancelled) return
+        if (!filled.ok) {
+          toppedUp.current = false
+          return
+        }
+        const seeds = filled.seeds || []
         const latest = cardsRef.current
-        const have = new Set(latest.map((card) => card.nickname))
-        const extra = seeds.filter((seed) => seed.nickname && !have.has(seed.nickname))
+        const have = new Set(latest.flatMap((card) => [card.nickname, card.nickname.replace(/[（(].*$/, '').trim()]))
+        const extra = seeds.filter((seed) => {
+          const bare = seed.nickname.replace(/[（(].*$/, '').trim()
+          return seed.nickname && !have.has(seed.nickname) && !have.has(bare)
+        })
         if (!extra.length) return
         const next = [
           ...latest,
@@ -775,6 +782,7 @@ export function TalentChatRoster({
     })()
     return () => {
       cancelled = true
+      toppedUp.current = false
       setChecking(false)
     }
   }, [pendingKey, note, city, talentType])

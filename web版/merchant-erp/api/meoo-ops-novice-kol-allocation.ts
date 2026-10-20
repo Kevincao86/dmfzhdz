@@ -18,7 +18,7 @@ import { findMemberForLibraryEntry } from '../src/lib/talentLibraryFilters.js'
 import { hydrateRecommendHallAvatarsFromAccounts } from '../src/lib/recommendHallMemberAvatars.js'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
 
-export const config = { maxDuration: 60 }
+export const config = { maxDuration: 180 }
 
 function sendOpsJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -79,6 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       feeType?: 'tier' | 'fixed'
       platform?: string
       industry?: string
+      gap?: number
+      skipNames?: string[]
     }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -122,6 +124,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return member?.id ? { ...card, memberId: String(member.id) } : card
       })
       sendOpsJson(res, 200, { ok: true, ...filled, cards })
+      return
+    }
+
+    if (body.mode === 'talent_public_fill') {
+      const city = String(body.city ?? '').trim()
+      const industry = String(body.industry ?? '').trim() || '本地生活'
+      const gap = Math.max(0, Math.min(20, Number(body.gap) || 0))
+      const skipNames = Array.isArray(body.skipNames) ? body.skipNames.map((name) => String(name || '')) : []
+      if (!city || gap < 1) {
+        sendOpsJson(res, 400, { ok: false, error: 'invalid_public_fill' })
+        return
+      }
+      const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
+        '../vite-plugins/merchantRegistryVendorEnv.js'
+      )
+      const { callDoubaoWebSearch } = await import('../vite-plugins/merchantAiUpstream.js')
+      const { runDoubaoExploreFill } = await import('../src/lib/talentPlanRecommend.js')
+      const env = await mergeMerchantAiEnvWithRegistrySnapshot(
+        process.cwd(),
+        process.env as Record<string, string>,
+      )
+      const key = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
+      if (!key) {
+        sendOpsJson(res, 503, { ok: false, error: 'doubao_key_missing' })
+        return
+      }
+      const seeds = await runDoubaoExploreFill(
+        async (system, user) => (await callDoubaoWebSearch(key, env, system, user)).text,
+        { city, industry, gap, skipNames },
+      )
+      sendOpsJson(res, 200, { ok: true, seeds })
       return
     }
 

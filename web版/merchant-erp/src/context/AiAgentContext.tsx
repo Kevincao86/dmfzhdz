@@ -118,14 +118,13 @@ import {
 import { allCitiesFlat } from '../lib/chinaRegion'
 import { extractTalentPlanHeadcount } from '../lib/aiAgentRecruitmentParse'
 import {
-  fillExploreTalentSeeds,
   talentCardFromPublicSeed,
   talentRosterNote,
   talentCardMatchesCloseWords,
   talentCloseWords,
   type TalentPlanCard,
 } from '../lib/talentPlanRecommend'
-import { requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
+import { requestPublicExploreFill, requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
 import { resolveStoreCityFromMerchantStores } from '../services/aiAgentRecruitmentAllocation'
 import {
   formatAiProductSubmitSummary,
@@ -716,13 +715,13 @@ async function fillPublicExploreCards(opts: {
   gap: number
   skipNames: string[]
 }): Promise<TalentPlanCard[]> {
-  const seeds = await fillExploreTalentSeeds({
+  const filled = await requestPublicExploreFill({
     city: opts.city,
     industry: opts.talentType,
     gap: opts.gap,
     skipNames: opts.skipNames,
   })
-  return seeds.map((seed, index) => talentCardFromPublicSeed(seed, `public-${index + 1}`, opts.talentType))
+  return (filled.seeds || []).map((seed, index) => talentCardFromPublicSeed(seed, `public-${index + 1}`, opts.talentType))
 }
 
 async function loadTalentRecommendBlock(userText: string, priorText = '', quotedFull = ''): Promise<string> {
