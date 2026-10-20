@@ -591,9 +591,46 @@ function cardMatchesStore(card: TalentPlanCard, needles: string[]): boolean {
   return needles.some((n) => blob.includes(n))
 }
 
-function formatLibraryLines(cards: TalentPlanCard[]): string {
+const TALENT_HEADCOUNT_CAP = 20
+
+/** 方案里的「邀请10位」优先；「其中8位、2位」是档位拆分，不当成总人数。 */
+function explicitTalentHeadcount(text: string): number {
+  const flat = text.replace(/,/g, '')
+  const invited = [...flat.matchAll(/邀请\s*(\d{1,2})\s*位/g)]
+  const picked = invited.length
+    ? invited
+    : [...flat.matchAll(/(?:共|合计|总共|需要)\s*(\d{1,2})\s*位/g)]
+  const last = picked.length
+    ? picked
+    : [...flat.matchAll(/(\d{1,2})\s*位\s*(?:温州|本地|生活|达人|探店)/g)]
+  if (!last.length) return 0
+  const n = Number(last[last.length - 1]?.[1])
+  if (!Number.isFinite(n) || n < 1 || n > TALENT_HEADCOUNT_CAP) return 0
+  return n
+}
+
+function talentHeadcountFromDialogue(userText: string, priorText: string): number {
+  return explicitTalentHeadcount(userText) || explicitTalentHeadcount(priorText) || 5
+}
+
+function talentPlanClause(text: string): string {
+  const flat = text.replace(/\s+/g, ' ')
+  const matched = flat.match(/邀请\s*\d{1,2}\s*位[^。\n]{0,180}/)
+  return matched ? matched[0].slice(0, 220) : ''
+}
+
+function recentDialogueText(msgs: { role: string; content?: string }[]): string {
+  return msgs
+    .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content)
+    .slice(-8)
+    .map((m) => String(m.content))
+    .join('\n')
+    .slice(-6000)
+}
+
+function formatLibraryLines(cards: TalentPlanCard[], limit = 8): string {
   return cards
-    .slice(0, 8)
+    .slice(0, limit)
     .map((c) => {
       const bits = [
         c.city,
@@ -607,9 +644,16 @@ function formatLibraryLines(cards: TalentPlanCard[]): string {
     .join('\n')
 }
 
-async function fetchDoubaoPublicTalents(city: string, industry: string, storeName: string): Promise<string> {
+async function fetchDoubaoPublicTalents(
+  city: string,
+  industry: string,
+  storeName: string,
+  count: number,
+  planClause: string,
+): Promise<string> {
   const region = city || '已绑定门店所在城市'
   const need = industry || '本地生活到店'
+  const want = Math.min(TALENT_HEADCOUNT_CAP, Math.max(1, count))
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(), 35000)
   try {
@@ -622,18 +666,19 @@ async function fetchDoubaoPublicTalents(city: string, industry: string, storeNam
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只写公网能核实的抖音本地生活达人，最多 5 位。区域只限「${region}」。内容要符合门店要求「${need}」。每人一行：昵称、城市、粉丝量级、内容方向、为何符合该门店。没有公开依据的不要写。不要编造联系方式。一个都没有就只回答「公网暂无符合条件的达人」。`,
+            content: `你是豆包公网达人检索。只写公网能核实的抖音本地生活达人，凑满 ${want} 位，不要少写，也不要改成别的人数。区域只限「${region}」。内容要符合门店要求「${need}」。${planClause ? `方案原话：${planClause}。粉丝档位按这句拆，总人数仍是 ${want} 位。` : ''}每人一行：昵称、城市、粉丝量级、内容方向、为何符合该门店。没有公开依据的不要写。不要编造联系方式。一个都没有就只回答「公网暂无符合条件的达人」。`,
           },
           {
             role: 'user',
-            content: `门店：${storeName || '未命名'}。经营要求：${need}。请检索${region}、内容方向匹配该门店的达人。`,
+            content: `门店：${storeName || '未命名'}。经营要求：${need}。请检索${region}、内容方向匹配该门店的达人，列出 ${want} 位。`,
           },
         ],
       },
       { signal: ac.signal },
     )
     const text = String(data.content || '').trim()
-    return text ? text.slice(0, 1200) : '公网暂无符合条件的达人。'
+    const cap = Math.min(4200, Math.max(1200, want * 380))
+    return text ? text.slice(0, cap) : '公网暂无符合条件的达人。'
   } catch {
     return '豆包公网本次没有返回可用名单。'
   } finally {
@@ -641,10 +686,14 @@ async function fetchDoubaoPublicTalents(city: string, industry: string, storeNam
   }
 }
 
-async function appendTalentRecommendBlock(base: string, userText?: string): Promise<string> {
+async function appendTalentRecommendBlock(
+  base: string,
+  userText?: string,
+  priorText = '',
+): Promise<string> {
   if (!userText || !isTalentRecommendAsk(userText)) return base
   try {
-    const block = await loadTalentRecommendBlock(userText)
+    const block = await loadTalentRecommendBlock(userText, priorText)
     return block.trim() ? `${base}\n\n${block}` : base
   } catch {
     const city = cityAskedForTalents(userText)
@@ -652,7 +701,7 @@ async function appendTalentRecommendBlock(base: string, userText?: string): Prom
   }
 }
 
-async function loadTalentRecommendBlock(userText: string): Promise<string> {
+async function loadTalentRecommendBlock(userText: string, priorText = ''): Promise<string> {
   const named = cityAskedForTalents(userText)
   let city = named
   let regionSource = named ? '用户指定' : ''
@@ -666,14 +715,16 @@ async function loadTalentRecommendBlock(userText: string): Promise<string> {
   }
   const { industry, storeName } = storeTalentRequirement()
   const needles = requirementNeedles(industry)
+  const headcount = talentHeadcountFromDialogue(userText, priorText)
+  const planClause = talentPlanClause(`${priorText}\n${userText}`)
   const [publicText, library] = await Promise.all([
-    fetchDoubaoPublicTalents(city, industry, storeName),
+    fetchDoubaoPublicTalents(city, industry, storeName, headcount, planClause),
     requestTalentPlanRecommend({
       city,
       platform: '抖音',
       talentType: industry || '本地生活',
       budgetYuan: 5000,
-      headcount: 8,
+      headcount,
       seats: [],
       excludedIds: [],
     }),
@@ -682,7 +733,7 @@ async function loadTalentRecommendBlock(userText: string): Promise<string> {
     (c) => !c.empty && c.nickname.trim() && cardMatchesCity(c, city),
   )
   const matched = sameCity.filter((c) => cardMatchesStore(c, needles))
-  const libraryLines = formatLibraryLines(matched)
+  const libraryLines = formatLibraryLines(matched, headcount)
   const libraryNote = libraryLines
     ? libraryLines
     : sameCity.length && needles.length
@@ -691,6 +742,7 @@ async function loadTalentRecommendBlock(userText: string): Promise<string> {
   return [
     '【达人推荐 · 本次】',
     `区域：${city || '未解析'}（${regionSource}）。门店：${storeName || '未命名'}。门店要求：${industry || '本地生活到店'}。`,
+    `人数：沿用上文方案，共 ${headcount} 位。${planClause ? `方案原话：${planClause}。` : ''}豆包公网必须按这个人数列全，不要改成 5 位或其它人数。若公网名单不足 ${headcount} 位，先写明方案要 ${headcount} 位、本次核到几位，不要把人数说成方案没写过的数字。`,
     '作答必须分成「豆包公网」和「星选达人库」两段，只使用下面给出的人。某一路没有就说明该路没有。不要把其他城市的人说成这个区域的达人。不要编造电话或微信。不要整段拒答，不要让用户自己去蝉妈妈、飞瓜或 MCN。',
     `【豆包公网】\n${publicText}`,
     `【星选达人库】\n${libraryNote}`,
@@ -767,9 +819,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const metricsQ = Boolean(userText && isBusinessMetricsQuery(userText))
     const domainKey = domains.slice().sort().join(',')
     const cacheKey = `${taskType ?? ''}|d${domainKey}|m${metricsQ ? 1 : 0}|${domains.length || metricsQ ? String(userText).slice(0, 96) : ''}`
+    const priorDialogue = recentDialogueText(messagesRef.current)
     const hit = merchantIntelCacheRef.current
     if (hit && now - hit.at < MERCHANT_INTEL_CACHE_MS && hit.task === cacheKey) {
-      return appendTalentRecommendBlock(hit.text, userText)
+      return appendTalentRecommendBlock(hit.text, userText, priorDialogue)
     }
     const text = await buildAgentMerchantIntelContextAsync(taskType)
     const habits = buildAgentUserHabitsContext(authUserIdRef.current)
@@ -791,7 +844,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       }
     }
     merchantIntelCacheRef.current = { at: now, task: cacheKey, text: combined }
-    return appendTalentRecommendBlock(combined, userText)
+    return appendTalentRecommendBlock(combined, userText, priorDialogue)
   }, [])
 
   useEffect(() => {
