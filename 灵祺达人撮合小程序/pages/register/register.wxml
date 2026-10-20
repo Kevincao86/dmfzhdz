@@ -60,12 +60,21 @@
     <view class="section-head">
       <view class="section-head-dot" />
       <text class="section-title">联系信息</text>
-      <view class="env-btn" data-key="contact" bindtap="onOpenSection">修改</view>
+      <view class="env-actions">
+        <view
+          wx:if="{{contact || wechatId || alipayAccount || gender || province || city}}"
+          class="env-btn env-btn--view"
+          data-key="contact"
+          data-mode="view"
+          bindtap="onOpenSection"
+        >查看</view>
+        <view class="env-btn" data-key="contact" data-mode="edit" bindtap="onOpenSection">修改</view>
+      </view>
     </view>
     <text class="env-sum">{{contact || '未填写电话'}}{{city ? ' · ' + city : ''}}</text>
     <view class="env-mask" wx:if="{{sectionOpenContact}}" data-key="contact" bindtap="onCloseSection" catchtouchmove="onEnvHold"></view>
     <view class="env-sheet">
-    <view class="env-letter">
+    <view class="env-letter {{envelopeViewKey === 'contact' ? 'env-letter--view' : ''}}">
     <view class="form-row">
       <text class="form-label">联系电话 *</text>
       <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
@@ -127,8 +136,8 @@
       </view>
     </view>
     <view class="env-save-row">
-      <button class="env-btn" data-key="contact" bindtap="onCloseSection">取消</button>
-      <button class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="contact" bindtap="onSubmit">保存</button>
+      <button class="env-btn" data-key="contact" bindtap="onCloseSection">{{envelopeViewKey === 'contact' ? '关闭' : '取消'}}</button>
+      <button wx:if="{{envelopeViewKey !== 'contact'}}" class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="contact" bindtap="onSubmit">保存</button>
     </view>
     </view>
     </view>
@@ -138,12 +147,21 @@
     <view class="section-head">
       <view class="section-head-dot" />
       <text class="section-title">团队基本信息</text>
-      <view class="env-btn" data-key="team" bindtap="onOpenSection">修改</view>
+      <view class="env-actions">
+        <view
+          wx:if="{{supplierProfile.teamName}}"
+          class="env-btn env-btn--view"
+          data-key="team"
+          data-mode="view"
+          bindtap="onOpenSection"
+        >查看</view>
+        <view class="env-btn" data-key="team" data-mode="edit" bindtap="onOpenSection">修改</view>
+      </view>
     </view>
     <text class="env-sum">{{supplierProfile.teamName || '未填写团队'}}</text>
     <view class="env-mask" wx:if="{{sectionOpenTeam}}" data-key="team" bindtap="onCloseSection" catchtouchmove="onEnvHold"></view>
     <view class="env-sheet">
-    <view class="env-letter">
+    <view class="env-letter {{envelopeViewKey === 'team' ? 'env-letter--view' : ''}}">
     <view class="form-row">
       <text class="form-label">团队名称 *</text>
       <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" placeholder="如：某某跟拍工作室" value="{{supplierProfile.teamName}}" data-k="teamName" bindinput="onSupplierField" />
@@ -243,8 +261,8 @@
       <switch checked="{{supplierProfile.acceptsIce}}" color="#6366f1" data-k="acceptsIce" bindchange="onSupplierSwitch" />
     </view>
     <view class="env-save-row">
-      <button class="env-btn" data-key="team" bindtap="onCloseSection">取消</button>
-      <button class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="team" bindtap="onSubmit">保存</button>
+      <button class="env-btn" data-key="team" bindtap="onCloseSection">{{envelopeViewKey === 'team' ? '关闭' : '取消'}}</button>
+      <button wx:if="{{envelopeViewKey !== 'team'}}" class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="team" bindtap="onSubmit">保存</button>
     </view>
     </view>
     </view>
@@ -256,9 +274,17 @@
       <text class="platform-card-title">{{item.name}}</text>
       <view class="platform-card-actions">
         <view
+          wx:if="{{item.enabled && !item.expanded}}"
+          class="platform-detail-btn platform-detail-btn--view"
+          data-id="{{item.id}}"
+          data-mode="view"
+          catchtap="onOpenPlatform"
+        >查看</view>
+        <view
           wx:if="{{!item.expanded}}"
           class="platform-detail-btn"
           data-id="{{item.id}}"
+          data-mode="edit"
           catchtap="onOpenPlatform"
         >
           <text>{{item.enabled ? '修改' : '开启'}}</text>
@@ -287,7 +313,7 @@
     <view class="env-mask" wx:if="{{item.enabled && item.expanded}}" data-id="{{item.id}}" catchtap="onClosePlatform" catchtouchmove="onEnvHold"></view>
     <view class="env-sheet" wx:if="{{item.enabled && item.expanded}}">
       <image class="env-pop-logo" src="{{item.icon}}" mode="aspectFit" />
-      <view class="env-letter">
+      <view class="env-letter {{envelopeViewKey === item.id ? 'env-letter--view' : ''}}">
       <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
       <view class="form-row">
         <text class="form-label">{{item.labels.profileLink}} *</text>
@@ -306,6 +332,7 @@
           disabled="{{profileAutofillLoading}}"
           data-id="{{item.id}}"
           bindtap="onProfileLinkAutofill"
+          wx:if="{{envelopeViewKey !== item.id}}"
         >AI自动解析链接并填写下方信息</button>
       </view>
       <image
@@ -379,7 +406,7 @@
         <text class="trade-shot-hint">打开抖音或快手「数据中心 → 数据概览 → 交易分析 → 近30日」，截这一屏。不上传也可以保存。</text>
         <image class="trade-shot-example" src="/images/trade-screenshot-example.jpg" mode="aspectFill" bindtap="onPreviewTradeExample" />
         <text class="trade-shot-hint">点击小图可放大。上图是抖音数据中心示例，快手截同样的交易数据页即可。</text>
-        <view class="trade-shot-actions">
+        <view class="trade-shot-actions" wx:if="{{envelopeViewKey !== item.id}}">
           <button class="profile-autofill-btn" size="mini" data-id="{{item.id}}" bindtap="onUploadTradeShot">{{item.profile.recentTradeScreenshot ? '重新上传' : '上传截图'}}</button>
           <button wx:if="{{item.profile.recentTradeScreenshot}}" class="profile-autofill-btn" size="mini" data-id="{{item.id}}" bindtap="onClearTradeShot">清除</button>
         </view>
@@ -434,8 +461,8 @@
         </view>
       </view>
       <view class="env-save-row">
-        <button class="env-btn" data-id="{{item.id}}" catchtap="onClosePlatform">取消</button>
-        <button class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="platform" data-id="{{item.id}}" bindtap="onSubmit">保存</button>
+        <button class="env-btn" data-id="{{item.id}}" catchtap="onClosePlatform">{{envelopeViewKey === item.id ? '关闭' : '取消'}}</button>
+        <button wx:if="{{envelopeViewKey !== item.id}}" class="env-btn env-btn--save" loading="{{submitting}}" disabled="{{submitting}}" data-section="platform" data-id="{{item.id}}" bindtap="onSubmit">保存</button>
       </view>
       </view>
     </view>

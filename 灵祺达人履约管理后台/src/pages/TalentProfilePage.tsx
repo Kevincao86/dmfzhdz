@@ -47,7 +47,9 @@ export function ProfileEnvelope({
   logo,
   actionLabel,
   open,
+  readOnly,
   saving,
+  onView,
   onEdit,
   onClose,
   onSave,
@@ -58,7 +60,9 @@ export function ProfileEnvelope({
   logo?: string
   actionLabel?: string
   open: boolean
+  readOnly?: boolean
   saving?: boolean
+  onView?: () => void
   onEdit: () => void
   onClose: () => void
   onSave: () => void
@@ -96,9 +100,16 @@ export function ProfileEnvelope({
             <div className="text-sm font-semibold text-stone-900">{title}</div>
             <div className="truncate text-xs text-stone-500">{summary || '未填写'}</div>
           </div>
-          <button type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={onEdit}>
-            {actionLabel || '修改'}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {onView ? (
+              <button type="button" className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-semibold text-stone-700" onClick={onView}>
+                查看
+              </button>
+            ) : null}
+            <button type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={onEdit}>
+              {actionLabel || '修改'}
+            </button>
+          </div>
         </div>
       </div>
       <style>{`
@@ -114,6 +125,16 @@ export function ProfileEnvelope({
           padding: 16px;
           box-shadow: 0 18px 48px rgba(28, 25, 23, 0.22);
         }
+        .lq-env-view input:disabled,
+        .lq-env-view textarea:disabled,
+        .lq-env-view select:disabled,
+        .lq-env-view button:disabled {
+          opacity: 1;
+          color: #1c1917;
+          -webkit-text-fill-color: #1c1917;
+          background-color: #fafaf9;
+        }
+        .lq-env-view .lq-env-editonly { display: none; }
         .lq-env-pop-logo {
           position: absolute;
           left: 50%;
@@ -137,11 +158,14 @@ export function ProfileEnvelope({
             {logo ? <img className="lq-env-pop-logo" src={logo} alt="" /> : null}
             <div className="lq-env-letter text-sm">
             <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
-            <div className="space-y-3">{children}</div>
+            <fieldset disabled={!!readOnly} className={readOnly ? 'lq-env-view m-0 min-w-0 border-0 p-0' : 'm-0 min-w-0 border-0 p-0'}>
+              <div className="space-y-3">{children}</div>
+            </fieldset>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700" onClick={onClose}>
-                取消
+                {readOnly ? '关闭' : '取消'}
               </button>
+              {readOnly ? null : (
               <button
                 type="button"
                 disabled={saving}
@@ -150,6 +174,7 @@ export function ProfileEnvelope({
               >
                 {saving ? '保存中…' : '保存'}
               </button>
+              )}
             </div>
             </div>
           </div>
@@ -205,6 +230,9 @@ function TalentProfileForm() {
   const [openContact, setOpenContact] = useState(false)
   const [openLogin, setOpenLogin] = useState(false)
   const [openPlat, setOpenPlat] = useState<Record<string, boolean>>({})
+  const [loginMode, setLoginMode] = useState<'view' | 'edit'>('edit')
+  const [contactMode, setContactMode] = useState<'view' | 'edit'>('edit')
+  const [platMode, setPlatMode] = useState<'view' | 'edit'>('edit')
   const [loginName, setLoginName] = useState(acc?.loginName || '')
   const [password, setPassword] = useState('')
   const [hasPassword, setHasPassword] = useState(!!acc?.hasPassword)
@@ -391,6 +419,7 @@ function TalentProfileForm() {
         if (err) {
           setMsg(`${p.name}：${err}`)
           setActivePlatform(p.id)
+          setPlatMode('edit')
           setOpenPlat((s) => ({ ...s, [p.id]: true }))
           return
         }
@@ -546,11 +575,37 @@ function TalentProfileForm() {
         title="修改密码"
         summary={hasPassword ? '账号密码已设置' : '未设置登录密码'}
         open={openLogin}
+        readOnly={loginMode === 'view'}
         saving={saving}
-        onEdit={() => setOpenLogin(true)}
+        onView={
+          hasPassword
+            ? () => {
+                setLoginMode('view')
+                setOpenLogin(true)
+              }
+            : undefined
+        }
+        onEdit={() => {
+          setLoginMode('edit')
+          setOpenLogin(true)
+        }}
         onClose={() => setOpenLogin(false)}
         onSave={() => void onSave('login')}
       >
+        {loginMode === 'view' ? (
+          <div className="space-y-3 text-sm text-stone-800">
+            <div>
+              <span className="text-slate-400">手机号</span>
+              <div className="mt-1 rounded-lg bg-stone-50 px-3 py-2">{loginName || '未填写'}</div>
+            </div>
+            <div>
+              <span className="text-slate-400">登录密码</span>
+              <div className="mt-1 rounded-lg bg-stone-50 px-3 py-2">已设置</div>
+            </div>
+          </div>
+        ) : null}
+        {loginMode === 'view' ? null : (
+        <>
         <p className="text-slate-400 text-xs">登录账号（选填）— 设置后可用账号密码登录，与微信绑定同一灵祺 ID</p>
         <label className="block">
           <span className="text-slate-400">手机号</span>
@@ -579,14 +634,28 @@ function TalentProfileForm() {
             placeholder={hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}
           />
         </label>
+        </>
+        )}
       </ProfileEnvelope>
 
       <ProfileEnvelope
         title="联系信息"
         summary={`${member.contact || '未填写电话'}${member.city ? ` · ${member.city}` : ''}`}
         open={openContact}
+        readOnly={contactMode === 'view'}
         saving={saving}
-        onEdit={() => setOpenContact(true)}
+        onView={
+          member.contact || member.wechatId || member.alipayAccount || member.gender || member.province || member.city
+            ? () => {
+                setContactMode('view')
+                setOpenContact(true)
+              }
+            : undefined
+        }
+        onEdit={() => {
+          setContactMode('edit')
+          setOpenContact(true)
+        }}
         onClose={() => setOpenContact(false)}
         onSave={() => void onSave('contact')}
       >
@@ -665,8 +734,19 @@ function TalentProfileForm() {
             }
             actionLabel={row?.enabled ? '修改' : '开启'}
             open={opened}
+            readOnly={platMode === 'view'}
             saving={saving}
+            onView={
+              row?.enabled
+                ? () => {
+                    setPlatMode('view')
+                    setActivePlatform(p.id)
+                    setOpenPlat({ [p.id]: true })
+                  }
+                : undefined
+            }
             onEdit={() => {
+              setPlatMode('edit')
               setActivePlatform(p.id)
               if (!row?.enabled) {
                 setMember((m) => {
@@ -707,7 +787,7 @@ function TalentProfileForm() {
           <button
             type="button"
             disabled={autofillLoading}
-            className="mt-2 w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-500 py-2 text-sm font-medium disabled:opacity-50"
+            className="lq-env-editonly mt-2 w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-500 py-2 text-sm font-medium disabled:opacity-50"
             onClick={() => void onAutofillFromLink()}
           >
             {autofillLoading ? 'AI 解析中…' : 'AI自动解析链接并填写下方信息'}
@@ -833,7 +913,7 @@ function TalentProfileForm() {
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
-              className="mt-2 block text-sm"
+              className="lq-env-editonly mt-2 block text-sm"
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 e.target.value = ''

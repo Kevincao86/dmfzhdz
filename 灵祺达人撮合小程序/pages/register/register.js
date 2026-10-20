@@ -136,6 +136,7 @@ Page({
     sectionPartContact: false,
     sectionPartTeam: false,
     envelopePartId: '',
+    envelopeViewKey: '',
     envScrollLock: false,
     editMode: true,
     provinces: [],
@@ -618,7 +619,8 @@ Page({
       const expanded = { ...this.data.platformExpanded, [platformId]: false }
       syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
       const still = !!(this.data.sectionOpenWx || this.data.sectionOpenContact || this.data.sectionOpenTeam)
-      this.setData({ envScrollLock: still, envelopePartId: '' })
+      const envelopeViewKey = this.data.envelopeViewKey === platformId ? '' : this.data.envelopeViewKey
+      this.setData({ envScrollLock: still, envelopePartId: '', envelopeViewKey })
       return
     }
     const openKey = key === 'wx' ? 'sectionOpenWx' : key === 'contact' ? 'sectionOpenContact' : 'sectionOpenTeam'
@@ -626,11 +628,16 @@ Page({
     hide[openKey] = false
     const platOpen = Object.keys(this.data.platformExpanded || {}).some((k) => this.data.platformExpanded[k])
     hide.envScrollLock = platOpen
+    hide.envelopeViewKey = this.data.envelopeViewKey === key ? '' : this.data.envelopeViewKey
     this.setData(hide)
   },
   onOpenSection(e) {
     const key = e.currentTarget.dataset.key
-    if (key === 'wx' || key === 'contact' || key === 'team') this.partSection(key)
+    const mode = e.currentTarget.dataset.mode || 'edit'
+    if (key === 'wx' || key === 'contact' || key === 'team') {
+      this.partSection(key)
+      this.setData({ envelopeViewKey: mode === 'view' ? key : '' })
+    }
   },
   onCloseSection(e) {
     const key = e.currentTarget.dataset.key
@@ -643,17 +650,18 @@ Page({
   },
   onOpenPlatform(e) {
     const id = e.currentTarget.dataset.id
+    const mode = e.currentTarget.dataset.mode || 'edit'
     if (!id) return
     const prof = (this.data.platformProfiles && this.data.platformProfiles[id]) || {}
     let profiles = this.data.platformProfiles
-    if (!prof.enabled) {
+    if (mode !== 'view' && !prof.enabled) {
       this.markFormDirty()
       profiles = { ...profiles }
       profiles[id] = { ...talentPlatforms.emptyProfile(), ...prof, enabled: true }
     }
     const expanded = { ...this.data.platformExpanded, [id]: true }
     syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, expanded)
-    this.setData({ envScrollLock: true })
+    this.setData({ envScrollLock: true, envelopeViewKey: mode === 'view' ? id : '' })
   },
   onPreviewTradeExample() {
     wx.previewImage({ urls: ['/images/trade-screenshot-example.jpg'] })
