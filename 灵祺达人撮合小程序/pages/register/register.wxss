@@ -530,15 +530,39 @@ button.cred-edit-btn[size='mini'] {
   z-index: 301;
   left: 40rpx;
   right: 40rpx;
-  top: 12vh;
-  max-height: 76vh;
+  top: 10vh;
+  max-height: 78vh;
+  overflow: visible;
+  background: #e6d3b8;
+  border-radius: 28rpx;
+  padding: 72rpx 16rpx 16rpx;
+  box-shadow: 0 24rpx 64rpx rgba(28, 25, 23, 0.18);
+  perspective: 900px;
+}
+
+.env-dialog-flap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 72rpx;
+  background: linear-gradient(180deg, #f3e6d2, #d8c2a2);
+  border-radius: 28rpx 28rpx 0 0;
+  transform-origin: top center;
+  z-index: 4;
+  animation: env-flap-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.env-letter {
+  position: relative;
+  z-index: 1;
+  max-height: 68vh;
   overflow-y: auto;
   background: #fff;
-  border-radius: 28rpx;
-  padding: 28rpx;
-  box-shadow: 0 24rpx 64rpx rgba(28, 25, 23, 0.18);
+  border-radius: 20rpx;
+  padding: 24rpx;
   transform-origin: top center;
-  animation: env-pop 0.42s cubic-bezier(0.22, 0.82, 0.24, 1);
+  animation: env-letter-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 .env-save-row {
@@ -553,35 +577,40 @@ button.cred-edit-btn[size='mini'] {
 }
 
 .paper-page .cred-modal {
+  overflow: visible;
+  perspective: 800px;
+  background: #e6d3b8;
+  padding-top: 72rpx;
+}
+
+.paper-page .cred-modal::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 56rpx;
+  background: linear-gradient(180deg, #f3e6d2, #d8c2a2);
+  border-radius: 24rpx 24rpx 0 0;
   transform-origin: top center;
-  animation: cred-env 0.42s cubic-bezier(0.22, 0.82, 0.24, 1);
+  animation: env-flap-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
-@keyframes env-pop {
-  from {
-    transform: rotateX(-68deg) scale(0.96);
-    opacity: 0;
-  }
-  to {
-    transform: none;
-    opacity: 1;
-  }
+@keyframes env-flap-open {
+  0% { transform: rotateX(0deg); }
+  100% { transform: rotateX(-78deg); }
 }
 
-@keyframes cred-env {
-  from {
-    transform: translateY(-50%) rotateX(-68deg) scale(0.96);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(-50%);
-    opacity: 1;
-  }
+@keyframes env-letter-open {
+  0% { transform: scaleY(0.06); opacity: 0.2; }
+  42% { transform: scaleY(0.55); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .env--open .env-sheet,
-  .paper-page .cred-modal {
+  .env-dialog-flap,
+  .env-letter,
+  .paper-page .cred-modal::before {
     animation: none;
   }
 }

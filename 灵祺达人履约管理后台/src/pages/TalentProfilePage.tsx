@@ -62,7 +62,7 @@ export function ProfileEnvelope({
   useEffect(() => {
     if (phase !== 'shut') return
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const timer = window.setTimeout(() => setPhase('closed'), reduce ? 0 : 380)
+    const timer = window.setTimeout(() => setPhase('closed'), reduce ? 0 : 620)
     return () => window.clearTimeout(timer)
   }, [phase])
 
@@ -80,44 +80,89 @@ export function ProfileEnvelope({
           </button>
         </div>
       </div>
+      <style>{`
+        .lq-env-stage { perspective: 1400px; }
+        .lq-env-pocket {
+          position: relative;
+          width: min(32rem, 100%);
+          background: #e6d3b8;
+          border-radius: 18px;
+          padding: 46px 12px 14px;
+          box-shadow: 0 24px 60px rgba(28, 25, 23, 0.28);
+          transform-style: preserve-3d;
+        }
+        .lq-env-flap {
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 64px;
+          background: linear-gradient(#f3e6d2, #d8c2a2);
+          clip-path: polygon(0 0, 100% 0, 50% 100%);
+          transform-origin: top center;
+          z-index: 4;
+          pointer-events: none;
+        }
+        .lq-env-letter {
+          position: relative;
+          z-index: 1;
+          max-height: 74vh;
+          overflow: auto;
+          background: #fff;
+          border-radius: 14px;
+          padding: 16px;
+          transform-origin: top center;
+        }
+        .lq-env-stage--open .lq-env-flap { animation: lq-flap-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        .lq-env-stage--open .lq-env-letter { animation: lq-letter-open 0.78s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        .lq-env-stage--shut .lq-env-flap { animation: lq-flap-shut 0.55s ease forwards; }
+        .lq-env-stage--shut .lq-env-letter { animation: lq-letter-shut 0.55s ease forwards; }
+        @keyframes lq-flap-open {
+          0% { transform: rotateX(0deg); }
+          100% { transform: rotateX(-78deg); }
+        }
+        @keyframes lq-letter-open {
+          0% { transform: scaleY(0.06); opacity: 0.2; }
+          42% { transform: scaleY(0.55); opacity: 1; }
+          100% { transform: scaleY(1); opacity: 1; }
+        }
+        @keyframes lq-flap-shut {
+          from { transform: rotateX(-78deg); }
+          to { transform: rotateX(0deg); }
+        }
+        @keyframes lq-letter-shut {
+          from { transform: scaleY(1); opacity: 1; }
+          to { transform: scaleY(0.08); opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .lq-env-flap, .lq-env-letter { animation: none !important; }
+        }
+      `}</style>
       {phase !== 'closed' ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
+        <div className="lq-env-stage fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
           <div
-            className={`env-dialog max-h-[82vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white px-4 py-4 text-sm shadow-2xl [perspective:900px] ${phase === 'shut' ? 'env-dialog--shut' : 'env-dialog--open'}`}
+            className={`lq-env-pocket ${phase === 'shut' ? 'lq-env-stage--shut' : 'lq-env-stage--open'}`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
-            <div className="space-y-3">{children}</div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700" onClick={onClose}>
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                onClick={onSave}
-              >
-                {saving ? '保存中…' : '保存'}
-              </button>
+            <div className="lq-env-flap" />
+            <div className="lq-env-letter text-sm">
+              <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
+              <div className="space-y-3">{children}</div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700" onClick={onClose}>
+                  取消
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  onClick={onSave}
+                >
+                  {saving ? '保存中…' : '保存'}
+                </button>
+              </div>
             </div>
           </div>
-          <style>{`
-            .env-dialog { transform-origin: top center; }
-            .env-dialog--open { animation: env-open 0.42s cubic-bezier(0.22, 0.82, 0.24, 1); }
-            .env-dialog--shut { animation: env-shut 0.36s cubic-bezier(0.4, 0, 0.7, 0.2) forwards; }
-            @keyframes env-open {
-              from { transform: rotateX(-68deg) scale(0.96); opacity: 0; }
-              to { transform: none; opacity: 1; }
-            }
-            @keyframes env-shut {
-              from { transform: none; opacity: 1; }
-              to { transform: rotateX(-68deg) scale(0.96); opacity: 0; }
-            }
-            @media (prefers-reduced-motion: reduce) {
-              .env-dialog--open, .env-dialog--shut { animation: none; }
-            }
-          `}</style>
         </div>
       ) : null}
     </section>
