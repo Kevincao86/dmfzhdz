@@ -1,29 +1,109 @@
 /**
- * 微信开放平台网站应用扫码：嵌入官方 qrconnect 页。
+ * 微信开放平台网站应用登录。
+ * 使用官方 WxLogin，电脑已登录微信（Windows 3.9.11+ / Mac 4.0.0+ 且未锁定）时拉起客户端确认。
  * @see https://developers.weixin.qq.com/doc/oplatform/Website_App/WeChat_Login/Wechat_Login.html
  */
+import { useEffect, useId, useRef } from 'react'
+
 type Props = {
   authorizeUrl: string
   className?: string
 }
 
+type WxLoginOptions = {
+  self_redirect: boolean
+  id: string
+  appid: string
+  scope: string
+  redirect_uri: string
+  state: string
+  stylelite: number
+  onCleanup?: () => void
+}
+
+declare global {
+  interface Window {
+    WxLogin?: new (opts: WxLoginOptions) => void
+  }
+}
+
+const WX_LOGIN_SRC = 'https://res.wx.qq.com/connect/zh_CN/htmledition/js/wxLogin.js'
+
+function loadWxLoginScript(): Promise<void> {
+  if (typeof window.WxLogin === 'function') return Promise.resolve()
+  const found = document.querySelector('script[data-wx-login="1"]')
+  if (found) {
+    return new Promise((resolve, reject) => {
+      found.addEventListener('load', () => resolve(), { once: true })
+      found.addEventListener('error', () => reject(new Error('wx_login_script')), { once: true })
+    })
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = WX_LOGIN_SRC
+    script.async = true
+    script.dataset.wxLogin = '1'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('wx_login_script'))
+    document.head.appendChild(script)
+  })
+}
+
 export default function WxOAuthOfficialPanel({ authorizeUrl, className }: Props) {
+  const reactId = useId().replace(/:/g, '')
+  const boxId = `wx-login-${reactId}`
+  const optsRef = useRef<WxLoginOptions | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let parsed: URL
+    try {
+      parsed = new URL(authorizeUrl)
+    } catch {
+      return
+    }
+    const appid = parsed.searchParams.get('appid') || ''
+    const redirect = parsed.searchParams.get('redirect_uri') || ''
+    const state = parsed.searchParams.get('state') || ''
+    if (!appid || !redirect || !state) return
+
+    const opts: WxLoginOptions = {
+      self_redirect: true,
+      id: boxId,
+      appid,
+      scope: 'snsapi_login',
+      redirect_uri: encodeURIComponent(redirect),
+      state,
+      stylelite: 1,
+    }
+    optsRef.current = opts
+
+    void loadWxLoginScript()
+      .then(() => {
+        if (cancelled || typeof window.WxLogin !== 'function') return
+        const box = document.getElementById(boxId)
+        if (box) box.innerHTML = ''
+        new window.WxLogin(opts)
+      })
+      .catch(() => {
+        /* 脚本失败时保留空容器，外层会提示刷新 */
+      })
+
+    return () => {
+      cancelled = true
+      optsRef.current?.onCleanup?.()
+      optsRef.current = null
+    }
+  }, [authorizeUrl, boxId])
+
   if (!authorizeUrl) return null
 
   return (
-    <div className={className ?? 'flex justify-center'}>
-      <div
-        className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner"
-        style={{ width: 300, height: 400 }}
-      >
-        <iframe
-          src={authorizeUrl}
-          title="微信官方扫码登录"
-          className="absolute left-0 top-0 border-0"
-          style={{ width: 300, height: 400 }}
-          scrolling="no"
-        />
-      </div>
+    <div className={className ?? 'flex flex-col items-center'}>
+      <div id={boxId} className="h-[400px] w-[300px] overflow-hidden rounded-2xl bg-white" />
+      <p className="mt-2 max-w-[300px] text-center text-[11px] leading-relaxed text-slate-400">
+        电脑已登录微信时，会拉起微信请你确认；没打开微信时仍显示二维码。
+      </p>
     </div>
   )
 }
