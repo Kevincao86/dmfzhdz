@@ -14,7 +14,7 @@ import {
 } from '../lib/mpSync/talentPlatformProfiles'
 import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
-import { noteOwnedWorkIdentity, readOwnedWorkIdentities } from '../lib/mpWorkIdentity'
+import { getWorkIdentity, noteOwnedWorkIdentity, readOwnedWorkIdentities } from '../lib/mpWorkIdentity'
 import { inferLegacyMemberType } from '../lib/mpSync/talentPlatformProfiles'
 import { TALENT_TAGS } from '../lib/mpSync/publishFormOptions'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
@@ -301,6 +301,18 @@ function TalentProfileForm() {
           ))}
         {readOwnedWorkIdentities().length < 3 ? (
           <span className="text-xs text-slate-400">可新增身份</span>
+        ) : null}
+        {getWorkIdentity() !== 'talent' && !readOwnedWorkIdentities().includes('talent') ? (
+          <Link
+            to={
+              getWorkIdentity() === 'shoot' || getWorkIdentity() === 'edit'
+                ? `/profile/supplier?identity=${getWorkIdentity()}`
+                : '/profile'
+            }
+            className="rounded-full border border-stone-300 bg-white px-3 py-1 text-sm text-stone-800"
+          >
+            返回上一身份
+          </Link>
         ) : null}
       </div>
       {member.lingqiTalentId ? (

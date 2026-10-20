@@ -97,17 +97,18 @@ let profilePulledAt = 0
 
 function identityBarState(activeId) {
   if (userProfile.readIdentity() === 'pr') {
-    return { identityChips: [], canAddIdentity: false }
+    return { identityChips: [], canAddIdentity: false, showIdentityBack: false }
   }
   const owned = userProfile.readOwnedIdentities()
   const active = activeId || userProfile.readIdentity()
-  return {
+    return {
     identityChips: owned.map((id) => ({
       id,
       label: IDENTITY_CHIP_LABEL[id] || id,
       active: id === active,
     })),
     canAddIdentity: owned.length < 3,
+    showIdentityBack: Boolean(active) && !owned.includes(active),
   }
 }
 
@@ -222,6 +223,17 @@ Page({
     const active = activeId || this._formIdentity || userProfile.readIdentity()
     this.setData(identityBarState(active))
   },
+  onBackIdentity() {
+    const owned = userProfile.readOwnedIdentities()
+    const saved = this._identityReturnTo
+    const current = userProfile.readIdentity()
+    const back = saved && owned.includes(saved) ? saved : owned.includes(current) ? current : owned[0]
+    if (!back) return
+    this._identityReturnTo = ''
+    this._formIdentity = back
+    this._formDirty = false
+    this.hydrateMemberFormFromStorage()
+  },
   onAddIdentity() {
     const owned = userProfile.readOwnedIdentities()
     const missing = ['talent', 'shoot', 'edit'].filter((id) => !owned.includes(id))
@@ -231,6 +243,8 @@ Page({
       success: (res) => {
         const id = missing[res.tapIndex]
         if (!id) return
+        const prev = this._formIdentity || userProfile.readIdentity()
+        if (owned.includes(prev)) this._identityReturnTo = prev
         this._formIdentity = id
         this._formDirty = false
         this.hydrateMemberFormFromStorage()

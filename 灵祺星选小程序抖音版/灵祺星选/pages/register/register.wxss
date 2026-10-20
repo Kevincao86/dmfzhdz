@@ -343,6 +343,17 @@
   line-height: 1;
 }
 
+.identity-back {
+  margin-top: 8rpx;
+  padding: 10rpx 28rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid #d6d3d1;
+  background: #fff;
+  color: #44403c;
+  font-size: 26rpx;
+  line-height: 1.4;
+}
+
 .identity-add-hint {
   font-size: 22rpx;
   line-height: 1.2;

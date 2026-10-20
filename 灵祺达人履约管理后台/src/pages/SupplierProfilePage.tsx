@@ -184,6 +184,14 @@ export default function SupplierProfilePage() {
         {readOwnedWorkIdentities().length < 3 ? (
           <span className="text-xs text-slate-400">可新增身份</span>
         ) : null}
+        {adding ? (
+          <Link
+            to={current === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${current}`}
+            className="rounded-full border border-stone-300 bg-white px-3 py-1 text-sm text-stone-800"
+          >
+            返回上一身份
+          </Link>
+        ) : null}
       </div>
       {teamId ? <p className="text-sm text-amber-500 font-mono">{teamId}</p> : null}
 

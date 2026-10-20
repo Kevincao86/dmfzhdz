@@ -13,6 +13,7 @@
     >{{item.label}}</view>
     <view class="identity-chip identity-chip--add" wx:if="{{canAddIdentity}}" bindtap="onAddIdentity">+</view>
     <text class="identity-add-hint" wx:if="{{canAddIdentity}}">可新增身份</text>
+    <view class="identity-back" wx:if="{{showIdentityBack}}" bindtap="onBackIdentity">返回上一身份</view>
   </view>
 
   <view class="card">
