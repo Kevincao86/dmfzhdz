@@ -551,20 +551,30 @@ export async function renderRecruitmentPosterCanvas(
   })
   y += titleLines.length * 44 + 20
 
-  ctx.font = '26px sans-serif'
-  for (const row of input.rows) {
-    ctx.fillStyle = '#64748B'
-    ctx.fillText(`${row.label}：`, pad + 24, y)
-    ctx.fillStyle = '#0F172A'
-    ctx.font = 'bold 26px sans-serif'
-    ctx.fillText(truncateText(ctx, row.value, cardW - 220), pad + 170, y)
-    ctx.font = '26px sans-serif'
-    y += 42
-  }
-
   const qrFrameSize = QR_FRAME_SIZE
   const qrX = POSTER_W - pad - 24 - qrFrameSize
   const qrY = pad + cardH - qrFrameSize - 68
+  const valueX = pad + 170
+  const valueMaxW = Math.max(160, cardW - 194)
+  const rowLineH = 36
+  const rowBottom = qrY - 12
+  for (const row of input.rows) {
+    if (y + rowLineH > rowBottom) break
+    ctx.font = 'bold 26px sans-serif'
+    const room = Math.max(1, Math.floor((rowBottom - y) / rowLineH))
+    const lines = wrapLines(ctx, row.value || '—', valueMaxW, Math.min(4, room))
+    const shown = lines.length ? lines : ['—']
+    ctx.fillStyle = '#64748B'
+    ctx.font = '26px sans-serif'
+    ctx.fillText(`${row.label}：`, pad + 24, y)
+    ctx.fillStyle = '#0F172A'
+    ctx.font = 'bold 26px sans-serif'
+    shown.forEach((line, i) => {
+      ctx.fillText(line, valueX, y + i * rowLineH)
+    })
+    y += shown.length * rowLineH + 8
+  }
+
   const detailX = pad + 24
   const detailMaxW = cardW - 48
   const detailBudget = qrY - (y + 12) - 16
