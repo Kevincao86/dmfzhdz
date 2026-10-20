@@ -64,6 +64,7 @@ const AffiliateApplyPage = lazy(() => import('./pages/AffiliateApplyPage'))
 const AffiliatePortalPage = lazy(() => import('./pages/AffiliatePortalPage'))
 const PartnerSalespersonPortalPage = lazy(() => import('./pages/PartnerSalespersonPortalPage'))
 const ErpDyOAuthCallbackPage = lazy(() => import('./pages/login/ErpDyOAuthCallbackPage'))
+const ErpWxOAuthCallbackPage = lazy(() => import('./pages/login/ErpWxOAuthCallbackPage'))
 const HelpManualPage = lazy(() => import('./pages/HelpManualPage'))
 const KnowledgeBasePage = lazy(() => import('./pages/KnowledgeBasePage'))
 const TeamIntroPage = lazy(() => import('./pages/TeamIntroPage'))
@@ -115,6 +116,7 @@ export default function App() {
                   <Route path="/affiliate/portal" element={<AffiliatePortalPage />} />
                   <Route path="/partner/salesperson-portal" element={<PartnerSalespersonPortalPage />} />
                   <Route path="/login/dy-oauth" element={<ErpDyOAuthCallbackPage />} />
+                  <Route path="/login/wx-oauth" element={<ErpWxOAuthCallbackPage />} />
                   <Route path="/help" element={<HelpManualPage edition={pubEdition} />} />
                   <Route path="/help/:articleId" element={<HelpManualPage edition={pubEdition} />} />
                   <Route path="/team" element={<TeamIntroPage edition={pubEdition} />} />

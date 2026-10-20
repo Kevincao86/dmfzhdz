@@ -5,6 +5,7 @@ import RememberPasswordRow from '@merchant/components/login/RememberPasswordRow'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
 import DyOAuthOfficialPanel from '@merchant/components/login/DyOAuthOfficialPanel'
+import WxOAuthOfficialPanel from '@merchant/components/login/WxOAuthOfficialPanel'
 import LoginAltMethods from '@merchant/components/login/LoginAltMethods'
 import LoginAltMethodsAgreeRow, { LOGIN_AGREE_REQUIRED } from '@merchant/components/login/LoginAltMethodsAgreeRow'
 import { formatMpApiErr } from '../../lib/mpApiErrors'
@@ -15,9 +16,8 @@ import {
   emailLogin,
   emailRegister,
   phoneRegister,
-  scanCreate,
-  scanPoll,
   sendEmailCode,
+  wxOAuthBegin,
   sendRegisterSms,
   smsLogin,
 } from '../../lib/mpApi'
@@ -26,9 +26,6 @@ import type { MpAccount } from '../../lib/mpSession'
 
 export type LoginTab = 'password' | 'sms' | 'email' | 'scan' | 'register'
 export type ScanChannel = 'wechat' | 'douyin'
-
-/** 微信开放平台网站应用资质就绪后改为 true */
-export const SCAN_LOGIN_WECHAT_ENABLED = false
 
 const inputClass =
   'w-full rounded-xl border border-slate-200/90 bg-white/90 px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-500/15 sm:text-sm'
@@ -75,9 +72,9 @@ export default function TalentLoginAuthPanel({
 }: Props) {
   const nav = useNavigate()
   const [scanChannel, setScanChannel] = useState<ScanChannel>('douyin')
-  const [wxQrPayload, setWxQrPayload] = useState('')
-  const [wxTicket, setWxTicket] = useState('')
+  const [wxAuthorizeUrl, setWxAuthorizeUrl] = useState('')
   const [wxScanHint, setWxScanHint] = useState('')
+  const [wxLoading, setWxLoading] = useState(false)
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
@@ -168,36 +165,28 @@ export default function TalentLoginAuthPanel({
   }
 
   useEffect(() => {
-    if (tab !== 'scan' || !agreed || scanChannel !== 'wechat' || !SCAN_LOGIN_WECHAT_ENABLED) return
+    if (tab !== 'scan' || !agreed || scanChannel !== 'wechat') return
     let cancelled = false
+    setWxLoading(true)
+    setWxScanHint('')
+    setWxAuthorizeUrl('')
     ;(async () => {
       try {
-        const s = await scanCreate()
+        const s = await wxOAuthBegin(workIdentity)
         if (cancelled) return
-        setWxTicket(s.ticket)
-        setWxQrPayload(s.qrPayload)
-        setWxScanHint('请使用微信扫描二维码（资质配置后自动确认）')
+        setWxAuthorizeUrl(s.authorizeUrl)
       } catch (e) {
-        setWxScanHint(e instanceof Error ? e.message : '扫码初始化失败')
+        if (!cancelled) {
+          setWxScanHint(formatMpApiErr(e, '微信扫码登录失败，请刷新后重试'))
+        }
+      } finally {
+        if (!cancelled) setWxLoading(false)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [tab, scanChannel, agreed])
-
-  useEffect(() => {
-    if (tab !== 'scan' || !agreed || scanChannel !== 'wechat' || !SCAN_LOGIN_WECHAT_ENABLED || !wxTicket) return
-    const t = setInterval(async () => {
-      try {
-        const r = await scanPoll(wxTicket)
-        if (r.status === 'confirmed' && r.token && r.account) {
-          await onScanLoginSuccess(r.token, r.account)
-        } else if (r.message) setWxScanHint(r.message)
-      } catch (_) {}
-    }, 2500)
-    return () => clearInterval(t)
-  }, [wxTicket, tab, scanChannel, onScanLoginSuccess])
+  }, [tab, scanChannel, workIdentity, agreed])
 
   useEffect(() => {
     if (tab !== 'scan' || !agreed || scanChannel !== 'douyin') return
@@ -478,25 +467,17 @@ export default function TalentLoginAuthPanel({
               {LOGIN_AGREE_REQUIRED}
             </p>
           ) : scanChannel === 'wechat' ? (
-            SCAN_LOGIN_WECHAT_ENABLED ? (
-              <div className="space-y-4 text-center">
-                <div className="mx-auto flex h-52 w-52 items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-inner">
-                  <span className="break-all text-xs leading-snug text-slate-700">
-                    {wxQrPayload || '加载二维码…'}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-500">{wxScanHint}</p>
-                <p className="text-xs text-amber-700/90">
-                  接口已打通；微信开放平台网站应用资质齐全后可展示正式二维码
-                </p>
+            wxLoading ? (
+              <div className="flex flex-col items-center py-10 text-center">
+                <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" />
+                <p className="text-sm text-slate-500">正在加载微信授权页…</p>
               </div>
+            ) : wxAuthorizeUrl ? (
+              <WxOAuthOfficialPanel authorizeUrl={wxAuthorizeUrl} />
             ) : (
-              <div className="space-y-4 py-4 text-center">
-                <div className="mx-auto flex h-52 w-52 flex-col items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 px-6">
-                  <p className="text-base font-semibold text-slate-800">微信扫码接入中</p>
-                  <p className="mt-2 text-sm text-slate-500">微信开放平台网站应用审核通过后启用</p>
-                </div>
-                <p className="text-sm text-slate-500">请先用账号密码登录，或切换「抖音扫码」</p>
+              <div className="space-y-3 py-6 text-center">
+                <p className="text-sm leading-relaxed text-slate-600">{wxScanHint || '无法加载微信扫码登录'}</p>
+                <p className="text-xs leading-relaxed text-slate-400">请刷新页面重试；若持续失败请联系客服</p>
               </div>
             )
           ) : dyLoading ? (
@@ -549,11 +530,7 @@ export default function TalentLoginAuthPanel({
           { id: 'sms', label: '短信验证码' },
           { id: 'email', label: '邮箱登录' },
           { id: 'douyin', label: '抖音登录' },
-          {
-            id: 'wechat',
-            label: '微信登录',
-            hint: '微信开放平台网站应用审核通过后启用',
-          },
+          { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
         ]}
       />
       {agreeNeed && !agreed ? (

@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
 import { cn } from '../../cn'
 import DyOAuthOfficialPanel from './DyOAuthOfficialPanel'
-import { erpDyOAuthBegin, type ErpOAuthPortal } from '../../lib/mpScanAuthApi'
+import WxOAuthOfficialPanel from './WxOAuthOfficialPanel'
+import { erpDyOAuthBegin, erpWxOAuthBegin, type ErpOAuthPortal } from '../../lib/mpScanAuthApi'
 import { toUserFacingError } from '../../lib/userFacingError'
 
 export type ScanChannel = 'wechat' | 'douyin'
-
-/** 微信开放平台网站应用资质就绪后改为 true */
-export const SCAN_LOGIN_WECHAT_ENABLED = false
 
 type Props = {
   portal: ErpOAuthPortal
@@ -26,6 +24,9 @@ export default function ErpScanLoginPanel({ portal, err, onErr, channel }: Props
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
+  const [wxAuthorizeUrl, setWxAuthorizeUrl] = useState('')
+  const [wxScanHint, setWxScanHint] = useState('')
+  const [wxLoading, setWxLoading] = useState(false)
 
   useEffect(() => {
     if (scanChannel !== 'douyin') return
@@ -51,6 +52,35 @@ export default function ErpScanLoginPanel({ portal, err, onErr, channel }: Props
         }
       } finally {
         if (!cancelled) setDyLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [scanChannel, portal, onErr])
+
+  useEffect(() => {
+    if (scanChannel !== 'wechat') return
+    if (portal !== 'merchant') {
+      setWxAuthorizeUrl('')
+      setWxScanHint('服务商端暂未开通微信扫码，请使用商家版登录')
+      setWxLoading(false)
+      return
+    }
+    let cancelled = false
+    setWxLoading(true)
+    setWxScanHint('')
+    setWxAuthorizeUrl('')
+    onErr(null)
+    ;(async () => {
+      try {
+        const s = await erpWxOAuthBegin(portal)
+        if (cancelled) return
+        setWxAuthorizeUrl(s.authorizeUrl)
+      } catch (e) {
+        if (!cancelled) onErr(toUserFacingError(e, '扫码登录'))
+      } finally {
+        if (!cancelled) setWxLoading(false)
       }
     })()
     return () => {
@@ -90,17 +120,22 @@ export default function ErpScanLoginPanel({ portal, err, onErr, channel }: Props
       )}
 
       {scanChannel === 'wechat' ? (
-        <div className="rounded-2xl border border-white/50 bg-white/40 px-4 py-8 text-center backdrop-blur-sm">
-          {SCAN_LOGIN_WECHAT_ENABLED ? (
-            <p className="text-sm text-slate-600">微信扫码登录接入中</p>
+        <div className="rounded-2xl border border-white/50 bg-white/40 px-2 py-4 backdrop-blur-sm">
+          {wxLoading ? (
+            <div className="flex flex-col items-center py-6">
+              <div className="mb-3 h-9 w-9 animate-spin rounded-full border-2 border-cyan-200 border-t-cyan-600" />
+              <p className="text-sm text-slate-500">正在加载微信官方授权页…</p>
+            </div>
+          ) : wxAuthorizeUrl ? (
+            <WxOAuthOfficialPanel authorizeUrl={wxAuthorizeUrl} />
           ) : (
-            <>
-              <p className="text-sm font-medium text-slate-800">微信扫码登录接入中</p>
-              <p className="mt-2 text-xs leading-relaxed text-slate-500">
-                微信开放平台网站应用资质审核通过后自动开放；当前请使用抖音扫码或手机验证码登录。
-              </p>
-            </>
+            <p className="py-4 text-center text-sm text-slate-500">
+              {wxScanHint || '无法加载微信扫码，请稍后重试'}
+            </p>
           )}
+          <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-400">
+            请使用微信扫一扫。首次扫码会开通商家试用账号。
+          </p>
         </div>
       ) : (
         <div className="rounded-2xl border border-white/50 bg-white/40 px-2 py-4 backdrop-blur-sm">

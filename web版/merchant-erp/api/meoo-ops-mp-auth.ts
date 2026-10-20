@@ -51,6 +51,8 @@ import {
   mpAuthBindPhoneLogin,
   mpAuthDyOAuthBegin,
   mpAuthDyOAuthComplete,
+  mpAuthWxOAuthBegin,
+  mpAuthWxOAuthComplete,
   resolveSession,
 } from '../src/lib/mpAccountAuth.js'
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
@@ -764,6 +766,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         mergeRequired: mergeRequired === true,
         ticket: ticket || '',
         subjectLabel: subjectLabel || '',
+        account: payload,
+        access_token: erpSession?.access_token,
+        refresh_token: erpSession?.refresh_token,
+        loginName: erpSession?.loginName,
+        needsPhoneBind: erpSession?.needsPhoneBind,
+      })
+      return
+    }
+
+    if (action === 'wx_oauth_begin') {
+      const workIdentity = pickAuthField(req, body, 'workIdentity') || 'talent'
+      const portalRaw = pickAuthField(req, body, 'portal') || 'xingxuan'
+      if (portalRaw === 'partner') {
+        sendJson(res, 503, { ok: false, error: 'wx_web_not_configured' })
+        return
+      }
+      const portal = portalRaw === 'merchant' ? 'merchant' : 'xingxuan'
+      const redirectUri = pickAuthField(req, body, 'redirectUri')
+      const out = await mpAuthWxOAuthBegin(supabaseUrl, serviceRole, workIdentity, {
+        portal,
+        redirectUri,
+      })
+      sendJson(res, 200, { ok: true, ...out })
+      return
+    }
+
+    if (action === 'wx_oauth_complete') {
+      const code = pickAuthField(req, body, 'code')
+      const state = pickAuthField(req, body, 'state')
+      if (!code || !state) {
+        sendJson(res, 400, { ok: false, error: 'missing_code_or_state' })
+        return
+      }
+      const { token, account, workIdentity, isNew, portal, erpSession } = await mpAuthWxOAuthComplete(
+        supabaseUrl,
+        serviceRole,
+        code,
+        state,
+      )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, {
+        ok: true,
+        token,
+        isNew,
+        workIdentity,
+        portal,
         account: payload,
         access_token: erpSession?.access_token,
         refresh_token: erpSession?.refresh_token,
@@ -1855,6 +1903,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'scan_poll',
         'dy_oauth_begin',
         'dy_oauth_complete',
+        'wx_oauth_begin',
+        'wx_oauth_complete',
         'scan_confirm_dev',
         'hall_registry',
         'client_state_get',
@@ -1933,6 +1983,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'merge_confirm_douyin' ||
       msg.startsWith('merge_subject_conflict_') ||
       msg === 'dy_bind_ticket_mismatch' ||
+      msg === 'wx_oauth_state_invalid' ||
+      msg === 'wx_oauth_ticket_expired' ||
+      msg === 'wx_oauth_ticket_used' ||
+      msg === 'wx_oauth_code_invalid' ||
+      msg === 'wx_web_token_failed' ||
       msg === 'missing_openid' ||
       msg === 'missing_code' ||
       /^invalid code/i.test(msg) ||
@@ -1940,11 +1995,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       /^dy_code2session_/i.test(msg) ||
       /duplicate key|23505/i.test(msg)
         ? 400
-        : msg === 'wx_not_configured' || msg === 'dy_not_configured'
+        : msg === 'wx_not_configured' ||
+            msg === 'dy_not_configured' ||
+            msg === 'dy_web_not_configured' ||
+            msg === 'wx_web_not_configured'
           ? 503
-          : msg === 'dy_web_not_configured'
-            ? 503
-            : 500
+          : 500
     const zh: Record<string, string> = {
       sms_code_invalid: '验证码错误或已过期',
       invalid_sms_code: '请输入 6 位验证码',
@@ -1970,6 +2026,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       dy_not_configured: '抖音登录未配置（请在轻量配置 MP_DOUYIN_SECRET）',
       dy_web_not_configured:
         '抖音网站扫码登录未配置（请在轻量配置 MP_DOUYIN_WEB_CLIENT_KEY / MP_DOUYIN_WEB_CLIENT_SECRET，并在抖音开放平台配置授权回调）',
+      wx_web_not_configured: '微信网站扫码登录未配置，请联系管理员',
+      wx_oauth_state_invalid: '微信授权状态无效，请返回登录页重试',
+      wx_oauth_ticket_expired: '微信扫码登录已过期，请重新发起',
+      wx_oauth_ticket_used: '该微信授权已使用，请重新扫码',
+      wx_oauth_code_invalid: '微信授权码无效或已使用，请重新扫码',
+      wx_web_token_failed: '微信授权失败，请重新扫码',
       dy_oauth_state_invalid: '抖音授权状态无效，请返回登录页重试',
       dy_oauth_ticket_expired: '抖音扫码登录已过期，请重新发起',
       erp_dy_phone_not_bound: '该抖音账号未绑定手机号，请先在小程序完善资料或使用手机验证码登录',

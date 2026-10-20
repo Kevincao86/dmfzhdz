@@ -44,7 +44,18 @@ import {
   createAdminSessionForUserId,
   findAuthUserByPhone,
 } from '../../vite-plugins/authSmsAuthShared.js'
-import { signInOrProvisionByDyOpenId } from '../../vite-plugins/authIdentityBindCore.js'
+import { signInOrProvisionByDyOpenId, signInOrProvisionByWxWebOpenId } from '../../vite-plugins/authIdentityBindCore.js'
+import {
+  buildWechatWebAuthorizeUrl,
+  decodeWxOAuthState,
+  exchangeWechatWebOAuthCode,
+  isWechatWebOAuthConfigured,
+  newWxOAuthTicket,
+  pickWechatWebRedirectUri,
+  readWechatWebAppId,
+  wechatWebOpenIdStorageKey,
+  type WxWebPortal,
+} from './wechatWebOAuth.js'
 
 export type MpAccountRole = 'talent' | 'pr'
 
@@ -2399,6 +2410,129 @@ export async function mpAuthDyOAuthComplete(
   let erpSession: MpAuthDyOAuthCompleteResult['erpSession']
   if (isErpPortal) {
     erpSession = await tryErpSessionFromMpAccount(account)
+  }
+
+  const token = await createSession(rest, account.id)
+  await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(parsed.ticket)}`, {
+    status: 'confirmed',
+    openid,
+    account_id: account.id,
+    session_token: token,
+  })
+
+  const fixedWorkIdentity = isErpPortal ? workIdentity : await fixedIdentityForAccount(supabaseUrl, serviceRole, account)
+  return { token, account, workIdentity: fixedWorkIdentity, isNew, portal, erpSession }
+}
+
+/** 微信网站应用扫码登录：生成官方 qrconnect 地址 */
+export async function mpAuthWxOAuthBegin(
+  supabaseUrl: string,
+  serviceRole: string,
+  workIdentity: string,
+  opts?: { portal?: WxWebPortal; redirectUri?: string },
+): Promise<{ authorizeUrl: string; ticket: string; expiresAt: string; redirectUri: string; appId: string }> {
+  const portal: WxWebPortal = opts?.portal === 'merchant' ? 'merchant' : 'xingxuan'
+  if (!isWechatWebOAuthConfigured(portal)) throw new Error('wx_web_not_configured')
+  const rest = restClient(supabaseUrl, serviceRole)
+  const state = newWxOAuthTicket(
+    portal,
+    portal === 'xingxuan' ? normalizeDyOAuthWorkIdentity(workIdentity) : 'merchant',
+  )
+  const expiresAt = new Date(Date.now() + SCAN_TTL_SEC * 1000).toISOString()
+  const res = await rest.post('/mp_wx_scan_tickets', {
+    ticket: state.ticket,
+    status: 'pending',
+    expires_at: expiresAt,
+  })
+  if (!res.ok) throw new Error('scan_ticket_create_failed')
+  const redirectUri = pickWechatWebRedirectUri(opts?.redirectUri, portal)
+  const authorizeUrl = buildWechatWebAuthorizeUrl(state.ticket, portal, redirectUri)
+  return { authorizeUrl, ticket: state.ticket, expiresAt, redirectUri, appId: readWechatWebAppId(portal) }
+}
+
+/** 微信 OAuth 回调：code + state → 会话（商家门户额外返回 ERP 会话） */
+export async function mpAuthWxOAuthComplete(
+  supabaseUrl: string,
+  serviceRole: string,
+  code: string,
+  state: string,
+): Promise<MpAuthDyOAuthCompleteResult> {
+  const parsed = decodeWxOAuthState(state)
+  if (!parsed?.ticket) throw new Error('wx_oauth_state_invalid')
+  if (!isWechatWebOAuthConfigured(parsed.portal)) throw new Error('wx_web_not_configured')
+
+  const rest = restClient(supabaseUrl, serviceRole)
+  const ticketRes = await rest.get(
+    `/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(parsed.ticket)}&limit=1`,
+  )
+  if (!ticketRes.ok) throw new Error('wx_oauth_ticket_lookup_failed')
+  const ticketRows = (await ticketRes.json()) as { status: string; expires_at: string }[]
+  const ticketRow = ticketRows[0]
+  if (!ticketRow) throw new Error('wx_oauth_ticket_expired')
+  if (new Date(ticketRow.expires_at).getTime() < Date.now()) throw new Error('wx_oauth_ticket_expired')
+  if (ticketRow.status === 'confirmed') throw new Error('wx_oauth_ticket_used')
+
+  const oauth = await exchangeWechatWebOAuthCode(code, parsed.portal)
+  const openid = wechatWebOpenIdStorageKey(oauth.openId)
+  const portal = parsed.portal
+  const isErpPortal = portal === 'merchant'
+  const workIdentity = isErpPortal ? 'merchant' : normalizeDyOAuthWorkIdentity(parsed.workIdentity)
+  let role: MpAccountRole = workIdentity === 'pr' ? 'pr' : 'talent'
+
+  let account = await findAccountByOpenId(rest, openid)
+  let isNew = false
+  if (!account) {
+    isNew = true
+    account = await insertAccount(rest, {
+      openid,
+      active_role: role,
+      wx_nick_name: oauth.nickname || '',
+      wx_avatar_url: oauth.avatarUrl || '',
+    })
+  } else if (oauth.nickname || oauth.avatarUrl) {
+    await updateAccount(rest, account.id, {
+      wx_nick_name: mergeWxNick(oauth.nickname, account.wx_nick_name),
+      wx_avatar_url: mergeWxAvatar(oauth.avatarUrl, account.wx_avatar_url),
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+  if (!isNew && !isErpPortal) role = account.active_role === 'pr' ? 'pr' : 'talent'
+
+  if (!isErpPortal) {
+    account = await provisionRegistryForAccount(
+      supabaseUrl,
+      serviceRole,
+      account,
+      role,
+      oauth.nickname || account.wx_nick_name || '',
+      oauth.avatarUrl || account.wx_avatar_url || '',
+    )
+    if (isNew && role === 'talent' && (workIdentity === 'shoot' || workIdentity === 'edit')) {
+      account = await mpAuthEnsureIdentity(
+        supabaseUrl,
+        serviceRole,
+        account.id,
+        role,
+        workIdentity,
+        { initial: true },
+      )
+    }
+  }
+
+  let erpSession: MpAuthDyOAuthCompleteResult['erpSession']
+  if (isErpPortal) {
+    const wx = await signInOrProvisionByWxWebOpenId({
+      openid,
+      nickName: oauth.nickname || account.wx_nick_name || '',
+    })
+    if (!wx.ok) throw new Error(wx.error || 'wx_web_token_failed')
+    erpSession = {
+      access_token: wx.access_token,
+      refresh_token: wx.refresh_token,
+      loginName: wx.loginName,
+      needsPhoneBind: wx.needsPhoneBind,
+      isNew: wx.isNew,
+    }
   }
 
   const token = await createSession(rest, account.id)

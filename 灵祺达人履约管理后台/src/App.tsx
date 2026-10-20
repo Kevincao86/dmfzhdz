@@ -7,6 +7,7 @@ import AppShell from './components/AppShell'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import DyOAuthCallbackPage from './pages/login/DyOAuthCallbackPage'
+import WxOAuthCallbackPage from './pages/login/WxOAuthCallbackPage'
 import RegisterPage from './pages/RegisterPage'
 import AffiliateApplyPage from '@merchant/pages/AffiliateApplyPage'
 import AffiliatePortalPage from '@merchant/pages/AffiliatePortalPage'
@@ -113,6 +114,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/login/dy-oauth" element={<DyOAuthCallbackPage />} />
+      <Route path="/login/wx-oauth" element={<WxOAuthCallbackPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/affiliate/apply" element={<AffiliateApplyPage />} />
       <Route path="/affiliate/portal" element={<AffiliatePortalPage />} />

@@ -208,6 +208,40 @@ async function postDyOAuth(body: Record<string, unknown>) {
   throw new Error(lastErr)
 }
 
+export async function wxOAuthBegin(workIdentity: string) {
+  const redirectUri =
+    typeof window !== 'undefined' ? `${window.location.origin}/login/wx-oauth` : ''
+  const data = await postDyOAuth({
+    action: 'wx_oauth_begin',
+    workIdentity,
+    portal: 'xingxuan',
+    redirectUri,
+  })
+  const authorizeUrl = String(data.authorizeUrl || '')
+  if (!authorizeUrl) throw new Error('未获取到微信授权链接')
+  return {
+    authorizeUrl,
+    ticket: String(data.ticket || ''),
+    redirectUri: String(data.redirectUri || redirectUri),
+    appId: String(data.appId || ''),
+  }
+}
+
+export async function wxOAuthComplete(code: string, state: string) {
+  const data = await postDyOAuth({
+    action: 'wx_oauth_complete',
+    code,
+    state,
+  })
+  const token = String(data.token || '')
+  if (!token) throw new Error('微信授权成功，但未获取到登录会话')
+  return {
+    token,
+    workIdentity: String(data.workIdentity || 'talent'),
+    account: data.account as MpAccount,
+  }
+}
+
 export async function dyOAuthBegin(workIdentity: string, bind = false) {
   const redirectUri =
     typeof window !== 'undefined' ? `${window.location.origin}/login/dy-oauth` : ''

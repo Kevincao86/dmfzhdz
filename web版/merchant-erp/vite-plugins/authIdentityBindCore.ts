@@ -14,6 +14,7 @@ import { readMerchantSupabaseAdminEnv, readMerchantSupabaseAnonKey } from './mer
 import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 export const ERP_WX_OPENID_META_KEY = 'erp_wx_openid'
+export const ERP_WXWEB_OPENID_META_KEY = 'erp_wxweb_openid'
 export const ERP_DY_OPENID_META_KEY = 'erp_dy_openid'
 export const ERP_BIND_EMAIL_META_KEY = 'bind_email'
 
@@ -64,6 +65,11 @@ export function wxOpenIdFromUser(u: Record<string, unknown>): string {
 export function dyOpenIdFromUser(u: Record<string, unknown>): string {
   const meta = (u.user_metadata as Record<string, unknown> | undefined) ?? {}
   return String(meta[ERP_DY_OPENID_META_KEY] || '').trim()
+}
+
+export function wxWebOpenIdFromUser(u: Record<string, unknown>): string {
+  const meta = (u.user_metadata as Record<string, unknown> | undefined) ?? {}
+  return String(meta[ERP_WXWEB_OPENID_META_KEY] || '').trim()
 }
 
 export type IdentitySnapshot = {
@@ -320,6 +326,55 @@ export async function bindErpDyOpenIdToAuthUser(
     return { ok: false, error: 'dy_openid_already_bound', message: '该抖音已绑定其他商家账号' }
   }
   const patched = await patchUserMetadata(id, { [ERP_DY_OPENID_META_KEY]: dy })
+  if (!patched.ok) return { ok: false, error: 'bind_failed', message: patched.message }
+  return { ok: true }
+}
+
+export async function findAuthUserByErpWxWebOpenId(
+  openid: string,
+): Promise<{ userId: string; email: string; loginName: string } | null> {
+  const needle = String(openid || '').trim()
+  if (!needle) return null
+  const { supabaseUrl, serviceRole, missingParts } = adminEnv()
+  if (missingParts.length) return null
+  const base = supabaseUrl.replace(/\/$/, '')
+  let page = 1
+  const perPage = 200
+  while (page <= 20) {
+    const res = await supabaseAdminFetch(`${base}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, {
+      headers: adminHeaders(serviceRole),
+    })
+    if (!res.ok) return null
+    const parsed = (await res.json()) as { users?: Record<string, unknown>[] }
+    const users = Array.isArray(parsed.users) ? parsed.users : []
+    for (const u of users) {
+      if (wxWebOpenIdFromUser(u) !== needle) continue
+      const userId = typeof u.id === 'string' ? u.id : ''
+      const email = typeof u.email === 'string' ? u.email : ''
+      const meta = u.user_metadata as { login_name?: string } | undefined
+      const loginName =
+        (typeof meta?.login_name === 'string' && meta.login_name.trim()) ||
+        (email ? email.split('@')[0] ?? '' : '')
+      if (userId && email) return { userId, email, loginName }
+    }
+    if (users.length < perPage) break
+    page += 1
+  }
+  return null
+}
+
+export async function bindErpWxWebOpenIdToAuthUser(
+  userId: string,
+  openid: string,
+): Promise<{ ok: true } | { ok: false; error: string; message: string }> {
+  const id = String(userId || '').trim()
+  const wx = String(openid || '').trim()
+  if (!id || !wx) return { ok: false, error: 'invalid_bind', message: '绑定参数无效' }
+  const existing = await findAuthUserByErpWxWebOpenId(wx)
+  if (existing && existing.userId !== id) {
+    return { ok: false, error: 'wx_openid_already_bound', message: '该微信已绑定其他商家账号' }
+  }
+  const patched = await patchUserMetadata(id, { [ERP_WXWEB_OPENID_META_KEY]: wx })
   if (!patched.ok) return { ok: false, error: 'bind_failed', message: patched.message }
   return { ok: true }
 }
@@ -1034,6 +1089,12 @@ function loginNameFromDyOpenId(openid: string): string {
   return `dy${tail}`.slice(0, 32)
 }
 
+function loginNameFromWxWebOpenId(openid: string): string {
+  const clean = openid.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+  const tail = (clean || 'user').slice(-10)
+  return `wx${tail}`.slice(0, 32)
+}
+
 export async function signInOrProvisionByDyOpenId(input: {
   openid: string
   nickName?: string
@@ -1078,6 +1139,64 @@ export async function signInOrProvisionByDyOpenId(input: {
     isNew = true
   } else {
     await bindErpDyOpenIdToAuthUser(user.userId, openid)
+  }
+  const session = await createAdminSessionForUserId(user.userId, user.email)
+  if (!session.ok) return { ok: false, error: session.error, message: '登录失败，请稍后重试' }
+  const full = await fetchAuthUserById(user.userId)
+  return {
+    ok: true,
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    loginName: user.loginName,
+    isNew,
+    needsPhoneBind: needsPhoneBindFromUser(full),
+  }
+}
+
+export async function signInOrProvisionByWxWebOpenId(input: {
+  openid: string
+  nickName?: string
+}): Promise<
+  | {
+      ok: true
+      access_token: string
+      refresh_token: string
+      loginName: string
+      isNew: boolean
+      needsPhoneBind: boolean
+    }
+  | { ok: false; error: string; message: string }
+> {
+  const openid = String(input.openid || '').trim()
+  if (!openid) return { ok: false, error: 'invalid_wx_openid', message: '微信授权无效' }
+  let user = await findAuthUserByErpWxWebOpenId(openid)
+  let isNew = false
+  if (!user) {
+    let loginName = loginNameFromWxWebOpenId(openid)
+    const merchantName = String(input.nickName || '').trim() || '微信商家'
+    const password = randomBytes(12).toString('base64url')
+    let provisioned: Awaited<ReturnType<typeof provisionMerchantTenant>> | null = null
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      provisioned = await provisionMerchantTenant({
+        loginName,
+        password,
+        merchantName,
+        trialDays: 7,
+        edition: 'merchant',
+      })
+      if (provisioned.ok) break
+      if (provisioned.error !== 'login_exists') {
+        return { ok: false, error: provisioned.error, message: '微信注册失败，请稍后重试' }
+      }
+      loginName = `${loginNameFromWxWebOpenId(openid)}${attempt + 2}`.slice(0, 32)
+    }
+    if (!provisioned?.ok) return { ok: false, error: 'login_exists', message: '微信注册失败' }
+    const bind = await bindErpWxWebOpenIdToAuthUser(provisioned.userId, openid)
+    if (!bind.ok) return { ok: false, error: bind.error, message: bind.message }
+    user = { userId: provisioned.userId, email: provisioned.email, loginName }
+    isNew = true
+  } else {
+    await bindErpWxWebOpenIdToAuthUser(user.userId, openid)
   }
   const session = await createAdminSessionForUserId(user.userId, user.email)
   if (!session.ok) return { ok: false, error: session.error, message: '登录失败，请稍后重试' }

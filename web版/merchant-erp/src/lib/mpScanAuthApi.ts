@@ -50,6 +50,58 @@ export async function erpDyOAuthBegin(portal: ErpOAuthPortal): Promise<{
   return { authorizeUrl, ticket, redirectUri: outRedirect, clientKey }
 }
 
+export async function erpWxOAuthBegin(portal: ErpOAuthPortal): Promise<{
+  authorizeUrl: string
+  ticket: string
+  redirectUri: string
+  appId: string
+}> {
+  if (portal !== 'merchant') throw new Error('微信扫码登录目前仅商家版可用')
+  const redirectUri =
+    typeof window !== 'undefined' ? `${window.location.origin}/login/wx-oauth` : ''
+  const data = await postMpAuth({
+    action: 'wx_oauth_begin',
+    workIdentity: portal,
+    portal,
+    redirectUri,
+  })
+  const authorizeUrl = String(data.authorizeUrl || '')
+  const ticket = String(data.ticket || '')
+  const outRedirect = String(data.redirectUri || redirectUri)
+  const appId = String(data.appId || '')
+  if (!authorizeUrl) throw new Error('未获取到微信授权链接')
+  return { authorizeUrl, ticket, redirectUri: outRedirect, appId }
+}
+
+export async function erpWxOAuthComplete(
+  code: string,
+  state: string,
+): Promise<{
+  access_token: string
+  refresh_token: string
+  loginName?: string
+  portal?: string
+  needsPhoneBind?: boolean
+}> {
+  const data = await postMpAuth({
+    action: 'wx_oauth_complete',
+    code,
+    state,
+  })
+  const access_token = String(data.access_token || '')
+  const refresh_token = String(data.refresh_token || '')
+  if (!access_token || !refresh_token) {
+    throw new Error('微信授权成功，但未获取到 ERP 登录会话')
+  }
+  return {
+    access_token,
+    refresh_token,
+    loginName: typeof data.loginName === 'string' ? data.loginName : undefined,
+    portal: typeof data.portal === 'string' ? data.portal : undefined,
+    needsPhoneBind: data.needsPhoneBind === true,
+  }
+}
+
 export async function erpDyOAuthComplete(
   code: string,
   state: string,

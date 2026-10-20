@@ -764,11 +764,7 @@ export default function LoginAuthPanel({
               methods={[
                 { id: 'sms', label: '短信验证码' },
                 { id: 'email', label: '邮箱登录' },
-                {
-                  id: 'wechat',
-                  label: '微信登录',
-                  hint: '微信开放平台网站应用审核通过后启用',
-                },
+                { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
                 { id: 'douyin', label: '抖音登录' },
               ]}
             />
