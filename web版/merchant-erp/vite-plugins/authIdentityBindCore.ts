@@ -85,7 +85,7 @@ export function identitiesFromUser(u: Record<string, unknown>): IdentitySnapshot
   const phone = phoneFromUserRecord(u) || ''
   const email = bindEmailFromUser(u)
   return {
-    wechat: Boolean(wxOpenIdFromUser(u)),
+    wechat: Boolean(wxOpenIdFromUser(u) || wxWebOpenIdFromUser(u)),
     douyin: Boolean(dyOpenIdFromUser(u)),
     phone: Boolean(phone),
     email: Boolean(email),

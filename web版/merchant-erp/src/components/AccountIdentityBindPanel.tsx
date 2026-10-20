@@ -185,7 +185,7 @@ export default function AccountIdentityBindPanel() {
                 setMergeToken('')
                 setAwaitingCode(false)
                 if (it.id === 'wechat') {
-                  setHint('请在商家小程序内使用微信一键登录完成绑定')
+                  setHint(on ? '当前账号已通过微信登录绑定' : '请在登录页使用微信扫码，或在商家小程序内使用微信一键登录')
                   return
                 }
                 if (it.id === 'douyin') {
