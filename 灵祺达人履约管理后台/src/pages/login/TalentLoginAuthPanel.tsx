@@ -254,6 +254,46 @@ export default function TalentLoginAuthPanel({
         </p>
       </div>
 
+      {!bindOpen ? (
+        <>
+          <LoginAltMethods
+            className="mb-5 mt-0"
+            showDivider={false}
+            activeId={tab === 'scan' ? scanChannel : tab === 'sms' || tab === 'email' ? tab : undefined}
+            onSelect={(id) => {
+              if (!agreed) {
+                setAgreeNeed(true)
+                return
+              }
+              setAgreeNeed(false)
+              setLocalErr('')
+              if (id === 'sms' || id === 'email') {
+                onTabChange(id)
+                return
+              }
+              if (id === 'douyin') {
+                setScanChannel('douyin')
+                onTabChange('scan')
+                return
+              }
+              if (id === 'wechat') {
+                setScanChannel('wechat')
+                onTabChange('scan')
+              }
+            }}
+            methods={[
+              { id: 'sms', label: '短信验证码' },
+              { id: 'email', label: '邮箱登录' },
+              { id: 'douyin', label: '抖音登录' },
+              { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
+            ]}
+          />
+          {agreeNeed && !agreed ? (
+            <p className="mb-3 text-center text-xs text-amber-700">{LOGIN_AGREE_REQUIRED}</p>
+          ) : null}
+        </>
+      ) : null}
+
       {info ? <p className="mb-3 rounded-xl bg-violet-50 px-3 py-2 text-sm text-violet-800">{info}</p> : null}
 
       {bindOpen ? (
@@ -507,42 +547,6 @@ export default function TalentLoginAuthPanel({
           )}
         </>
       )) : null}
-
-      {!bindOpen ? (
-      <LoginAltMethods
-        activeId={tab === 'scan' ? scanChannel : tab === 'sms' || tab === 'email' ? tab : undefined}
-        onSelect={(id) => {
-          if (!agreed) {
-            setAgreeNeed(true)
-            return
-          }
-          setAgreeNeed(false)
-          setLocalErr('')
-          if (id === 'sms' || id === 'email') {
-            onTabChange(id)
-            return
-          }
-          if (id === 'douyin') {
-            setScanChannel('douyin')
-            onTabChange('scan')
-            return
-          }
-          if (id === 'wechat') {
-            setScanChannel('wechat')
-            onTabChange('scan')
-          }
-        }}
-        methods={[
-          { id: 'sms', label: '短信验证码' },
-          { id: 'email', label: '邮箱登录' },
-          { id: 'douyin', label: '抖音登录' },
-          { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
-        ]}
-      />
-      ) : null}
-      {agreeNeed && !agreed ? (
-        <p className="mt-2 text-center text-xs text-amber-700">{LOGIN_AGREE_REQUIRED}</p>
-      ) : null}
 
       {showDevPreview && onDevPreview ? (
         <button

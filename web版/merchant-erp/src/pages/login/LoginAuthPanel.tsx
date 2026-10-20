@@ -550,6 +550,30 @@ export default function LoginAuthPanel({
           </div>
         </div>
 
+        {mode === 'login' ? (
+          <LoginAltMethods
+            className="mb-5 mt-0"
+            showDivider={false}
+            activeId={loginMethod === 'password' ? undefined : loginMethod}
+            onSelect={(id) => {
+              if (id === 'password') return
+              if (!agreed) {
+                onErr(LOGIN_AGREE_REQUIRED)
+                return
+              }
+              setLoginMethod(id)
+              onErr(null)
+              onInfoHint(null)
+            }}
+            methods={[
+              { id: 'sms', label: '短信验证码' },
+              { id: 'email', label: '邮箱登录' },
+              { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
+              { id: 'douyin', label: '抖音登录' },
+            ]}
+          />
+        ) : null}
+
         {infoHint ? (
           <p className="mb-4 rounded-xl border border-cyan-200/80 bg-cyan-50 px-3 py-2.5 text-center text-sm text-cyan-950">
             {infoHint}
@@ -748,26 +772,6 @@ export default function LoginAuthPanel({
                 )}
               </>
             )}
-
-            <LoginAltMethods
-              activeId={loginMethod === 'password' ? undefined : loginMethod}
-              onSelect={(id) => {
-                if (id === 'password') return
-                if (!agreed) {
-                  onErr(LOGIN_AGREE_REQUIRED)
-                  return
-                }
-                setLoginMethod(id)
-                onErr(null)
-                onInfoHint(null)
-              }}
-              methods={[
-                { id: 'sms', label: '短信验证码' },
-                { id: 'email', label: '邮箱登录' },
-                { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
-                { id: 'douyin', label: '抖音登录' },
-              ]}
-            />
           </>
         ) : (
           <form className="space-y-3.5" onSubmit={(e) => void submitRegister(e)}>

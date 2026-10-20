@@ -14,6 +14,8 @@ type Props = {
   methods: LoginAltMethod[]
   activeId?: LoginAltMethodId
   onSelect: (id: LoginAltMethodId) => void
+  className?: string
+  showDivider?: boolean
 }
 
 function SmsIcon() {
@@ -94,9 +96,10 @@ function MethodIcon({ id }: { id: LoginAltMethodId }) {
   )
 }
 
-export default function LoginAltMethods({ methods, activeId, onSelect }: Props) {
+export default function LoginAltMethods({ methods, activeId, onSelect, className, showDivider = true }: Props) {
   return (
-    <div className="mt-6">
+    <div className={cn('mt-6', className)}>
+      {showDivider ? (
       <div className="relative mb-4">
         <div className="absolute inset-0 flex items-center" aria-hidden>
           <div className="w-full border-t border-slate-200/80" />
@@ -105,6 +108,7 @@ export default function LoginAltMethods({ methods, activeId, onSelect }: Props) 
           <span className="bg-white/80 px-3 text-xs text-slate-400">或使用</span>
         </div>
       </div>
+      ) : null}
       <div
         className={cn(
           'grid gap-2',
