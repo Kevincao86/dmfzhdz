@@ -286,6 +286,7 @@
 
     <view class="env-mask" wx:if="{{item.enabled && item.expanded}}" data-id="{{item.id}}" catchtap="onClosePlatform" catchtouchmove="onEnvHold"></view>
     <view class="env-sheet" wx:if="{{item.enabled && item.expanded}}">
+      <image class="env-pop-logo" src="{{item.icon}}" mode="aspectFit" />
       <view class="env-letter">
       <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
       <view class="form-row">

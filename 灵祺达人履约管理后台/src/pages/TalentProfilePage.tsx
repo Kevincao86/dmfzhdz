@@ -114,10 +114,28 @@ export function ProfileEnvelope({
           padding: 16px;
           box-shadow: 0 18px 48px rgba(28, 25, 23, 0.22);
         }
+        .lq-env-pop-logo {
+          position: absolute;
+          left: 50%;
+          top: 0;
+          z-index: 2;
+          width: 52px;
+          height: 52px;
+          padding: 6px;
+          border-radius: 50%;
+          border: 2px solid #d6c4a8;
+          background: #fff;
+          object-fit: contain;
+          box-shadow: 0 6px 16px rgba(90, 62, 30, 0.12);
+          transform: translate(-50%, -50%);
+          pointer-events: none;
+        }
       `}</style>
       {open ? (
         <div ref={layerRef} className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
-          <div className="lq-env-letter text-sm" onClick={(e) => e.stopPropagation()}>
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            {logo ? <img className="lq-env-pop-logo" src={logo} alt="" /> : null}
+            <div className="lq-env-letter text-sm">
             <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
             <div className="space-y-3">{children}</div>
             <div className="mt-4 flex justify-end gap-2">
@@ -132,6 +150,7 @@ export function ProfileEnvelope({
               >
                 {saving ? '保存中…' : '保存'}
               </button>
+            </div>
             </div>
           </div>
         </div>

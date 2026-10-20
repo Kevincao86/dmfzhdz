@@ -533,6 +533,22 @@ button.cred-edit-btn[size='mini'] {
   padding: 0;
 }
 
+.env-pop-logo {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 2;
+  width: 88rpx;
+  height: 88rpx;
+  margin-left: -44rpx;
+  margin-top: -44rpx;
+  padding: 8rpx;
+  border-radius: 50%;
+  border: 2rpx solid #d6c4a8;
+  background: #fff;
+  box-sizing: border-box;
+}
+
 .env-letter {
   position: relative;
   z-index: 1;
