@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
 import { useProtectedForm } from '../hooks/useProtectedForm'
 import { ensureIdentity, fetchSession, registerTalentMember, setLoginCredentials } from '../lib/mpApi'
 import { getAccount, getActiveRole, getToken, persistAccount } from '../lib/mpSession'
-import { getWorkIdentity } from '../lib/mpWorkIdentity'
+import { getWorkIdentity, noteOwnedWorkIdentity } from '../lib/mpWorkIdentity'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import {
   DAILY_CAPACITY,
@@ -24,8 +24,12 @@ import {
 import { TALENT_TAGS } from '../lib/mpSync/publishFormOptions'
 
 export default function SupplierProfilePage() {
-  const workId = getWorkIdentity()
-  if (getActiveRole() !== 'talent' || (workId !== 'shoot' && workId !== 'edit')) {
+  const [params] = useSearchParams()
+  const asked = params.get('identity')
+  const current = getWorkIdentity()
+  const workId = asked === 'shoot' || asked === 'edit' ? asked : current
+  const adding = workId !== current
+  if (getActiveRole() !== 'talent' || (!adding && workId !== 'shoot' && workId !== 'edit')) {
     return <Navigate to="/profile" replace />
   }
 
@@ -107,9 +111,10 @@ export default function SupplierProfilePage() {
     }
     setSaving(true)
     setMsg('')
+    const primary = getWorkIdentity()
     const saved = {
       ...member,
-      workIdentity: workId,
+      workIdentity: primary === 'talent' ? 'talent' : workId,
       memberType: 'douyin' as const,
       accountTags: [...supplierTagsForWorkId(workId), ...sp.categoryTags],
       supplierProfile: normalizeSupplierProfile(sp),
@@ -130,6 +135,7 @@ export default function SupplierProfilePage() {
       if (reg.lingqiEditTeamId) saved.lingqiEditTeamId = reg.lingqiEditTeamId
       if (reg.id) saved.id = reg.id
       writeMember(saved as never)
+      noteOwnedWorkIdentity(workId)
       unlockForm()
       setMsg('已保存并同步云端')
     } catch (e) {

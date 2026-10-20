@@ -20,7 +20,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { getAccount } from '../lib/mpSession'
-import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
+import { getWorkIdentity, readOwnedWorkIdentities, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
 import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
@@ -308,6 +308,33 @@ export default function ProfilePage() {
         planLabel={membershipLabel}
         stats={stats}
       />
+      {!isPr ? (
+        <div className="mt-3 flex flex-wrap gap-2 px-1">
+          {readOwnedWorkIdentities().map((id) => (
+            <span
+              key={id}
+              className={
+                id === workId
+                  ? 'rounded-full bg-stone-900 px-3 py-1 text-xs text-white'
+                  : 'rounded-full bg-white px-3 py-1 text-xs text-stone-600'
+              }
+            >
+              {id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
+            </span>
+          ))}
+          {(['talent', 'shoot', 'edit'] as const)
+            .filter((id) => !readOwnedWorkIdentities().includes(id))
+            .map((id) => (
+              <Link
+                key={id}
+                to={id === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${id}`}
+                className="rounded-full border border-dashed border-stone-300 px-3 py-1 text-xs text-stone-700"
+              >
+                +{id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
+              </Link>
+            ))}
+        </div>
+      ) : null}
 
       {decorBanner?.imageUrl ? (
         <button

@@ -3,8 +3,8 @@ import { readMember, writeMember } from './mpSync/talentMember'
 import { emptyAllProfiles } from './mpSync/talentPlatformProfiles'
 import { emptyPrProfile, readPrProfile, writePrProfile } from './mpSync/userProfile'
 import {
+  adoptOwnedFromAccount,
   getWorkIdentity,
-  identityFromAccount,
   setWorkIdentity,
   workIdentityToAccountRole,
   type MpWorkIdentity,
@@ -86,7 +86,7 @@ export async function applyWorkIdentityAfterLogin(
   account: MpAccount,
   _workId?: MpWorkIdentity,
 ): Promise<MpAccount> {
-  const workId = identityFromAccount(account)
+  const workId = adoptOwnedFromAccount(account)
   setWorkIdentity(workId)
   setSession(token, { ...account, workIdentity: workId })
   setActiveRole(workIdentityToAccountRole(workId))

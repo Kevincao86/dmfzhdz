@@ -1869,7 +1869,8 @@ Page({
         guestRoutes.redirectToLogin(back)
         return
       }
-      const workId = userProfile.readIdentity()
+      const needRelay = recruitApplyGate.orderIdentity(this.data.mpOrder)
+      const workId = userProfile.readOwnedIdentities().includes(needRelay) ? needRelay : userProfile.readIdentity()
       const member = memberStore.readMember()
       if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
       this.openFormRelaySource()
@@ -1901,9 +1902,30 @@ Page({
       guestRoutes.redirectToLogin(`/pages/apply/apply?${q0.join('&')}`)
       return
     }
-    const workId = userProfile.readIdentity()
+    const need = recruitApplyGate.orderIdentity(this.data.mpOrder)
+    const owned = userProfile.readOwnedIdentities()
+    const needLabel = recruitApplyGate.identityShortLabel(need)
+    if (!owned.includes(need)) {
+      const mpProfileNav = require('../../../utils/mpProfileNav.js')
+      wx.showModal({
+        title: '需要新增身份',
+        content: `这条是${needLabel}商单。请到我的信息点 + 新增${needLabel}后再报名。`,
+        confirmText: '去新增',
+        success(res) {
+          if (res.confirm) mpProfileNav.goMyProfile()
+        },
+      })
+      return
+    }
     const member = memberStore.readMember()
-    if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
+    if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, need)) return
+    if (userProfile.readIdentity() !== need) {
+      userProfile.writeIdentity(need)
+      try {
+        require('../../../utils/tabBar.js').refreshTabBar(this)
+      } catch (_) {}
+    }
+    const workId = need
     const verdict = recruitApplyGate.validateRecruitmentClaim(this.data.mpOrder, workId)
     if (!verdict.ok) {
       if (verdict.code === 'slots_full') {

@@ -1616,10 +1616,21 @@ Page({
       guestRoutes.redirectToLogin(`/pages/apply/apply?${q0.join('&')}`)
       return
     }
-    const workId = userProfile.readIdentity()
+    const need = recruitApplyGate.orderIdentity(this.data.mpOrder)
+    const owned = userProfile.readOwnedIdentities()
+    const needLabel = recruitApplyGate.identityShortLabel(need)
+    if (owned.indexOf(need) < 0) {
+      wx.showModal({
+        title: '需要新增身份',
+        content: `这条是${needLabel}商单。请到我的信息点 + 新增${needLabel}后再报名。`,
+        showCancel: false,
+      })
+      return
+    }
     const member = memberStore.readMember()
-    if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
-    const recruitHint = recruitApplyGate.claimBlockHint(this.data.mpOrder, workId)
+    if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, need)) return
+    if (userProfile.readIdentity() !== need) userProfile.writeIdentity(need)
+    const recruitHint = recruitApplyGate.claimBlockHint(this.data.mpOrder, need)
     if (recruitHint) {
       wx.showToast({ title: recruitHint, icon: 'none' })
       return

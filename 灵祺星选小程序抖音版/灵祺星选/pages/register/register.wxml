@@ -4,6 +4,15 @@
     <text class="page-hero-sub">{{isSupplier ? '填写团队服务能力与作品集，报名时可一键填入' : '按平台填写达人资料，报名时可一键填入'}}</text>
   </view>
 
+  <view class="identity-row" wx:if="{{identityChips.length}}">
+    <view
+      wx:for="{{identityChips}}"
+      wx:key="id"
+      class="identity-chip {{item.active ? 'identity-chip--on' : ''}}"
+    >{{item.label}}</view>
+    <view class="identity-chip identity-chip--add" wx:if="{{canAddIdentity}}" bindtap="onAddIdentity">+</view>
+  </view>
+
   <view class="card">
     <view class="section-head">
       <view class="section-head-dot" />

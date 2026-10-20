@@ -76,6 +76,19 @@ function validateRecruitmentClaim(mp, workIdentity) {
   return { ok: true }
 }
 
+function orderIdentity(mp) {
+  if (isEditTeamRecruitment(mp)) return 'edit'
+  const target = recruitTargetFromMpOrder(mp)
+  if (target === 'shoot' || target === 'edit') return target
+  return 'talent'
+}
+
+function identityShortLabel(id) {
+  if (id === 'shoot') return '拍摄'
+  if (id === 'edit') return '剪辑'
+  return '达人'
+}
+
 function claimBlockHint(mp, workIdentity) {
   const v = validateRecruitmentClaim(mp || {}, workIdentity)
   if (!v.ok) return v.message
@@ -92,5 +105,7 @@ module.exports = {
   hallOrderVisibleToIdentity,
   hallOrderMatchesIdentityPool,
   validateRecruitmentClaim,
+  orderIdentity,
+  identityShortLabel,
   claimBlockHint,
 }

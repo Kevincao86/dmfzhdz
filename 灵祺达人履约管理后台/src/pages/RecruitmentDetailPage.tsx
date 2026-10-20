@@ -37,9 +37,9 @@ import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import VisitScheduleTalentPanel from '../components/mp/VisitScheduleTalentPanel'
 import VisitPublishLinkPanel from '../components/mp/VisitPublishLinkPanel'
 import TalentUploadedVideoPreviewModal from '../components/mp/TalentUploadedVideoPreviewModal'
-import { getWorkIdentity } from '../lib/mpWorkIdentity'
+import { getWorkIdentity, readOwnedWorkIdentities, setWorkIdentity } from '../lib/mpWorkIdentity'
 import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
-import { claimBlockHint, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
+import { claimBlockHint, claimIdentityForOrder, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
 import { isIceSlotsFull } from '../lib/mpRecruitment/iceOrderStats'
 import {
   formatSignupCountdownText,
@@ -415,17 +415,29 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
       window.alert('报名已截止')
       return
     }
-    if (applyGateHint) {
-      const verdict = mpRaw ? validateRecruitmentClaim(mpRaw, workIdentity) : { ok: true as const }
+    if (role !== 'pr' && mpRaw) {
+      const need = claimIdentityForOrder(mpRaw)
+      const owned = readOwnedWorkIdentities()
+      const needLabel = need === 'shoot' ? '拍摄' : need === 'edit' ? '剪辑' : '达人'
+      if (!owned.includes(need)) {
+        window.alert(`这条是${needLabel}商单。请到我的信息点 + 新增${needLabel}后再报名。`)
+        nav('/profile')
+        return
+      }
+      if (getWorkIdentity() !== need) setWorkIdentity(need)
+    }
+    const freshHint = mpRaw && role !== 'pr' ? claimBlockHint(mpRaw, getWorkIdentity()) : applyGateHint
+    if (freshHint) {
+      const verdict = mpRaw ? validateRecruitmentClaim(mpRaw, getWorkIdentity()) : { ok: true as const }
       if (!verdict.ok && verdict.code === 'targeted_invite_only') {
         if (window.confirm(`${applyGateHint}\n\n前往我的邀约？`)) nav('/targeted-invites')
         return
       }
       if (!verdict.ok && verdict.code !== 'slots_full' && mpRaw) {
-        window.alert(applyGateHint || '当前版本不能报名。身份在注册时已确定。')
+        window.alert(freshHint || '当前版本不能报名。身份在注册时已确定。')
         return
       }
-      window.alert(applyGateHint)
+      window.alert(freshHint)
       return
     }
     const meta = mpRaw?.mpPublishMeta as { applyFormTemplateId?: string } | undefined

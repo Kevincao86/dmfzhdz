@@ -14,6 +14,7 @@ import {
 } from '../lib/mpSync/talentPlatformProfiles'
 import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
+import { noteOwnedWorkIdentity } from '../lib/mpWorkIdentity'
 import { inferLegacyMemberType } from '../lib/mpSync/talentPlatformProfiles'
 import { TALENT_TAGS } from '../lib/mpSync/publishFormOptions'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
@@ -247,6 +248,7 @@ function TalentProfileForm() {
       if (reg?.lingqiTalentId) saved.lingqiTalentId = reg.lingqiTalentId
       if (reg?.id) saved.id = reg.id
       writeMember(saved)
+      noteOwnedWorkIdentity('talent')
       unlockForm()
       remoteHydratedRef.current = false
       setMsg(credWarn ? `${credWarn}；资料已同步云端` : '已保存并同步云端')

@@ -148,51 +148,18 @@ async function ensureWorkIdentityIfNeeded() {
   return finalizeAccountForWorkId(workId, auth.readAccount())
 }
 
-async function applyWorkIdentitySwitch(next) {
+async function applyWorkIdentitySwitch() {
   const prev = userProfile.readIdentity()
-  if (!next || next === prev) return { workId: prev }
-
-  const accountRole = identityTypes.accountRoleForWorkIdentity(next)
-  userProfile.writeIdentity(next)
-
-  if (!auth.isLoggedIn()) {
-    return { workId: next, needsReLogin: true, cloudWarning: '请登录以完成身份注册' }
-  }
-
-  try {
-    try {
-      await auth.ensureIdentity(accountRole, workIdentityForApi(next))
-    } catch (e) {
-      const msg = String(e?.message || e)
-      if (/invalid_session|account_not_found|invalid_credentials/i.test(msg)) {
-        return { workId: next, needsReLogin: true, cloudWarning: '登录已过期，请重新登录' }
-      }
-    }
-    const account = await finalizeAccountForWorkId(next, auth.readAccount())
-    if (account && !identitySatisfied(next, account)) {
-      return {
-        workId: next,
-        cloudWarning: '已切换身份，团队 ID 同步中，请稍后刷新',
-      }
-    }
-    return { workId: next }
-  } catch (e) {
-    const msg = String(e?.message || e)
-    if (/invalid_session|account_not_found|invalid_credentials/i.test(msg)) {
-      return { workId: next, needsReLogin: true, cloudWarning: '登录已过期，请重新登录' }
-    }
-    throw e
-  }
+  return { workId: prev, cloudWarning: '身份在注册时已确定，不能切换' }
 }
 
 async function applyWorkIdentityAfterLogin(token, account, workId) {
-  const accountRole = identityTypes.accountRoleForWorkIdentity(workId)
-  userProfile.writeIdentity(workId)
+  const fixed = account ? userProfile.adoptAccountIdentity(account) : workId
   auth.writeSession(token, account)
   try {
-    await auth.ensureIdentity(accountRole, workIdentityForApi(workId))
+    await auth.ensureIdentity(identityTypes.accountRoleForWorkIdentity(fixed), workIdentityForApi(fixed))
   } catch (_) {}
-  return finalizeAccountForWorkId(workId, auth.readAccount()) || account
+  return finalizeAccountForWorkId(fixed, auth.readAccount()) || account
 }
 
 module.exports = {

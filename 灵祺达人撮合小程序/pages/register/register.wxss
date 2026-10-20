@@ -402,3 +402,33 @@
   gap: 16rpx;
   margin-top: 12rpx;
 }
+
+.identity-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin: 0 24rpx 20rpx;
+}
+
+.identity-chip {
+  min-width: 120rpx;
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: #57534e;
+  font-size: 26rpx;
+  text-align: center;
+}
+
+.identity-chip--on {
+  background: #1c1917;
+  color: #fff;
+}
+
+.identity-chip--add {
+  min-width: 72rpx;
+  padding-left: 0;
+  padding-right: 0;
+  font-size: 36rpx;
+  line-height: 1;
+}

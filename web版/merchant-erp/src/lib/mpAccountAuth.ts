@@ -462,7 +462,36 @@ export function talentSideStillExists(
   return memberHasResolvablePlatformInfo(member)
 }
 
-/** 登录版本：PR 账号优先；达人资料已删除且 PR 资料还在时进 PR；拍摄/剪辑其次。 */
+/** 同一账号已开通的达人/拍摄/剪辑。达人库有资料时，即使工作台曾记成拍摄/剪辑，也算有达人。 */
+export function listOwnedSupplierIdentities(
+  account: {
+    active_role?: string | null
+    lingqi_talent_id?: string | null
+  },
+  member?: {
+    workIdentity?: string | null
+    lingqiTalentId?: string | null
+    lingqiShootTeamId?: string | null
+    lingqiEditTeamId?: string | null
+  } | null,
+  opts?: { talentInLibrary?: boolean },
+): Array<'talent' | 'shoot' | 'edit'> {
+  if (account.active_role === 'pr') return []
+  const wid = String(member?.workIdentity || '').trim()
+  const talentId = String(account.lingqi_talent_id || member?.lingqiTalentId || '').trim()
+  const shootId = String(member?.lingqiShootTeamId || '').trim()
+  const editId = String(member?.lingqiEditTeamId || '').trim()
+  const talentOwned =
+    opts?.talentInLibrary === true || (Boolean(talentId) && wid !== 'shoot' && wid !== 'edit')
+  const out: Array<'talent' | 'shoot' | 'edit'> = []
+  if (talentOwned) out.push('talent')
+  if (shootId || wid === 'shoot') out.push('shoot')
+  if (editId || wid === 'edit') out.push('edit')
+  if (!out.length) out.push('talent')
+  return out
+}
+
+/** 登录版本：同一账号达人和拍摄/剪辑都有时优先达人；只有拍摄或只有剪辑时停在原身份。 */
 export function resolveFixedWorkIdentity(
   account: {
     active_role?: string | null
@@ -473,18 +502,24 @@ export function resolveFixedWorkIdentity(
   },
   member?: {
     workIdentity?: string | null
+    lingqiTalentId?: string | null
     lingqiShootTeamId?: string | null
     lingqiEditTeamId?: string | null
   } | null,
-  opts?: { talentProfileLive?: boolean },
+  opts?: { talentProfileLive?: boolean; talentInLibrary?: boolean },
 ): MpFixedWorkIdentity {
   if (account.active_role === 'pr') return 'pr'
-  if (member?.workIdentity === 'shoot' || String(member?.lingqiShootTeamId || '').trim()) return 'shoot'
-  if (member?.workIdentity === 'edit' || String(member?.lingqiEditTeamId || '').trim()) return 'edit'
+  const owned = listOwnedSupplierIdentities(account, member, { talentInLibrary: opts?.talentInLibrary })
+  const hasTalent = owned.includes('talent')
   const hasPr = Boolean(String(account.lingqi_pr_id || '').trim() || String(account.registry_pr_id || '').trim())
-  const hasTalent = Boolean(
-    String(account.lingqi_talent_id || '').trim() || String(account.registry_member_id || '').trim(),
-  )
+  if (opts?.talentProfileLive === false) {
+    if (owned.includes('shoot') && !hasTalent) return 'shoot'
+    if (owned.includes('edit') && !hasTalent) return 'edit'
+    if (hasPr) return 'pr'
+  }
+  if (hasTalent && (owned.includes('shoot') || owned.includes('edit'))) return 'talent'
+  if (!hasTalent && owned.includes('shoot')) return 'shoot'
+  if (!hasTalent && owned.includes('edit')) return 'edit'
   if (opts?.talentProfileLive === false && hasPr) return 'pr'
   if (hasPr && !hasTalent) return 'pr'
   return 'talent'
@@ -505,6 +540,7 @@ export function accountToClientPayload(
     lingqiShootTeamId?: string | null
     lingqiEditTeamId?: string | null
     workIdentity?: string | null
+    ownedWorkIdentities?: Array<'talent' | 'shoot' | 'edit'>
     prFeatureAccess?: { addons: boolean; recommendHall: boolean }
     mpMembershipPlan?: string | null
     mpMembershipExpiresAt?: string | null
@@ -522,6 +558,7 @@ export function accountToClientPayload(
     lingqiShootTeamId: extras?.lingqiShootTeamId ?? null,
     lingqiEditTeamId: extras?.lingqiEditTeamId ?? null,
     workIdentity: extras?.workIdentity ?? null,
+    ownedWorkIdentities: extras?.ownedWorkIdentities ?? undefined,
     registryMemberId: account.registry_member_id,
     registryPrId: account.registry_pr_id,
     wxNickName: account.wx_nick_name,
@@ -551,6 +588,7 @@ export async function accountPayloadWithMemberExtras(
     lingqiShootTeamId?: string | null
     lingqiEditTeamId?: string | null
     workIdentity?: string | null
+    ownedWorkIdentities?: Array<'talent' | 'shoot' | 'edit'>
     prFeatureAccess?: { addons: boolean; recommendHall: boolean }
     mpMembershipPlan?: string | null
     mpMembershipExpiresAt?: string | null
@@ -573,7 +611,9 @@ export async function accountPayloadWithMemberExtras(
         : undefined)
     const linkedMember = findRegistryMemberForAccount(data, acc)
     const talentProfileLive = talentSideStillExists(data, acc, linkedMember)
-    const fixedIdentity = resolveFixedWorkIdentity(acc, linkedMember, { talentProfileLive })
+    const talentInLibrary = findTalentLibraryEntriesForAccount(data, acc, linkedMember).length > 0
+    const fixedIdentity = resolveFixedWorkIdentity(acc, linkedMember, { talentProfileLive, talentInLibrary })
+    const ownedWorkIdentities = listOwnedSupplierIdentities(acc, linkedMember, { talentInLibrary })
     if (
       fixedIdentity === 'pr' &&
       acc.active_role !== 'pr' &&
@@ -588,9 +628,9 @@ export async function accountPayloadWithMemberExtras(
       extras = {
         lingqiShootTeamId: member.lingqiShootTeamId || null,
         lingqiEditTeamId: member.lingqiEditTeamId || null,
-        workIdentity: member.workIdentity || null,
+        workIdentity: fixedIdentity,
+        ownedWorkIdentities,
       }
-      extras.workIdentity = fixedIdentity
       if (acc.active_role !== 'pr') {
         extras.prFeatureAccess = resolveEffectiveFeatureAccess(
           'talent',
@@ -606,7 +646,10 @@ export async function accountPayloadWithMemberExtras(
       }
     }
     // 达人/拍摄/剪辑身份保留达人会员权限。仅有 PR 编号时不能覆盖，否则专业版达人评估会被 PR 套餐关掉。
-    if (!member) extras.workIdentity = fixedIdentity
+    if (!member) {
+      extras.workIdentity = fixedIdentity
+      extras.ownedWorkIdentities = ownedWorkIdentities
+    }
     if (acc.active_role === 'pr' || (!extras.prFeatureAccess && (acc.lingqi_pr_id || acc.registry_pr_id))) {
       const pr = findRegistryPrForAccount(data, acc)
       extras.prFeatureAccess = pr
@@ -1912,8 +1955,10 @@ async function fixedIdentityForAccount(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const linkedMember = findRegistryMemberForAccount(data, account)
+    const talentInLibrary = findTalentLibraryEntriesForAccount(data, account, linkedMember).length > 0
     return resolveFixedWorkIdentity(account, linkedMember, {
       talentProfileLive: talentSideStillExists(data, account, linkedMember),
+      talentInLibrary,
     })
   } catch {
     return resolveFixedWorkIdentity(account, null)

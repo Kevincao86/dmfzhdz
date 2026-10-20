@@ -152,7 +152,7 @@ Page({
     this.setData(idPatch)
   },
   hydrateMemberFormFromStorage() {
-    const workIdentity = userProfile.readIdentity()
+    const workIdentity = this._formIdentity || userProfile.readIdentity()
     const isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
     const cur = readMember()
     const acct = auth.readAccount()
@@ -190,6 +190,36 @@ Page({
     Object.assign(patch, identityIdLabels.buildIdentityIdLabels(workIdentity, { member, account: acct }))
     this.setData(patch)
     if (isSupplier) this.syncSupplierUi(patch.supplierProfile)
+    this.syncIdentityBar(workIdentity)
+  },
+  syncIdentityBar(activeId) {
+    if (userProfile.readIdentity() === 'pr') {
+      this.setData({ identityChips: [], canAddIdentity: false })
+      return
+    }
+    const labels = { talent: '达人', shoot: '拍摄', edit: '剪辑' }
+    const owned = userProfile.readOwnedIdentities()
+    const active = activeId || this._formIdentity || userProfile.readIdentity()
+    this.setData({
+      identityChips: owned.map((id) => ({ id, label: labels[id] || id, active: id === active })),
+      canAddIdentity: owned.length < 3,
+    })
+  },
+  onAddIdentity() {
+    const owned = userProfile.readOwnedIdentities()
+    const missing = ['talent', 'shoot', 'edit'].filter((id) => !owned.includes(id))
+    if (!missing.length) return
+    const labels = { talent: '达人', shoot: '拍摄', edit: '剪辑' }
+    wx.showActionSheet({
+      itemList: missing.map((id) => `新增${labels[id]}`),
+      success: (res) => {
+        const id = missing[res.tapIndex]
+        if (!id) return
+        this._formIdentity = id
+        this._formDirty = false
+        this.hydrateMemberFormFromStorage()
+      },
+    })
   },
   async onShow() {
     const workIdentity = userProfile.readIdentity()
@@ -205,10 +235,12 @@ Page({
     const acct = auth.readAccount()
     if (acct && !this._formDirty) accountMemberSync.syncTalentMemberFromAccount(acct)
     if (!this._formDirty) this.hydrateMemberFormFromStorage()
+    const formIdentity = this._formIdentity || workIdentity
     const patch = loginCredPanel.patchFromAccount(acct)
-    patch.workIdentity = workIdentity
-    patch.isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
+    patch.workIdentity = formIdentity
+    patch.isSupplier = formIdentity === 'shoot' || formIdentity === 'edit'
     this.setData(patch)
+    this.syncIdentityBar(formIdentity)
   },
   syncSupplierUi(profile) {
     const p = supplierTeamProfile.normalizeSupplierProfile(profile)
@@ -647,12 +679,14 @@ Page({
     const prev = readMember()
     const acct = auth.readAccount()
     const workId = this.data.workIdentity || 'talent'
+    const primary = userProfile.readIdentity()
+    const adding = Boolean(this._formIdentity && this._formIdentity !== primary)
     const member = {
       id: (acct && acct.registryMemberId) || (prev && prev.id) || `MTM-${Date.now()}`,
       lingqiTalentId: (acct && acct.lingqiTalentId) || (prev && prev.lingqiTalentId) || '',
       lingqiShootTeamId: (prev && prev.lingqiShootTeamId) || (acct && acct.lingqiShootTeamId) || '',
       lingqiEditTeamId: (prev && prev.lingqiEditTeamId) || (acct && acct.lingqiEditTeamId) || '',
-      workIdentity: this.data.isSupplier ? workId : 'talent',
+      workIdentity: adding ? primary : this.data.isSupplier ? workId : 'talent',
       memberType: this.data.isSupplier ? 'douyin' : talentPlatforms.inferLegacyMemberType(profiles),
       wxNickName: String(this.data.wxNickName || '').trim(),
       wxAvatarUrl: String(this.data.wxAvatarUrl || '').trim(),
@@ -726,7 +760,9 @@ Page({
           if (reg && reg.lingqiEditTeamId) member.lingqiEditTeamId = reg.lingqiEditTeamId
           if (reg && reg.id) member.id = reg.id
           writeMember(member)
-          switchWorkIdentity.syncLocalProfilesFromAccount(auth.readAccount(), workId)
+          if (adding) userProfile.noteOwnedIdentity(workId)
+          switchWorkIdentity.syncLocalProfilesFromAccount(auth.readAccount(), adding ? primary : workId)
+          if (adding) this._formIdentity = ''
         } catch (cloudErr) {
           console.warn('[register] cloud sync failed', cloudErr)
           const detail = mpApiErrors.formatMpApiErr(cloudErr, '请稍后重试')
