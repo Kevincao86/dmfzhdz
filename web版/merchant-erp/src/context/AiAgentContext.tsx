@@ -116,7 +116,13 @@ import {
   parseRegionToCityState,
 } from '../lib/recruitmentCityPicker'
 import { allCitiesFlat } from '../lib/chinaRegion'
-import { talentCardMatchesCloseWords, talentCloseWords, type TalentPlanCard } from '../lib/talentPlanRecommend'
+import {
+  citedProfileUrls,
+  publicTalentJumpLink,
+  talentCardMatchesCloseWords,
+  talentCloseWords,
+  type TalentPlanCard,
+} from '../lib/talentPlanRecommend'
 import { requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
 import { resolveStoreCityFromMerchantStores } from '../services/aiAgentRecruitmentAllocation'
 import {
@@ -632,9 +638,10 @@ function parseFollowerCount(raw: string): number {
 }
 
 function cardsFromPublicText(text: string, city: string, talentType: string): TalentPlanCard[] {
+  const cited = citedProfileUrls(text)
   const out: TalentPlanCard[] = []
   const seen = new Set<string>()
-  for (const line of text.split(/\n+/)) {
+  for (const line of text.split('【检索到的主页】')[0]!.split(/\n+/)) {
     const row = line.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim()
     if (!row || /暂无|不拉公网|库内已凑满|没有返回/.test(row)) continue
     const parts = row.split(/[|｜]/).map((part) => part.trim()).filter(Boolean)
@@ -642,9 +649,8 @@ function cardsFromPublicText(text: string, city: string, talentType: string): Ta
     const nickname = parts[0]!.replace(/^昵称[:：]/, '').slice(0, 24)
     if (nickname.length < 2 || seen.has(nickname) || /^达人$|^公网$|^检索$/.test(nickname)) continue
     const url = (row.match(/https?:\/\/[^\s|｜)）]+/) || [])[0] || ''
-    const profileLink = /douyin\.com|xiaohongshu\.com|xhslink\.com|kuaishou\.com/i.test(url)
-      ? url.replace(/[)），。]+$/, '')
-      : ''
+    const profileLink = publicTalentJumpLink(nickname, url, cited)
+    const profileVerified = Boolean(profileLink) && !/\/search\//.test(profileLink)
     const direction = parts.find((part, index) => index >= 3 && !/^https?:/.test(part) && part !== '无') || ''
     seen.add(nickname)
     out.push({
@@ -659,6 +665,7 @@ function cardsFromPublicText(text: string, city: string, talentType: string): Ta
       tags: [],
       avatarUrl: '',
       profileLink,
+      profileVerified,
       tierLabel: '公网',
       unitBudgetYuan: 0,
       talentType: direction || talentType,
@@ -728,15 +735,16 @@ function publicGapNote(planText: string, picked: TalentPlanCard[], headcount: nu
   return `还差头部 ${needHead} 位、腰部 ${needWaist} 位。头部约 10 万粉，腰部为千粉到万粉。类目和城市必须与方案一致。`
 }
 
-/** 公网检索只保留搜索结果里真实出现的主页，丢掉编造的图片地址。 */
+/** 模型自己写的主页一律丢掉，只留【检索到的主页】里出现过的链接。 */
 function keepRealProfileUrls(text: string): string {
-  return text.replace(/https?:\/\/[^\s|｜)）]+/g, (url) =>
-    /douyin\.com\/(?:user|share\/user)\/|v\.douyin\.com\/|iesdouyin\.com\/share\/user\/|xiaohongshu\.com\/user\/|xhslink\.com\/|kuaishou\.com\/(?:profile|fw)\//i.test(
-      url,
-    )
-      ? url
-      : '无',
-  )
+  const cited = new Set(citedProfileUrls(text).map((url) => url.replace(/\/+$/, '')))
+  const body = text.split('【检索到的主页】')[0] || text
+  const kept = body.replace(/https?:\/\/[^\s|｜)）]+/g, (url) => {
+    const cleaned = url.replace(/[)），。]+$/, '').replace(/\/+$/, '')
+    return cited.has(cleaned) ? url : '无'
+  })
+  const block = text.includes('【检索到的主页】') ? `\n【检索到的主页】${text.split('【检索到的主页】')[1]}` : ''
+  return `${kept}${block}`
 }
 
 async function fetchDoubaoPublicTalents(
@@ -761,7 +769,7 @@ async function fetchDoubaoPublicTalents(
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。内容必须符合方案，不要写无关类目。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。主页只填检索结果里真实出现的抖音/小红书/快手用户主页，没有就写无。不要编造头像、电话、微信。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
+            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。内容必须符合方案，不要写无关类目。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。主页只能原样复制检索结果里的用户主页，禁止自己编写 douyin.com/user、v.douyin.com 或其他链接；没有就写无。不要编造头像、电话、微信。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
           },
           {
             role: 'user',
@@ -773,7 +781,9 @@ async function fetchDoubaoPublicTalents(
     )
     const text = keepRealProfileUrls(String(data.content || '').trim())
     const cap = Math.min(4200, Math.max(1200, want * 380))
-    return text ? text.slice(0, cap) : '公网暂无符合条件的达人。'
+    const citedBlock = text.includes('【检索到的主页】') ? `\n【检索到的主页】${text.split('【检索到的主页】')[1]}` : ''
+    const body = (text.split('【检索到的主页】')[0] || '').slice(0, cap).trim()
+    return body ? `${body}${citedBlock}` : '公网暂无符合条件的达人。'
   } catch {
     return '豆包公网本次没有返回可用名单。'
   } finally {

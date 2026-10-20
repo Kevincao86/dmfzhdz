@@ -9,6 +9,9 @@ import type { RegistryRecruitmentOrder } from '../lib/opsRegistryTypes'
 import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import { supabase } from '../lib/supabaseClient'
 import {
+  citedProfileUrls,
+  displayTalentProfileLink,
+  publicTalentJumpLink,
   talentCardMatchesCloseWords,
   talentCloseWords,
   type TalentPlanCard,
@@ -460,14 +463,14 @@ export function TalentPlanChoice({
                   {card.source === 'public' ? (
                     <p className="mt-0.5 text-xs text-violet-700">{card.reason || '公网补位'}</p>
                   ) : null}
-                  {card.profileLink ? (
+                  {displayTalentProfileLink(card) ? (
                     <a
-                      href={card.profileLink}
+                      href={displayTalentProfileLink(card)}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-0.5 inline-block text-xs text-violet-700 hover:underline"
                     >
-                      {profileLinkLabel(card.platform, card.profileLink)}
+                      {jumpLabel(card.platform, displayTalentProfileLink(card))}
                     </a>
                   ) : null}
                   <p className="mt-0.5 text-xs text-slate-500">{card.reason}</p>
@@ -494,10 +497,9 @@ type RosterNotice = {
   people: TalentPlanCard[]
 }
 
-function realProfileUrl(raw: string): string {
-  const url = (raw.match(/https?:\/\/[^\s|｜)）]+/) || [])[0] || ''
-  if (!/douyin\.com|xiaohongshu\.com|xhslink\.com|kuaishou\.com/i.test(url)) return ''
-  return url.replace(/[)），。]+$/, '')
+function jumpLabel(platform: string, url: string): string {
+  if (/\/search\//.test(url)) return '去抖音搜这位达人'
+  return profileLinkLabel(platform, url)
 }
 
 async function fetchOnePublicCard(opts: {
@@ -521,7 +523,7 @@ async function fetchOnePublicCard(opts: {
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补 1 位，区域只限「${city}」，内容贴近「${need}」。不要前言。只写一行：昵称｜城市｜粉丝｜内容方向｜主页。主页只填检索结果里真实的抖音/小红书/快手用户主页，没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+            content: `你是豆包公网达人检索。只补 1 位，区域只限「${city}」，内容贴近「${need}」。不要前言。只写一行：昵称｜城市｜粉丝｜内容方向｜主页。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
           },
           { role: 'user', content: `请检索 1 位${city}、${need}达人，并带上能打开的主页。` },
         ],
@@ -537,6 +539,8 @@ async function fetchOnePublicCard(opts: {
     const nickname = (parts[0] || '').replace(/^昵称[:：]/, '').slice(0, 24)
     if (nickname.length < 2 || skip.includes(nickname)) return null
     const direction = parts.find((part, index) => index >= 3 && part !== '无' && !/^https?:/.test(part)) || ''
+    const raw = String(data.content || '')
+    const profileLink = publicTalentJumpLink(nickname, line, citedProfileUrls(raw))
     return {
       seatId: opts.seatId,
       talentId: `public:${nickname}`,
@@ -548,7 +552,8 @@ async function fetchOnePublicCard(opts: {
       quoteYuan: null,
       tags: [],
       avatarUrl: '',
-      profileLink: realProfileUrl(line),
+      profileLink,
+      profileVerified: Boolean(profileLink) && !/\/search\//.test(profileLink),
       tierLabel: '公网',
       unitBudgetYuan: 0,
       talentType: direction || need,
@@ -801,17 +806,17 @@ export function TalentChatRoster({
                   {card.quoteYuan != null ? `报价¥${card.quoteYuan}` : card.reason}
                   {card.tags.length ? ` · ${card.tags.slice(0, 2).join('/')}` : ''}
                 </p>
-                {card.profileLink ? (
+                {displayTalentProfileLink(card) ? (
                   <a
-                    href={card.profileLink}
+                    href={displayTalentProfileLink(card)}
                     target="_blank"
                     rel="noreferrer"
                     className="mt-0.5 inline-block text-xs text-violet-700 hover:underline"
                   >
-                    {profileLinkLabel(card.platform, card.profileLink)}
+                    {jumpLabel(card.platform, displayTalentProfileLink(card))}
                   </a>
                 ) : (
-                  <p className="mt-0.5 text-xs text-slate-400">暂无主页</p>
+                  <p className="mt-0.5 text-xs text-slate-400">主页未核到</p>
                 )}
               </div>
             </div>
@@ -834,17 +839,17 @@ export function TalentChatRoster({
               {notice.people.map((person) => (
                 <li key={person.seatId}>
                   {person.nickname}
-                  {person.profileLink ? (
+                  {displayTalentProfileLink(person) ? (
                     <a
-                      href={person.profileLink}
+                      href={displayTalentProfileLink(person)}
                       target="_blank"
                       rel="noreferrer"
                       className="ml-2 text-violet-700 underline"
                     >
-                      打开主页
+                      {jumpLabel(person.platform, displayTalentProfileLink(person))}
                     </a>
                   ) : (
-                    <span className="ml-2 text-amber-800/80">暂无主页</span>
+                    <span className="ml-2 text-amber-800/80">主页未核到</span>
                   )}
                 </li>
               ))}

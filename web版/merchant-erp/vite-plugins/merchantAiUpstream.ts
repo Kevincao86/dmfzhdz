@@ -3635,6 +3635,32 @@ function extractResponsesOutputText(data: Record<string, unknown>): string {
   return parts.join('\n').trim()
 }
 
+const SEARCH_PROFILE_URL_RE =
+  /https?:\/\/(?:[\w.-]+\.)?(?:douyin\.com\/(?:user|share\/user)\/[A-Za-z0-9_-]+|v\.douyin\.com\/[A-Za-z0-9]+|iesdouyin\.com\/share\/user\/[A-Za-z0-9_-]+|xiaohongshu\.com\/user\/[A-Za-z0-9]+|xhslink\.com\/[A-Za-z0-9]+|kuaishou\.com\/(?:profile|fw)\/[A-Za-z0-9]+)/gi
+
+/** 只收集检索引用字段里的主页，不扫模型正文，避免把编造链接当成引用。 */
+function collectCitedProfileUrls(value: unknown, out: Set<string>, depth = 0): void {
+  if (depth > 12 || value == null || typeof value !== 'object') return
+  if (Array.isArray(value)) {
+    for (const item of value) collectCitedProfileUrls(item, out, depth + 1)
+    return
+  }
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if ((key === 'url' || key === 'link' || key === 'site_url') && typeof child === 'string') {
+      const found = child.match(new RegExp(SEARCH_PROFILE_URL_RE.source, 'gi')) || []
+      for (const url of found) out.add(url.replace(/[)），。]+$/, '').replace(/\/+$/, ''))
+    } else {
+      collectCitedProfileUrls(child, out, depth + 1)
+    }
+  }
+}
+
+function appendCitedProfiles(text: string, urls: Iterable<string>): string {
+  const list = [...new Set(urls)].filter(Boolean)
+  if (!list.length) return text
+  return `${text}\n【检索到的主页】\n${list.join('\n')}`
+}
+
 function upstreamErrorMessage(data: Record<string, unknown>, status: number): string {
   const errObj = data.error as { message?: string; msg?: string } | undefined
   return (
@@ -3675,7 +3701,9 @@ async function postDoubaoResponsesSearch(
   if (!res.ok) throw new Error(upstreamErrorMessage(data, res.status))
   const text = extractResponsesOutputText(data)
   if (!text) throw new Error('豆包联网未返回正文')
-  return text
+  const cited = new Set<string>()
+  collectCitedProfileUrls(data, cited)
+  return appendCitedProfiles(text, cited)
 }
 
 function htmlToPlain(html: string) {
@@ -3694,6 +3722,12 @@ function htmlToPlain(html: string) {
 function searchCore(query: string) {
   const token = (query.match(/[\u4e00-\u9fff]{2,}/u) || [''])[0]
   return token.replace(/(南湖店|旗舰店|总店|分店)$/u, '').replace(/店$/u, '')
+}
+
+function profileUrlsInHtml(html: string): string[] {
+  const decoded = html.replace(/\\u002F/gi, '/').replace(/\\\//g, '/')
+  const found = decoded.match(new RegExp(SEARCH_PROFILE_URL_RE.source, 'gi')) || []
+  return [...new Set(found.map((url) => url.replace(/[)），。]+$/, '').replace(/\/+$/, '')))]
 }
 
 async function runPublicWebSearch(query: string): Promise<string> {
@@ -3722,7 +3756,8 @@ async function runPublicWebSearch(query: string): Promise<string> {
       if (!lines.includes(compact)) lines.push(compact)
       if (lines.length >= 6) break
     }
-    return lines.length ? lines.map((line, index) => `${index + 1}. ${line}`).join('\n') : '这一条检索没有公开结果'
+    const body = lines.length ? lines.map((line, index) => `${index + 1}. ${line}`).join('\n') : '这一条检索没有公开结果'
+    return appendCitedProfiles(body, profileUrlsInHtml(html))
   } catch {
     return '检索超时'
   }
@@ -3751,18 +3786,19 @@ async function doubaoFunctionWebSearch(
   const blocks: string[] = []
   for (const query of webSearchQueries(user)) {
     const block = await runPublicWebSearch(query)
-    if (!block || /没有公开结果|检索没有结果|检索超时|检索词为空/.test(block)) continue
+    if (!block || (/没有公开结果|检索没有结果|检索超时|检索词为空/.test(block.split('【检索到的主页】')[0] || '') && !block.includes('【检索到的主页】'))) continue
     blocks.push(block)
     break
   }
   const notes = blocks.join('\n')
+  const cited = (notes.split('【检索到的主页】')[1] || '').match(/https?:\/\/\S+/g) || []
   const talentAsk = /达人|探店博主/.test(`${system}\n${user}`)
   const grounded = notes
     ? talentAsk
-      ? `${user}\n\n联网检索结果：\n${notes}\n只根据检索结果列出达人。每行：昵称｜城市｜粉丝数字｜等级｜内容方向。不要编造电话或微信。`
+      ? `${user}\n\n联网检索结果：\n${notes}\n只根据检索结果列出达人。每行：昵称｜城市｜粉丝数字｜等级｜内容方向。主页只能原样复制【检索到的主页】里的链接，没有就写无，不要自己编链接。不要编造电话或微信。`
       : `${user}\n\n联网检索结果：\n${notes}\n只根据这些检索结果回答。有套餐和价格就写出来。`
     : user
-  return openAiStyleChat(
+  const text = await openAiStyleChat(
     `${doubaoArkApiV3Root(env)}/chat/completions`,
     apiKey,
     model,
@@ -3772,6 +3808,7 @@ async function doubaoFunctionWebSearch(
     grounded,
     { temperature: 0, max_tokens: talentAsk ? 2000 : 1200 },
   )
+  return appendCitedProfiles(text, cited)
 }
 
 /** 豆包联网：先走方舟联网插件；账号未开通时改为对话里调用 web_search 工具 */

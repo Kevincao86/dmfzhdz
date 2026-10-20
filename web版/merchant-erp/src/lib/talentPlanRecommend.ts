@@ -31,8 +31,10 @@ export type TalentPlanCard = {
   tags: string[]
   /** 微信头像，仅 https。账号表只读补全，不落库 */
   avatarUrl: string
-  /** 可打开的主页链接 */
+  /** 可打开的主页链接。公网未核到时是抖音搜索页 */
   profileLink: string
+  /** 公网主页来自检索引用。没有该标记的用户主页按编造处理 */
+  profileVerified?: boolean
   tierLabel: string
   unitBudgetYuan: number
   talentType: string
@@ -110,6 +112,44 @@ export function talentCardMatchesCloseWords(
   if (!words.length) return true
   const blob = [card.nickname, card.reason, card.level, ...(card.tags || [])].join(' ')
   return words.some((word) => word && blob.includes(word))
+}
+
+function profileUrlPattern(): RegExp {
+  return /https?:\/\/(?:[\w.-]+\.)?(?:douyin\.com\/(?:user|share\/user)\/[A-Za-z0-9_-]+|v\.douyin\.com\/[A-Za-z0-9]+|iesdouyin\.com\/share\/user\/[A-Za-z0-9_-]+|xiaohongshu\.com\/user\/[A-Za-z0-9]+|xhslink\.com\/[A-Za-z0-9]+|kuaishou\.com\/(?:profile|fw)\/[A-Za-z0-9]+)/gi
+}
+
+function cleanProfileUrl(raw: string): string {
+  return raw.replace(/[)），。]+$/, '').replace(/\/+$/, '')
+}
+
+/** 只认检索结果里单独列出的主页，不认模型写在达人行里的链接。 */
+export function citedProfileUrls(text: string): string[] {
+  const block = String(text || '').split('【检索到的主页】')[1] || ''
+  const found = block.match(profileUrlPattern()) || []
+  return [...new Set(found.map((url) => cleanProfileUrl(url)))]
+}
+
+/** 旧会话里的公网主页没有核验标记，打开时改去抖音搜索，避免「用户不存在」。 */
+export function displayTalentProfileLink(card: {
+  source: string
+  nickname: string
+  profileLink: string
+  profileVerified?: boolean
+}): string {
+  if (card.source !== 'public') return card.profileLink || ''
+  if (card.profileVerified && card.profileLink && !/\/search\//.test(card.profileLink)) return card.profileLink
+  if (card.profileLink && /\/search\//.test(card.profileLink)) return card.profileLink
+  return publicTalentJumpLink(card.nickname, '', [])
+}
+
+/** 检索里核到的主页才当主页；否则去抖音搜索昵称，避免点进「用户不存在」。 */
+export function publicTalentJumpLink(nickname: string, rawUrl: string, cited: string[]): string {
+  const url = (String(rawUrl || '').match(profileUrlPattern()) || [])[0] || ''
+  const cleaned = url ? cleanProfileUrl(url) : ''
+  if (cleaned && cited.some((item) => cleanProfileUrl(item) === cleaned)) return cleaned
+  const name = nickname.trim()
+  if (name.length < 2) return ''
+  return `https://www.douyin.com/search/${encodeURIComponent(name)}?type=user`
 }
 
 export function tierKeyFromLabel(tier: string): KolTierKey {
