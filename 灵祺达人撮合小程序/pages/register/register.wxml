@@ -1,4 +1,4 @@
-<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<page-meta page-style="{{lqPageStyle}}{{envScrollLock ? 'overflow:hidden;' : ''}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
 <view class="{{lqAccentClass}} page-shell page-with-bar paper-page foot-col" style="{{lqPageStyle}}">
   <view class="page-hero page-hero--compact">
     <text class="page-hero-title">{{isSupplier ? (workIdentity === 'edit' ? '剪辑团队信息' : '拍摄团队信息') : '我的信息'}}</text>
@@ -23,7 +23,7 @@
       <view class="env-btn" data-key="wx" bindtap="onOpenSection">修改</view>
     </view>
     <text class="env-sum">{{wxNickName || '未填写昵称'}}</text>
-    <view class="env-mask" wx:if="{{sectionOpenWx}}" data-key="wx" bindtap="onCloseSection"></view>
+    <view class="env-mask" wx:if="{{sectionOpenWx}}" data-key="wx" bindtap="onCloseSection" catchtouchmove="onEnvHold"></view>
     <view class="env-sheet">
     <view class="env-half env-half--left {{sectionPartWx ? 'is-parted' : ''}}"></view>
     <view class="env-half env-half--right {{sectionPartWx ? 'is-parted' : ''}}"></view>
@@ -67,7 +67,7 @@
       <view class="env-btn" data-key="contact" bindtap="onOpenSection">修改</view>
     </view>
     <text class="env-sum">{{contact || '未填写电话'}}{{city ? ' · ' + city : ''}}</text>
-    <view class="env-mask" wx:if="{{sectionOpenContact}}" data-key="contact" bindtap="onCloseSection"></view>
+    <view class="env-mask" wx:if="{{sectionOpenContact}}" data-key="contact" bindtap="onCloseSection" catchtouchmove="onEnvHold"></view>
     <view class="env-sheet">
     <view class="env-half env-half--left {{sectionPartContact ? 'is-parted' : ''}}"></view>
     <view class="env-half env-half--right {{sectionPartContact ? 'is-parted' : ''}}"></view>
@@ -147,7 +147,7 @@
       <view class="env-btn" data-key="team" bindtap="onOpenSection">修改</view>
     </view>
     <text class="env-sum">{{supplierProfile.teamName || '未填写团队'}}</text>
-    <view class="env-mask" wx:if="{{sectionOpenTeam}}" data-key="team" bindtap="onCloseSection"></view>
+    <view class="env-mask" wx:if="{{sectionOpenTeam}}" data-key="team" bindtap="onCloseSection" catchtouchmove="onEnvHold"></view>
     <view class="env-sheet">
     <view class="env-half env-half--left {{sectionPartTeam ? 'is-parted' : ''}}"></view>
     <view class="env-half env-half--right {{sectionPartTeam ? 'is-parted' : ''}}"></view>
@@ -293,7 +293,7 @@
       >{{tagName}}</text>
     </view>
 
-    <view class="env-mask" wx:if="{{item.enabled && item.expanded}}" data-id="{{item.id}}" catchtap="onClosePlatform"></view>
+    <view class="env-mask" wx:if="{{item.enabled && item.expanded}}" data-id="{{item.id}}" catchtap="onClosePlatform" catchtouchmove="onEnvHold"></view>
     <view class="env-sheet" wx:if="{{item.enabled && item.expanded}}">
       <view class="env-half env-half--left {{envelopePartId === item.id ? 'is-parted' : ''}}"></view>
       <view class="env-half env-half--right {{envelopePartId === item.id ? 'is-parted' : ''}}"></view>

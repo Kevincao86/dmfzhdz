@@ -42,6 +42,17 @@ function envelopePaper(side: 'left' | 'right') {
   )
 }
 
+let profileEnvelopeScrollLocks = 0
+
+function retainProfileScrollLock() {
+  profileEnvelopeScrollLocks += 1
+  if (profileEnvelopeScrollLocks === 1) document.documentElement.classList.add('lq-env-scroll-lock')
+  return () => {
+    profileEnvelopeScrollLocks = Math.max(0, profileEnvelopeScrollLocks - 1)
+    if (profileEnvelopeScrollLocks === 0) document.documentElement.classList.remove('lq-env-scroll-lock')
+  }
+}
+
 export function ProfileEnvelope({
   title,
   summary,
@@ -65,6 +76,7 @@ export function ProfileEnvelope({
 }) {
   const [phase, setPhase] = useState<'closed' | 'open' | 'shut'>('closed')
   const [parted, setParted] = useState(false)
+  const layerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (open) {
       setPhase('open')
@@ -92,6 +104,27 @@ export function ProfileEnvelope({
     const timer = window.setTimeout(() => setPhase('closed'), reduce ? 0 : 460)
     return () => window.clearTimeout(timer)
   }, [phase])
+  useEffect(() => {
+    if (phase === 'closed') return
+    return retainProfileScrollLock()
+  }, [phase])
+  useEffect(() => {
+    const layer = layerRef.current
+    if (!layer || phase === 'closed') return
+    const onWheel = (event: WheelEvent) => {
+      const letter = layer.querySelector('.lq-env-letter')
+      if (!(letter instanceof HTMLElement) || !letter.contains(event.target as Node)) {
+        event.preventDefault()
+        return
+      }
+      const max = letter.scrollHeight - letter.clientHeight
+      const atTop = letter.scrollTop <= 0
+      const atBottom = letter.scrollTop >= max - 1
+      if (max <= 1 || (event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)) event.preventDefault()
+    }
+    layer.addEventListener('wheel', onWheel, { passive: false })
+    return () => layer.removeEventListener('wheel', onWheel)
+  }, [phase])
 
   return (
     <section>
@@ -109,11 +142,16 @@ export function ProfileEnvelope({
       </div>
       <style>{`
         .lq-env-pocket { position: relative; width: min(32rem, 100%); }
+        html.lq-env-scroll-lock,
+        html.lq-env-scroll-lock body {
+          overflow: hidden;
+        }
         .lq-env-letter {
           position: relative;
           z-index: 1;
           max-height: 78vh;
           overflow: auto;
+          overscroll-behavior: contain;
           background: #fff;
           border-radius: 16px;
           padding: 16px;
@@ -160,7 +198,7 @@ export function ProfileEnvelope({
         }
       `}</style>
       {phase !== 'closed' ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
+        <div ref={layerRef} className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
           <div className="lq-env-pocket" onClick={(e) => e.stopPropagation()}>
             <div className="lq-env-letter text-sm">
               <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>

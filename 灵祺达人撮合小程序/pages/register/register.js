@@ -134,6 +134,7 @@ Page({
     sectionPartContact: false,
     sectionPartTeam: false,
     envelopePartId: '',
+    envScrollLock: false,
     editMode: true,
     provinces: [],
     cities: [],
@@ -606,7 +607,10 @@ Page({
     const expanded = { ...this.data.platformExpanded, [id]: cur.enabled }
     if (!cur.enabled) expanded[id] = false
     syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, expanded)
+    const still = !!(this.data.sectionOpenWx || this.data.sectionOpenContact || this.data.sectionOpenTeam || Object.keys(expanded).some((k) => expanded[k]))
+    this.setData({ envScrollLock: still })
   },
+  onEnvHold() {},
   partSection(key) {
     const openKey = key === 'wx' ? 'sectionOpenWx' : key === 'contact' ? 'sectionOpenContact' : 'sectionOpenTeam'
     const partKey = key === 'wx' ? 'sectionPartWx' : key === 'contact' ? 'sectionPartContact' : 'sectionPartTeam'
@@ -614,6 +618,7 @@ Page({
     const opened = {}
     opened[openKey] = true
     opened[partKey] = false
+    opened.envScrollLock = true
     this.setData(opened, () => {
       this._envShut = setTimeout(() => {
         const parted = {}
@@ -629,6 +634,8 @@ Page({
       this._envShut = setTimeout(() => {
         const expanded = { ...this.data.platformExpanded, [platformId]: false }
         syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
+        const still = !!(this.data.sectionOpenWx || this.data.sectionOpenContact || this.data.sectionOpenTeam)
+        this.setData({ envScrollLock: still })
       }, 480)
       return
     }
@@ -640,6 +647,8 @@ Page({
     this._envShut = setTimeout(() => {
       const hide = {}
       hide[openKey] = false
+      const platOpen = Object.keys(this.data.platformExpanded || {}).some((k) => this.data.platformExpanded[k])
+      hide.envScrollLock = platOpen
       this.setData(hide)
     }, 480)
   },
@@ -664,7 +673,7 @@ Page({
     if (this._envShut) clearTimeout(this._envShut)
     const expanded = { ...this.data.platformExpanded, [id]: true }
     syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
-    this.setData({ envelopePartId: '' }, () => {
+    this.setData({ envelopePartId: '', envScrollLock: true }, () => {
       this._envShut = setTimeout(() => this.setData({ envelopePartId: id }), 40)
     })
   },
