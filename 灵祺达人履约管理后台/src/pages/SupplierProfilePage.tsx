@@ -4,7 +4,7 @@ import RegionSelect from '../components/mp/RegionSelect'
 import { useProtectedForm } from '../hooks/useProtectedForm'
 import { ensureIdentity, fetchSession, registerTalentMember, setLoginCredentials } from '../lib/mpApi'
 import { getAccount, getActiveRole, getToken, persistAccount } from '../lib/mpSession'
-import { getWorkIdentity, noteOwnedWorkIdentity } from '../lib/mpWorkIdentity'
+import { getWorkIdentity, noteOwnedWorkIdentity, readOwnedWorkIdentities } from '../lib/mpWorkIdentity'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import {
   DAILY_CAPACITY,
@@ -154,6 +154,34 @@ export default function SupplierProfilePage() {
         ← 返回我的
       </Link>
       <h2 className="text-xl font-bold">{workId === 'edit' ? '剪辑团队信息' : '拍摄团队信息'}</h2>
+      <div className="flex flex-wrap gap-2">
+        {readOwnedWorkIdentities().map((id) =>
+          id === workId ? (
+            <span key={id} className="rounded-full bg-stone-900 px-3 py-1 text-sm text-white">
+              {id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
+            </span>
+          ) : (
+            <Link
+              key={id}
+              to={id === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${id}`}
+              className="rounded-full bg-white px-3 py-1 text-sm text-stone-700"
+            >
+              {id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
+            </Link>
+          ),
+        )}
+        {(['talent', 'shoot', 'edit'] as const)
+          .filter((id) => !readOwnedWorkIdentities().includes(id))
+          .map((id) => (
+            <Link
+              key={id}
+              to={id === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${id}`}
+              className="rounded-full border border-dashed border-stone-400 bg-white px-3 py-1 text-sm text-stone-800"
+            >
+              +{id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
+            </Link>
+          ))}
+      </div>
       {teamId ? <p className="text-sm text-amber-500 font-mono">{teamId}</p> : null}
 
       <section className="pub-form-card space-y-3 text-sm">

@@ -14,7 +14,7 @@ import {
 } from '../lib/mpSync/talentPlatformProfiles'
 import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
-import { noteOwnedWorkIdentity } from '../lib/mpWorkIdentity'
+import { noteOwnedWorkIdentity, readOwnedWorkIdentities } from '../lib/mpWorkIdentity'
 import { inferLegacyMemberType } from '../lib/mpSync/talentPlatformProfiles'
 import { TALENT_TAGS } from '../lib/mpSync/publishFormOptions'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
@@ -272,6 +272,34 @@ function TalentProfileForm() {
         ← 返回我的
       </Link>
       <h2 className="text-xl font-bold">我的信息（达人）</h2>
+      <div className="flex flex-wrap gap-2">
+        {readOwnedWorkIdentities().map((id) =>
+          id === 'talent' ? (
+            <span key={id} className="rounded-full bg-stone-900 px-3 py-1 text-sm text-white">
+              达人
+            </span>
+          ) : (
+            <Link
+              key={id}
+              to={`/profile/supplier?identity=${id}`}
+              className="rounded-full bg-white px-3 py-1 text-sm text-stone-700"
+            >
+              {id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
+            </Link>
+          ),
+        )}
+        {(['talent', 'shoot', 'edit'] as const)
+          .filter((id) => !readOwnedWorkIdentities().includes(id))
+          .map((id) => (
+            <Link
+              key={id}
+              to={id === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${id}`}
+              className="rounded-full border border-dashed border-stone-400 bg-white px-3 py-1 text-sm text-stone-800"
+            >
+              +{id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
+            </Link>
+          ))}
+      </div>
       {member.lingqiTalentId ? (
         <p className="text-sm text-slate-400">达人 ID：{member.lingqiTalentId}</p>
       ) : null}
