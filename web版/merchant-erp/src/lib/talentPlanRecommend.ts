@@ -26,6 +26,8 @@ export type TalentPlanCard = {
   city: string
   platform: string
   followers: number
+  /** 公网粉丝来自检索摘录。没有该标记的数字是模型填写的，界面不展示 */
+  followersVerified?: boolean
   level: string
   quoteYuan: number | null
   tags: string[]
@@ -150,6 +152,40 @@ export function publicTalentJumpLink(nickname: string, rawUrl: string, cited: st
   const name = nickname.trim()
   if (name.length < 2) return ''
   return `https://www.douyin.com/search/${encodeURIComponent(name)}?type=user`
+}
+
+function fanCountInExcerpt(row: string): number {
+  const wan = row.match(/(\d+(?:\.\d+)?)\s*万\s*粉/)
+  if (wan) return Math.round(Number(wan[1]) * 10000)
+  const labeled = row.match(/粉(?:丝)?[:：]?\s*(\d+(?:\.\d+)?)\s*万/)
+  if (labeled) return Math.round(Number(labeled[1]) * 10000)
+  const plain = row.match(/粉丝[:：]?\s*(\d{2,})/)
+  return plain ? Number(plain[1]) : 0
+}
+
+/** 只认检索摘录里和该昵称写在一起的粉丝数，不认模型名单里的数字。 */
+export function citedFollowerCount(nickname: string, text: string): number {
+  const name = nickname.trim()
+  if (name.length < 2) return 0
+  const block = String(text || '').split('【检索摘录】')[1] || ''
+  let best = 0
+  for (const line of block.split('\n')) {
+    const row = line.trim()
+    if (!row.includes(name)) continue
+    const found = fanCountInExcerpt(row)
+    if (found > best) best = found
+  }
+  return best
+}
+
+export function formatFollowerCount(count: number): string {
+  if (!Number.isFinite(count) || count <= 0) return ''
+  if (count >= 10000) {
+    const wan = count / 10000
+    const text = wan >= 100 ? String(Math.round(wan)) : String(Math.round(wan * 10) / 10)
+    return `${text}万`
+  }
+  return String(Math.round(count))
 }
 
 export function tierKeyFromLabel(tier: string): KolTierKey {

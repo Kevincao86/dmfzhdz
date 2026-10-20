@@ -3661,6 +3661,30 @@ function appendCitedProfiles(text: string, urls: Iterable<string>): string {
   return `${text}\n【检索到的主页】\n${list.join('\n')}`
 }
 
+function collectCitedExcerpts(value: unknown, out: string[], depth = 0): void {
+  if (depth > 12 || value == null || typeof value !== 'object') return
+  if (Array.isArray(value)) {
+    for (const item of value) collectCitedExcerpts(item, out, depth + 1)
+    return
+  }
+  const rec = value as Record<string, unknown>
+  const title = typeof rec.title === 'string' ? rec.title.trim() : ''
+  const summary = typeof rec.summary === 'string' ? rec.summary.trim() : ''
+  const snippet = typeof rec.snippet === 'string' ? rec.snippet.trim() : ''
+  const line = [title, summary, snippet].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+  if (line.length >= 6 && /粉丝/.test(line)) {
+    const clipped = line.slice(0, 240)
+    if (!out.includes(clipped)) out.push(clipped)
+  }
+  for (const child of Object.values(rec)) collectCitedExcerpts(child, out, depth + 1)
+}
+
+function appendCitedExcerpts(text: string, lines: Iterable<string>): string {
+  const list = [...new Set(lines)].map((line) => line.trim()).filter((line) => line.length >= 6 && /粉丝/.test(line))
+  if (!list.length) return text
+  return `${text}\n【检索摘录】\n${list.slice(0, 20).join('\n')}`
+}
+
 function upstreamErrorMessage(data: Record<string, unknown>, status: number): string {
   const errObj = data.error as { message?: string; msg?: string } | undefined
   return (
@@ -3703,7 +3727,9 @@ async function postDoubaoResponsesSearch(
   if (!text) throw new Error('豆包联网未返回正文')
   const cited = new Set<string>()
   collectCitedProfileUrls(data, cited)
-  return appendCitedProfiles(text, cited)
+  const excerpts: string[] = []
+  collectCitedExcerpts(data, excerpts)
+  return appendCitedExcerpts(appendCitedProfiles(text, cited), excerpts)
 }
 
 function htmlToPlain(html: string) {
@@ -3792,10 +3818,15 @@ async function doubaoFunctionWebSearch(
   }
   const notes = blocks.join('\n')
   const cited = (notes.split('【检索到的主页】')[1] || '').match(/https?:\/\/\S+/g) || []
+  const excerpts = notes
+    .split('【检索到的主页】')[0]!
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /粉丝/.test(line))
   const talentAsk = /达人|探店博主/.test(`${system}\n${user}`)
   const grounded = notes
     ? talentAsk
-      ? `${user}\n\n联网检索结果：\n${notes}\n只根据检索结果列出达人。每行：昵称｜城市｜粉丝数字｜等级｜内容方向。主页只能原样复制【检索到的主页】里的链接，没有就写无，不要自己编链接。不要编造电话或微信。`
+      ? `${user}\n\n联网检索结果：\n${notes}\n只根据检索结果列出达人。每行：昵称｜城市｜无｜等级｜内容方向。粉丝不要自己写数字。主页只能原样复制【检索到的主页】里的链接，没有就写无，不要自己编链接。不要编造电话或微信。`
       : `${user}\n\n联网检索结果：\n${notes}\n只根据这些检索结果回答。有套餐和价格就写出来。`
     : user
   const text = await openAiStyleChat(
@@ -3808,7 +3839,7 @@ async function doubaoFunctionWebSearch(
     grounded,
     { temperature: 0, max_tokens: talentAsk ? 2000 : 1200 },
   )
-  return appendCitedProfiles(text, cited)
+  return appendCitedExcerpts(appendCitedProfiles(text, cited), excerpts)
 }
 
 /** 豆包联网：先走方舟联网插件；账号未开通时改为对话里调用 web_search 工具 */

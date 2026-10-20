@@ -9,8 +9,10 @@ import type { RegistryRecruitmentOrder } from '../lib/opsRegistryTypes'
 import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import { supabase } from '../lib/supabaseClient'
 import {
+  citedFollowerCount,
   citedProfileUrls,
   displayTalentProfileLink,
+  formatFollowerCount,
   publicTalentJumpLink,
   talentCardMatchesCloseWords,
   talentCloseWords,
@@ -55,14 +57,6 @@ type Props = {
   onChoose?: () => void
 }
 
-function parseFans(raw: string): number {
-  const t = raw.replace(/粉丝/g, '').trim()
-  const wan = t.match(/(\d+(?:\.\d+)?)\s*万/)
-  if (wan) return Math.round(Number(wan[1]) * 10000)
-  const n = t.match(/(\d{2,})/)
-  return n ? Number(n[1]) : 0
-}
-
 function parsePublicTalentLines(
   text: string,
   cityHint = '',
@@ -71,13 +65,28 @@ function parsePublicTalentLines(
   nickname: string
   city: string
   followers: number
+  followersVerified: boolean
   level: string
   reason: string
 }> {
   const cap = Math.min(20, Math.max(1, limit))
-  const out: Array<{ nickname: string; city: string; followers: number; level: string; reason: string }> = []
+  const out: Array<{
+    nickname: string
+    city: string
+    followers: number
+    followersVerified: boolean
+    level: string
+    reason: string
+  }> = []
   const seen = new Set<string>()
-  const push = (row: { nickname: string; city: string; followers: number; level: string; reason: string }) => {
+  const push = (row: {
+    nickname: string
+    city: string
+    followers: number
+    followersVerified: boolean
+    level: string
+    reason: string
+  }) => {
     const key = row.nickname.trim()
     if (key.length < 2 || seen.has(key) || out.length >= cap) return
     seen.add(key)
@@ -91,10 +100,12 @@ function parsePublicTalentLines(
     if (parts.length >= 2) {
       const nickname = parts[0]!.replace(/^昵称[:：]/, '').slice(0, 24)
       if (/^达人$|^公网$|^检索$/.test(nickname)) continue
+      const followers = citedFollowerCount(nickname, text)
       push({
         nickname,
         city: parts[1] || cityHint,
-        followers: parseFans(parts[2] || row),
+        followers,
+        followersVerified: followers > 0,
         level: parts[3] || '',
         reason: parts.slice(4).join(' ').slice(0, 80),
       })
@@ -103,10 +114,13 @@ function parsePublicTalentLines(
     if (want && !row.includes(want) && !/粉丝|万粉|探店/.test(row)) continue
     const nickname = (row.match(/[\u4e00-\u9fffA-Za-z0-9_（）()]{2,16}/) || [])[0] || ''
     if (!nickname || nickname === want || /^(达人|公网|检索|粉丝|探店|本地生活)$/.test(nickname)) continue
+    const name = nickname.replace(/[（(].*$/, '').slice(0, 24)
+    const followers = citedFollowerCount(name, text)
     push({
-      nickname: nickname.replace(/[（(].*$/, '').slice(0, 24),
+      nickname: name,
       city: cityHint,
-      followers: parseFans(row),
+      followers,
+      followersVerified: followers > 0,
       level: '',
       reason: row.slice(0, 80),
     })
@@ -137,7 +151,7 @@ async function fetchPublicTalents(opts: {
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。请联网搜索「${city} 抖音 探店达人」「${city} ${need} 达人」。只写${opts.platform || '抖音'}、区域在「${city}」、内容贴近「${need}」的达人，凑满 ${want} 位。不要前言。每行严格：昵称｜${city}｜粉丝数字｜等级｜内容方向。不要电话或微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+            content: `你是豆包公网达人检索。请联网搜索「${city} 抖音 探店达人」「${city} ${need} 达人」。只写${opts.platform || '抖音'}、区域在「${city}」、内容贴近「${need}」的达人，凑满 ${want} 位。不要前言。每行严格：昵称｜${city}｜无｜等级｜内容方向。粉丝不要自己写数字。不要电话或微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
           },
           {
             role: 'user',
@@ -183,7 +197,14 @@ async function fetchPublicTalentsUntil(opts: {
 }
 
 function publicCard(
-  person: { nickname: string; city: string; followers: number; level: string; reason: string },
+  person: {
+    nickname: string
+    city: string
+    followers: number
+    followersVerified?: boolean
+    level: string
+    reason: string
+  },
   base: TalentPlanCard,
   city: string,
   platform: string,
@@ -196,6 +217,7 @@ function publicCard(
     city: person.city || city,
     platform: platform || base.platform || '抖音',
     followers: person.followers,
+    followersVerified: Boolean(person.followersVerified),
     level: person.level || base.tierLabel,
     quoteYuan: null,
     tags: [],
@@ -451,7 +473,7 @@ export function TalentPlanChoice({
                     <span className="ml-2 text-xs font-normal text-slate-500">
                       {card.platform}
                       {card.city ? ` · ${card.city}` : ''}
-                      {card.followers > 0 ? ` · 粉丝${card.followers}` : ''}
+                      {followerLabel(card)}
                     </span>
                   </p>
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
@@ -497,6 +519,13 @@ type RosterNotice = {
   people: TalentPlanCard[]
 }
 
+function followerLabel(card: TalentPlanCard): string {
+  if (card.source === 'public' && !card.followersVerified) return ''
+  if (card.followers <= 0) return ''
+  const text = card.source === 'public' ? formatFollowerCount(card.followers) : String(card.followers)
+  return text ? ` · 粉丝${text}` : ''
+}
+
 function jumpLabel(platform: string, url: string): string {
   if (/\/search\//.test(url)) return '去抖音搜这位达人'
   return profileLinkLabel(platform, url)
@@ -523,7 +552,7 @@ async function fetchOnePublicCard(opts: {
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补 1 位，区域只限「${city}」，内容贴近「${need}」。不要前言。只写一行：昵称｜城市｜粉丝｜内容方向｜主页。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+            content: `你是豆包公网达人检索。只补 1 位，区域只限「${city}」，内容贴近「${need}」。不要前言。只写一行：昵称｜城市｜无｜内容方向｜主页。粉丝不要自己写数字。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
           },
           { role: 'user', content: `请检索 1 位${city}、${need}达人，并带上能打开的主页。` },
         ],
@@ -541,13 +570,15 @@ async function fetchOnePublicCard(opts: {
     const direction = parts.find((part, index) => index >= 3 && part !== '无' && !/^https?:/.test(part)) || ''
     const raw = String(data.content || '')
     const profileLink = publicTalentJumpLink(nickname, line, citedProfileUrls(raw))
+    const followers = citedFollowerCount(nickname, raw)
     return {
       seatId: opts.seatId,
       talentId: `public:${nickname}`,
       nickname,
       city: parts[1] || city,
       platform: '抖音',
-      followers: parseFans(parts[2] || ''),
+      followers,
+      followersVerified: followers > 0,
       level: '',
       quoteYuan: null,
       tags: [],
@@ -799,7 +830,7 @@ export function TalentChatRoster({
                   <span className="ml-2 text-xs font-normal text-slate-500">
                     {card.source === 'public' ? '公网' : '星选库'}
                     {card.city ? ` · ${card.city}` : ''}
-                    {card.followers > 0 ? ` · 粉丝${card.followers}` : ''}
+                    {followerLabel(card)}
                   </span>
                 </p>
                 <p className="mt-0.5 text-xs text-slate-500">

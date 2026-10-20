@@ -117,6 +117,7 @@ import {
 } from '../lib/recruitmentCityPicker'
 import { allCitiesFlat } from '../lib/chinaRegion'
 import {
+  citedFollowerCount,
   citedProfileUrls,
   publicTalentJumpLink,
   talentCardMatchesCloseWords,
@@ -630,18 +631,22 @@ function recentDialogueText(msgs: { role: string; content?: string }[]): string 
 /** 本轮推荐卡片。界面直接渲染，不让模型把主页和头像写成文字。 */
 let pendingTalentRoster: AiTalentRoster | null = null
 
-function parseFollowerCount(raw: string): number {
-  const wan = raw.match(/(\d+(?:\.\d+)?)\s*万/)
-  if (wan) return Math.round(Number(wan[1]) * 10000)
-  const n = raw.match(/(\d{2,})/)
-  return n ? Number(n[1]) : 0
+function searchFooters(text: string): { body: string; footer: string } {
+  const marks = ['【检索到的主页】', '【检索摘录】']
+  let cut = text.length
+  for (const mark of marks) {
+    const index = text.indexOf(mark)
+    if (index >= 0 && index < cut) cut = index
+  }
+  if (cut === text.length) return { body: text, footer: '' }
+  return { body: text.slice(0, cut), footer: text.slice(cut) }
 }
 
 function cardsFromPublicText(text: string, city: string, talentType: string): TalentPlanCard[] {
   const cited = citedProfileUrls(text)
   const out: TalentPlanCard[] = []
   const seen = new Set<string>()
-  for (const line of text.split('【检索到的主页】')[0]!.split(/\n+/)) {
+  for (const line of searchFooters(text).body.split(/\n+/)) {
     const row = line.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim()
     if (!row || /暂无|不拉公网|库内已凑满|没有返回/.test(row)) continue
     const parts = row.split(/[|｜]/).map((part) => part.trim()).filter(Boolean)
@@ -652,6 +657,7 @@ function cardsFromPublicText(text: string, city: string, talentType: string): Ta
     const profileLink = publicTalentJumpLink(nickname, url, cited)
     const profileVerified = Boolean(profileLink) && !/\/search\//.test(profileLink)
     const direction = parts.find((part, index) => index >= 3 && !/^https?:/.test(part) && part !== '无') || ''
+    const followers = citedFollowerCount(nickname, text)
     seen.add(nickname)
     out.push({
       seatId: `public-${out.length + 1}`,
@@ -659,7 +665,8 @@ function cardsFromPublicText(text: string, city: string, talentType: string): Ta
       nickname,
       city: parts[1] || city,
       platform: '抖音',
-      followers: parseFollowerCount(parts[2] || row),
+      followers,
+      followersVerified: followers > 0,
       level: '',
       quoteYuan: null,
       tags: [],
@@ -738,13 +745,12 @@ function publicGapNote(planText: string, picked: TalentPlanCard[], headcount: nu
 /** 模型自己写的主页一律丢掉，只留【检索到的主页】里出现过的链接。 */
 function keepRealProfileUrls(text: string): string {
   const cited = new Set(citedProfileUrls(text).map((url) => url.replace(/\/+$/, '')))
-  const body = text.split('【检索到的主页】')[0] || text
+  const { body, footer } = searchFooters(text)
   const kept = body.replace(/https?:\/\/[^\s|｜)）]+/g, (url) => {
     const cleaned = url.replace(/[)），。]+$/, '').replace(/\/+$/, '')
     return cited.has(cleaned) ? url : '无'
   })
-  const block = text.includes('【检索到的主页】') ? `\n【检索到的主页】${text.split('【检索到的主页】')[1]}` : ''
-  return `${kept}${block}`
+  return `${kept}${footer}`
 }
 
 async function fetchDoubaoPublicTalents(
@@ -769,7 +775,7 @@ async function fetchDoubaoPublicTalents(
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。内容必须符合方案，不要写无关类目。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。主页只能原样复制检索结果里的用户主页，禁止自己编写 douyin.com/user、v.douyin.com 或其他链接；没有就写无。不要编造头像、电话、微信。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
+            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。内容必须符合方案，不要写无关类目。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。粉丝一栏一律写无，不要自己估算。主页只能原样复制检索结果里的用户主页，禁止自己编写 douyin.com/user、v.douyin.com 或其他链接；没有就写无。不要编造头像、电话、微信。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
           },
           {
             role: 'user',
@@ -781,9 +787,9 @@ async function fetchDoubaoPublicTalents(
     )
     const text = keepRealProfileUrls(String(data.content || '').trim())
     const cap = Math.min(4200, Math.max(1200, want * 380))
-    const citedBlock = text.includes('【检索到的主页】') ? `\n【检索到的主页】${text.split('【检索到的主页】')[1]}` : ''
-    const body = (text.split('【检索到的主页】')[0] || '').slice(0, cap).trim()
-    return body ? `${body}${citedBlock}` : '公网暂无符合条件的达人。'
+    const { body, footer } = searchFooters(text)
+    const clipped = body.slice(0, cap).trim()
+    return clipped ? `${clipped}${footer}` : '公网暂无符合条件的达人。'
   } catch {
     return '豆包公网本次没有返回可用名单。'
   } finally {
