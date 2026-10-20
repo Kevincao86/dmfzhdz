@@ -13,8 +13,10 @@ import {
   citedProfileUrls,
   displayTalentProfileLink,
   formatFollowerCount,
-  isPublicExploreCreator,
+  isBrandPublicAccount,
+  nicknamesConfirmedExplore,
   publicTalentJumpLink,
+  searchConfirmsExploreCreator,
   talentCardMatchesCloseWords,
   talentCloseWords,
   type TalentPlanCard,
@@ -103,7 +105,7 @@ function parsePublicTalentLines(
       if (/^达人$|^公网$|^检索$/.test(nickname)) continue
       const followers = citedFollowerCount(nickname, text)
       const direction = [parts[3], ...parts.slice(4)].filter(Boolean).join(' ')
-      if (!isPublicExploreCreator(nickname, direction, text)) continue
+      if (isBrandPublicAccount(nickname, direction)) continue
       push({
         nickname,
         city: parts[1] || cityHint,
@@ -119,7 +121,7 @@ function parsePublicTalentLines(
     if (!nickname || nickname === want || /^(达人|公网|检索|粉丝|探店|本地生活)$/.test(nickname)) continue
     const name = nickname.replace(/[（(].*$/, '').slice(0, 24)
     const followers = citedFollowerCount(name, text)
-    if (!isPublicExploreCreator(name, row, text)) continue
+    if (isBrandPublicAccount(name, row)) continue
     push({
       nickname: name,
       city: cityHint,
@@ -155,7 +157,7 @@ async function fetchPublicTalents(opts: {
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。请联网搜索「${city} 抖音 探店达人」。只要探店达人，不要品牌官方号、旗舰店、门店自己的号。只写${opts.platform || '抖音'}、区域在「${city}」、内容贴近「${need}」的达人，凑满 ${want} 位。不要前言。每行严格：昵称｜${city}｜无｜等级｜探店。粉丝不要自己写数字。不要电话或微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+            content: `你是豆包公网达人检索。请联网搜索「${city} 抖音 本地生活探店达人」。找自己在做探店的账号，昵称里不必出现「探店」。不要品牌官方号、旗舰店、门店自己的号。只写${opts.platform || '抖音'}、区域在「${city}」、内容贴近「${need}」的达人，凑满 ${want} 位。不要前言。每行严格：昵称｜${city}｜无｜等级｜实际内容。粉丝不要自己写数字。不要电话或微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
           },
           {
             role: 'user',
@@ -165,7 +167,12 @@ async function fetchPublicTalents(opts: {
       },
       { signal: ac.signal },
     )
-    return parsePublicTalentLines(String(data.content || ''), city, want)
+    const parsed = parsePublicTalentLines(String(data.content || ''), city, want)
+    const confirmed = await nicknamesConfirmedExplore(
+      parsed.map((person) => person.nickname),
+      city,
+    )
+    return parsed.filter((person) => confirmed.has(person.nickname))
   } catch {
     return []
   } finally {
@@ -228,6 +235,7 @@ function publicCard(
     avatarUrl: '',
     profileLink: '',
     source: 'public',
+    exploreVerified: true,
     reason: person.reason ? `公网 · ${person.reason}` : '公网补位',
   }
 }
@@ -556,7 +564,7 @@ async function fetchOnePublicCard(opts: {
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补 1 位探店达人，区域只限「${city}」，内容贴近「${need}」。不要品牌官方号、旗舰店、门店自己的号。不要前言。只写一行：昵称｜城市｜无｜探店｜主页。粉丝不要自己写数字。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+            content: `你是豆包公网达人检索。只补 1 位本地生活探店达人，区域只限「${city}」，内容贴近「${need}」。昵称里不必出现「探店」。不要品牌官方号、旗舰店、门店自己的号。不要前言。只写一行：昵称｜城市｜无｜实际内容｜主页。粉丝不要自己写数字。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
           },
           { role: 'user', content: `请检索 1 位${city}、${need}达人，并带上能打开的主页。` },
         ],
@@ -575,7 +583,8 @@ async function fetchOnePublicCard(opts: {
     const raw = String(data.content || '')
     const profileLink = publicTalentJumpLink(nickname, line, citedProfileUrls(raw))
     const followers = citedFollowerCount(nickname, raw)
-    if (!isPublicExploreCreator(nickname, direction, raw)) return null
+    if (isBrandPublicAccount(nickname, direction)) return null
+    if (!(await searchConfirmsExploreCreator(nickname, parts[1] || city))) return null
     return {
       seatId: opts.seatId,
       talentId: `public:${nickname}`,
@@ -594,6 +603,7 @@ async function fetchOnePublicCard(opts: {
       unitBudgetYuan: 0,
       talentType: direction || need,
       source: 'public',
+      exploreVerified: true,
       reason: direction ? `公网 · ${direction}` : '公网补位',
     }
   } catch {
@@ -664,6 +674,8 @@ export function TalentChatRoster({
 }) {
   const [replacingId, setReplacingId] = useState('')
   const [publishing, setPublishing] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [hideNote, setHideNote] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<RosterNotice | null>(null)
   const seenIdSet = useRef(
@@ -676,11 +688,53 @@ export function TalentChatRoster({
   const seenNameSet = useRef(
     new Set([...(seenNames || []), ...cards.map((item) => item.nickname)].filter(Boolean)),
   )
-  const shown = cards.filter(
-    (card) =>
-      card.source !== 'public' ||
-      isPublicExploreCreator(card.nickname, `${card.reason || ''} ${card.talentType || ''}`, ''),
-  )
+  const cardsRef = useRef(cards)
+  cardsRef.current = cards
+  const onCardsChangeRef = useRef(onCardsChange)
+  onCardsChangeRef.current = onCardsChange
+  const pendingKey = cards
+    .filter((card) => card.source === 'public' && !card.exploreVerified && !card.empty)
+    .map((card) => card.nickname)
+    .join('\n')
+  const shown = cards.filter((card) => card.source !== 'public' || card.exploreVerified)
+
+  useEffect(() => {
+    if (!pendingKey) {
+      setChecking(false)
+      return
+    }
+    const ac = new AbortController()
+    let cancelled = false
+    setChecking(true)
+    void (async () => {
+      const current = cardsRef.current
+      const pending = current.filter((card) => card.source === 'public' && !card.exploreVerified && !card.empty)
+      const confirmed = await nicknamesConfirmedExplore(
+        pending.map((card) => card.nickname),
+        city,
+        ac.signal,
+      )
+      if (cancelled || ac.signal.aborted) return
+      const next = current.flatMap((card) => {
+        if (card.source !== 'public' || card.exploreVerified || card.empty) return [card]
+        if (isBrandPublicAccount(card.nickname, `${card.reason || ''}${card.talentType || ''}`)) return []
+        if (!confirmed.has(card.nickname)) return []
+        return [{ ...card, exploreVerified: true }]
+      })
+      setChecking(false)
+      if (next.length < current.length) setHideNote(true)
+      const changed =
+        next.length !== current.length ||
+        next.some((card, index) => card.exploreVerified !== current[index]?.exploreVerified)
+      if (changed) {
+        onCardsChangeRef.current(next, { ids: [...seenIdSet.current], names: [...seenNameSet.current] })
+      }
+    })()
+    return () => {
+      cancelled = true
+      ac.abort()
+    }
+  }, [pendingKey, city])
 
   function rememberSeen() {
     for (const item of cards) {
@@ -824,7 +878,8 @@ export function TalentChatRoster({
           {publishing ? '正在发布…' : '定向招募'}
         </button>
       </div>
-      {note && shown.length === cards.length ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
+      {note && !hideNote && shown.length === cards.length ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
+      {checking ? <p className="mt-1 text-xs text-slate-500">正在逐个检索这些达人是不是本地生活探店账号…</p> : null}
       {error ? <p className="mt-2 text-xs text-amber-700">{error}</p> : null}
       <ul className="mt-3 space-y-2">
         {shown.map((card) => (

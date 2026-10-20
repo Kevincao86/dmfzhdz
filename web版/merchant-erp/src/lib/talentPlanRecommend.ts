@@ -1,3 +1,4 @@
+import { postAiChat } from '../services/ai/aiClient'
 import type { KolTierKey } from './merchantRecruitmentTierPlan'
 import { inferKolTierFromApplicant, kolTierLabel } from './merchantRecruitmentTierPlan'
 import type { RegistryTalentLibraryEntry } from './opsRegistryTypes'
@@ -45,6 +46,8 @@ export type TalentPlanCard = {
   empty?: boolean
   /** 星选小程序会员 id。没有对应会员时不能站内定向邀约 */
   memberId?: string
+  /** 公网这位达人已经过豆包联网检索，确认是本地生活探店账号 */
+  exploreVerified?: boolean
 }
 
 export type TalentBudgetSeatSource = {
@@ -165,14 +168,91 @@ function fanCountInExcerpt(row: string): number {
 
 const BRAND_ACCOUNT_RE = /旗舰店|官方|官旗|专卖店|企业号|总店|直营店|品牌店|体验店|形象店|品牌推广|官方号|门店号|放映室|电视台|传媒/
 
-/** 公网只留探店账号。模型在内容方向里写的「探店」不算。 */
-export function isPublicExploreCreator(nickname: string, direction: string, sourceText: string): boolean {
+/** 旗舰店、官方号、门店自己的号直接排除，不必再检索。 */
+export function isBrandPublicAccount(nickname: string, direction = ''): boolean {
   const name = nickname.trim()
-  if (name.length < 2) return false
-  if (BRAND_ACCOUNT_RE.test(`${name}${direction}`)) return false
-  if (name.includes('探店')) return true
-  const block = String(sourceText || '').split('【检索摘录】')[1] || ''
-  return block.split('\n').some((line) => line.includes(name) && /探店/.test(line))
+  if (name.length < 2) return true
+  return BRAND_ACCOUNT_RE.test(`${name}${direction}`)
+}
+
+/** 只认豆包这次检索写出的「是｜依据」。昵称里有没有「探店」不算。 */
+export function exploreSearchSaysYes(text: string): boolean {
+  const body = String(text || '').split('【检索')[0] || ''
+  const line = body
+    .split(/\n+/)
+    .map((row) => row.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim())
+    .find((row) => /^(是|否)/.test(row))
+  if (!line || !/^是(?:[|｜:：,，\s]|$)/.test(line)) return false
+  const basis = line.replace(/^是[|｜:：,，\s]*/, '').trim()
+  if (basis.length < 8) return false
+  if (/^(本地生活)?探店达人[。！!]?$/.test(basis)) return false
+  if (/不是探店|非探店|不算探店|并非探店/.test(basis)) return false
+  return /探店|到店|打卡/.test(basis)
+}
+
+/** 对这一位达人单独联网检索，确认是不是本地生活探店账号。 */
+export async function searchConfirmsExploreCreator(
+  nickname: string,
+  city: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const name = nickname.trim()
+  if (isBrandPublicAccount(name)) return false
+  if (signal?.aborted) return false
+  const ac = new AbortController()
+  const onAbort = () => ac.abort()
+  signal?.addEventListener('abort', onAbort, { once: true })
+  const timer = setTimeout(() => ac.abort(), 22000)
+  try {
+    const data = await postAiChat(
+      {
+        provider: 'doubao',
+        stream: false,
+        temperature: 0,
+        webSearch: true,
+        messages: [
+          {
+            role: 'system',
+            content: `你是豆包公网检索。请联网搜索抖音账号「${name}」，只根据检索结果判断：这个账号是不是自己在做本地生活探店（到店拍摄、探店、吃喝玩乐打卡）。昵称里有没有「探店」两个字不能作为依据。品牌官方号、旗舰店、专卖店、门店自己的号、企业号、放映室、电视台回答否。检索结果看不出在做探店，回答否。不要前言。只写一行：是｜检索依据，或：否｜原因。依据必须来自这次检索，写清这个账号实际发什么内容。`,
+          },
+          {
+            role: 'user',
+            content: `搜索：抖音 ${name} ${city || ''} 探店`,
+          },
+        ],
+      },
+      { signal: ac.signal },
+    )
+    return exploreSearchSaysYes(String(data.content || ''))
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+  }
+}
+
+/** 逐个检索。同时最多 4 个，避免一次把名单里的人当成探店达人放进来。 */
+export async function nicknamesConfirmedExplore(
+  names: string[],
+  city: string,
+  signal?: AbortSignal,
+): Promise<Set<string>> {
+  const unique = [...new Set(names.map((item) => item.trim()).filter((item) => !isBrandPublicAccount(item)))]
+  const confirmed = new Set<string>()
+  let cursor = 0
+  async function worker() {
+    while (cursor < unique.length) {
+      if (signal?.aborted) return
+      const index = cursor
+      cursor += 1
+      const name = unique[index]!
+      if (await searchConfirmsExploreCreator(name, city, signal)) confirmed.add(name)
+    }
+  }
+  const workers = Math.min(4, unique.length)
+  if (workers > 0) await Promise.all(Array.from({ length: workers }, () => worker()))
+  return confirmed
 }
 
 /** 只认检索摘录里和该昵称写在一起的粉丝数，不认模型名单里的数字。 */

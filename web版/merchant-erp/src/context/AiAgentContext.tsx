@@ -120,7 +120,8 @@ import { extractTalentPlanHeadcount } from '../lib/aiAgentRecruitmentParse'
 import {
   citedFollowerCount,
   citedProfileUrls,
-  isPublicExploreCreator,
+  isBrandPublicAccount,
+  nicknamesConfirmedExplore,
   publicTalentJumpLink,
   talentCardMatchesCloseWords,
   talentCloseWords,
@@ -678,7 +679,7 @@ function cardsFromPublicText(text: string, city: string, talentType: string): Ta
     const profileVerified = Boolean(profileLink) && !/\/search\//.test(profileLink)
     const direction = parts.find((part, index) => index >= 3 && !/^https?:/.test(part) && part !== '无') || ''
     const followers = citedFollowerCount(nickname, text)
-    if (!isPublicExploreCreator(nickname, direction, text)) continue
+    if (isBrandPublicAccount(nickname, direction)) continue
     seen.add(nickname)
     out.push({
       seatId: `public-${out.length + 1}`,
@@ -796,7 +797,7 @@ async function fetchDoubaoPublicTalents(
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。只要探店达人，不要品牌官方号、旗舰店、专卖店、门店自己的号、企业号。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。内容方向必须写探店。粉丝一栏一律写无，不要自己估算。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
+            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。先找本地生活探店达人，昵称里不必出现「探店」。不要品牌官方号、旗舰店、专卖店、门店自己的号、企业号。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。内容方向写检索到的实际内容，不要为了过关改成探店。粉丝一栏一律写无，不要自己估算。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
           },
           {
             role: 'user',
@@ -879,7 +880,17 @@ async function loadTalentRecommendBlock(userText: string, priorText = '', quoted
           `${planClause}${planClause ? '。' : ''}${publicGapNote(planText, picked, headcount)}${skipNames.length ? `不要重复：${skipNames.join('、')}。` : ''}`,
         )
       : ''
-  const publicCards = gap > 0 ? cardsFromPublicText(publicText, city, talentType).slice(0, gap) : []
+  const parsedPublic = gap > 0 ? cardsFromPublicText(publicText, city, talentType) : []
+  const confirmedNames = parsedPublic.length
+    ? await nicknamesConfirmedExplore(
+        parsedPublic.map((card) => card.nickname),
+        city,
+      )
+    : new Set<string>()
+  const publicCards = parsedPublic
+    .filter((card) => confirmedNames.has(card.nickname))
+    .slice(0, gap)
+    .map((card) => ({ ...card, exploreVerified: true }))
   const cards = [...picked, ...publicCards]
   const asked = `方案要 ${headcount} 位。`
   const note =
