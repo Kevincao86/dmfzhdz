@@ -37,6 +37,7 @@ export function ProfileEnvelope({
   open,
   saving,
   onEdit,
+  onClose,
   onSave,
   children,
 }: {
@@ -46,43 +47,51 @@ export function ProfileEnvelope({
   open: boolean
   saving?: boolean
   onEdit: () => void
+  onClose: () => void
   onSave: () => void
   children: ReactNode
 }) {
+  const [phase, setPhase] = useState<'closed' | 'open' | 'shut'>('closed')
+  useEffect(() => {
+    if (open) {
+      setPhase('open')
+      return
+    }
+    setPhase((cur) => (cur === 'closed' ? 'closed' : 'shut'))
+  }, [open])
+  useEffect(() => {
+    if (phase !== 'shut') return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const timer = window.setTimeout(() => setPhase('closed'), reduce ? 0 : 380)
+    return () => window.clearTimeout(timer)
+  }, [phase])
+
   return (
-    <section className="relative [perspective:900px]">
-      <div
-        className={`pointer-events-none relative mx-8 h-4 origin-top rounded-b-[46%] bg-[#ead9c2] transition-transform duration-500 ease-[cubic-bezier(0.22,0.82,0.24,1)] motion-reduce:transition-none ${open ? '[transform:rotateX(175deg)]' : ''}`}
-      >
-        {logo ? (
-          <img
-            src={logo}
-            alt=""
-            className="absolute left-1/2 top-0 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white object-contain shadow"
-          />
-        ) : null}
-      </div>
-      <div className="relative z-[1] -mt-1 rounded-2xl border border-[#eadcc8] bg-[#fbf7f1] px-4 py-3 shadow-sm">
+    <section>
+      <div className="rounded-2xl border border-stone-200 bg-[#fbf7f1] px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
           {logo ? <img src={logo} alt="" className="h-9 w-9 rounded-xl bg-white object-contain" /> : null}
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-stone-900">{title}</div>
-            {!open ? <div className="truncate text-xs text-stone-500">{summary || '未填写'}</div> : null}
+            <div className="truncate text-xs text-stone-500">{summary || '未填写'}</div>
           </div>
-          {!open ? (
-            <button type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={onEdit}>
-              修改
-            </button>
-          ) : null}
+          <button type="button" className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700" onClick={onEdit}>
+            修改
+          </button>
         </div>
       </div>
-      <div
-        className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.22,0.82,0.24,1)] motion-reduce:transition-none ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
-      >
-        <div className={open ? 'overflow-hidden' : 'pointer-events-none overflow-hidden'}>
-          <div className="space-y-3 rounded-b-2xl border border-t-0 border-[#eadcc8] bg-white px-4 py-3 text-sm">
-            {children}
-            <div className="flex justify-end">
+      {phase !== 'closed' ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 p-4" onClick={onClose}>
+          <div
+            className={`env-dialog max-h-[82vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white px-4 py-4 text-sm shadow-2xl [perspective:900px] ${phase === 'shut' ? 'env-dialog--shut' : 'env-dialog--open'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 text-base font-semibold text-stone-900">{title}</div>
+            <div className="space-y-3">{children}</div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700" onClick={onClose}>
+                取消
+              </button>
               <button
                 type="button"
                 disabled={saving}
@@ -93,8 +102,24 @@ export function ProfileEnvelope({
               </button>
             </div>
           </div>
+          <style>{`
+            .env-dialog { transform-origin: top center; }
+            .env-dialog--open { animation: env-open 0.42s cubic-bezier(0.22, 0.82, 0.24, 1); }
+            .env-dialog--shut { animation: env-shut 0.36s cubic-bezier(0.4, 0, 0.7, 0.2) forwards; }
+            @keyframes env-open {
+              from { transform: rotateX(-68deg) scale(0.96); opacity: 0; }
+              to { transform: none; opacity: 1; }
+            }
+            @keyframes env-shut {
+              from { transform: none; opacity: 1; }
+              to { transform: rotateX(-68deg) scale(0.96); opacity: 0; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .env-dialog--open, .env-dialog--shut { animation: none; }
+            }
+          `}</style>
         </div>
-      </div>
+      ) : null}
     </section>
   )
 }
@@ -439,12 +464,9 @@ function TalentProfileForm() {
               to={id === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${id}`}
               className="rounded-full border border-dashed border-stone-400 bg-white px-3 py-1 text-sm text-stone-800"
             >
-              {id === 'shoot' ? '新增拍摄身份' : id === 'edit' ? '新增剪辑身份' : '新增达人身份'}
+              +{id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
             </Link>
           ))}
-        {readOwnedWorkIdentities().length < 3 ? (
-          <span className="text-xs text-slate-400">可新增身份</span>
-        ) : null}
         {getWorkIdentity() !== 'talent' && !readOwnedWorkIdentities().includes('talent') ? (
           <Link
             to={
@@ -468,6 +490,7 @@ function TalentProfileForm() {
         open={openLogin}
         saving={saving}
         onEdit={() => setOpenLogin(true)}
+        onClose={() => setOpenLogin(false)}
         onSave={() => void onSave('login')}
       >
         <p className="text-slate-400 text-xs">登录账号（选填）— 设置后可用账号密码登录，与微信绑定同一灵祺 ID</p>
@@ -506,6 +529,7 @@ function TalentProfileForm() {
         open={openWx}
         saving={saving}
         onEdit={() => setOpenWx(true)}
+        onClose={() => setOpenWx(false)}
         onSave={() => void onSave('wx')}
       >
         <label className="block">
@@ -527,6 +551,7 @@ function TalentProfileForm() {
         open={openContact}
         saving={saving}
         onEdit={() => setOpenContact(true)}
+        onClose={() => setOpenContact(false)}
         onSave={() => void onSave('contact')}
       >
         <label className="block">
@@ -608,6 +633,7 @@ function TalentProfileForm() {
               setActivePlatform(p.id)
               setOpenPlat({ [p.id]: true })
             }}
+            onClose={() => setOpenPlat({})}
             onSave={() => void onSave('platform', p.id)}
           >
             {opened && p.id === activePlatform ? (

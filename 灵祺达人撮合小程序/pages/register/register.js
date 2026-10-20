@@ -609,6 +609,18 @@ Page({
     else if (key === 'contact') this.setData({ sectionOpenContact: true })
     else if (key === 'team') this.setData({ sectionOpenTeam: true })
   },
+  onCloseSection(e) {
+    const key = e.currentTarget.dataset.key
+    if (key === 'wx') this.setData({ sectionOpenWx: false })
+    else if (key === 'contact') this.setData({ sectionOpenContact: false })
+    else if (key === 'team') this.setData({ sectionOpenTeam: false })
+  },
+  onClosePlatform(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    const expanded = { ...this.data.platformExpanded, [id]: false }
+    syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
+  },
   onOpenPlatform(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return

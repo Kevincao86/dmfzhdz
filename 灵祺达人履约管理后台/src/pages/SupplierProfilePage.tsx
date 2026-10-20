@@ -208,12 +208,9 @@ export default function SupplierProfilePage() {
               to={id === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${id}`}
               className="rounded-full border border-dashed border-stone-400 bg-white px-3 py-1 text-sm text-stone-800"
             >
-              {id === 'shoot' ? '新增拍摄身份' : id === 'edit' ? '新增剪辑身份' : '新增达人身份'}
+              +{id === 'shoot' ? '拍摄' : id === 'edit' ? '剪辑' : '达人'}
             </Link>
           ))}
-        {readOwnedWorkIdentities().length < 3 ? (
-          <span className="text-xs text-slate-400">可新增身份</span>
-        ) : null}
         {adding ? (
           <Link
             to={current === 'talent' ? '/profile/talent' : `/profile/supplier?identity=${current}`}
@@ -231,6 +228,7 @@ export default function SupplierProfilePage() {
         open={openContact}
         saving={saving}
         onEdit={() => setOpenContact(true)}
+        onClose={() => setOpenContact(false)}
         onSave={() => void onSave('contact')}
       >
         <label className="block">
@@ -265,6 +263,7 @@ export default function SupplierProfilePage() {
         open={openTeam}
         saving={saving}
         onEdit={() => setOpenTeam(true)}
+        onClose={() => setOpenTeam(false)}
         onSave={() => void onSave('team')}
       >
         <label className="block">

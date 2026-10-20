@@ -474,38 +474,18 @@ button.cred-edit-btn[size='mini'] {
   font-size: 24rpx !important;
 }
 
-.env {
-  perspective: 900px;
-}
-
-.env-flap {
-  height: 22rpx;
-  margin: 0 48rpx 8rpx;
-  background: #ead9c2;
-  border-radius: 0 0 46% 46%;
-  transform-origin: top center;
-  transition: transform 0.46s cubic-bezier(0.22, 0.82, 0.24, 1);
-  position: relative;
-}
-
-.env--open .env-flap {
-  transform: rotateX(175deg);
-}
-
-.env-flap-logo {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  width: 44rpx;
-  height: 44rpx;
-  margin-left: -22rpx;
-  margin-top: -18rpx;
-  border-radius: 12rpx;
-  background: #fff;
-}
-
 .env .section-head {
   margin-bottom: 0;
+}
+
+.env-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(28, 25, 23, 0.45);
+  z-index: 300;
 }
 
 .env-btn {
@@ -541,46 +521,46 @@ button.cred-edit-btn[size='mini'] {
 }
 
 .env-sheet {
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(-12rpx);
-  transition: max-height 0.5s cubic-bezier(0.22, 0.82, 0.24, 1), opacity 0.35s ease, transform 0.45s cubic-bezier(0.22, 0.82, 0.24, 1);
-  pointer-events: none;
+  display: none;
 }
 
 .env--open .env-sheet {
-  max-height: 3600rpx;
-  opacity: 1;
-  transform: none;
-  pointer-events: auto;
+  display: block;
+  position: fixed;
+  z-index: 301;
+  left: 40rpx;
+  right: 40rpx;
+  top: 12vh;
+  max-height: 76vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 28rpx;
+  padding: 28rpx;
+  box-shadow: 0 24rpx 64rpx rgba(28, 25, 23, 0.18);
+  transform-origin: top center;
+  animation: env-pop 0.42s cubic-bezier(0.22, 0.82, 0.24, 1);
 }
 
 .env-save-row {
   display: flex;
   justify-content: flex-end;
+  gap: 16rpx;
   padding-top: 16rpx;
 }
 
-.paper-page .cred-modal-mask {
-  display: none;
+.env-save-row .env-btn {
+  margin-left: 0;
 }
 
 .paper-page .cred-modal {
-  position: relative;
-  left: auto;
-  right: auto;
-  top: auto;
-  width: auto;
-  margin: 0 24rpx 24rpx;
   transform-origin: top center;
-  animation: env-unfold 0.46s cubic-bezier(0.22, 0.82, 0.24, 1);
+  animation: cred-env 0.42s cubic-bezier(0.22, 0.82, 0.24, 1);
 }
 
-@keyframes env-unfold {
+@keyframes env-pop {
   from {
-    transform: rotateX(-72deg);
-    opacity: 0.35;
+    transform: rotateX(-68deg) scale(0.96);
+    opacity: 0;
   }
   to {
     transform: none;
@@ -588,11 +568,20 @@ button.cred-edit-btn[size='mini'] {
   }
 }
 
+@keyframes cred-env {
+  from {
+    transform: translateY(-50%) rotateX(-68deg) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(-50%);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .env-flap,
-  .env-sheet,
+  .env--open .env-sheet,
   .paper-page .cred-modal {
-    transition: none;
     animation: none;
   }
 }
