@@ -1547,6 +1547,7 @@ authRegisterProvision
 authSmsAuthShared
 ecs-auth-api-server
 ErpDyOAuthCallbackPage
+ErpWxOAuthCallbackPage
 mpScanAuthApi
 mpAccountAuth
 meoo-ops-mp-auth

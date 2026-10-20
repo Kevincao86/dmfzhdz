@@ -8,6 +8,7 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { readAuthUserFromAccessToken } from '../vite-plugins/authIdentityBindCore.js'
 import {
   loadMpHallRegistryPayload,
   loadTalentInboxForMpSession,
@@ -730,7 +731,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         portalRaw === 'merchant' || portalRaw === 'partner' ? portalRaw : ('xingxuan' as const)
       const redirectUri = pickAuthField(req, body, 'redirectUri')
       let bindAccountId = ''
-      if (body.bind === true) {
+      let bindAuthUserId = ''
+      if (body.bind === true && portal === 'merchant') {
+        const user = await readAuthUserFromAccessToken(String(body.access_token || ''))
+        bindAuthUserId = typeof user?.id === 'string' ? user.id : ''
+        if (!bindAuthUserId) {
+          sendJson(res, 401, { ok: false, error: 'invalid_session' })
+          return
+        }
+      } else if (body.bind === true) {
         const sess = await resolveSession(rest, sessionToken(req, body))
         if (!sess) {
           sendJson(res, 401, { ok: false, error: 'invalid_session' })
@@ -742,6 +751,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         portal,
         redirectUri,
         bindAccountId,
+        bindAuthUserId,
       })
       sendJson(res, 200, { ok: true, ...out })
       return
@@ -754,8 +764,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, error: 'missing_code_or_state' })
         return
       }
-      const { token, account, workIdentity, isNew, portal, erpSession, mergeRequired, ticket, subjectLabel } =
+      const { token, account, workIdentity, isNew, portal, erpSession, mergeRequired, ticket, subjectLabel, boundToAuthUser } =
         await mpAuthDyOAuthComplete(supabaseUrl, serviceRole, code, state)
+      if (boundToAuthUser) {
+        sendJson(res, 200, { ok: true, bound: true })
+        return
+      }
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, {
         ok: true,
@@ -784,9 +798,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const portal = portalRaw === 'merchant' ? 'merchant' : 'xingxuan'
       const redirectUri = pickAuthField(req, body, 'redirectUri')
+      let bindAuthUserId = ''
+      if (body.bind === true) {
+        if (portal !== 'merchant') {
+          sendJson(res, 400, { ok: false, error: 'wx_web_not_configured' })
+          return
+        }
+        const user = await readAuthUserFromAccessToken(String(body.access_token || ''))
+        bindAuthUserId = typeof user?.id === 'string' ? user.id : ''
+        if (!bindAuthUserId) {
+          sendJson(res, 401, { ok: false, error: 'invalid_session' })
+          return
+        }
+      }
       const out = await mpAuthWxOAuthBegin(supabaseUrl, serviceRole, workIdentity, {
         portal,
         redirectUri,
+        bindAuthUserId,
       })
       sendJson(res, 200, { ok: true, ...out })
       return
@@ -799,12 +827,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, error: 'missing_code_or_state' })
         return
       }
-      const { token, account, workIdentity, isNew, portal, erpSession } = await mpAuthWxOAuthComplete(
+      const { token, account, workIdentity, isNew, portal, erpSession, boundToAuthUser } = await mpAuthWxOAuthComplete(
         supabaseUrl,
         serviceRole,
         code,
         state,
       )
+      if (boundToAuthUser) {
+        sendJson(res, 200, { ok: true, bound: true })
+        return
+      }
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, {
         ok: true,
@@ -1977,6 +2009,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'dy_openid_conflict' ||
       msg === 'invalid_password' ||
       msg === 'wx_openid_already_bound' ||
+      msg === 'dy_openid_already_bound' ||
       msg === 'merge_confirm_phone' ||
       msg === 'merge_confirm_email' ||
       msg === 'merge_confirm_wechat' ||
@@ -2038,6 +2071,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       erp_dy_phone_not_registered: '该手机号尚未注册 ERP 账号，请先注册或使用账号密码登录',
       wx_already_registered: '该微信已注册',
       wx_openid_already_bound: '该微信已绑定其他账号，请用原账号登录',
+      dy_openid_already_bound: '该抖音已绑定其他账号，请用原账号登录',
       merge_confirm_phone: '该手机号已有账号，请确认是否合并到当前登录账号',
       merge_confirm_email: '该邮箱已有账号，请确认是否合并到当前登录账号',
       merge_confirm_wechat: '该微信已有账号，请确认是否合并到当前登录账号',

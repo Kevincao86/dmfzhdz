@@ -28,7 +28,10 @@ async function postMpAuth(body: Record<string, unknown>): Promise<ApiJson> {
   return data
 }
 
-export async function erpDyOAuthBegin(portal: ErpOAuthPortal): Promise<{
+export async function erpDyOAuthBegin(
+  portal: ErpOAuthPortal,
+  opts?: { bind?: boolean; accessToken?: string },
+): Promise<{
   authorizeUrl: string
   ticket: string
   redirectUri: string
@@ -41,6 +44,7 @@ export async function erpDyOAuthBegin(portal: ErpOAuthPortal): Promise<{
     workIdentity: portal,
     portal,
     redirectUri,
+    ...(opts?.bind ? { bind: true, access_token: opts.accessToken || '' } : {}),
   })
   const authorizeUrl = String(data.authorizeUrl || '')
   const ticket = String(data.ticket || '')
@@ -50,7 +54,10 @@ export async function erpDyOAuthBegin(portal: ErpOAuthPortal): Promise<{
   return { authorizeUrl, ticket, redirectUri: outRedirect, clientKey }
 }
 
-export async function erpWxOAuthBegin(portal: ErpOAuthPortal): Promise<{
+export async function erpWxOAuthBegin(
+  portal: ErpOAuthPortal,
+  opts?: { bind?: boolean; accessToken?: string },
+): Promise<{
   authorizeUrl: string
   ticket: string
   redirectUri: string
@@ -64,6 +71,7 @@ export async function erpWxOAuthBegin(portal: ErpOAuthPortal): Promise<{
     workIdentity: portal,
     portal,
     redirectUri,
+    ...(opts?.bind ? { bind: true, access_token: opts.accessToken || '' } : {}),
   })
   const authorizeUrl = String(data.authorizeUrl || '')
   const ticket = String(data.ticket || '')
@@ -82,12 +90,16 @@ export async function erpWxOAuthComplete(
   loginName?: string
   portal?: string
   needsPhoneBind?: boolean
+  bound?: boolean
 }> {
   const data = await postMpAuth({
     action: 'wx_oauth_complete',
     code,
     state,
   })
+  if (data.bound === true) {
+    return { bound: true, access_token: '', refresh_token: '' }
+  }
   const access_token = String(data.access_token || '')
   const refresh_token = String(data.refresh_token || '')
   if (!access_token || !refresh_token) {
@@ -111,12 +123,16 @@ export async function erpDyOAuthComplete(
   loginName?: string
   portal?: string
   needsPhoneBind?: boolean
+  bound?: boolean
 }> {
   const data = await postMpAuth({
     action: 'dy_oauth_complete',
     code,
     state,
   })
+  if (data.bound === true) {
+    return { bound: true, access_token: '', refresh_token: '' }
+  }
   const access_token = String(data.access_token || '')
   const refresh_token = String(data.refresh_token || '')
   if (!access_token || !refresh_token) {

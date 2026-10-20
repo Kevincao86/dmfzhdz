@@ -32,6 +32,10 @@ export default function ErpWxOAuthCallbackPage() {
       try {
         const r = await erpWxOAuthComplete(code, state)
         if (cancelled || !supabase) return
+        if (r.bound) {
+          nav('/account', { replace: true })
+          return
+        }
         const { error } = await supabase.auth.setSession({
           access_token: r.access_token,
           refresh_token: r.refresh_token,

@@ -44,7 +44,12 @@ import {
   createAdminSessionForUserId,
   findAuthUserByPhone,
 } from '../../vite-plugins/authSmsAuthShared.js'
-import { signInOrProvisionByDyOpenId, signInOrProvisionByWxWebOpenId } from '../../vite-plugins/authIdentityBindCore.js'
+import {
+  bindErpDyOpenIdToAuthUser,
+  bindErpWxWebOpenIdToAuthUser,
+  signInOrProvisionByDyOpenId,
+  signInOrProvisionByWxWebOpenId,
+} from '../../vite-plugins/authIdentityBindCore.js'
 import {
   buildWechatWebAuthorizeUrl,
   decodeWxOAuthState,
@@ -2171,13 +2176,13 @@ export async function mpAuthDyOAuthBegin(
   supabaseUrl: string,
   serviceRole: string,
   workIdentity: string,
-  opts?: { portal?: DyOAuthPortal; redirectUri?: string; bindAccountId?: string },
+  opts?: { portal?: DyOAuthPortal; redirectUri?: string; bindAccountId?: string; bindAuthUserId?: string },
 ): Promise<{ authorizeUrl: string; ticket: string; expiresAt: string; redirectUri: string; clientKey: string }> {
   if (!isDouyinWebOAuthConfigured()) throw new Error('dy_web_not_configured')
   const rest = restClient(supabaseUrl, serviceRole)
   const ticket = `dyoauth_${newScanTicket()}`
   const expiresAt = new Date(Date.now() + SCAN_TTL_SEC * 1000).toISOString()
-  const bindAccountId = String(opts?.bindAccountId || '').trim()
+  const bindAccountId = String(opts?.bindAccountId || opts?.bindAuthUserId || '').trim()
   const res = await rest.post('/mp_wx_scan_tickets', {
     ticket,
     status: 'pending',
@@ -2194,7 +2199,10 @@ export async function mpAuthDyOAuthBegin(
       portal === 'xingxuan' ? normalizeDyOAuthWorkIdentity(workIdentity) : portal,
     portal,
   })
-  const authorizeUrl = buildDouyinWebAuthorizeUrl(state, redirectUri)
+  let authorizeUrl = buildDouyinWebAuthorizeUrl(state, redirectUri)
+  if (opts?.bindAuthUserId && portal === 'merchant') {
+    authorizeUrl += '&is_call_app=1'
+  }
   return { authorizeUrl, ticket, expiresAt, redirectUri, clientKey: readDouyinWebClientKey() }
 }
 
@@ -2214,6 +2222,8 @@ export type MpAuthDyOAuthCompleteResult = {
     needsPhoneBind?: boolean
     isNew?: boolean
   }
+  /** 已登录商家把扫码结果绑到当前账号，不换登录会话 */
+  boundToAuthUser?: boolean
 }
 
 async function tryErpSessionFromMpAccount(
@@ -2320,6 +2330,34 @@ async function finishDouyinBindToLoginAccount(
   return { token, account, workIdentity: fixed || workIdentity, isNew: false, portal: 'xingxuan' }
 }
 
+/** 商家已登录：把网站 openid 写到当前账号，不新建租户、不换会话。 */
+async function finishMerchantScanBind(
+  rest: ReturnType<typeof restClient>,
+  ticket: string,
+  authUserId: string,
+  openid: string,
+  kind: 'wx' | 'dy',
+): Promise<MpAuthDyOAuthCompleteResult> {
+  const bind =
+    kind === 'wx'
+      ? await bindErpWxWebOpenIdToAuthUser(authUserId, openid)
+      : await bindErpDyOpenIdToAuthUser(authUserId, openid)
+  if (!bind.ok) throw new Error(bind.error || 'bind_failed')
+  await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(ticket)}`, {
+    status: 'confirmed',
+    openid,
+    account_id: authUserId,
+  })
+  return {
+    token: '',
+    account: { id: authUserId } as MpAccountRow,
+    workIdentity: 'merchant',
+    isNew: false,
+    portal: 'merchant',
+    boundToAuthUser: true,
+  }
+}
+
 /** 抖音扫码已证明该抖音号后，用户确认才把对方账号并入当前登录账号。 */
 export async function mpAuthConfirmDyBindMerge(
   supabaseUrl: string,
@@ -2382,7 +2420,7 @@ export async function mpAuthDyOAuthComplete(
     `/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(parsed.ticket)}&limit=1`,
   )
   if (!ticketRes.ok) throw new Error('dy_oauth_ticket_lookup_failed')
-  const ticketRows = (await ticketRes.json()) as { status: string; expires_at: string }[]
+  const ticketRows = (await ticketRes.json()) as { status: string; expires_at: string; account_id?: string | null }[]
   const ticketRow = ticketRows[0]
   if (!ticketRow) throw new Error('dy_oauth_ticket_expired')
   if (new Date(ticketRow.expires_at).getTime() < Date.now()) throw new Error('dy_oauth_ticket_expired')
@@ -2395,7 +2433,10 @@ export async function mpAuthDyOAuthComplete(
   const workIdentity = isErpPortal
     ? portal
     : normalizeDyOAuthWorkIdentity(parsed.workIdentity)
-  const bindAccountId = String((ticketRow as { account_id?: string | null }).account_id || '').trim()
+  const bindAccountId = String(ticketRow.account_id || '').trim()
+  if (bindAccountId && portal === 'merchant') {
+    return finishMerchantScanBind(rest, parsed.ticket, bindAccountId, openid, 'dy')
+  }
   if (bindAccountId && !isErpPortal) {
     return finishDouyinBindToLoginAccount(
       supabaseUrl,
@@ -2474,7 +2515,7 @@ export async function mpAuthWxOAuthBegin(
   supabaseUrl: string,
   serviceRole: string,
   workIdentity: string,
-  opts?: { portal?: WxWebPortal; redirectUri?: string },
+  opts?: { portal?: WxWebPortal; redirectUri?: string; bindAuthUserId?: string },
 ): Promise<{ authorizeUrl: string; ticket: string; expiresAt: string; redirectUri: string; appId: string }> {
   const portal: WxWebPortal = opts?.portal === 'merchant' ? 'merchant' : 'xingxuan'
   if (!isWechatWebOAuthConfigured(portal)) throw new Error('wx_web_not_configured')
@@ -2484,10 +2525,12 @@ export async function mpAuthWxOAuthBegin(
     portal === 'xingxuan' ? normalizeDyOAuthWorkIdentity(workIdentity) : 'merchant',
   )
   const expiresAt = new Date(Date.now() + SCAN_TTL_SEC * 1000).toISOString()
+  const bindAuthUserId = String(opts?.bindAuthUserId || '').trim()
   const res = await rest.post('/mp_wx_scan_tickets', {
     ticket: state.ticket,
     status: 'pending',
     expires_at: expiresAt,
+    ...(bindAuthUserId ? { account_id: bindAuthUserId } : {}),
   })
   if (!res.ok) throw new Error('scan_ticket_create_failed')
   const redirectUri = pickWechatWebRedirectUri(opts?.redirectUri, portal)
@@ -2511,7 +2554,7 @@ export async function mpAuthWxOAuthComplete(
     `/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(parsed.ticket)}&limit=1`,
   )
   if (!ticketRes.ok) throw new Error('wx_oauth_ticket_lookup_failed')
-  const ticketRows = (await ticketRes.json()) as { status: string; expires_at: string }[]
+  const ticketRows = (await ticketRes.json()) as { status: string; expires_at: string; account_id?: string | null }[]
   const ticketRow = ticketRows[0]
   if (!ticketRow) throw new Error('wx_oauth_ticket_expired')
   if (new Date(ticketRow.expires_at).getTime() < Date.now()) throw new Error('wx_oauth_ticket_expired')
@@ -2520,6 +2563,10 @@ export async function mpAuthWxOAuthComplete(
   const oauth = await exchangeWechatWebOAuthCode(code, parsed.portal)
   const openid = wechatWebOpenIdStorageKey(oauth.openId)
   const portal = parsed.portal
+  const bindAuthUserId = String(ticketRow.account_id || '').trim()
+  if (bindAuthUserId && portal === 'merchant') {
+    return finishMerchantScanBind(rest, parsed.ticket, bindAuthUserId, openid, 'wx')
+  }
   const isErpPortal = portal === 'merchant'
   const workIdentity = isErpPortal ? 'merchant' : normalizeDyOAuthWorkIdentity(parsed.workIdentity)
   let role: MpAccountRole = workIdentity === 'pr' ? 'pr' : 'talent'

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { cn } from '../cn'
 import wechatLogo from './login/LoginAltMethods.wechat.png'
+import DyOAuthOfficialPanel from './login/DyOAuthOfficialPanel'
+import WxOAuthOfficialPanel from './login/WxOAuthOfficialPanel'
+import { erpDyOAuthBegin, erpWxOAuthBegin } from '../lib/mpScanAuthApi'
 import { supabase } from '../lib/supabaseClient'
 import { isBindEmailValid, isCnMobileValid, postAuthIdentity, sendAuthEmailCode, sendAuthSms } from '../lib/tenantRegisterApi'
 import { toUserFacingError } from '../lib/userFacingError'
@@ -38,6 +41,9 @@ export default function AccountIdentityBindPanel() {
   const [mergeToken, setMergeToken] = useState('')
   const [mergeMsg, setMergeMsg] = useState('')
   const [awaitingCode, setAwaitingCode] = useState(false)
+  const [scanBind, setScanBind] = useState<null | { kind: 'wechat' | 'douyin'; url: string }>(null)
+  const [scanErr, setScanErr] = useState('')
+  const [scanLoading, setScanLoading] = useState(false)
 
   const load = useCallback(async () => {
     const token = (await supabase?.auth.getSession())?.data.session?.access_token || ''
@@ -83,6 +89,28 @@ export default function AccountIdentityBindPanel() {
     }
     setCooldown(60)
     if (r.devCode) setCode(r.devCode)
+  }
+
+  const openScanBind = async (kind: 'wechat' | 'douyin') => {
+    setScanErr('')
+    setScanLoading(true)
+    setScanBind({ kind, url: '' })
+    try {
+      const token = (await supabase?.auth.getSession())?.data.session?.access_token || ''
+      if (!token) {
+        setScanErr('请先登录后再绑定')
+        return
+      }
+      const started =
+        kind === 'wechat'
+          ? await erpWxOAuthBegin('merchant', { bind: true, accessToken: token })
+          : await erpDyOAuthBegin('merchant', { bind: true, accessToken: token })
+      setScanBind({ kind, url: started.authorizeUrl })
+    } catch (e) {
+      setScanErr(toUserFacingError(e, kind === 'wechat' ? '微信绑定' : '抖音绑定'))
+    } finally {
+      setScanLoading(false)
+    }
   }
 
   const submit = async () => {
@@ -185,11 +213,19 @@ export default function AccountIdentityBindPanel() {
                 setMergeToken('')
                 setAwaitingCode(false)
                 if (it.id === 'wechat') {
-                  setHint(on ? '当前账号已通过微信登录绑定' : '请在登录页使用微信扫码，或在商家小程序内使用微信一键登录')
+                  if (on) {
+                    setHint('当前账号已通过微信登录绑定')
+                    return
+                  }
+                  void openScanBind('wechat')
                   return
                 }
                 if (it.id === 'douyin') {
-                  setHint('请在登录页使用抖音扫码完成绑定')
+                  if (on) {
+                    setHint('当前账号已绑定抖音')
+                    return
+                  }
+                  void openScanBind('douyin')
                   return
                 }
                 setBindKind(it.id)
@@ -228,6 +264,40 @@ export default function AccountIdentityBindPanel() {
         </p>
       ) : null}
       {hint ? <p className="mt-3 text-xs text-slate-500">{hint}</p> : null}
+      {scanBind ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[90vh] w-full max-w-sm overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-800">
+                {scanBind.kind === 'wechat' ? '绑定微信' : '绑定抖音'}
+              </p>
+              <button
+                type="button"
+                className="text-xs text-slate-500"
+                onClick={() => {
+                  setScanBind(null)
+                  setScanErr('')
+                }}
+              >
+                关闭
+              </button>
+            </div>
+            {scanLoading ? <p className="py-8 text-center text-sm text-slate-500">正在打开授权页…</p> : null}
+            {scanErr ? <p className="text-sm text-red-600">{scanErr}</p> : null}
+            {!scanLoading && scanBind.url && scanBind.kind === 'wechat' ? (
+              <WxOAuthOfficialPanel authorizeUrl={scanBind.url} />
+            ) : null}
+            {!scanLoading && scanBind.url && scanBind.kind === 'douyin' ? (
+              <>
+                <DyOAuthOfficialPanel authorizeUrl={scanBind.url} />
+                <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-400">
+                  请用抖音 App 扫码授权。手机浏览器会尝试拉起抖音；电脑端没有和微信一样的客户端一键确认。
+                </p>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       {bindKind ? (
         <div className="mt-4 space-y-2 rounded-xl border border-slate-200 p-3">
           <p className="text-sm font-medium text-slate-800">

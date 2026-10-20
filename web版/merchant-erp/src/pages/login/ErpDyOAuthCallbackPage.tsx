@@ -17,10 +17,8 @@ export default function ErpDyOAuthCallbackPage() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.top && window.top !== window.self) {
       window.top.location.replace(window.location.href)
+      return
     }
-  }, [])
-
-  useEffect(() => {
     const mode = resolveDyOAuthCallbackMode(params)
     if (mode.kind === 'error') {
       setView('error')
@@ -43,6 +41,10 @@ export default function ErpDyOAuthCallbackPage() {
       try {
         const r = await erpDyOAuthComplete(mode.code, mode.state)
         if (cancelled) return
+        if (r.bound) {
+          nav('/account', { replace: true })
+          return
+        }
         const { error } = await supabase.auth.setSession({
           access_token: r.access_token,
           refresh_token: r.refresh_token,
