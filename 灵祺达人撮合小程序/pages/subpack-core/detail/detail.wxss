@@ -1526,3 +1526,27 @@
   font-weight: 400 !important;
   box-shadow: 0 8rpx 0 rgba(22, 163, 74, 0.28);
 }
+
+/* 参与流程序号：说明换行时不要把圆点拉成椭圆 */
+.steps .step-item {
+  align-items: flex-start;
+}
+
+.step-num {
+  flex: 0 0 44rpx;
+  align-self: flex-start;
+  width: 44rpx;
+  height: 44rpx;
+  min-width: 44rpx;
+  min-height: 44rpx;
+  max-height: 44rpx;
+  line-height: 44rpx;
+  border-radius: 22rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.step-body {
+  flex: 1;
+  min-width: 0;
+}

@@ -284,91 +284,91 @@
       </view>
       <view class="steps" wx:if="{{isIce && isEditIce}}">
         <view class="step-item">
-          <text class="step-num">1</text>
+          <view class="step-num">1</view>
           <text class="step-body">剪辑身份认领并填写认领条数</text>
         </view>
         <view class="step-item">
-          <text class="step-num">2</text>
+          <view class="step-num">2</view>
           <text class="step-body">确认接收后查看剪辑师群码</text>
         </view>
         <view class="step-item">
-          <text class="step-num">3</text>
+          <view class="step-num">3</view>
           <text class="step-body">批量回传成片 https 链接</text>
         </view>
       </view>
       <view class="steps" wx:elif="{{isIce}}">
         <view class="step-item">
-          <text class="step-num">1</text>
+          <view class="step-num">1</view>
           <text class="step-body">认领云剪任务（闭环）</text>
         </view>
         <view class="step-item">
-          <text class="step-num">2</text>
+          <view class="step-num">2</view>
           <text class="step-body">确认接收后下载分配成片</text>
         </view>
         <view class="step-item">
-          <text class="step-num">3</text>
+          <view class="step-num">3</view>
           <text class="step-body">{{iceStep3Hint || '发布抖音并回传链接，AI 核查通过后自动完成'}}</text>
         </view>
       </view>
       <view class="steps" wx:elif="{{view.isFormRelay}}">
         <block wx:if="{{view.formRelayGroupQr}}">
           <view class="step-item">
-            <text class="step-num">1</text>
+            <view class="step-num">1</view>
             <text class="step-body">点击「前往原表报名」查看群二维码</text>
           </view>
           <view class="step-item">
-            <text class="step-num">2</text>
+            <view class="step-num">2</view>
             <text class="step-body">长按识别二维码，加入微信群</text>
           </view>
         </block>
         <block wx:else>
           <view class="step-item">
-            <text class="step-num">1</text>
+            <view class="step-num">1</view>
             <text class="step-body">点击「前往原表报名」打开原招募表单</text>
           </view>
           <view class="step-item">
-            <text class="step-num">2</text>
+            <view class="step-num">2</view>
             <text class="step-body">在原表填写信息并提交（按原表要求）</text>
           </view>
         </block>
         <view class="step-item">
-          <text class="step-num">3</text>
+          <view class="step-num">3</view>
           <text class="step-body">后续进度与结算以原表/招募方通知为准</text>
         </view>
       </view>
       <view class="steps" wx:elif="{{isOpenLoop}}">
         <view class="step-item">
-          <text class="step-num">1</text>
+          <view class="step-num">1</view>
           <text class="step-body">点击「我要报名」填写信息</text>
         </view>
         <view class="step-item">
-          <text class="step-num">2</text>
+          <view class="step-num">2</view>
           <text class="step-body">报名后等待招募方审核，通过后在我的报名详情里扫码进群</text>
         </view>
         <view class="step-item">
-          <text class="step-num">3</text>
+          <view class="step-num">3</view>
           <text class="step-body">后续沟通与交付以群内通知为准</text>
         </view>
       </view>
       <view class="steps" wx:else>
         <view class="step-item">
-          <text class="step-num">1</text>
+          <view class="step-num">1</view>
           <text class="step-body">点击「我要报名」填写信息（无需注册会员）</text>
         </view>
         <view class="step-item">
-          <text class="step-num">2</text>
+          <view class="step-num">2</view>
           <text class="step-body">会员可选择是否填入已保存资料</text>
         </view>
         <view class="step-item">
-          <text class="step-num">3</text>
+          <view class="step-num">3</view>
           <text class="step-body">招募方 PR 在报名列表「确认选择」您（审核通过）</text>
         </view>
         <view class="step-item">
-          <text class="step-num">4</text>
+          <view class="step-num">4</view>
           <text class="step-body">审核通过后可「联系招募方」，并确认探店排期</text>
         </view>
         <view class="step-item">
-          <text class="step-num">5</text>
+          <view class="step-num">5</view>
           <text class="step-body">完成内容发布，按约定结算</text>
         </view>
       </view>
