@@ -594,10 +594,10 @@ function cardMatchesCity(card: TalentPlanCard, city: string): boolean {
 
 const TALENT_HEADCOUNT_CAP = 20
 
-/** 方案里的「邀请10位」优先；「其中8位、2位」是档位拆分，不当成总人数。 */
+/** 方案里的「邀请/招募 N 位」优先；「其中8位、2位」是档位拆分，不当成总人数。 */
 function explicitTalentHeadcount(text: string): number {
   const flat = text.replace(/,/g, '')
-  const invited = [...flat.matchAll(/邀请\s*(\d{1,2})\s*位/g)]
+  const invited = [...flat.matchAll(/(?:邀请|招募|安排)\s*(\d{1,2})\s*位/g)]
   const picked = invited.length
     ? invited
     : [...flat.matchAll(/(?:共|合计|总共|需要)\s*(\d{1,2})\s*位/g)]
@@ -610,31 +610,41 @@ function explicitTalentHeadcount(text: string): number {
   return n
 }
 
-function talentHeadcountFromDialogue(userText: string, priorText: string): number {
-  const named = explicitTalentHeadcount(userText) || explicitTalentHeadcount(priorText)
-  if (named > 0) return named
-  const latest = `${userText}\n${priorText}`.slice(-2500)
+/** 输入框里的引用只有开头几百字。按消息 id 取回被引用的全文。 */
+function quotedSourceText(userText: string, msgs: { id: string; content?: string }[]): string {
+  const ids = [...userText.matchAll(/\[引用(?:我|助手)\s+#([A-Za-z0-9-]+)/g)].map((item) => item[1] || '')
+  const chunks: string[] = []
+  for (const shortId of ids) {
+    if (!shortId) continue
+    const hit = [...msgs].reverse().find((msg) => msg.id === shortId || msg.id.startsWith(shortId))
+    const body = String(hit?.content || '').trim()
+    if (body && !chunks.includes(body)) chunks.push(body)
+  }
+  return chunks.join('\n').slice(0, 12000)
+}
+
+function talentHeadcountFromDialogue(userText: string, priorText: string, quotedFull = ''): number {
+  for (const blob of [quotedFull, userText, priorText]) {
+    if (!blob) continue
+    const named = explicitTalentHeadcount(blob)
+    if (named > 0) return named
+  }
+  for (const blob of [quotedFull, userText, priorText]) {
+    if (!blob) continue
+    const fromPlan = extractTalentPlanHeadcount(blob)
+    if (fromPlan && fromPlan >= 1 && fromPlan <= TALENT_HEADCOUNT_CAP) return fromPlan
+  }
+  const latest = (quotedFull || `${userText}\n${priorText}`).slice(-4000)
   const quotas = planFanQuotas(latest)
   const split = (quotas?.waist || 0) + (quotas?.head || 0)
   if (split > 0 && split <= TALENT_HEADCOUNT_CAP) return split
-  const fromPlan = extractTalentPlanHeadcount(latest)
-  if (fromPlan && fromPlan >= 1 && fromPlan <= TALENT_HEADCOUNT_CAP) return fromPlan
   return 5
 }
 
 function talentPlanClause(text: string): string {
   const flat = text.replace(/\s+/g, ' ')
-  const matched = flat.match(/邀请\s*\d{1,2}\s*位[^。\n]{0,180}/)
+  const matched = flat.match(/(?:邀请|招募|安排)\s*\d{1,2}\s*位[^。\n]{0,180}/)
   return matched ? matched[0].slice(0, 220) : ''
-}
-
-function recentDialogueText(msgs: { role: string; content?: string }[]): string {
-  return msgs
-    .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content)
-    .slice(-8)
-    .map((m) => String(m.content))
-    .join('\n')
-    .slice(-6000)
 }
 
 /** 本轮推荐卡片。界面直接渲染，不让模型把主页和头像写成文字。 */
@@ -810,10 +820,11 @@ async function appendTalentRecommendBlock(
   base: string,
   userText?: string,
   priorText = '',
+  quotedFull = '',
 ): Promise<string> {
   if (!userText || !isTalentRecommendAsk(userText)) return base
   try {
-    const block = await loadTalentRecommendBlock(userText, priorText)
+    const block = await loadTalentRecommendBlock(userText, priorText, quotedFull)
     return block.trim() ? `${base}\n\n${block}` : base
   } catch {
     const city = cityAskedForTalents(userText)
@@ -821,7 +832,7 @@ async function appendTalentRecommendBlock(
   }
 }
 
-async function loadTalentRecommendBlock(userText: string, priorText = ''): Promise<string> {
+async function loadTalentRecommendBlock(userText: string, priorText = '', quotedFull = ''): Promise<string> {
   const named = cityAskedForTalents(userText)
   const planCity = cityAskedForTalents(priorText)
   let city = named || planCity
@@ -835,9 +846,9 @@ async function loadTalentRecommendBlock(userText: string, priorText = ''): Promi
     regionSource = city ? '已绑定门店' : '未解析到'
   }
   const { industry, storeName } = storeTalentRequirement()
-  const planText = `${priorText}\n${userText}`
+  const planText = [quotedFull, priorText, userText].filter(Boolean).join('\n')
   const closeWords = talentCloseWords(industry)
-  const headcount = talentHeadcountFromDialogue(userText, priorText)
+  const headcount = talentHeadcountFromDialogue(userText, priorText, quotedFull)
   const planClause = talentPlanClause(planText)
   const talentType = industry || '本地生活到店'
   const library = await requestTalentPlanRecommend({
@@ -868,12 +879,13 @@ async function loadTalentRecommendBlock(userText: string, priorText = ''): Promi
       : ''
   const publicCards = gap > 0 ? cardsFromPublicText(publicText, city, talentType).slice(0, gap) : []
   const cards = [...picked, ...publicCards]
+  const asked = `方案要 ${headcount} 位。`
   const note =
     publicCards.length > 0
-      ? `星选库接近要求的有 ${picked.length} 位，公网补了 ${publicCards.length} 位。`
+      ? `${asked}星选库接近要求的有 ${picked.length} 位，公网补了 ${publicCards.length} 位。`
       : gap > 0
-        ? `星选库接近要求的有 ${picked.length} 位。公网这次没有补到更多同城达人。`
-        : `星选库已按门店类目配满 ${picked.length} 位。`
+        ? `${asked}星选库接近要求的有 ${picked.length} 位。公网这次没有补到更多同城达人。`
+        : `${asked}星选库已按门店类目配满 ${picked.length} 位。`
   pendingTalentRoster = cards.length
     ? {
         cards,
@@ -967,10 +979,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const metricsQ = Boolean(userText && isBusinessMetricsQuery(userText))
     const domainKey = domains.slice().sort().join(',')
     const cacheKey = `${taskType ?? ''}|d${domainKey}|m${metricsQ ? 1 : 0}|${domains.length || metricsQ ? String(userText).slice(0, 96) : ''}`
-    const priorDialogue = recentDialogueText(messagesRef.current)
+    const priorDialogue = messagesRef.current
+      .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content)
+      .slice(-8)
+      .map((m) => String(m.content))
+      .join('\n')
+    const quotedFull = quotedSourceText(String(userText || ''), messagesRef.current)
     const hit = merchantIntelCacheRef.current
     if (hit && now - hit.at < MERCHANT_INTEL_CACHE_MS && hit.task === cacheKey) {
-      return appendTalentRecommendBlock(hit.text, userText, priorDialogue)
+      return appendTalentRecommendBlock(hit.text, userText, priorDialogue, quotedFull)
     }
     const text = await buildAgentMerchantIntelContextAsync(taskType)
     const habits = buildAgentUserHabitsContext(authUserIdRef.current)
@@ -992,7 +1009,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       }
     }
     merchantIntelCacheRef.current = { at: now, task: cacheKey, text: combined }
-    return appendTalentRecommendBlock(combined, userText, priorDialogue)
+    return appendTalentRecommendBlock(combined, userText, priorDialogue, quotedFull)
   }, [])
 
   useEffect(() => {
