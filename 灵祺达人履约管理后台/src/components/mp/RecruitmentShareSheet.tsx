@@ -74,28 +74,72 @@ function httpsThumb(order: Record<string, unknown>): string {
 
 type WxOpenSdk = {
   ready?: boolean
-  onReady?: () => void
-  shareMiniProgram: (opts: Record<string, unknown>) => Promise<{ errcode?: number; errmsg?: string }>
+  onReady?: (() => void) | undefined
+  shareMiniProgram?: (opts: Record<string, unknown>) => Promise<{ errcode?: number; errmsg?: string }>
 }
 
-function loadWxOpenSdk(): Promise<WxOpenSdk> {
-  const w = window as Window & { wxopensdk?: WxOpenSdk }
-  const ready = (sdk: WxOpenSdk) =>
-    new Promise<WxOpenSdk>((resolve) => {
-      if (sdk.ready || !sdk.onReady) resolve(sdk)
-      else sdk.onReady = () => resolve(sdk)
-    })
-  if (w.wxopensdk) return ready(w.wxopensdk)
+function wxShareErrText(code: number, errmsg?: string): string {
+  const known: Record<number, string> = {
+    1: '当前浏览器不能调用电脑微信',
+    2: '网络错误，请再试一次',
+    3: '分享票据失效，请再点一次',
+    4: '分享参数有误',
+    6: '等待微信超时，请先打开并解锁电脑微信',
+    8: '分享太频繁，请稍后再试',
+    [-11032]: '当前网站域名还没登记到微信开放平台',
+    [-11033]: '请用 https 打开星选后再分享',
+    [-11034]: '网站应用还没有这项分享权限',
+    [-11036]: '电脑微信版本过低，请升级到 4.1 及以上',
+  }
+  return known[code] || errmsg || `微信没有发出去（${code}）`
+}
+
+/** 脚本刚执行时 wxopensdk 是空对象，shareMiniProgram 要等 iframe 同步后才挂上。 */
+function waitWxOpenSdkReady(sdk: WxOpenSdk): Promise<WxOpenSdk> {
+  if (sdk.ready && typeof sdk.shareMiniProgram === 'function') return Promise.resolve(sdk)
   return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error('微信分享组件还没连上，请确认电脑已安装并登录微信后再试'))
+    }, 12000)
+    const prev = sdk.onReady
+    sdk.onReady = () => {
+      window.clearTimeout(timer)
+      if (typeof prev === 'function') prev()
+      if (typeof sdk.shareMiniProgram === 'function') resolve(sdk)
+      else reject(new Error('微信分享组件没有分享能力，请刷新页面后再试'))
+    }
+    if (sdk.ready && typeof sdk.shareMiniProgram === 'function') {
+      window.clearTimeout(timer)
+      resolve(sdk)
+    }
+  })
+}
+
+let wxOpenSdkPromise: Promise<WxOpenSdk> | null = null
+
+function loadWxOpenSdk(): Promise<WxOpenSdk> {
+  if (wxOpenSdkPromise) return wxOpenSdkPromise
+  const w = window as Window & { wxopensdk?: WxOpenSdk }
+  wxOpenSdkPromise = new Promise((resolve, reject) => {
     const finish = () => {
       const sdk = w.wxopensdk
-      if (!sdk) reject(new Error('微信分享组件没有加载出来'))
-      else void ready(sdk).then(resolve)
+      if (!sdk) {
+        wxOpenSdkPromise = null
+        reject(new Error('微信分享组件没有加载出来'))
+        return
+      }
+      void waitWxOpenSdkReady(sdk).then(resolve, (err) => {
+        wxOpenSdkPromise = null
+        reject(err)
+      })
+    }
+    if (w.wxopensdk) {
+      finish()
+      return
     }
     const existing = document.querySelector('script[data-wxopensdk]')
     if (existing) {
       existing.addEventListener('load', finish, { once: true })
-      if (w.wxopensdk) finish()
       return
     }
     const s = document.createElement('script')
@@ -103,9 +147,13 @@ function loadWxOpenSdk(): Promise<WxOpenSdk> {
     s.async = true
     s.dataset.wxopensdk = '1'
     s.onload = finish
-    s.onerror = () => reject(new Error('微信分享组件加载失败'))
+    s.onerror = () => {
+      wxOpenSdkPromise = null
+      reject(new Error('微信分享组件加载失败'))
+    }
     document.head.appendChild(s)
   })
+  return wxOpenSdkPromise
 }
 
 type Props = {
@@ -135,6 +183,10 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   const [qrUrl, setQrUrl] = useState('')
   const [wxBusy, setWxBusy] = useState<'' | 'chat' | 'timeline'>('')
   const [wxHint, setWxHint] = useState('')
+
+  useEffect(() => {
+    void loadWxOpenSdk().catch(() => {})
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -249,10 +301,11 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     setWxBusy(scene)
     setWxHint(scene === 'timeline' ? '正在打开微信朋友圈…' : '正在打开微信…')
     try {
-      const ticket = await fetchMpWxPcShareTicket(orderId)
-      const sdk = await loadWxOpenSdk()
+      const [ticket, sdk] = await Promise.all([fetchMpWxPcShareTicket(orderId), loadWxOpenSdk()])
+      const share = sdk.shareMiniProgram
+      if (typeof share !== 'function') throw new Error('微信分享组件没有分享能力，请刷新页面后再试')
       const cardTitle = String(order.title || title || 'AI按城市品类匹配商单').trim()
-      const result = await sdk.shareMiniProgram({
+      const result = await share({
         appid: ticket.appid,
         userName: ticket.userName,
         txt: cardTitle,
@@ -263,7 +316,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
         timeout: 15000,
       })
       const code = Number(result?.errcode ?? 0)
-      if (code) setWxHint(result?.errmsg || `微信没有发出去（${code}）`)
+      if (code) setWxHint(wxShareErrText(code, result?.errmsg))
       else setWxHint(scene === 'timeline' ? '已发到微信，请在朋友圈确认' : '已发到微信，请在聊天窗口确认')
     } catch (e) {
       setWxHint(e instanceof Error ? e.message : '微信分享没有发出去')
