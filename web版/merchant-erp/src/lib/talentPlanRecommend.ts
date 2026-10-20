@@ -163,6 +163,18 @@ function fanCountInExcerpt(row: string): number {
   return plain ? Number(plain[1]) : 0
 }
 
+const BRAND_ACCOUNT_RE = /旗舰店|官方|官旗|专卖店|企业号|总店|直营店|品牌店|体验店|形象店|品牌推广|官方号|门店号|放映室|电视台|传媒/
+
+/** 公网只留探店账号。模型在内容方向里写的「探店」不算。 */
+export function isPublicExploreCreator(nickname: string, direction: string, sourceText: string): boolean {
+  const name = nickname.trim()
+  if (name.length < 2) return false
+  if (BRAND_ACCOUNT_RE.test(`${name}${direction}`)) return false
+  if (name.includes('探店')) return true
+  const block = String(sourceText || '').split('【检索摘录】')[1] || ''
+  return block.split('\n').some((line) => line.includes(name) && /探店/.test(line))
+}
+
 /** 只认检索摘录里和该昵称写在一起的粉丝数，不认模型名单里的数字。 */
 export function citedFollowerCount(nickname: string, text: string): number {
   const name = nickname.trim()

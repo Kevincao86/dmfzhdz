@@ -13,6 +13,7 @@ import {
   citedProfileUrls,
   displayTalentProfileLink,
   formatFollowerCount,
+  isPublicExploreCreator,
   publicTalentJumpLink,
   talentCardMatchesCloseWords,
   talentCloseWords,
@@ -101,6 +102,8 @@ function parsePublicTalentLines(
       const nickname = parts[0]!.replace(/^昵称[:：]/, '').slice(0, 24)
       if (/^达人$|^公网$|^检索$/.test(nickname)) continue
       const followers = citedFollowerCount(nickname, text)
+      const direction = [parts[3], ...parts.slice(4)].filter(Boolean).join(' ')
+      if (!isPublicExploreCreator(nickname, direction, text)) continue
       push({
         nickname,
         city: parts[1] || cityHint,
@@ -116,6 +119,7 @@ function parsePublicTalentLines(
     if (!nickname || nickname === want || /^(达人|公网|检索|粉丝|探店|本地生活)$/.test(nickname)) continue
     const name = nickname.replace(/[（(].*$/, '').slice(0, 24)
     const followers = citedFollowerCount(name, text)
+    if (!isPublicExploreCreator(name, row, text)) continue
     push({
       nickname: name,
       city: cityHint,
@@ -151,7 +155,7 @@ async function fetchPublicTalents(opts: {
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。请联网搜索「${city} 抖音 探店达人」「${city} ${need} 达人」。只写${opts.platform || '抖音'}、区域在「${city}」、内容贴近「${need}」的达人，凑满 ${want} 位。不要前言。每行严格：昵称｜${city}｜无｜等级｜内容方向。粉丝不要自己写数字。不要电话或微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+            content: `你是豆包公网达人检索。请联网搜索「${city} 抖音 探店达人」。只要探店达人，不要品牌官方号、旗舰店、门店自己的号。只写${opts.platform || '抖音'}、区域在「${city}」、内容贴近「${need}」的达人，凑满 ${want} 位。不要前言。每行严格：昵称｜${city}｜无｜等级｜探店。粉丝不要自己写数字。不要电话或微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
           },
           {
             role: 'user',
@@ -552,7 +556,7 @@ async function fetchOnePublicCard(opts: {
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补 1 位，区域只限「${city}」，内容贴近「${need}」。不要前言。只写一行：昵称｜城市｜无｜内容方向｜主页。粉丝不要自己写数字。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+            content: `你是豆包公网达人检索。只补 1 位探店达人，区域只限「${city}」，内容贴近「${need}」。不要品牌官方号、旗舰店、门店自己的号。不要前言。只写一行：昵称｜城市｜无｜探店｜主页。粉丝不要自己写数字。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
           },
           { role: 'user', content: `请检索 1 位${city}、${need}达人，并带上能打开的主页。` },
         ],
@@ -571,6 +575,7 @@ async function fetchOnePublicCard(opts: {
     const raw = String(data.content || '')
     const profileLink = publicTalentJumpLink(nickname, line, citedProfileUrls(raw))
     const followers = citedFollowerCount(nickname, raw)
+    if (!isPublicExploreCreator(nickname, direction, raw)) return null
     return {
       seatId: opts.seatId,
       talentId: `public:${nickname}`,
@@ -671,6 +676,11 @@ export function TalentChatRoster({
   const seenNameSet = useRef(
     new Set([...(seenNames || []), ...cards.map((item) => item.nickname)].filter(Boolean)),
   )
+  const shown = cards.filter(
+    (card) =>
+      card.source !== 'public' ||
+      isPublicExploreCreator(card.nickname, `${card.reason || ''} ${card.talentType || ''}`, ''),
+  )
 
   function rememberSeen() {
     for (const item of cards) {
@@ -733,8 +743,8 @@ export function TalentChatRoster({
     setPublishing(true)
     setError('')
     setNotice(null)
-    const library = cards.filter((card) => card.source !== 'public' && !card.empty && card.nickname)
-    const publicCards = cards.filter((card) => card.source === 'public' && !card.empty)
+    const library = shown.filter((card) => card.source !== 'public' && !card.empty && card.nickname)
+    const publicCards = shown.filter((card) => card.source === 'public' && !card.empty)
     const inviteIds = [...new Set(library.map((card) => card.memberId).filter((id): id is string => Boolean(id)))]
     if (!inviteIds.length) {
       setPublishing(false)
@@ -804,20 +814,20 @@ export function TalentChatRoster({
   return (
     <div className="mt-3 rounded-xl border border-violet-100 bg-white p-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-900">推荐 {cards.length} 位达人</p>
+        <p className="text-sm font-semibold text-slate-900">推荐 {shown.length} 位达人</p>
         <button
           type="button"
-          disabled={publishing || Boolean(replacingId) || cards.length === 0}
+          disabled={publishing || Boolean(replacingId) || shown.length === 0}
           onClick={() => void publishTargeted()}
           className="shrink-0 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {publishing ? '正在发布…' : '定向招募'}
         </button>
       </div>
-      {note ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
+      {note && shown.length === cards.length ? <p className="mt-1 text-xs text-slate-500">{note}</p> : null}
       {error ? <p className="mt-2 text-xs text-amber-700">{error}</p> : null}
       <ul className="mt-3 space-y-2">
-        {cards.map((card) => (
+        {shown.map((card) => (
           <li
             key={card.seatId}
             className="flex items-start justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2"

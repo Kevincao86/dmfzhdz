@@ -120,6 +120,7 @@ import { extractTalentPlanHeadcount } from '../lib/aiAgentRecruitmentParse'
 import {
   citedFollowerCount,
   citedProfileUrls,
+  isPublicExploreCreator,
   publicTalentJumpLink,
   talentCardMatchesCloseWords,
   talentCloseWords,
@@ -677,6 +678,7 @@ function cardsFromPublicText(text: string, city: string, talentType: string): Ta
     const profileVerified = Boolean(profileLink) && !/\/search\//.test(profileLink)
     const direction = parts.find((part, index) => index >= 3 && !/^https?:/.test(part) && part !== '无') || ''
     const followers = citedFollowerCount(nickname, text)
+    if (!isPublicExploreCreator(nickname, direction, text)) continue
     seen.add(nickname)
     out.push({
       seatId: `public-${out.length + 1}`,
@@ -794,7 +796,7 @@ async function fetchDoubaoPublicTalents(
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。内容必须符合方案，不要写无关类目。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。粉丝一栏一律写无，不要自己估算。主页只能原样复制检索结果里的用户主页，禁止自己编写 douyin.com/user、v.douyin.com 或其他链接；没有就写无。不要编造头像、电话、微信。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
+            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。只要探店达人，不要品牌官方号、旗舰店、专卖店、门店自己的号、企业号。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。内容方向必须写探店。粉丝一栏一律写无，不要自己估算。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
           },
           {
             role: 'user',
