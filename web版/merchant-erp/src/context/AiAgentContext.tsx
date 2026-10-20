@@ -485,7 +485,11 @@ type AiAgentContextValue = {
   quoteMessage: (m: AiAgentMessage) => void
   clearPendingQuote: () => void
   /** 替换某一条推荐里的一位达人后写回卡片 */
-  patchTalentRoster: (messageId: string, cards: TalentPlanCard[]) => void
+  patchTalentRoster: (
+    messageId: string,
+    cards: TalentPlanCard[],
+    seen?: { ids: string[]; names: string[] },
+  ) => void
   /** 有用户发言后的侧边栏：历史对话快照，最多 10 条 */
   archivedSessions: AiAgentArchivedSession[]
   /** 将当前对话存档并回到欢迎空态 */
@@ -1203,15 +1207,27 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const patchTalentRoster = useCallback((messageId: string, cards: TalentPlanCard[]) => {
-    setMessages((prev) => {
-      const next = prev.map((m) =>
-        m.id === messageId && m.talentRoster ? { ...m, talentRoster: { ...m.talentRoster, cards } } : m,
-      )
-      messagesRef.current = next
-      return next
-    })
-  }, [])
+  const patchTalentRoster = useCallback(
+    (messageId: string, cards: TalentPlanCard[], seen?: { ids: string[]; names: string[] }) => {
+      setMessages((prev) => {
+        const next = prev.map((m) =>
+          m.id === messageId && m.talentRoster
+            ? {
+                ...m,
+                talentRoster: {
+                  ...m.talentRoster,
+                  cards,
+                  ...(seen ? { seenIds: seen.ids, seenNames: seen.names } : {}),
+                },
+              }
+            : m,
+        )
+        messagesRef.current = next
+        return next
+      })
+    },
+    [],
+  )
 
   const removeComposerAttachment = useCallback((index: number) => {
     setPendingComposerAttachments((prev) => {

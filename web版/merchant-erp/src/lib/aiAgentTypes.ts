@@ -12,6 +12,9 @@ export type AiTalentRoster = {
   talentType: string
   storeName: string
   note: string
+  /** 换下去的人和当前名单都留着，避免替换在两个人之间来回跳 */
+  seenIds?: string[]
+  seenNames?: string[]
 }
 
 /** 系统侧能力授权（后续与租户权限、OAuth 范围对齐） */

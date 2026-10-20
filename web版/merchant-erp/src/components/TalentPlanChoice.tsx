@@ -608,6 +608,8 @@ export function TalentChatRoster({
   talentType,
   storeName,
   note,
+  seenIds,
+  seenNames,
   onCardsChange,
 }: {
   cards: TalentPlanCard[]
@@ -615,27 +617,47 @@ export function TalentChatRoster({
   talentType: string
   storeName: string
   note: string
-  onCardsChange: (cards: TalentPlanCard[]) => void
+  seenIds?: string[]
+  seenNames?: string[]
+  onCardsChange: (cards: TalentPlanCard[], seen: { ids: string[]; names: string[] }) => void
 }) {
   const [replacingId, setReplacingId] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState<RosterNotice | null>(null)
+  const seenIdSet = useRef(
+    new Set(
+      [...(seenIds || []), ...cards.map((item) => item.talentId)].filter(
+        (id) => id && !id.startsWith('public:'),
+      ),
+    ),
+  )
+  const seenNameSet = useRef(
+    new Set([...(seenNames || []), ...cards.map((item) => item.nickname)].filter(Boolean)),
+  )
+
+  function rememberSeen() {
+    for (const item of cards) {
+      if (item.talentId && !item.talentId.startsWith('public:')) seenIdSet.current.add(item.talentId)
+      if (item.nickname) seenNameSet.current.add(item.nickname)
+    }
+  }
 
   async function replaceOne(card: TalentPlanCard) {
     if (replacingId || publishing) return
     setReplacingId(card.seatId)
     setError('')
-    const skipNames = cards.map((item) => item.nickname).filter(Boolean)
-    const excludedIds = cards
-      .map((item) => item.talentId)
-      .filter((id) => id && !id.startsWith('public:'))
+    rememberSeen()
+    if (card.talentId && !card.talentId.startsWith('public:')) seenIdSet.current.add(card.talentId)
+    if (card.nickname) seenNameSet.current.add(card.nickname)
+    const skipNames = [...seenNameSet.current]
+    const excludedIds = [...seenIdSet.current]
     const res = await requestTalentPlanRecommend({
       city,
       platform: card.platform || '抖音',
       talentType: talentType || card.talentType || '本地生活',
       budgetYuan: 5000,
-      headcount: 1,
+      headcount: 20,
       seats: [],
       excludedIds,
     })
@@ -644,7 +666,8 @@ export function TalentChatRoster({
       (item) =>
         item.nickname.trim() &&
         !item.empty &&
-        !skipNames.includes(item.nickname) &&
+        !seenNameSet.current.has(item.nickname) &&
+        !seenIdSet.current.has(item.talentId) &&
         talentCardMatchesCloseWords(item, closeWords),
     )
     const next = fromLibrary
@@ -656,11 +679,16 @@ export function TalentChatRoster({
           seatId: card.seatId,
         })
     setReplacingId('')
-    if (!next) {
+    if (!next || seenNameSet.current.has(next.nickname)) {
       setError('星选库和公网暂时没有可替换的达人')
       return
     }
-    onCardsChange(cards.map((item) => (item.seatId === card.seatId ? next : item)))
+    if (next.talentId && !next.talentId.startsWith('public:')) seenIdSet.current.add(next.talentId)
+    seenNameSet.current.add(next.nickname)
+    onCardsChange(
+      cards.map((item) => (item.seatId === card.seatId ? next : item)),
+      { ids: [...seenIdSet.current], names: [...seenNameSet.current] },
+    )
     setNotice(null)
   }
 
