@@ -222,17 +222,38 @@ function ageText(raw: unknown): string {
   return String(n)
 }
 
+function httpUrl(raw: string): string {
+  const s = String(raw || '').trim()
+  if (/^https?:\/\//i.test(s)) return s
+  if (s.startsWith('//')) return `https:${s}`
+  return ''
+}
+
 function avatarUrlFrom(raw: unknown): string {
   if (!raw || typeof raw !== 'object') return ''
   const o = raw as Record<string, unknown>
-  for (const key of ['avatar_larger', 'avatar_large', 'avatar_medium', 'avatar_thumb', 'avatar']) {
+  for (const key of [
+    'avatar_larger',
+    'avatar_large',
+    'avatar_medium',
+    'avatar_thumb',
+    'avatar',
+    'images',
+    'headurl',
+    'headUrl',
+    'headImgUrl',
+    'avatarUrl',
+  ]) {
     const v = o[key]
-    if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v
+    if (typeof v === 'string') {
+      const url = httpUrl(v)
+      if (url) return url
+    }
     if (!v || typeof v !== 'object') continue
     const list = (v as DouyinImage).url_list
     if (!Array.isArray(list)) continue
-    const url = list.find((item) => typeof item === 'string' && /^https?:\/\//i.test(item))
-    if (url) return url
+    const url = list.find((item) => typeof item === 'string' && httpUrl(item))
+    if (url) return httpUrl(url)
   }
   return ''
 }
@@ -409,6 +430,28 @@ function parseJsonObjectFromScriptPrefix(raw: string): unknown | null {
   }
 }
 
+function decodeJsonString(raw: string): string {
+  try {
+    return JSON.parse(`"${raw}"`) as string
+  } catch {
+    return raw
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, h: string) => String.fromCharCode(Number.parseInt(h, 16)))
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+      .replace(/\\\//g, '/')
+  }
+}
+
+function firstJsonString(html: string, key: string): string {
+  const re = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, 'g')
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html))) {
+    const s = decodeJsonString(m[1]).trim()
+    if (s && s !== '0') return s
+  }
+  return ''
+}
+
 function unescapeJsonString(raw: string): string {
   try {
     return JSON.parse(`"${raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`) as string
@@ -558,6 +601,50 @@ function enrichProfileFromHtml(
     if (redIdM?.[1]) {
       out = mergeProfileBlob(out, { platformAccount: redIdM[1] })
     }
+    const desc = firstJsonString(html, 'desc')
+    const ip = firstJsonString(html, 'ipLocation')
+    const follows = parseChineseCount(firstJsonString(html, 'follows'))
+    const liked = parseChineseCount(firstJsonString(html, 'likeAndCollect'))
+    const avatar = httpUrl(firstJsonString(html, 'images'))
+    out = mergeProfileBlob(out, {
+      signature: desc || undefined,
+      ipLocation: cleanIpLocation(ip),
+      followingCount: follows > 0 ? follows : undefined,
+      totalFavorited: liked > 0 ? liked : undefined,
+      avatarUrl: avatar || undefined,
+    })
+  }
+
+  if (key === 'kuaishou') {
+    const avatar = httpUrl(firstJsonString(html, 'headurl') || firstJsonString(html, 'headUrl'))
+    const bio = firstJsonString(html, 'user_text') || firstJsonString(html, 'userText')
+    const follow = parseChineseCount(firstJsonString(html, 'follow'))
+    const photo = parseChineseCount(firstJsonString(html, 'photoCount') || firstJsonString(html, 'photo_count'))
+    const ip = firstJsonString(html, 'ipLocation') || firstJsonString(html, 'cityName')
+    out = mergeProfileBlob(out, {
+      signature: bio || undefined,
+      avatarUrl: avatar || undefined,
+      followingCount: follow > 0 ? follow : undefined,
+      awemeCount: photo > 0 ? photo : undefined,
+      ipLocation: cleanIpLocation(ip),
+    })
+  }
+
+  if (key === 'weixin_video') {
+    const avatar = httpUrl(
+      firstJsonString(html, 'headUrl') || firstJsonString(html, 'headImgUrl'),
+    )
+    const bio = firstJsonString(html, 'signature')
+    const feeds = parseChineseCount(
+      firstJsonString(html, 'feedCount') || firstJsonString(html, 'feedsCount'),
+    )
+    const ip = firstJsonString(html, 'ipRegion') || firstJsonString(html, 'ipLocation')
+    out = mergeProfileBlob(out, {
+      signature: bio || undefined,
+      avatarUrl: avatar || undefined,
+      awemeCount: feeds > 0 ? feeds : undefined,
+      ipLocation: cleanIpLocation(ip),
+    })
   }
 
   if (key === 'douyin' && ogTitle) {
@@ -569,7 +656,7 @@ function enrichProfileFromHtml(
     const title = ogTitle.replace(/\s*[-|–—@].*$/, '').trim()
     out = mergeProfileBlob(out, { platformNickname: title })
   }
-  if (metaDesc && !out?.signature) {
+  if (metaDesc && !out?.signature && key !== 'xiaohongshu') {
     out = mergeProfileBlob(out, { signature: metaDesc })
   }
 
@@ -599,10 +686,11 @@ function pickNum(o: Record<string, unknown>, keys: string[]): number {
     if (v == null) continue
     if (typeof v === 'number' && Number.isFinite(v)) return Math.max(0, Math.round(v))
     const s = String(v).replace(/,/g, '').trim()
+    if (!s) continue
+    const chinese = parseChineseCount(s)
+    if (chinese > 0) return chinese
     const n = Number.parseInt(s, 10)
     if (Number.isFinite(n)) return Math.max(0, n)
-    const wm = /^([\d.]+)\s*万$/i.exec(s)
-    if (wm) return Math.round(Number(wm[1]) * 10000)
   }
   return 0
 }
@@ -692,14 +780,33 @@ function objectToBlob(o: Record<string, unknown>, key: ProfilePlatformKey): RawP
       pickStr(o, ['ip_location', 'ipLocation', 'location_city', 'city']),
     ),
     age: ageText(o.user_age ?? o.userAge ?? o.age),
-    followingCount: pickNum(o, ['following_count', 'followingCount']) || undefined,
-    totalFavorited: pickNum(o, ['total_favorited', 'totalFavorited']) || undefined,
-    awemeCount: pickNum(o, ['aweme_count', 'awemeCount']) || undefined,
+    followingCount:
+      pickNum(o, [
+        'following_count',
+        'followingCount',
+        ...(key === 'xiaohongshu' ? (['follows'] as const) : []),
+        ...(key === 'kuaishou' ? (['follow', 'following'] as const) : []),
+      ]) || undefined,
+    totalFavorited:
+      pickNum(o, [
+        'total_favorited',
+        'totalFavorited',
+        ...(key === 'xiaohongshu' ? (['likeAndCollect'] as const) : []),
+      ]) || undefined,
+    awemeCount:
+      pickNum(o, [
+        'aweme_count',
+        'awemeCount',
+        ...(key === 'kuaishou' ? (['photoCount', 'photo_count', 'photo'] as const) : []),
+        ...(key === 'weixin_video' ? (['feedCount', 'feedsCount'] as const) : []),
+      ]) || undefined,
   }
 
   if (key === 'kuaishou') {
     const grade = pickStr(o, ['liveLevelName', 'authorLevel', 'grade', 'levelName'])
     if (grade) blob.talentGrade = grade
+    if (!blob.signature) blob.signature = pickStr(o, ['user_text', 'userText'])
+    if (!blob.avatarUrl) blob.avatarUrl = httpUrl(pickStr(o, ['headurl', 'headUrl']))
   }
   if (key === 'dianping') {
     const rc = pickNum(o, ['reviewCount', 'review_count', 'commentCount'])

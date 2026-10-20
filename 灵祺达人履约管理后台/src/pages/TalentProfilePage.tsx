@@ -463,16 +463,14 @@ function TalentProfileForm() {
             onChange={(e) => patchProfile({ profileLink: e.target.value })}
             placeholder="粘贴分享口令或主页链接"
           />
-          {activePlatform !== 'weixin_video' ? (
-            <button
-              type="button"
-              disabled={autofillLoading}
-              className="mt-2 w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-500 py-2 text-sm font-medium disabled:opacity-50"
-              onClick={() => void onAutofillFromLink()}
-            >
-              {autofillLoading ? 'AI 解析中…' : 'AI自动解析链接并填写下方信息'}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            disabled={autofillLoading}
+            className="mt-2 w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-500 py-2 text-sm font-medium disabled:opacity-50"
+            onClick={() => void onAutofillFromLink()}
+          >
+            {autofillLoading ? 'AI 解析中…' : 'AI自动解析链接并填写下方信息'}
+          </button>
         </label>
         {prof.avatarUrl ? (
           <img
@@ -509,7 +507,10 @@ function TalentProfileForm() {
             onChange={(e) => patchProfile({ followers: e.target.value })}
           />
         </label>
-        {activePlatform === 'douyin' ? (
+        {activePlatform === 'douyin' ||
+        activePlatform === 'xiaohongshu' ||
+        activePlatform === 'kuaishou' ||
+        activePlatform === 'weixin_video' ? (
           <>
             <label className="block">
               <span className="text-slate-400">IP属地</span>
@@ -520,6 +521,7 @@ function TalentProfileForm() {
                 onChange={(e) => patchProfile({ ipLocation: e.target.value })}
               />
             </label>
+            {activePlatform === 'douyin' ? (
             <label className="block">
               <span className="text-slate-400">年龄</span>
               <input
@@ -529,6 +531,7 @@ function TalentProfileForm() {
                 onChange={(e) => patchProfile({ age: e.target.value })}
               />
             </label>
+            ) : null}
             <label className="block">
               <span className="text-slate-400">关注数</span>
               <input
@@ -539,7 +542,7 @@ function TalentProfileForm() {
               />
             </label>
             <label className="block">
-              <span className="text-slate-400">获赞</span>
+              <span className="text-slate-400">{activePlatform === 'xiaohongshu' ? '获赞与收藏' : '获赞'}</span>
               <input
                 className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
                 value={prof.totalFavorited || ''}

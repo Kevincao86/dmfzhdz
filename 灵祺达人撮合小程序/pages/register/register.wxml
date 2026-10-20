@@ -268,7 +268,6 @@
           bindinput="onPlatformField"
         />
         <button
-          wx:if="{{item.id !== 'weixin_video'}}"
           class="profile-autofill-btn"
           size="mini"
           loading="{{profileAutofillLoading && profileAutofillPlatform === item.id}}"
@@ -317,12 +316,12 @@
           bindinput="onPlatformField"
         />
       </view>
-      <block wx:if="{{item.id === 'douyin'}}">
+      <block wx:if="{{item.id === 'douyin' || item.id === 'xiaohongshu' || item.id === 'kuaishou' || item.id === 'weixin_video'}}">
         <view class="form-row">
           <text class="form-label">IP属地</text>
           <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" placeholder="解析后自动填入" value="{{item.profile.ipLocation}}" data-id="{{item.id}}" data-k="ipLocation" bindinput="onPlatformField" />
         </view>
-        <view class="form-row">
+        <view class="form-row" wx:if="{{item.id === 'douyin'}}">
           <text class="form-label">年龄</text>
           <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" placeholder="解析后自动填入" value="{{item.profile.age}}" data-id="{{item.id}}" data-k="age" bindinput="onPlatformField" />
         </view>
@@ -331,7 +330,7 @@
           <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" type="number" value="{{item.profile.followingCount}}" data-id="{{item.id}}" data-k="followingCount" bindinput="onPlatformField" />
         </view>
         <view class="form-row">
-          <text class="form-label">获赞</text>
+          <text class="form-label">{{item.id === 'xiaohongshu' ? '获赞与收藏' : '获赞'}}</text>
           <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" type="number" value="{{item.profile.totalFavorited}}" data-id="{{item.id}}" data-k="totalFavorited" bindinput="onPlatformField" />
         </view>
         <view class="form-row">

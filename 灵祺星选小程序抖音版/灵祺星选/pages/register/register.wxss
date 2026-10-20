@@ -360,6 +360,14 @@
   color: #a8a29e;
 }
 
+.platform-avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  margin: 8rpx 0 16rpx;
+  background: #f1f5f9;
+}
+
 button.cred-edit-btn[size='mini'] {
   display: inline-block !important;
   box-sizing: border-box !important;
