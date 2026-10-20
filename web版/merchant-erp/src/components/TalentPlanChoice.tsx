@@ -190,7 +190,7 @@ async function fetchPublicTalentsUntil(opts: {
   const all: ReturnType<typeof parsePublicTalentLines> = []
   const seen = new Set(opts.skipNames)
   let left = Math.min(20, Math.max(0, opts.count))
-  for (let round = 0; round < 2 && left > 0; round += 1) {
+  for (let round = 0; round < 4 && left > 0; round += 1) {
     const batch = await fetchPublicTalents({
       ...opts,
       count: left,
@@ -690,6 +690,7 @@ export function TalentChatRoster({
   )
   const cardsRef = useRef(cards)
   cardsRef.current = cards
+  const toppedUp = useRef(false)
   const onCardsChangeRef = useRef(onCardsChange)
   onCardsChangeRef.current = onCardsChange
   const pendingKey = cards
@@ -735,6 +736,65 @@ export function TalentChatRoster({
       ac.abort()
     }
   }, [pendingKey, city])
+
+  useEffect(() => {
+    if (toppedUp.current || pendingKey) return
+    const wanted = Number((note.match(/方案要\s*(\d{1,2})\s*位/) || [])[1] || 0)
+    const current = cardsRef.current
+    if (!wanted || wanted > 20 || current.length >= wanted) return
+    toppedUp.current = true
+    let cancelled = false
+    setChecking(true)
+    void (async () => {
+      try {
+      const people = await fetchPublicTalentsUntil({
+        city,
+        talentType: talentType || '本地生活',
+        platform: '抖音',
+        count: wanted - current.length,
+        skipNames: current.map((card) => card.nickname),
+      })
+      if (cancelled) return
+      const latest = cardsRef.current
+      const have = new Set(latest.map((card) => card.nickname))
+      const extra = people.filter((person) => person.nickname && !have.has(person.nickname))
+      if (!extra.length) return
+      const base: TalentPlanCard = {
+        seatId: 'public-fill',
+        talentId: '',
+        nickname: '',
+        city,
+        platform: '抖音',
+        followers: 0,
+        level: '',
+        quoteYuan: null,
+        tags: [],
+        avatarUrl: '',
+        profileLink: '',
+        tierLabel: '公网',
+        unitBudgetYuan: 0,
+        talentType: talentType || '本地生活',
+        source: 'public',
+        reason: '',
+      }
+      const next = [
+        ...latest,
+        ...extra.map((person, index) => ({
+          ...publicCard(person, base, city, '抖音'),
+          seatId: `public-fill-${index + 1}`,
+        })),
+      ]
+      setHideNote(true)
+      onCardsChangeRef.current(next, { ids: [...seenIdSet.current], names: [...seenNameSet.current] })
+      } finally {
+        if (!cancelled) setChecking(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+      setChecking(false)
+    }
+  }, [pendingKey, note, city, talentType])
 
   function rememberSeen() {
     for (const item of cards) {

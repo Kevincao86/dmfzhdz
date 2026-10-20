@@ -797,7 +797,7 @@ async function fetchDoubaoPublicTalents(
         messages: [
           {
             role: 'system',
-            content: `你是豆包公网达人检索。只补星选达人库不够的名额，凑满 ${want} 位，不要改人数。区域只限「${region}」。先找本地生活探店达人，昵称里不必出现「探店」。不要品牌官方号、旗舰店、专卖店、门店自己的号、企业号。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。内容方向写检索到的实际内容，不要为了过关改成探店。粉丝一栏一律写无，不要自己估算。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
+            content: `你是豆包公网达人检索。只补星选达人库不够的名额。这一轮必须写出 ${want} 行，一行一位，不能少，也不要把人数改成 3 或 5。区域只限「${region}」。先找本地生活探店达人，昵称里不必出现「探店」。不要品牌官方号、旗舰店、专卖店、门店自己的号、企业号。${planClause ? `方案原话：${planClause}。` : ''}每人一行，用竖线分隔：昵称｜城市｜粉丝｜内容方向｜主页。内容方向写检索到的实际内容，不要为了过关改成探店。粉丝一栏一律写无，不要自己估算。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。没有公开依据的不要写。一个都没有就只回答「公网暂无符合条件的达人」。`,
           },
           {
             role: 'user',
@@ -835,6 +835,62 @@ async function appendTalentRecommendBlock(
   }
 }
 
+/** 公网一轮往往只过几位。没补满方案人数就换一批继续检索，连续两轮没有新增才停。 */
+async function fillPublicExploreCards(opts: {
+  city: string
+  talentType: string
+  storeName: string
+  gap: number
+  planText: string
+  libraryCards: TalentPlanCard[]
+  planClause: string
+  skipNames: string[]
+}): Promise<TalentPlanCard[]> {
+  if (opts.gap <= 0) return []
+  const kept: TalentPlanCard[] = []
+  const seen = new Set(opts.skipNames.filter(Boolean))
+  let dry = 0
+  for (let round = 0; round < 4 && kept.length < opts.gap; round += 1) {
+    const left = opts.gap - kept.length
+    const ask = Math.min(TALENT_HEADCOUNT_CAP, Math.max(left, Math.min(12, left + 4)))
+    const skip = [...seen].slice(0, 40)
+    const publicText = await fetchDoubaoPublicTalents(
+      opts.city,
+      opts.talentType,
+      opts.storeName,
+      ask,
+      `${opts.planClause}${opts.planClause ? '。' : ''}${publicGapNote(opts.planText, opts.libraryCards, opts.gap + opts.libraryCards.length)}${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
+    )
+    const parsed = cardsFromPublicText(publicText, opts.city, opts.talentType).filter(
+      (card) => card.nickname && !seen.has(card.nickname),
+    )
+    if (!parsed.length) {
+      dry += 1
+      if (dry >= 2) break
+      continue
+    }
+    for (const card of parsed) seen.add(card.nickname)
+    const confirmed = await nicknamesConfirmedExplore(
+      parsed.map((card) => card.nickname),
+      opts.city,
+    )
+    let added = 0
+    for (const card of parsed) {
+      if (kept.length >= opts.gap) break
+      if (!confirmed.has(card.nickname)) continue
+      kept.push({ ...card, exploreVerified: true })
+      added += 1
+    }
+    if (added === 0) {
+      dry += 1
+      if (dry >= 2) break
+    } else {
+      dry = 0
+    }
+  }
+  return kept
+}
+
 async function loadTalentRecommendBlock(userText: string, priorText = '', quotedFull = ''): Promise<string> {
   const named = cityAskedForTalents(userText)
   const planCity = cityAskedForTalents(priorText)
@@ -869,28 +925,16 @@ async function loadTalentRecommendBlock(userText: string, priorText = '', quoted
   const matched = sameCity.filter((c) => talentCardMatchesCloseWords(c, closeWords))
   const picked = pickLibraryForPlan(matched, headcount, planText)
   const gap = Math.max(0, headcount - picked.length)
-  const skipNames = picked.map((card) => card.nickname).filter(Boolean)
-  const publicText =
-    gap > 0
-      ? await fetchDoubaoPublicTalents(
-          city,
-          talentType,
-          storeName,
-          gap,
-          `${planClause}${planClause ? '。' : ''}${publicGapNote(planText, picked, headcount)}${skipNames.length ? `不要重复：${skipNames.join('、')}。` : ''}`,
-        )
-      : ''
-  const parsedPublic = gap > 0 ? cardsFromPublicText(publicText, city, talentType) : []
-  const confirmedNames = parsedPublic.length
-    ? await nicknamesConfirmedExplore(
-        parsedPublic.map((card) => card.nickname),
-        city,
-      )
-    : new Set<string>()
-  const publicCards = parsedPublic
-    .filter((card) => confirmedNames.has(card.nickname))
-    .slice(0, gap)
-    .map((card) => ({ ...card, exploreVerified: true }))
+  const publicCards = await fillPublicExploreCards({
+    city,
+    talentType,
+    storeName,
+    gap,
+    planText,
+    libraryCards: picked,
+    planClause,
+    skipNames: picked.map((card) => card.nickname).filter(Boolean),
+  })
   const cards = [...picked, ...publicCards]
   const asked = `方案要 ${headcount} 位。`
   const note =
