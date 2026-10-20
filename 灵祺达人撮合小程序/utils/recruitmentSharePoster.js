@@ -398,10 +398,8 @@ function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
   ctx.drawImage(qrImg, x, y, size, size)
 }
 
-/** 与星选海报一致：小程序码白底略透，深色码点保持不透明 */
-const QR_WHITE_ALPHA = 150
-
-function softenQrWhite(ctx, x, y, w, h) {
+/** 海报底卡已有白层，小程序码白底直接抠掉。 */
+function knockOutQrWhite(ctx, x, y, w, h) {
   const ix = Math.max(0, Math.floor(x))
   const iy = Math.max(0, Math.floor(y))
   const iw = Math.max(1, Math.floor(w))
@@ -415,9 +413,11 @@ function softenQrWhite(ctx, x, y, w, h) {
   const px = image.data
   if (!px) return
   for (let i = 0; i < px.length; i += 4) {
-    if (px[i] >= 236 && px[i + 1] >= 236 && px[i + 2] >= 236) {
-      px[i + 3] = Math.min(px[i + 3], QR_WHITE_ALPHA)
-    }
+    const min = Math.min(px[i], px[i + 1], px[i + 2])
+    const max = Math.max(px[i], px[i + 1], px[i + 2])
+    if (min < 210 || max - min > 28) continue
+    if (min >= 246) px[i + 3] = 0
+    else px[i + 3] = Math.round(px[i + 3] * ((246 - min) / 36))
   }
   ctx.putImageData(image, ix, iy)
 }
@@ -426,12 +426,17 @@ function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackCon
   const innerSize = Math.round(frameSize * 0.92)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
-  ctx.fillStyle = `rgba(255,255,255,${(QR_WHITE_ALPHA / 255).toFixed(3)})`
-  ctx.fillRect(x, y, frameSize, frameSize)
 
   if (qrImg) {
-    ctx.drawImage(qrImg, innerX, innerY, innerSize, innerSize)
-    softenQrWhite(ctx, x, y, frameSize, frameSize)
+    const off = wx.createOffscreenCanvas({ type: '2d', width: innerSize, height: innerSize })
+    const octx = off && off.getContext('2d')
+    if (octx) {
+      octx.drawImage(qrImg, 0, 0, innerSize, innerSize)
+      knockOutQrWhite(octx, 0, 0, innerSize, innerSize)
+      ctx.drawImage(off, innerX, innerY, innerSize, innerSize)
+    } else {
+      ctx.drawImage(qrImg, innerX, innerY, innerSize, innerSize)
+    }
     return Promise.resolve()
   }
 
@@ -447,7 +452,6 @@ function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackCon
         '#0f172a',
         '#ffffff',
       )
-    softenQrWhite(ctx, x, y, frameSize, frameSize)
     return Promise.resolve(drawn)
   }
 

@@ -8,8 +8,6 @@ export const POSTER_W = 750
 export const POSTER_H = 1200
 const QR_FRAME_SIZE = 200
 const QR_INNER_RATIO = 0.72
-/** 小程序码白底略透，深色码点保持不透明，避免扫不出来 */
-const QR_WHITE_ALPHA = 150
 
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   const s = String(text || '')
@@ -427,7 +425,8 @@ function tintWhitesWithTheme(
   ctx.putImageData(now, x, y)
 }
 
-function softenQrWhite(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+/** 海报底卡已有白层，小程序码白底直接抠掉，深色码点和中间图标保留。 */
+function knockOutQrWhite(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
   const ix = Math.max(0, Math.floor(x))
   const iy = Math.max(0, Math.floor(y))
   const iw = Math.max(1, Math.floor(w))
@@ -435,9 +434,11 @@ function softenQrWhite(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   const image = ctx.getImageData(ix, iy, iw, ih)
   const px = image.data
   for (let i = 0; i < px.length; i += 4) {
-    if (px[i] >= 236 && px[i + 1] >= 236 && px[i + 2] >= 236) {
-      px[i + 3] = Math.min(px[i + 3], QR_WHITE_ALPHA)
-    }
+    const min = Math.min(px[i], px[i + 1], px[i + 2])
+    const max = Math.max(px[i], px[i + 1], px[i + 2])
+    if (min < 210 || max - min > 28) continue
+    if (min >= 246) px[i + 3] = 0
+    else px[i + 3] = Math.round(px[i + 3] * ((246 - min) / 36))
   }
   ctx.putImageData(image, ix, iy)
 }
@@ -452,10 +453,17 @@ function drawStyledQr(
   const innerSize = Math.round(frameSize * QR_INNER_RATIO)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
-  ctx.fillStyle = `rgba(255,255,255,${(QR_WHITE_ALPHA / 255).toFixed(3)})`
-  ctx.fillRect(x, y, frameSize, frameSize)
-  ctx.drawImage(qrImage, innerX, innerY, innerSize, innerSize)
-  softenQrWhite(ctx, x, y, frameSize, frameSize)
+  const off = document.createElement('canvas')
+  off.width = innerSize
+  off.height = innerSize
+  const octx = off.getContext('2d')
+  if (!octx) {
+    ctx.drawImage(qrImage, innerX, innerY, innerSize, innerSize)
+    return
+  }
+  octx.drawImage(qrImage, 0, 0, innerSize, innerSize)
+  knockOutQrWhite(octx, 0, 0, innerSize, innerSize)
+  ctx.drawImage(off, innerX, innerY)
 }
 
 export async function renderRecruitmentPosterCanvas(

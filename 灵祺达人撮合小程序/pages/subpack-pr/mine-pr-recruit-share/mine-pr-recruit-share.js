@@ -442,11 +442,11 @@ function drawCodeCard(opts) {
         const shot = themes.captureTheme(ctx, x, y, inner, inner)
         ctx.save()
         themes.clipShape(ctx, x, y, inner, opts.shapeId)
-        ctx.fillStyle = 'rgba(255,255,255,0.55)'
+        ctx.fillStyle = 'rgba(255,255,255,0.9)'
         ctx.fillRect(x, y, inner, inner)
         ctx.drawImage(img, x, y, inner, inner)
         ctx.restore()
-        if (shot && shot.reveal) shot.reveal(0.42)
+        if (shot && shot.reveal) shot.reveal(0.1)
         exportCanvas(canvas, side, side, 'share-code').then(resolve).catch(reject)
       }
       img.onerror = () => reject(new Error('小程序码图片无效'))

@@ -67,6 +67,38 @@ function recruitmentWebUrl(id: string) {
 const SHARE_THUMB_FALLBACK =
   'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/share/recruit-card-bg.jpg?v=20261010c'
 
+/** 太阳码白底只透一点，深色码点和中间图标保持实色。 */
+const SUN_CODE_WHITE_ALPHA = 230
+
+function fadeSunCodeWhite(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth || img.width
+      canvas.height = img.naturalHeight || img.height
+      const ctx = canvas.getContext('2d')
+      if (!ctx || !canvas.width || !canvas.height) {
+        resolve(dataUrl)
+        return
+      }
+      ctx.drawImage(img, 0, 0)
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const px = image.data
+      for (let i = 0; i < px.length; i += 4) {
+        const min = Math.min(px[i], px[i + 1], px[i + 2])
+        const max = Math.max(px[i], px[i + 1], px[i + 2])
+        if (min < 220 || max - min > 28) continue
+        px[i + 3] = Math.min(px[i + 3], SUN_CODE_WHITE_ALPHA)
+      }
+      ctx.putImageData(image, 0, 0)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
 function httpsThumb(order: Record<string, unknown>): string {
   const url = resolveOrderCoverUrl(order)
   return /^https:\/\//i.test(url) ? url : SHARE_THUMB_FALLBACK
@@ -241,8 +273,9 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     if (tab !== 'code' || !orderId) return
     let cancelled = false
     void fetchMpApplyWxacode(orderId)
-      .then((out) => {
-        if (!cancelled) setCodeUrl(out.dataUrl)
+      .then((out) => fadeSunCodeWhite(out.dataUrl))
+      .then((url) => {
+        if (!cancelled) setCodeUrl(url)
       })
       .catch(() => {
         if (!cancelled) setCodeErr('小程序码生成失败')
@@ -434,7 +467,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
                 <img
                   src={codeUrl}
                   alt="小程序码"
-                  className="relative h-52 w-52 rounded-xl bg-white object-contain"
+                  className="relative h-52 w-52 rounded-xl object-contain"
                 />
               </div>
             ) : (

@@ -2033,6 +2033,8 @@ PAT
       cat <<'PAT'
 recruitmentSharePosterRender.ts
 recruitmentSharePoster.js
+RecruitmentShareSheet.tsx
+mine-pr-recruit-share.js
 change-scope-guard
 PAT
       ;;
