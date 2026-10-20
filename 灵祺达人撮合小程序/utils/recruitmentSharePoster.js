@@ -398,15 +398,40 @@ function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
   ctx.drawImage(qrImg, x, y, size, size)
 }
 
+/** 与星选海报一致：小程序码白底略透，深色码点保持不透明 */
+const QR_WHITE_ALPHA = 150
+
+function softenQrWhite(ctx, x, y, w, h) {
+  const ix = Math.max(0, Math.floor(x))
+  const iy = Math.max(0, Math.floor(y))
+  const iw = Math.max(1, Math.floor(w))
+  const ih = Math.max(1, Math.floor(h))
+  let image
+  try {
+    image = ctx.getImageData(ix, iy, iw, ih)
+  } catch (e) {
+    return
+  }
+  const px = image.data
+  if (!px) return
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i] >= 236 && px[i + 1] >= 236 && px[i + 2] >= 236) {
+      px[i + 3] = Math.min(px[i + 3], QR_WHITE_ALPHA)
+    }
+  }
+  ctx.putImageData(image, ix, iy)
+}
+
 function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackContent) {
   const innerSize = Math.round(frameSize * 0.92)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
-  ctx.fillStyle = '#FFFFFF'
+  ctx.fillStyle = `rgba(255,255,255,${(QR_WHITE_ALPHA / 255).toFixed(3)})`
   ctx.fillRect(x, y, frameSize, frameSize)
 
   if (qrImg) {
     ctx.drawImage(qrImg, innerX, innerY, innerSize, innerSize)
+    softenQrWhite(ctx, x, y, frameSize, frameSize)
     return Promise.resolve()
   }
 
@@ -422,6 +447,7 @@ function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackCon
         '#0f172a',
         '#ffffff',
       )
+    softenQrWhite(ctx, x, y, frameSize, frameSize)
     return Promise.resolve(drawn)
   }
 

@@ -8,6 +8,8 @@ export const POSTER_W = 750
 export const POSTER_H = 1200
 const QR_FRAME_SIZE = 200
 const QR_INNER_RATIO = 0.72
+/** 小程序码白底略透，深色码点保持不透明，避免扫不出来 */
+const QR_WHITE_ALPHA = 150
 
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   const s = String(text || '')
@@ -425,6 +427,21 @@ function tintWhitesWithTheme(
   ctx.putImageData(now, x, y)
 }
 
+function softenQrWhite(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  const ix = Math.max(0, Math.floor(x))
+  const iy = Math.max(0, Math.floor(y))
+  const iw = Math.max(1, Math.floor(w))
+  const ih = Math.max(1, Math.floor(h))
+  const image = ctx.getImageData(ix, iy, iw, ih)
+  const px = image.data
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i] >= 236 && px[i + 1] >= 236 && px[i + 2] >= 236) {
+      px[i + 3] = Math.min(px[i + 3], QR_WHITE_ALPHA)
+    }
+  }
+  ctx.putImageData(image, ix, iy)
+}
+
 function drawStyledQr(
   ctx: CanvasRenderingContext2D,
   qrImage: CanvasImageSource,
@@ -435,9 +452,10 @@ function drawStyledQr(
   const innerSize = Math.round(frameSize * QR_INNER_RATIO)
   const innerX = x + (frameSize - innerSize) / 2
   const innerY = y + (frameSize - innerSize) / 2
-  ctx.fillStyle = '#FFFFFF'
+  ctx.fillStyle = `rgba(255,255,255,${(QR_WHITE_ALPHA / 255).toFixed(3)})`
   ctx.fillRect(x, y, frameSize, frameSize)
   ctx.drawImage(qrImage, innerX, innerY, innerSize, innerSize)
+  softenQrWhite(ctx, x, y, frameSize, frameSize)
 }
 
 export async function renderRecruitmentPosterCanvas(

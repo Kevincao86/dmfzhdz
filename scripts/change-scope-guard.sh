@@ -129,6 +129,7 @@ list_scopes() {
   mp_hall_browse       达人浏览招募单：点开只回这一单并裁报名明细，大厅列表短缓存，避免千人同时打开卡顿
   mp_apply_fast        达人报名：只锁这一张招募单，旧单首次报名后移出整份注册表，避免百人同时报名排队写整库
   xingxuan_wx_share    星选分享招募：电脑微信发给好友或群、发到朋友圈，卡片与达人小程序同一张商单
+  share_poster_qr_white 分享海报小程序码白底略透明，星选与达人小程序同一张海报
   mp_login_email_account 达人小程序：验证码登录增加邮箱；账号密码不限制为纯数字
   mp_profile_trade_tags 达人我的信息：交易示例改小图；打开资料时保留账号标签
   pr_applicant_shot_thumb 报名达人：后台截图显示小图，点击查看大图
@@ -2025,6 +2026,13 @@ meoo-ops-mp-auth.ts
 wechatPcOpenShare.ts
 RecruitmentShareSheet.tsx
 mpApi.ts
+change-scope-guard
+PAT
+      ;;
+    share_poster_qr_white)
+      cat <<'PAT'
+recruitmentSharePosterRender.ts
+recruitmentSharePoster.js
 change-scope-guard
 PAT
       ;;
