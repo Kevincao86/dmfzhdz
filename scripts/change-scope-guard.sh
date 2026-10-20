@@ -127,6 +127,7 @@ list_scopes() {
   mp_login_identity_close 登录身份：达人库已删除则进 PR；我的信息短信注销账号
   mp_multi_identity    达人/拍摄/剪辑最多3个：管理库有达人时优先显示达人并自动带上已有身份；报名按商单自动用对应身份
   mp_hall_browse       达人浏览招募单：点开只回这一单并裁报名明细，大厅列表短缓存，避免千人同时打开卡顿
+  mp_apply_fast        达人报名：只锁这一张招募单，旧单首次报名后移出整份注册表，避免百人同时报名排队写整库
   mp_login_email_account 达人小程序：验证码登录增加邮箱；账号密码不限制为纯数字
   mp_profile_trade_tags 达人我的信息：交易示例改小图；打开资料时保留账号标签
   pr_applicant_shot_thumb 报名达人：后台截图显示小图，点击查看大图
@@ -2004,6 +2005,16 @@ registryTenantIsolation.ts
 registrySnapshotPgAppend.ts
 mpApi.ts
 opsRegistryTalentMp.js
+change-scope-guard
+PAT
+      ;;
+    mp_apply_fast)
+      cat <<'PAT'
+meoo-ops-mp-recruitment-orders-apply.ts
+meoo-ops-mp-hall-registry.ts
+mpRecruitmentApplyFast.ts
+mpRecruitmentApplyCore.ts
+mpRecruitmentOrderRowStore.ts
 change-scope-guard
 PAT
       ;;

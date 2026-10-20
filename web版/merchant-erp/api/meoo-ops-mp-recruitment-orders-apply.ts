@@ -7,7 +7,9 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpRecruitmentApplicant } from '../src/lib/opsRegistryTypes.js'
+import { invalidateMpHallListCache } from './meoo-ops-mp-hall-registry.js'
 import { applyToMpRecruitmentOrderInSnapshot } from '../src/lib/mpRecruitmentApplyCore.js'
+import { tryApplyMpRecruitmentOrderFast } from '../src/lib/mpRecruitmentApplyFast.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -81,6 +83,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const nick = (applicant?.platformNickname || applicant?.name || '').trim()
     if (!mpOrderId || !applicant || !applicant.id || !nick) {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_apply' })
+      return
+    }
+
+    const fast = await tryApplyMpRecruitmentOrderFast({
+      mpOrderId,
+      applicant,
+      workIdentity: body.workIdentity,
+      claimSlotCount: body.claimSlotCount,
+      preferredVisitDate: body.preferredVisitDate,
+    })
+    if (fast.handled) {
+      if (fast.status === 200) invalidateMpHallListCache()
+      sendOpsJson(res, fast.status, fast.body)
       return
     }
 

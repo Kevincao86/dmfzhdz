@@ -12,6 +12,11 @@ type HallListCacheEntry = { at: number; json: string }
 const hallListCache = new Map<string, HallListCacheEntry>()
 const hallListInflight = new Map<string, Promise<string>>()
 
+/** 报名写入后丢掉大厅列表缓存，下一轮列表读到新的报名人数。 */
+export function invalidateMpHallListCache(): void {
+  hallListCache.clear()
+}
+
 async function hallListResponseJson(includeRecommendPool: boolean): Promise<string> {
   const key = includeRecommendPool ? 'pool' : 'hall'
   const hit = hallListCache.get(key)
