@@ -148,10 +148,12 @@ export function buildApplicantFromRows(
   if (Object.keys(customFields).length) applicant.customFields = customFields
   const member = readMember()
   if (member?.id) applicant.talentMemberId = String(member.id).trim()
-  if (member?.wxAvatarUrl) {
-    applicant.avatar = String(member.wxAvatarUrl).trim()
-    applicant.wxAvatarUrl = applicant.avatar
-  }
+  if (member?.wxAvatarUrl) applicant.wxAvatarUrl = String(member.wxAvatarUrl).trim()
+  const profiles = member?.platformProfiles
+  const douyinAvatar = String(profiles?.douyin?.avatarUrl || '').trim()
+  const platformAvatar = String(profiles?.[platformIdFromName(platform)]?.avatarUrl || '').trim()
+  const showAvatar = douyinAvatar || platformAvatar || String(member?.wxAvatarUrl || '').trim()
+  if (showAvatar) applicant.avatar = showAvatar
   if (!isSupplier) {
     const pid = platformIdFromName(platform)
     const prof = member?.platformProfiles?.[pid]

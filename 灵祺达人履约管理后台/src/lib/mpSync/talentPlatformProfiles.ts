@@ -28,6 +28,13 @@ export type PlatformProfile = {
   quotePrice: string
   accountTags: string[]
   recentTradeScreenshot: string
+  avatarUrl: string
+  ipLocation: string
+  age: string
+  signature: string
+  followingCount: string
+  totalFavorited: string
+  awemeCount: string
 }
 
 export type TalentPrExclusiveQuote = {
@@ -52,6 +59,13 @@ export function emptyProfile(): PlatformProfile {
     quotePrice: '',
     accountTags: [],
     recentTradeScreenshot: '',
+    avatarUrl: '',
+    ipLocation: '',
+    age: '',
+    signature: '',
+    followingCount: '',
+    totalFavorited: '',
+    awemeCount: '',
   }
 }
 

@@ -277,6 +277,12 @@
           bindtap="onProfileLinkAutofill"
         >AI自动解析链接并填写下方信息</button>
       </view>
+      <image
+        wx:if="{{item.profile.avatarUrl}}"
+        class="platform-avatar"
+        src="{{item.profile.avatarUrl}}"
+        mode="aspectFill"
+      />
       <view class="form-row">
         <text class="form-label">{{item.labels.accountId}} *</text>
         <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
@@ -311,6 +317,32 @@
           bindinput="onPlatformField"
         />
       </view>
+      <block wx:if="{{item.id === 'douyin'}}">
+        <view class="form-row">
+          <text class="form-label">IP属地</text>
+          <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" placeholder="解析后自动填入" value="{{item.profile.ipLocation}}" data-id="{{item.id}}" data-k="ipLocation" bindinput="onPlatformField" />
+        </view>
+        <view class="form-row">
+          <text class="form-label">年龄</text>
+          <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" placeholder="解析后自动填入" value="{{item.profile.age}}" data-id="{{item.id}}" data-k="age" bindinput="onPlatformField" />
+        </view>
+        <view class="form-row">
+          <text class="form-label">关注数</text>
+          <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" type="number" value="{{item.profile.followingCount}}" data-id="{{item.id}}" data-k="followingCount" bindinput="onPlatformField" />
+        </view>
+        <view class="form-row">
+          <text class="form-label">获赞</text>
+          <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" type="number" value="{{item.profile.totalFavorited}}" data-id="{{item.id}}" data-k="totalFavorited" bindinput="onPlatformField" />
+        </view>
+        <view class="form-row">
+          <text class="form-label">作品数</text>
+          <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" type="number" value="{{item.profile.awemeCount}}" data-id="{{item.id}}" data-k="awemeCount" bindinput="onPlatformField" />
+        </view>
+        <view class="form-row">
+          <text class="form-label">简介</text>
+          <textarea style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}" class="input" value="{{item.profile.signature}}" data-id="{{item.id}}" data-k="signature" bindinput="onPlatformField" />
+        </view>
+      </block>
       <view class="form-row" wx:if="{{item.showTradeShot}}">
         <text class="form-label">近期交易截图（选填）</text>
         <text class="trade-shot-hint">打开抖音或快手「数据中心 → 数据概览 → 交易分析 → 近30日」，截这一屏。不上传也可以保存。</text>

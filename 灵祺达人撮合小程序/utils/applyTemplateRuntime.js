@@ -132,10 +132,13 @@ function buildApplicantFromRows(rows, data, meta) {
   const member = memberStore.readMember()
   if (member) {
     if (member.id) applicant.talentMemberId = String(member.id).trim()
-    if (member.wxAvatarUrl) {
-      applicant.avatar = String(member.wxAvatarUrl).trim()
-      applicant.wxAvatarUrl = applicant.avatar
-    }
+    if (member.wxAvatarUrl) applicant.wxAvatarUrl = String(member.wxAvatarUrl).trim()
+    const profiles = member.platformProfiles || {}
+    const douyinAvatar = profiles.douyin && String(profiles.douyin.avatarUrl || '').trim()
+    const pid = talentPlatforms.platformIdFromName(platform)
+    const platformAvatar = profiles[pid] && String(profiles[pid].avatarUrl || '').trim()
+    const showAvatar = douyinAvatar || platformAvatar || String(member.wxAvatarUrl || '').trim()
+    if (showAvatar) applicant.avatar = showAvatar
     if (!isSupplier) {
       const pid = talentPlatforms.platformIdFromName(platform)
       const prof = member.platformProfiles && member.platformProfiles[pid]

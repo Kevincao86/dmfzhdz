@@ -562,8 +562,17 @@ Page({
       if (parsed.profileLink) cur.profileLink = parsed.profileLink
       if (parsed.followers > 0) cur.followers = String(parsed.followers)
       if (parsed.talentGrade && id === 'kuaishou') cur.talentGrade = parsed.talentGrade
+      if (parsed.avatarUrl) cur.avatarUrl = String(parsed.avatarUrl)
+      if (parsed.ipLocation) cur.ipLocation = String(parsed.ipLocation)
+      if (parsed.age) cur.age = String(parsed.age)
+      if (parsed.signature) cur.signature = String(parsed.signature)
+      if (parsed.followingCount > 0) cur.followingCount = String(parsed.followingCount)
+      if (parsed.totalFavorited > 0) cur.totalFavorited = String(parsed.totalFavorited)
+      if (parsed.awemeCount > 0) cur.awemeCount = String(parsed.awemeCount)
       if (Array.isArray(parsed.accountTags) && parsed.accountTags.length) {
         const merged = [...new Set([...(cur.accountTags || []), ...parsed.accountTags])]
+          .map((t) => String(t || '').trim())
+          .filter((t) => t && t.length <= 12)
         cur.accountTags = merged
       }
       profiles[id] = cur

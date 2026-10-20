@@ -4,7 +4,6 @@ const hallFilters = require('./recruitmentHallFilters.js')
 const talentContactPrGate = require('./talentContactPrGate.js')
 const memberStore = require('./talentMember.js')
 const { labels } = require('./platformLabels.js')
-const { TALENT_TAGS } = require('./publishFormOptions.js')
 
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { getIceVerifyMode } = require('./iceOrderStats.js')
@@ -102,11 +101,17 @@ function openTalentProfileLink(url) {
   copyTalentProfileLink(url)
 }
 
+function memberShowAvatar(mem, pid) {
+  const profs = (mem && mem.platformProfiles) || {}
+  const douyinAvatar = profs.douyin && String(profs.douyin.avatarUrl || '').trim()
+  if (douyinAvatar) return douyinAvatar
+  const platformAvatar = profs[pid] && String(profs[pid].avatarUrl || '').trim()
+  if (platformAvatar) return platformAvatar
+  return String((mem && mem.wxAvatarUrl) || '').trim()
+}
+
 function resolveApplicantAvatar(applicant, reg) {
   if (!applicant) return ''
-  if (applicant.avatar || applicant.wxAvatarUrl) {
-    return String(applicant.avatar || applicant.wxAvatarUrl || '').trim()
-  }
   const members = Array.isArray(reg?.mpTalentMembers) ? reg.mpTalentMembers : []
   const account = String(applicant.platformAccount || '').trim().toLowerCase()
   const plat = applicant.platform || '抖音'
@@ -115,33 +120,37 @@ function resolveApplicantAvatar(applicant, reg) {
   for (const m of members) {
     const prof = m.platformProfiles && m.platformProfiles[pid]
     if (prof && account && String(prof.platformAccount || '').trim().toLowerCase() === account) {
-      return String(m.wxAvatarUrl || '').trim()
+      return memberShowAvatar(m, pid)
     }
   }
   const contact = String(applicant.contact || '').trim()
   if (contact) {
     for (const m of members) {
-      if (String(m.contact || '').trim() === contact) return String(m.wxAvatarUrl || '').trim()
-    }
-  }
-  const lib = Array.isArray(reg?.talentLibraryEntries) ? reg.talentLibraryEntries : []
-  for (const e of lib) {
-    if (account && String(e.platformAccount || '').trim().toLowerCase() === account) {
-      break
+      if (String(m.contact || '').trim() === contact) return memberShowAvatar(m, pid)
     }
   }
   const self = memberStore.readMember()
-  if (self && self.wxAvatarUrl && contact && String(self.contact || '').trim() === contact) {
-    return String(self.wxAvatarUrl).trim()
+  if (self && contact && String(self.contact || '').trim() === contact) {
+    return memberShowAvatar(self, pid)
+  }
+  if (applicant.avatar || applicant.wxAvatarUrl) {
+    return String(applicant.avatar || applicant.wxAvatarUrl || '').trim()
   }
   return ''
 }
 
 function normalizeAccountTags(raw) {
   if (!Array.isArray(raw)) return []
-  return raw
-    .map((t) => String(t || '').trim())
-    .filter((t) => t && TALENT_TAGS.includes(t))
+  const out = []
+  const seen = new Set()
+  for (const item of raw) {
+    const tag = String(item || '').trim()
+    if (!tag || tag.length > 12 || seen.has(tag)) continue
+    seen.add(tag)
+    out.push(tag)
+    if (out.length >= 12) break
+  }
+  return out
 }
 
 function resolveApplicantMemberProfile(applicant, reg) {

@@ -30,6 +30,13 @@ function emptyProfile() {
     quotePrice: '',
     accountTags: [],
     recentTradeScreenshot: '',
+    avatarUrl: '',
+    ipLocation: '',
+    age: '',
+    signature: '',
+    followingCount: '',
+    totalFavorited: '',
+    awemeCount: '',
   }
 }
 
@@ -41,14 +48,18 @@ function emptyAllProfiles() {
 
 function buildAccountTagGrid(selected) {
   const set = new Set(Array.isArray(selected) ? selected : [])
-  return TALENT_TAGS.map((name) => ({ name, on: set.has(name) }))
+  const base = TALENT_TAGS.map((name) => ({ name, on: set.has(name) }))
+  const extra = [...set]
+    .filter((name) => name && !TALENT_TAGS.includes(name) && String(name).length <= 12)
+    .map((name) => ({ name, on: true }))
+  return base.concat(extra)
 }
 
 function normalizeProfile(raw) {
   const base = emptyProfile()
   if (!raw || typeof raw !== 'object') return base
   const tags = Array.isArray(raw.accountTags)
-    ? raw.accountTags.filter((t) => TALENT_TAGS.includes(t))
+    ? raw.accountTags.map((t) => String(t || '').trim()).filter((t) => t && t.length <= 12)
     : []
   const merged = {
     ...base,
@@ -56,6 +67,13 @@ function normalizeProfile(raw) {
     enabled: !!raw.enabled,
     accountTags: tags,
     followers: raw.followers != null ? String(raw.followers) : '',
+    followingCount: raw.followingCount != null ? String(raw.followingCount) : '',
+    totalFavorited: raw.totalFavorited != null ? String(raw.totalFavorited) : '',
+    awemeCount: raw.awemeCount != null ? String(raw.awemeCount) : '',
+    avatarUrl: raw.avatarUrl != null ? String(raw.avatarUrl) : '',
+    ipLocation: raw.ipLocation != null ? String(raw.ipLocation) : '',
+    age: raw.age != null ? String(raw.age) : '',
+    signature: raw.signature != null ? String(raw.signature) : '',
   }
   delete merged.alipayAccount
   return merged

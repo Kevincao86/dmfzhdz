@@ -695,6 +695,13 @@ export type ParsedProfileLink = {
   accountTags: string[]
   talentGrade?: string
   reviewCount?: string
+  avatarUrl?: string
+  ipLocation?: string
+  age?: string
+  signature?: string
+  followingCount?: number
+  totalFavorited?: number
+  awemeCount?: number
 }
 
 export async function parseProfileLink(link: string, platform = '抖音'): Promise<ParsedProfileLink> {

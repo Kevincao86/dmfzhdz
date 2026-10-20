@@ -31,6 +31,13 @@ export type ProfileLinkParseOk = {
   accountTags: string[]
   talentGrade?: string
   reviewCount?: string
+  avatarUrl?: string
+  ipLocation?: string
+  age?: string
+  signature?: string
+  followingCount?: number
+  totalFavorited?: number
+  awemeCount?: number
 }
 
 export type ProfileLinkParseResult = ProfileLinkParseOk | { ok: false; message: string }
@@ -93,6 +100,12 @@ type RawProfileBlob = {
   signature?: string
   talentGrade?: string
   reviewCount?: string
+  avatarUrl?: string
+  ipLocation?: string
+  age?: string
+  followingCount?: number
+  totalFavorited?: number
+  awemeCount?: number
 }
 
 const PLATFORM_HOST: Record<ProfilePlatformKey, RegExp> = {
@@ -172,6 +185,8 @@ function canonicalDouyinProfileUrl(profileUrl: string): string {
   return sec ? `https://www.douyin.com/user/${sec}` : profileUrl
 }
 
+type DouyinImage = { url_list?: string[] }
+
 type IesDouyinUserInfo = {
   nickname?: string
   unique_id?: string
@@ -179,7 +194,47 @@ type IesDouyinUserInfo = {
   signature?: string
   mplatform_followers_count?: number
   follower_count?: number
+  following_count?: number
+  total_favorited?: number | string
+  aweme_count?: number
   gender?: number
+  user_age?: number
+  ip_location?: string
+  city?: string
+  location_city?: string
+  avatar_larger?: DouyinImage
+  avatar_large?: DouyinImage
+  avatar_medium?: DouyinImage
+  avatar_thumb?: DouyinImage
+}
+
+function cleanIpLocation(raw: unknown): string {
+  const text = String(raw || '')
+    .replace(/^IP属地[：:\s]*/i, '')
+    .trim()
+  if (!text || text === '0' || text === '未知') return ''
+  return text.slice(0, 16)
+}
+
+function ageText(raw: unknown): string {
+  const n = typeof raw === 'number' ? raw : Number.parseInt(String(raw || '').replace(/岁/g, ''), 10)
+  if (!Number.isFinite(n) || n < 1 || n > 120) return ''
+  return String(n)
+}
+
+function avatarUrlFrom(raw: unknown): string {
+  if (!raw || typeof raw !== 'object') return ''
+  const o = raw as Record<string, unknown>
+  for (const key of ['avatar_larger', 'avatar_large', 'avatar_medium', 'avatar_thumb', 'avatar']) {
+    const v = o[key]
+    if (typeof v === 'string' && /^https?:\/\//i.test(v)) return v
+    if (!v || typeof v !== 'object') continue
+    const list = (v as DouyinImage).url_list
+    if (!Array.isArray(list)) continue
+    const url = list.find((item) => typeof item === 'string' && /^https?:\/\//i.test(item))
+    if (url) return url
+  }
+  return ''
 }
 
 async function fetchDouyinUserBySecUid(secUid: string): Promise<RawProfileBlob | null> {
@@ -199,15 +254,63 @@ async function fetchDouyinUserBySecUid(secUid: string): Promise<RawProfileBlob |
     const u = j.user_info
     const uniqueId = String(u.unique_id || '').trim()
     const shortId = String(u.short_id || '').trim()
-    return {
+    const blob: RawProfileBlob = {
       platformNickname: String(u.nickname || '').trim(),
       platformAccount: uniqueId && uniqueId !== '0' ? uniqueId : shortId !== '0' ? shortId : '',
       followers: Math.max(
         0,
         Number(u.mplatform_followers_count ?? u.follower_count ?? 0) || 0,
       ),
-      gender: typeof u.gender === 'number' ? u.gender : undefined,
+      gender: u.gender === 1 || u.gender === 2 ? u.gender : undefined,
       signature: String(u.signature || '').trim(),
+      avatarUrl: avatarUrlFrom(u),
+      ipLocation: cleanIpLocation(u.ip_location || u.location_city || u.city),
+      age: ageText(u.user_age),
+      followingCount: Math.max(0, Number(u.following_count) || 0) || undefined,
+      totalFavorited: Math.max(0, Number(u.total_favorited) || 0) || undefined,
+      awemeCount: Math.max(0, Number(u.aweme_count) || 0) || undefined,
+    }
+    return blob
+  } catch {
+    return null
+  }
+}
+
+/** 直播用户接口不带网页签名，粉丝/关注/性别/头像比 ies 接口更接近主页。IP 属地和年龄不在这份返回里。 */
+async function fetchDouyinWebcastBySecUid(secUid: string): Promise<RawProfileBlob | null> {
+  if (!secUid) return null
+  const apiUrl = `https://live.douyin.com/webcast/user/?aid=6383&sec_target_uid=${encodeURIComponent(secUid)}`
+  try {
+    const res = await fetch(apiUrl, {
+      headers: {
+        ...fetchHeaders('douyin', 'desktop'),
+        Accept: 'application/json, text/plain, */*',
+        Referer: 'https://live.douyin.com/',
+      },
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return null
+    const j = (await res.json()) as {
+      status_code?: number
+      data?: IesDouyinUserInfo & {
+        display_id?: string
+        follow_info?: { follower_count?: number; following_count?: number }
+      }
+    }
+    if (j.status_code !== 0 || !j.data) return null
+    const u = j.data
+    const displayId = String(u.display_id || u.unique_id || '').trim()
+    const follow = u.follow_info || {}
+    return {
+      platformNickname: String(u.nickname || '').trim(),
+      platformAccount: displayId && displayId !== '0' ? displayId : '',
+      followers: Math.max(0, Number(follow.follower_count ?? u.follower_count ?? 0) || 0),
+      followingCount: Math.max(0, Number(follow.following_count ?? u.following_count ?? 0) || 0) || undefined,
+      gender: u.gender === 1 || u.gender === 2 ? u.gender : undefined,
+      signature: String(u.signature || '').trim(),
+      avatarUrl: avatarUrlFrom(u),
+      ipLocation: cleanIpLocation(u.ip_location || u.location_city || u.city),
+      age: ageText(u.user_age),
     }
   } catch {
     return null
@@ -356,14 +459,21 @@ function mergeProfileBlob(base: RawProfileBlob | null, extra: RawProfileBlob | n
   if (!base && !extra) return null
   if (!base) return extra
   if (!extra) return base
+  const gender = base.gender === 1 || base.gender === 2 ? base.gender : extra.gender
   return {
     platformNickname: base.platformNickname || extra.platformNickname,
     platformAccount: base.platformAccount || extra.platformAccount,
     followers: Math.max(base.followers ?? 0, extra.followers ?? 0) || undefined,
-    gender: base.gender ?? extra.gender,
+    gender: gender === 1 || gender === 2 ? gender : undefined,
     signature: base.signature || extra.signature,
     talentGrade: base.talentGrade || extra.talentGrade,
     reviewCount: base.reviewCount || extra.reviewCount,
+    avatarUrl: extra.avatarUrl || base.avatarUrl,
+    ipLocation: base.ipLocation || extra.ipLocation,
+    age: base.age || extra.age,
+    followingCount: Math.max(base.followingCount ?? 0, extra.followingCount ?? 0) || undefined,
+    totalFavorited: Math.max(base.totalFavorited ?? 0, extra.totalFavorited ?? 0) || undefined,
+    awemeCount: Math.max(base.awemeCount ?? 0, extra.awemeCount ?? 0) || undefined,
   }
 }
 
@@ -461,6 +571,13 @@ function enrichProfileFromHtml(
   }
   if (metaDesc && !out?.signature) {
     out = mergeProfileBlob(out, { signature: metaDesc })
+  }
+
+  if (key === 'douyin') {
+    const ipM = /IP属地[：:\s]*([^\s<，,｜|]{2,16})/.exec(html)
+    if (ipM?.[1]) out = mergeProfileBlob(out, { ipLocation: cleanIpLocation(ipM[1]) })
+    const ageM = /IP属地[\s\S]{0,80}?(\d{1,3})\s*岁/.exec(html)
+    if (ageM?.[1]) out = mergeProfileBlob(out, { age: ageText(ageM[1]) })
   }
 
   return out
@@ -568,8 +685,16 @@ function objectToBlob(o: Record<string, unknown>, key: ProfilePlatformKey): RawP
       'follower',
       'subscribers',
     ]),
-    gender: typeof o.gender === 'number' ? o.gender : undefined,
+    gender: o.gender === 1 || o.gender === 2 ? o.gender : undefined,
     signature: pickStr(o, ['signature', 'desc', 'description', 'bio', 'userDesc']),
+    avatarUrl: avatarUrlFrom(o),
+    ipLocation: cleanIpLocation(
+      pickStr(o, ['ip_location', 'ipLocation', 'location_city', 'city']),
+    ),
+    age: ageText(o.user_age ?? o.userAge ?? o.age),
+    followingCount: pickNum(o, ['following_count', 'followingCount']) || undefined,
+    totalFavorited: pickNum(o, ['total_favorited', 'totalFavorited']) || undefined,
+    awemeCount: pickNum(o, ['aweme_count', 'awemeCount']) || undefined,
   }
 
   if (key === 'kuaishou') {
@@ -790,16 +915,22 @@ function inferAccountTags(signature: string): string[] {
   if (!text) return []
   const picked = new Set<string>()
   for (const m of text.matchAll(/#([^\s#]{1,12})/g)) {
-    const frag = m[1] || ''
+    const frag = (m[1] || '').replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '')
+    if (frag.length < 2) continue
+    let matched = false
     for (const tag of TALENT_TAG_OPTIONS) {
-      if (frag.includes(tag) || tag.includes(frag)) picked.add(tag)
+      if (frag.includes(tag) || tag.includes(frag)) {
+        picked.add(tag)
+        matched = true
+      }
     }
+    if (!matched) picked.add(frag)
   }
   for (const tag of TALENT_TAG_OPTIONS) {
     const kws = TAG_KEYWORDS[tag] || [tag]
     if (kws.some((kw) => text.includes(kw))) picked.add(tag)
   }
-  return [...picked].slice(0, 5)
+  return [...picked].slice(0, 8)
 }
 
 const PLATFORM_HINT: Record<ProfilePlatformKey, string> = {
@@ -839,7 +970,8 @@ export async function runProfileLinkParseCore(
   if (key === 'douyin') {
     const sec = extractSecUidFromDouyinUrl(profileUrl)
     const apiUser = sec ? await fetchDouyinUserBySecUid(sec) : null
-    user = mergeProfileBlob(user, apiUser)
+    const liveUser = sec ? await fetchDouyinWebcastBySecUid(sec) : null
+    user = mergeProfileBlob(mergeProfileBlob(user, apiUser), liveUser)
   }
 
   if (key === 'dianping') {
@@ -876,6 +1008,13 @@ export async function runProfileLinkParseCore(
   }
   if (user.talentGrade) out.talentGrade = user.talentGrade
   if (user.reviewCount) out.reviewCount = user.reviewCount
+  if (user.avatarUrl) out.avatarUrl = user.avatarUrl
+  if (user.ipLocation) out.ipLocation = user.ipLocation
+  if (user.age) out.age = user.age
+  if (user.signature) out.signature = user.signature
+  if ((user.followingCount ?? 0) > 0) out.followingCount = user.followingCount
+  if ((user.totalFavorited ?? 0) > 0) out.totalFavorited = user.totalFavorited
+  if ((user.awemeCount ?? 0) > 0) out.awemeCount = user.awemeCount
   return out
 }
 

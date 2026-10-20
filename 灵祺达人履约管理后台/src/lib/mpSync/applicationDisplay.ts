@@ -1,7 +1,6 @@
 import type { MpRegistry } from '../mpRecruitment/types'
 import { platformIdFromName } from './talentPlatformProfiles'
 import { labels } from './platformLabels'
-import { TALENT_TAGS } from './publishFormOptions'
 import { readMember, primaryPlatformProfile } from './talentMember'
 import {
   extractProfileLinkUrl,
@@ -81,15 +80,29 @@ function resolveApplicantProfileLink(applicant: Record<string, unknown>, reg: Mp
 
 function normalizeAccountTags(raw: unknown): string[] {
   if (!Array.isArray(raw)) return []
-  const allowed = new Set<string>(TALENT_TAGS as readonly string[])
-  return raw.map((t) => String(t || '').trim()).filter((t) => t && allowed.has(t))
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    const tag = String(item || '').trim()
+    if (!tag || tag.length > 12 || seen.has(tag)) continue
+    seen.add(tag)
+    out.push(tag)
+    if (out.length >= 12) break
+  }
+  return out
+}
+
+function memberShowAvatar(mem: Record<string, unknown>, pid: string): string {
+  const profs = mem.platformProfiles as Record<string, { avatarUrl?: string }> | undefined
+  const douyinAvatar = String(profs?.douyin?.avatarUrl || '').trim()
+  if (douyinAvatar) return douyinAvatar
+  const platformAvatar = String(profs?.[pid]?.avatarUrl || '').trim()
+  if (platformAvatar) return platformAvatar
+  return String(mem.wxAvatarUrl || '').trim()
 }
 
 function resolveApplicantAvatar(applicant: Record<string, unknown>, reg: MpRegistry): string {
   if (!applicant) return ''
-  if (applicant.avatar || applicant.wxAvatarUrl) {
-    return String(applicant.avatar || applicant.wxAvatarUrl || '').trim()
-  }
   const members = Array.isArray(reg?.mpTalentMembers) ? reg.mpTalentMembers : []
   const account = String(applicant.platformAccount || '').trim().toLowerCase()
   const plat = String(applicant.platform || '抖音')
@@ -100,19 +113,22 @@ function resolveApplicantAvatar(applicant: Record<string, unknown>, reg: MpRegis
     const profs = mem.platformProfiles as Record<string, { platformAccount?: string }> | undefined
     const prof = profs?.[pid]
     if (prof && account && String(prof.platformAccount || '').trim().toLowerCase() === account) {
-      return String(mem.wxAvatarUrl || '').trim()
+      return memberShowAvatar(mem, pid)
     }
   }
   const contact = String(applicant.contact || '').trim()
   if (contact) {
     for (const m of members) {
       const mem = m as Record<string, unknown>
-      if (String(mem.contact || '').trim() === contact) return String(mem.wxAvatarUrl || '').trim()
+      if (String(mem.contact || '').trim() === contact) return memberShowAvatar(mem, pid)
     }
   }
   const self = readMember()
-  if (self?.wxAvatarUrl && contact && String(self.contact || '').trim() === contact) {
-    return String(self.wxAvatarUrl).trim()
+  if (self && contact && String(self.contact || '').trim() === contact) {
+    return memberShowAvatar(self as unknown as Record<string, unknown>, pid)
+  }
+  if (applicant.avatar || applicant.wxAvatarUrl) {
+    return String(applicant.avatar || applicant.wxAvatarUrl || '').trim()
   }
   return ''
 }

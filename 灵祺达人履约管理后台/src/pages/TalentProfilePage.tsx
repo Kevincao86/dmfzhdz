@@ -158,10 +158,9 @@ function TalentProfileForm() {
     setMsg('')
     try {
       const parsed = await parseProfileLink(link, platName)
-      const talentTagSet = new Set<string>(TALENT_TAGS)
       const mergedTags = [
         ...new Set([...(prof.accountTags || []), ...(parsed.accountTags || [])]),
-      ].filter((t): t is (typeof TALENT_TAGS)[number] => talentTagSet.has(t))
+      ].filter((t) => t && t.length <= 12)
       const profilePatch: Partial<PlatformProfile> = {
         platformAccount: parsed.platformAccount || prof.platformAccount,
         platformNickname: parsed.platformNickname || prof.platformNickname,
@@ -169,12 +168,23 @@ function TalentProfileForm() {
         followers: parsed.followers > 0 ? String(parsed.followers) : prof.followers,
         accountTags: mergedTags,
       }
+      if (parsed.avatarUrl) profilePatch.avatarUrl = parsed.avatarUrl
+      if (parsed.ipLocation) profilePatch.ipLocation = parsed.ipLocation
+      if (parsed.age) profilePatch.age = parsed.age
+      if (parsed.signature) profilePatch.signature = parsed.signature
+      if ((parsed.followingCount ?? 0) > 0) profilePatch.followingCount = String(parsed.followingCount)
+      if ((parsed.totalFavorited ?? 0) > 0) profilePatch.totalFavorited = String(parsed.totalFavorited)
+      if ((parsed.awemeCount ?? 0) > 0) profilePatch.awemeCount = String(parsed.awemeCount)
       if (parsed.talentGrade && activePlatform === 'kuaishou') {
         profilePatch.talentGrade = parsed.talentGrade
       }
       patchProfile(profilePatch)
       if (parsed.gender && !member.gender) patchMember({ gender: parsed.gender })
-      setMsg('已根据链接自动填写')
+      setMsg(
+        activePlatform === 'douyin' && !parsed.ipLocation
+          ? '已填写头像、账号和粉丝。IP属地、年龄这次公开接口没有返回'
+          : '已根据链接自动填写',
+      )
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e))
     } finally {
@@ -464,6 +474,14 @@ function TalentProfileForm() {
             </button>
           ) : null}
         </label>
+        {prof.avatarUrl ? (
+          <img
+            src={prof.avatarUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="h-16 w-16 rounded-full object-cover"
+          />
+        ) : null}
         <label className="block">
           <span className="text-slate-400">{lb.accountId}</span>
           <input
@@ -491,6 +509,65 @@ function TalentProfileForm() {
             onChange={(e) => patchProfile({ followers: e.target.value })}
           />
         </label>
+        {activePlatform === 'douyin' ? (
+          <>
+            <label className="block">
+              <span className="text-slate-400">IP属地</span>
+              <input
+                className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                value={prof.ipLocation || ''}
+                onFocus={focus.onFocus}
+                onChange={(e) => patchProfile({ ipLocation: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">年龄</span>
+              <input
+                className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                value={prof.age || ''}
+                onFocus={focus.onFocus}
+                onChange={(e) => patchProfile({ age: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">关注数</span>
+              <input
+                className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                value={prof.followingCount || ''}
+                onFocus={focus.onFocus}
+                onChange={(e) => patchProfile({ followingCount: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">获赞</span>
+              <input
+                className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                value={prof.totalFavorited || ''}
+                onFocus={focus.onFocus}
+                onChange={(e) => patchProfile({ totalFavorited: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">作品数</span>
+              <input
+                className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                value={prof.awemeCount || ''}
+                onFocus={focus.onFocus}
+                onChange={(e) => patchProfile({ awemeCount: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-slate-400">简介</span>
+              <textarea
+                className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                rows={3}
+                value={prof.signature || ''}
+                onFocus={focus.onFocus}
+                onChange={(e) => patchProfile({ signature: e.target.value })}
+              />
+            </label>
+          </>
+        ) : null}
         {activePlatform === 'douyin' || activePlatform === 'kuaishou' ? (
           <div>
             <span className="text-slate-400">近期交易截图（选填）</span>
@@ -566,7 +643,7 @@ function TalentProfileForm() {
           <span className="text-slate-400">账号标签</span>
           <p className="text-xs text-slate-500 mt-1 mb-2">可多选，自动填写时会尝试匹配简介关键词</p>
           <div className="flex flex-wrap gap-2">
-            {TALENT_TAGS.map((tag) => {
+            {[...TALENT_TAGS, ...(prof.accountTags || []).filter((tag) => !(TALENT_TAGS as readonly string[]).includes(tag))].map((tag) => {
               const on = (prof.accountTags || []).includes(tag)
               return (
                 <button

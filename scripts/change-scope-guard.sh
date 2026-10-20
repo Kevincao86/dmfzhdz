@@ -133,6 +133,7 @@ list_scopes() {
   pr_detail_share      星选 PR 版招募详情不能报名，但仍可打开分享招募
   hall_card_height     星选招募大厅商单卡片同一行拉成一样高
   mp_step_circle       达人小程序参与流程序号保持正圆，说明换行时不拉成椭圆
+  douyin_profile_parse 抖音主页解析：IP属地、头像、关注获赞作品简介，标签可超出内置词，报名优先抖音头像
   poster_row_wrap      分享海报字段按宽度自动换行，不再把费用类型裁成省略号
   mp_login_email_account 达人小程序：验证码登录增加邮箱；账号密码不限制为纯数字
   mp_profile_trade_tags 达人我的信息：交易示例改小图；打开资料时保留账号标签
@@ -2058,6 +2059,23 @@ PAT
       cat <<'PAT'
 detail.wxml
 detail.wxss
+change-scope-guard
+PAT
+      ;;
+    douyin_profile_parse)
+      cat <<'PAT'
+profileLinkParseCore.ts
+mpApi.ts
+talentPlatformProfiles.ts
+TalentProfilePage.tsx
+applyTemplateRuntime.ts
+applicationDisplay.ts
+talentPlatformProfiles.js
+register.js
+register.wxml
+register.wxss
+applyTemplateRuntime.js
+applicationDisplay.js
 change-scope-guard
 PAT
       ;;
