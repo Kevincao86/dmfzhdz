@@ -525,3 +525,127 @@ export async function postAiAgentNativeImage(
   }
   return { ok: false, message: lastErr || 'ai_agent_image_unavailable' }
 }
+
+export type ImageClarifyChoice = {
+  route: 'wanx_sr_1' | 'wanx_sr_2' | 'qwen_edit'
+  label: string
+  detail: string
+  reason: string
+}
+
+async function postImageClarifyBody(
+  body: Record<string, unknown>,
+): Promise<
+  | { ok: true; json: Record<string, unknown> }
+  | { ok: false; message: string }
+> {
+  const [authHeaders, tenantId] = await Promise.all([aiAuthHeaders(), tenantIdForApi()])
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    ...authHeaders,
+  }
+  const payload = tenantId ? { ...body, tenantId } : body
+  let lastErr = 'no_response'
+  for (const target of aiChatFetchUrlCandidates('/api/meoo-ai-agent-image')) {
+    let res: Response
+    try {
+      res = await fetch(target, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      })
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      continue
+    }
+    const text = await res.text()
+    let json: Record<string, unknown> | null = null
+    try {
+      json = text ? (JSON.parse(text) as Record<string, unknown>) : null
+    } catch {
+      json = null
+    }
+    if (res.ok && json && json.ok === true) return { ok: true, json }
+    const message = json && typeof json.message === 'string' ? json.message : ''
+    const detail = json && typeof json.detail === 'string' ? json.detail : ''
+    if (res.status !== 404) return { ok: false, message: message || detail || text.trim() || `HTTP ${res.status}` }
+    lastErr = message || text.slice(0, 200)
+  }
+  return { ok: false, message: lastErr || '变清晰接口不可用' }
+}
+
+export async function postImageClarifyJudge(
+  imageDataUrl: string,
+  width: number,
+  height: number,
+): Promise<{ ok: true; choice: ImageClarifyChoice } | { ok: false; message: string }> {
+  const out = await postImageClarifyBody({
+    clarify: true,
+    clarify_phase: 'judge',
+    reference_image: imageDataUrl,
+    image_width: width,
+    image_height: height,
+  })
+  if (!out.ok) return out
+  const route = out.json.route
+  if (route !== 'wanx_sr_1' && route !== 'wanx_sr_2' && route !== 'qwen_edit') {
+    return { ok: false, message: '没有选出可用的变清晰方式' }
+  }
+  return {
+    ok: true,
+    choice: {
+      route,
+      label: String(out.json.label || '万相超分'),
+      detail: String(out.json.detail || ''),
+      reason: String(out.json.reason || ''),
+    },
+  }
+}
+
+export async function postImageClarifyRun(
+  imageDataUrl: string,
+  width: number,
+  height: number,
+  route: ImageClarifyChoice['route'],
+): Promise<
+  | {
+      ok: true
+      imageUrl: string
+      choice: ImageClarifyChoice
+      pointsCharged?: number
+      fallbackNote?: string
+    }
+  | { ok: false; message: string }
+> {
+  const out = await postImageClarifyBody({
+    clarify: true,
+    clarify_phase: 'run',
+    clarify_route: route,
+    reference_image: imageDataUrl,
+    image_width: width,
+    image_height: height,
+  })
+  if (!out.ok) return out
+  const imageUrl = typeof out.json.imageUrl === 'string' ? out.json.imageUrl.trim() : ''
+  if (!imageUrl) return { ok: false, message: '没有返回清晰后的图片' }
+  const used = out.json.route
+  const choiceRoute =
+    used === 'wanx_sr_1' || used === 'wanx_sr_2' || used === 'qwen_edit' ? used : route
+  const pointsRaw = out.json.pointsCharged
+  const pointsCharged =
+    typeof pointsRaw === 'number' && Number.isFinite(pointsRaw) ? Math.max(0, Math.floor(pointsRaw)) : undefined
+  const fallbackNote = typeof out.json.fallbackNote === 'string' ? out.json.fallbackNote : undefined
+  return {
+    ok: true,
+    imageUrl,
+    choice: {
+      route: choiceRoute,
+      label: String(out.json.label || ''),
+      detail: String(out.json.detail || ''),
+      reason: String(out.json.reason || ''),
+    },
+    ...(pointsCharged != null ? { pointsCharged } : {}),
+    ...(fallbackNote ? { fallbackNote } : {}),
+  }
+}
