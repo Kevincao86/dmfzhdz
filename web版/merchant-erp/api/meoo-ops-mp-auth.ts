@@ -2054,6 +2054,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'wx_oauth_code_invalid' ||
       msg === 'wx_web_token_failed' ||
       msg === 'missing_openid' ||
+      msg === 'scan_ticket_create_failed' ||
+      msg === 'bind_failed' ||
       msg === 'missing_code' ||
       /^invalid code/i.test(msg) ||
       /^wx_code2session_/i.test(msg) ||
@@ -2125,6 +2127,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       dy_openid_conflict: '该抖音已绑定其他手机号账号',
       missing_openid: '缺少微信 openid，请重新登录后再试',
       unknown_action: '后台接口未更新，请稍后再试',
+      scan_ticket_create_failed: '暂时无法发起绑定，请稍后重试',
+      bind_failed: '绑定失败，请稍后重试',
     }
     const message =
       zh[msg] ||

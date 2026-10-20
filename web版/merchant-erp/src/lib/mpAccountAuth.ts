@@ -2171,6 +2171,12 @@ function normalizeDyOAuthWorkIdentity(raw: string): 'talent' | 'shoot' | 'edit' 
   return 'talent'
 }
 
+/** 商家绑定把登录用户编号放在 session_token，避免写入达人账号外键。 */
+function bindAuthMarker(sessionToken: string | null | undefined): string {
+  const raw = String(sessionToken || '')
+  return raw.startsWith('bindauth:') ? raw.slice('bindauth:'.length).trim() : ''
+}
+
 /** 抖音网站应用扫码登录：生成授权 URL（PC 端 iframe / 二维码） */
 export async function mpAuthDyOAuthBegin(
   supabaseUrl: string,
@@ -2182,12 +2188,14 @@ export async function mpAuthDyOAuthBegin(
   const rest = restClient(supabaseUrl, serviceRole)
   const ticket = `dyoauth_${newScanTicket()}`
   const expiresAt = new Date(Date.now() + SCAN_TTL_SEC * 1000).toISOString()
-  const bindAccountId = String(opts?.bindAccountId || opts?.bindAuthUserId || '').trim()
+  const bindAccountId = String(opts?.bindAccountId || '').trim()
+  const bindAuthUserId = String(opts?.bindAuthUserId || '').trim()
   const res = await rest.post('/mp_wx_scan_tickets', {
     ticket,
     status: 'pending',
     expires_at: expiresAt,
     ...(bindAccountId ? { account_id: bindAccountId } : {}),
+    ...(bindAuthUserId ? { session_token: `bindauth:${bindAuthUserId}` } : {}),
   })
   if (!res.ok) throw new Error('scan_ticket_create_failed')
   const portal: DyOAuthPortal =
@@ -2200,7 +2208,7 @@ export async function mpAuthDyOAuthBegin(
     portal,
   })
   let authorizeUrl = buildDouyinWebAuthorizeUrl(state, redirectUri)
-  if (bindAccountId) {
+  if (bindAccountId || bindAuthUserId) {
     authorizeUrl += '&is_call_app=1'
   }
   return { authorizeUrl, ticket, expiresAt, redirectUri, clientKey: readDouyinWebClientKey() }
@@ -2411,7 +2419,7 @@ async function finishMerchantScanBind(
   await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(ticket)}`, {
     status: 'confirmed',
     openid,
-    account_id: authUserId,
+    session_token: null,
   })
   return {
     token: '',
@@ -2485,7 +2493,12 @@ export async function mpAuthDyOAuthComplete(
     `/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(parsed.ticket)}&limit=1`,
   )
   if (!ticketRes.ok) throw new Error('dy_oauth_ticket_lookup_failed')
-  const ticketRows = (await ticketRes.json()) as { status: string; expires_at: string; account_id?: string | null }[]
+  const ticketRows = (await ticketRes.json()) as {
+    status: string
+    expires_at: string
+    account_id?: string | null
+    session_token?: string | null
+  }[]
   const ticketRow = ticketRows[0]
   if (!ticketRow) throw new Error('dy_oauth_ticket_expired')
   if (new Date(ticketRow.expires_at).getTime() < Date.now()) throw new Error('dy_oauth_ticket_expired')
@@ -2498,10 +2511,11 @@ export async function mpAuthDyOAuthComplete(
   const workIdentity = isErpPortal
     ? portal
     : normalizeDyOAuthWorkIdentity(parsed.workIdentity)
-  const bindAccountId = String(ticketRow.account_id || '').trim()
-  if (bindAccountId && portal === 'merchant') {
-    return finishMerchantScanBind(rest, parsed.ticket, bindAccountId, openid, 'dy')
+  const merchantBindUserId = bindAuthMarker(ticketRow.session_token)
+  if (merchantBindUserId && portal === 'merchant') {
+    return finishMerchantScanBind(rest, parsed.ticket, merchantBindUserId, openid, 'dy')
   }
+  const bindAccountId = String(ticketRow.account_id || '').trim()
   if (bindAccountId && !isErpPortal) {
     return finishDouyinBindToLoginAccount(
       supabaseUrl,
@@ -2595,7 +2609,8 @@ export async function mpAuthWxOAuthBegin(
     ticket: state.ticket,
     status: 'pending',
     expires_at: expiresAt,
-    ...(bindAuthUserId ? { account_id: bindAuthUserId } : {}),
+    ...(bindAuthUserId && portal === 'merchant' ? { session_token: `bindauth:${bindAuthUserId}` } : {}),
+    ...(bindAuthUserId && portal !== 'merchant' ? { account_id: bindAuthUserId } : {}),
   })
   if (!res.ok) throw new Error('scan_ticket_create_failed')
   const redirectUri = pickWechatWebRedirectUri(opts?.redirectUri, portal)
@@ -2619,7 +2634,12 @@ export async function mpAuthWxOAuthComplete(
     `/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(parsed.ticket)}&limit=1`,
   )
   if (!ticketRes.ok) throw new Error('wx_oauth_ticket_lookup_failed')
-  const ticketRows = (await ticketRes.json()) as { status: string; expires_at: string; account_id?: string | null }[]
+  const ticketRows = (await ticketRes.json()) as {
+    status: string
+    expires_at: string
+    account_id?: string | null
+    session_token?: string | null
+  }[]
   const ticketRow = ticketRows[0]
   if (!ticketRow) throw new Error('wx_oauth_ticket_expired')
   if (new Date(ticketRow.expires_at).getTime() < Date.now()) throw new Error('wx_oauth_ticket_expired')
@@ -2628,10 +2648,11 @@ export async function mpAuthWxOAuthComplete(
   const oauth = await exchangeWechatWebOAuthCode(code, parsed.portal)
   const openid = wechatWebOpenIdStorageKey(oauth.openId)
   const portal = parsed.portal
-  const bindAuthUserId = String(ticketRow.account_id || '').trim()
-  if (bindAuthUserId && portal === 'merchant') {
-    return finishMerchantScanBind(rest, parsed.ticket, bindAuthUserId, openid, 'wx')
+  const merchantBindUserId = bindAuthMarker(ticketRow.session_token)
+  if (merchantBindUserId && portal === 'merchant') {
+    return finishMerchantScanBind(rest, parsed.ticket, merchantBindUserId, openid, 'wx')
   }
+  const bindAuthUserId = String(ticketRow.account_id || '').trim()
   if (bindAuthUserId && portal !== 'merchant') {
     return finishXingxuanWechatBind(
       supabaseUrl,
