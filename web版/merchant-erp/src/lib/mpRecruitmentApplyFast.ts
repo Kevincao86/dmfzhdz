@@ -221,7 +221,10 @@ SET registry = jsonb_set(
     updated_at = now()
 WHERE id = 1`
 
-export async function tryApplyMpRecruitmentOrderFast(input: ApplyInput): Promise<FastApplyOutcome> {
+export async function tryApplyMpRecruitmentOrderFast(
+  input: ApplyInput,
+  attempt = 0,
+): Promise<FastApplyOutcome> {
   const db = getPool()
   if (!db) return { handled: false }
   const mpOrderId = String(input.mpOrderId || '').trim()
@@ -331,7 +334,28 @@ export async function tryApplyMpRecruitmentOrderFast(input: ApplyInput): Promise
          VALUES ($1, $2, $3, $4::jsonb, $5)`,
         [mpOrderId, sourceId, status, bodyJson, groupQr],
       )
+      const before = await client.query<{ n: number }>(
+        `SELECT jsonb_array_length(COALESCE(registry->'mpRecruitmentOrders', '[]'::jsonb))::int AS n
+         FROM ops_registry_snapshot WHERE id = 1`,
+      )
+      const matches = await client.query<{ n: number }>(
+        `SELECT count(*)::int AS n
+         FROM ops_registry_snapshot s,
+              jsonb_array_elements(COALESCE(s.registry->'mpRecruitmentOrders', '[]'::jsonb)) o
+         WHERE s.id = 1 AND o->>'id' = $1`,
+        [mpOrderId],
+      )
       await client.query(REMOVE_ORDER_SQL, [mpOrderId])
+      const after = await client.query<{ n: number }>(
+        `SELECT jsonb_array_length(COALESCE(registry->'mpRecruitmentOrders', '[]'::jsonb))::int AS n
+         FROM ops_registry_snapshot WHERE id = 1`,
+      )
+      const beforeN = Number(before.rows[0]?.n || 0)
+      const matchN = Number(matches.rows[0]?.n || 0)
+      const afterN = Number(after.rows[0]?.n || 0)
+      if (matchN < 1 || afterN !== beforeN - matchN) {
+        throw new Error('apply_snapshot_remove_mismatch')
+      }
     } else {
       await client.query(
         `UPDATE mp_recruitment_order
@@ -352,10 +376,12 @@ export async function tryApplyMpRecruitmentOrderFast(input: ApplyInput): Promise
     if (client) await client.query('ROLLBACK').catch(() => undefined)
     if (isBusyError(error)) return busy('报名人数较多，请稍后再试')
     const code = (error as { code?: string }).code
-    if (code === '23505') return { handled: false }
+    if (code === '23505' && attempt < 1) {
+      return tryApplyMpRecruitmentOrderFast(input, attempt + 1)
+    }
     const msg = error instanceof Error ? error.message : String(error)
-    console.error('[mpRecruitmentApplyFast] fallback:', msg.slice(0, 240))
-    return { handled: false }
+    console.error('[mpRecruitmentApplyFast] rejected:', msg.slice(0, 240))
+    return busy('报名没有写上，请再试一次')
   } finally {
     client?.release()
   }

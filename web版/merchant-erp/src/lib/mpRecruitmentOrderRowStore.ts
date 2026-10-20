@@ -4,6 +4,7 @@
  */
 import pg from 'pg'
 import type { RegistryFile, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
+import { withSyncedApplicantCount } from './mpRecruitCount.js'
 import {
   normalizeMpRecruitmentOrderForRegistryPersist,
   sanitizeValueForPostgresJson,
@@ -367,24 +368,65 @@ export async function patchMpRecruitmentOrderRowGroupQr(id: string, groupQr: str
   return (updated.rowCount ?? 0) > 0
 }
 
-async function updateRowBody(id: string, order: RegistryMpRecruitmentOrder, groupQr: string | null): Promise<void> {
-  const body = canonicalMpOrderRowJson(order)
-  const status = String(order.status || '').trim()
-  await withClient((client) =>
-    groupQr === null
-      ? client.query(
+/** 行在本次读取之后又被报名写过时，把行上多出来的报名人留住，避免整库保存盖掉。 */
+function unionApplicants(
+  incoming: RegistryMpRecruitmentOrder,
+  stored: RegistryMpRecruitmentOrder,
+): RegistryMpRecruitmentOrder {
+  const incomingApps = Array.isArray(incoming.applicants) ? incoming.applicants : []
+  const storedApps = Array.isArray(stored.applicants) ? stored.applicants : []
+  const seen = new Set(incomingApps.map((row) => String(row?.id || '').trim()).filter(Boolean))
+  const extra = storedApps.filter((row) => {
+    const id = String(row?.id || '').trim()
+    return id && !seen.has(id)
+  })
+  if (!extra.length) return incoming
+  return withSyncedApplicantCount({ ...incoming, applicants: [...incomingApps, ...extra] })
+}
+
+async function updateRowBody(
+  id: string,
+  order: RegistryMpRecruitmentOrder,
+  groupQr: string | null,
+  baselineJson?: string | null,
+): Promise<void> {
+  await withClient(async (client) => {
+    await client.query('BEGIN')
+    try {
+      const cur = await client.query<{ body: unknown }>(
+        `SELECT body FROM mp_recruitment_order WHERE id = $1 FOR UPDATE`,
+        [id],
+      )
+      const stored = parseOrderBody(cur.rows[0]?.body)
+      let next = order
+      if (stored) {
+        const storedJson = canonicalMpOrderRowJson(stored)
+        const rowMoved = baselineJson == null || storedJson !== baselineJson
+        if (rowMoved) next = unionApplicants(order, stored)
+      }
+      const body = canonicalMpOrderRowJson(next)
+      const status = String(next.status || '').trim()
+      if (groupQr === null) {
+        await client.query(
           `UPDATE mp_recruitment_order
            SET body = $2::jsonb, status = $3, updated_at = now()
            WHERE id = $1`,
           [id, body, status],
         )
-      : client.query(
+      } else {
+        await client.query(
           `UPDATE mp_recruitment_order
            SET body = $2::jsonb, status = $3, group_qr = $4, updated_at = now()
            WHERE id = $1`,
           [id, body, status, groupQr],
-        ),
-  )
+        )
+      }
+      await client.query('COMMIT')
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined)
+      throw error
+    }
+  })
 }
 
 /**
@@ -428,7 +470,13 @@ export async function peelRowOrdersBeforeSnapshotSave(
     const bodyChanged = prevJson !== nextJson
     const qrChanged = nextQr !== prevQr
     if (!bodyChanged && !qrChanged) continue
-    await updateRowBody(id, current, qrChanged ? nextQr : null)
+    await updateRowBody(id, current, qrChanged ? nextQr : null, prevJson ?? null)
+  }
+  const incoming = Array.isArray(persist.mpRecruitmentOrders) ? persist.mpRecruitmentOrders : []
+  for (const order of incoming) {
+    const id = orderIdOf(order)
+    if (!id || !tableIds.has(id) || baseline?.jsonById.has(id)) continue
+    await updateRowBody(id, order, null, null)
   }
   if (toDelete.length) {
     await withClient((client) =>
@@ -436,7 +484,6 @@ export async function peelRowOrdersBeforeSnapshotSave(
     )
   }
 
-  const incoming = Array.isArray(persist.mpRecruitmentOrders) ? persist.mpRecruitmentOrders : []
   persist.mpRecruitmentOrders = incoming.filter((order) => {
     const id = orderIdOf(order)
     return !id || !tracked.has(id)
