@@ -4,6 +4,7 @@
  */
 import { chatVisionAgentFromRequest } from './merchantVisionLlmChat.js'
 import { extractQwenVisionImageUrlsFromPayload } from '../src/lib/qwenVisionApi.js'
+import { signVolcVisualJsonPost } from './volcVisualSign.js'
 
 export type ClarifyRoute = 'wanx_sr_1' | 'wanx_sr_2' | 'qwen_edit'
 
@@ -20,15 +21,46 @@ const JUDGE_SYSTEM = `你只判断一张图适合哪种变清晰方式。只输�
 scene: portrait | product | text | photo | screenshot | illustration
 blur: light | heavy
 reason: 不超过16个汉字
-有真实人脸用 portrait。有商品用 product。以文字或界面为主用 text 或 screenshot。实拍风景人物用 photo。只有卡通、插画、手绘才用 illustration。`
+画面里只要有真实的人，无论远近、无论背景是不是风景，scene 都必须是 portrait。没有人的商品用 product。以文字或界面为主用 text 或 screenshot。没有人的风景才用 photo。只有卡通、插画、手绘才用 illustration。`
 
 const EDIT_PROMPT =
   '这是同一张插画的高清修复。保持画面里的人物、物体、构图和颜色不变，只提高清晰度和线条细节。不要重画，不要换风格，不要加字，不要改背景。'
+
+const FACE_LOCK_PROMPT =
+  '图像超分。人物五官、脸型、表情、身份和姿势必须与原图完全一致，禁止重画人脸，只提高清晰度。'
 
 const DASHSCOPE = 'https://dashscope.aliyuncs.com'
 
 function qwenKey(env: Record<string, string>): string {
   return (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
+}
+
+function volcVisualCredentials(env: Record<string, string>): {
+  accessKeyId: string
+  secretAccessKey: string
+  region: string
+} | null {
+  const accessKeyId = (
+    env.JIMENG_ACCESS_KEY_ID ??
+    env.MERCHANT_AI_VOLC_ACCESS_KEY ??
+    env.VOLC_ACCESSKEY ??
+    env.VOLC_ACCESS_KEY_ID ??
+    env.VOLC_AK ??
+    ''
+  ).trim()
+  const secretAccessKey = (
+    env.JIMENG_SECRET_ACCESS_KEY ??
+    env.MERCHANT_AI_VOLC_SECRET_KEY ??
+    env.VOLC_SECRETKEY ??
+    env.VOLC_SECRET_ACCESS_KEY ??
+    env.VOLC_SK ??
+    ''
+  ).trim()
+  if (!accessKeyId || !secretAccessKey) return null
+  const region =
+    (env.JIMENG_REGION ?? env.MERCHANT_AI_VOLC_REGION ?? env.VOLC_REGION ?? 'cn-north-1').trim() ||
+    'cn-north-1'
+  return { accessKeyId, secretAccessKey, region }
 }
 
 function parseJudge(text: string): { scene: string; blur: string; reason: string } {
@@ -69,7 +101,7 @@ export function chooseClarifyRoute(
       reason,
     }
   }
-  if (scene === 'portrait' || scene === 'text' || scene === 'screenshot') {
+  if (scene === 'portrait' || scene === 'photo' || scene === 'text' || scene === 'screenshot') {
     return {
       route: 'wanx_sr_1',
       label: '清晰处理',
@@ -149,10 +181,7 @@ export async function judgeClarifyImage(
     const choice = chooseClarifyRoute(judged.scene, judged.blur, width, height, judged.reason)
     return { ...choice, visionModel: res.model }
   } catch {
-    return describeClarifyRoute(
-      width > 0 && height > 0 && Math.min(width, height) < 960 ? 'wanx_sr_2' : 'wanx_sr_1',
-      '没看清画面，按实拍照片做超分',
-    )
+    return describeClarifyRoute('wanx_sr_1', '按原图变清晰，不改人脸')
   }
 }
 
@@ -218,11 +247,46 @@ async function pollDashscope(apiKey: string, taskId: string): Promise<string> {
   throw new Error('处理时间有点长，请再试一次')
 }
 
-async function runWanxSuperResolution(
-  apiKey: string,
-  imageDataUrl: string,
-  factor: 1 | 2,
-): Promise<string> {
+async function runLensKeepFace(env: Record<string, string>, imageDataUrl: string): Promise<string> {
+  const cred = volcVisualCredentials(env)
+  if (!cred) throw new Error('画质增强未配置')
+  const b64 = imageDataUrl.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '').trim()
+  if (!b64) throw new Error('请上传图片')
+  const signed = signVolcVisualJsonPost({
+    accessKeyId: cred.accessKeyId,
+    secretAccessKey: cred.secretAccessKey,
+    region: cred.region,
+    action: 'CVProcess',
+    version: '2022-08-31',
+    body: {
+      req_key: 'lens_lqir',
+      binary_data_base64: [b64],
+      resolution_boundary: '144p',
+      enable_hdr: false,
+      enable_wb: false,
+      result_format: 1,
+      jpg_quality: 95,
+      return_url: true,
+    },
+  })
+  const res = await fetchTimed(
+    signed.url,
+    { method: 'POST', headers: signed.headers, body: signed.body },
+    40_000,
+  )
+  const data = await readJson(res)
+  if (!res.ok || Number(data.code) !== 10000) {
+    const msg = typeof data.message === 'string' ? data.message : ''
+    throw new Error(msg || '清晰处理失败')
+  }
+  const payload = (data.data as Record<string, unknown> | undefined) ?? data
+  const urls = payload.image_urls
+  const first = Array.isArray(urls) ? urls.find((u) => typeof u === 'string' && u.trim()) : ''
+  if (typeof first === 'string') return usableImageUrl(first)
+  throw new Error('清晰处理没有返回图片')
+}
+
+async function runWanxSuperResolution(apiKey: string, imageDataUrl: string): Promise<string> {
   const res = await fetchTimed(`${DASHSCOPE}/api/v1/services/aigc/image2image/image-synthesis`, {
     method: 'POST',
     headers: {
@@ -234,10 +298,10 @@ async function runWanxSuperResolution(
       model: 'wanx2.1-imageedit',
       input: {
         function: 'super_resolution',
-        prompt: '图像超分。',
+        prompt: FACE_LOCK_PROMPT,
         base_image_url: imageDataUrl,
       },
-      parameters: { upscale_factor: factor, n: 1 },
+      parameters: { upscale_factor: 1, n: 1 },
     }),
   })
   const data = await readJson(res)
@@ -290,22 +354,33 @@ export async function runClarifyImage(
   imageDataUrl: string,
   route: ClarifyRoute,
 ): Promise<{ imageUrl: string; choice: ClarifyChoice; fallbackNote?: string }> {
-  const key = qwenKey(env)
-  if (!key) throw new Error('未配置通义千问 Key，无法变清晰')
   const choice = describeClarifyRoute(route)
-  if (route === 'qwen_edit') {
+  if (route !== 'qwen_edit') {
     try {
-      const imageUrl = await runQwenImageEdit(key, imageDataUrl)
+      const imageUrl = await runLensKeepFace(env, imageDataUrl)
       return { imageUrl, choice }
-    } catch {
-      const imageUrl = await runWanxSuperResolution(key, imageDataUrl, 1)
-      return {
-        imageUrl,
-        choice: describeClarifyRoute('wanx_sr_1', choice.reason),
-        fallbackNote: '已换一种方式把图变清晰',
-      }
+    } catch (lensErr) {
+      const key = qwenKey(env)
+      if (!key) throw lensErr instanceof Error ? lensErr : new Error('清晰处理暂时不可用')
+      console.error(
+        '[image-clarify] lens failed',
+        lensErr instanceof Error ? lensErr.message.slice(0, 200) : 'unknown',
+      )
+      const imageUrl = await runWanxSuperResolution(key, imageDataUrl)
+      return { imageUrl, choice, fallbackNote: '已换成不改人脸的清晰处理' }
     }
   }
-  const imageUrl = await runWanxSuperResolution(key, imageDataUrl, route === 'wanx_sr_2' ? 2 : 1)
-  return { imageUrl, choice }
+  const key = qwenKey(env)
+  if (!key) throw new Error('未配置通义千问 Key，无法变清晰')
+  try {
+    const imageUrl = await runQwenImageEdit(key, imageDataUrl)
+    return { imageUrl, choice }
+  } catch {
+    const imageUrl = await runLensKeepFace(env, imageDataUrl)
+    return {
+      imageUrl,
+      choice: describeClarifyRoute('wanx_sr_1', choice.reason),
+      fallbackNote: '已换成不改人脸的清晰处理',
+    }
+  }
 }
