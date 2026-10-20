@@ -2,6 +2,7 @@ const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const memberStore = require('../../utils/talentMember.js')
 const talentPlatforms = require('../../utils/talentPlatformProfiles.js')
+const profileLinkParse = require('../../utils/profileLinkParse.js')
 const auth = require('../../utils/auth.js')
 const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
 const regionPicker = require('../../utils/regionPicker.js')
@@ -62,9 +63,54 @@ function applyShowAvatar(member, platform) {
   const pid = talentPlatforms.platformIdFromName(platform)
   const platformAvatar = String((profiles[pid] && profiles[pid].avatarUrl) || '').trim()
   if (platformAvatar) return { url: platformAvatar, label: `${platform || '平台'}头像` }
-  const wxAvatar = String((member && member.wxAvatarUrl) || '').trim()
-  if (wxAvatar) return { url: wxAvatar, label: '头像' }
   return { url: '', label: '' }
+}
+
+function rememberParsedAvatar(member, platform, url) {
+  if (!member || !url || !member.platformProfiles) return
+  const pid = talentPlatforms.platformIdFromName(platform)
+  const prof = member.platformProfiles[pid]
+  if (!prof || String(prof.avatarUrl || '').trim()) return
+  memberStore.writeMember({
+    ...member,
+    platformProfiles: {
+      ...member.platformProfiles,
+      [pid]: { ...prof, avatarUrl: url },
+    },
+  })
+}
+
+function fillAvatarFromProfileLink(page, member, platform, link, account) {
+  const primary = String(link || '').trim()
+  const douyinId = platform === '抖音' ? String(account || '').replace(/^@/, '').trim() : ''
+  const show = (avatar) => {
+    if (!avatar) return
+    page.setData({
+      applyAvatarUrl: avatar,
+      applyAvatarLabel: platform === '抖音' ? '抖音头像' : `${platform || '平台'}头像`,
+    })
+    rememberParsedAvatar(member, platform, avatar)
+  }
+  const readAvatar = (parsed) => String((parsed && parsed.avatarUrl) || '').trim()
+  const byAccount = () => {
+    if (!douyinId) return
+    profileLinkParse
+      .parseProfileLink(douyinId, '抖音')
+      .then((parsed) => show(readAvatar(parsed)))
+      .catch(() => {})
+  }
+  if (!primary) {
+    byAccount()
+    return
+  }
+  profileLinkParse
+    .parseProfileLink(primary, platform)
+    .then((parsed) => {
+      const avatar = readAvatar(parsed)
+      if (avatar) show(avatar)
+      else byAccount()
+    })
+    .catch(() => byAccount())
 }
 
 function detailUrlAfterApply(mpOrderId) {
@@ -409,6 +455,10 @@ Page({
     }
     this.setData(patch, () => {
       syncApplyRows(this)
+      const profileLink = String(patch.profileLink || '').trim()
+      if (!isSupplierApply && !showAvatar.url && (profileLink || patch.platformAccount)) {
+        fillAvatarFromProfileLink(this, member, platform, profileLink, patch.platformAccount)
+      }
       if (member && orderMeta) {
         this.maybePromptExclusiveQuote(
           member,

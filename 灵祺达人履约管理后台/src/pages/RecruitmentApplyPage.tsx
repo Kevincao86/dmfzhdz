@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { uploadContentImage, uploadContentVideo } from '../lib/mpContentUpload'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
-import { applyToMpOrder, fetchMpRegistry, registerTalentMember } from '../lib/mpApi'
+import { applyToMpOrder, fetchMpRegistry, parseProfileLink, registerTalentMember } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { addApplication, hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
 import { canReclaimIceOrder, clearLocalIceApplyState } from '../lib/mpSync/talentContactPrGate'
@@ -60,8 +60,6 @@ function applyShowAvatar(member: TalentMember | null, platform: string): { url: 
   if (douyinAvatar) return { url: douyinAvatar, label: '抖音头像' }
   const platformAvatar = String(profiles?.[platformIdFromName(platform)]?.avatarUrl || '').trim()
   if (platformAvatar) return { url: platformAvatar, label: `${platform}头像` }
-  const wxAvatar = String(member?.wxAvatarUrl || '').trim()
-  if (wxAvatar) return { url: wxAvatar, label: '头像' }
   return { url: '', label: '' }
 }
 
@@ -150,7 +148,7 @@ export default function RecruitmentApplyPage() {
   }, [orderId])
 
   const member = readMember()
-  const applyAvatar = isSupplierApply ? { url: '', label: '' } : applyShowAvatar(member, platform)
+  const storedAvatar = isSupplierApply ? { url: '', label: '' } : applyShowAvatar(member, platform)
   const canSyncMember = isSupplierApply
     ? supplierMemberSyncAvailable(member, supplierWorkId)
     : memberSyncAvailable(member, platform)
@@ -160,6 +158,12 @@ export default function RecruitmentApplyPage() {
     ...(applyFieldsFromMember(readMember(), platform) || {}),
   }))
   const [formReady, setFormReady] = useState(false)
+  const [parsedAvatar, setParsedAvatar] = useState('')
+  const applyAvatar = storedAvatar.url
+    ? storedAvatar
+    : parsedAvatar
+      ? { url: parsedAvatar, label: platform === '抖音' ? '抖音头像' : `${platform}头像` }
+      : { url: '', label: '' }
   const { lockForm, unlockForm, lockedRef: formLockedRef } = useProtectedForm()
   const [exclusivePromptDone, setExclusivePromptDone] = useState(false)
   const [tierSelfQuotePromptDone, setTierSelfQuotePromptDone] = useState(false)
@@ -212,6 +216,50 @@ export default function RecruitmentApplyPage() {
       unlockForm()
     }
   }, [unlockForm])
+
+  useEffect(() => {
+    if (isSupplierApply || storedAvatar.url) return
+    const link = String(form.profileLink || '').trim()
+    const account = String(form.platformAccount || '').replace(/^@/, '').trim()
+    if (!link && !account) return
+    let cancelled = false
+    void (async () => {
+      let url = ''
+      if (link) {
+        try {
+          const parsed = await parseProfileLink(link, platform)
+          url = String(parsed.avatarUrl || '').trim()
+        } catch {
+          url = ''
+        }
+      }
+      if (!url && platform === '抖音' && account) {
+        try {
+          const parsed = await parseProfileLink(account, '抖音')
+          url = String(parsed.avatarUrl || '').trim()
+        } catch {
+          url = ''
+        }
+      }
+      if (cancelled || !url) return
+      setParsedAvatar(url)
+      const current = readMember()
+      if (!current?.platformProfiles) return
+      const pid = platformIdFromName(platform)
+      const prof = current.platformProfiles[pid]
+      if (!prof || String(prof.avatarUrl || '').trim()) return
+      writeMember({
+        ...current,
+        platformProfiles: {
+          ...current.platformProfiles,
+          [pid]: { ...prof, avatarUrl: url },
+        },
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isSupplierApply, storedAvatar.url, form.profileLink, form.platformAccount, platform])
 
   useEffect(() => {
     if (formReady) return
