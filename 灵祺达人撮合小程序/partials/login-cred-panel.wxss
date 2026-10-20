@@ -32,12 +32,6 @@
   flex-shrink: 0;
 }
 
-.cred-edit-btn--ghost {
-  color: #57534e;
-  background: #fff;
-  border-color: #d6d3d1;
-}
-
 .cred-view-value {
   display: block;
   margin-top: 8rpx;
@@ -48,13 +42,19 @@
   font-size: 28rpx;
 }
 
-.cred-edit-btn {
+.cred-edit-btn,
+.cred-edit-btn--ghost {
+  box-sizing: border-box;
+  width: 128rpx;
+  min-width: 128rpx;
+  max-width: 128rpx;
   margin: 0;
-  padding: 0 28rpx;
+  padding: 0;
   height: 56rpx;
-  line-height: 56rpx;
+  line-height: 52rpx;
   font-size: 24rpx;
   font-weight: 600;
+  text-align: center;
   color: var(--lq-primary-dark);
   background: var(--lq-primary-50);
   border: 2rpx solid var(--lq-primary-100);
