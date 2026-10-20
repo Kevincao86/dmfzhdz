@@ -197,15 +197,27 @@ export function exploreSearchSaysYes(text: string): boolean {
   return /该账号|这个账号|博主|达人/.test(body) && /探店|到店打卡|到店拍摄/.test(body) && body.length >= 12
 }
 
-/** 对这一位达人单独联网检索，确认是不是本地生活探店账号。 */
-export async function searchConfirmsExploreCreator(
-  nickname: string,
+/** 依据里写明「由某人运营 / 真名是某人」时，某人是同一个号，不能再占一个名额。 */
+export function exploreOperatorNames(text: string): string[] {
+  const body = String(text || '').split('【检索')[0]
+  const found = new Set<string>()
+  for (const match of body.matchAll(/由(?:[^，,。|｜\n]{0,24}?)([\u4e00-\u9fa5]{2,3})\s*(?:个人)?运营/g)) {
+    if (match[1]) found.add(match[1].trim())
+  }
+  for (const match of body.matchAll(/(?:真名|本名)(?:是|为|叫)\s*([\u4e00-\u9fa5]{2,3})/g)) {
+    if (match[1]) found.add(match[1].trim())
+  }
+  return [...found]
+}
+
+const EXPLORE_JUDGE_SYSTEM = (name: string) =>
+  `你是豆包公网检索。请联网搜索抖音账号「${name}」，只根据检索结果判断：这个账号是不是自己在做本地生活探店（到店拍摄、探店、吃喝玩乐打卡）。昵称里有没有「探店」两个字不能作为依据。品牌官方号、旗舰店、专卖店、门店自己的号、企业号、放映室、电视台回答否。检索结果看不出在做探店，回答否。不要前言。只写一行：是｜检索依据，或：否｜原因。依据必须来自这次检索，写清这个账号实际发什么内容。`
+
+async function oneExploreVerdict(
+  name: string,
   city: string,
   signal?: AbortSignal,
-): Promise<boolean> {
-  const name = nickname.trim()
-  if (isBrandPublicAccount(name)) return false
-  if (signal?.aborted) return false
+): Promise<{ yes: boolean; text: string }> {
   const ac = new AbortController()
   const onAbort = () => ac.abort()
   signal?.addEventListener('abort', onAbort, { once: true })
@@ -218,35 +230,66 @@ export async function searchConfirmsExploreCreator(
         temperature: 0,
         webSearch: true,
         messages: [
-          {
-            role: 'system',
-            content: `你是豆包公网检索。请联网搜索抖音账号「${name}」，只根据检索结果判断：这个账号是不是自己在做本地生活探店（到店拍摄、探店、吃喝玩乐打卡）。昵称里有没有「探店」两个字不能作为依据。品牌官方号、旗舰店、专卖店、门店自己的号、企业号、放映室、电视台回答否。检索结果看不出在做探店，回答否。不要前言。只写一行：是｜检索依据，或：否｜原因。依据必须来自这次检索，写清这个账号实际发什么内容。`,
-          },
-          {
-            role: 'user',
-            content: `搜索：抖音 ${name} ${city || ''} 探店`,
-          },
+          { role: 'system', content: EXPLORE_JUDGE_SYSTEM(name) },
+          { role: 'user', content: `搜索：抖音 ${name} ${city || ''} 探店` },
         ],
       },
       { signal: ac.signal },
     )
-    return exploreSearchSaysYes(String(data.content || ''))
+    const text = String(data.content || '')
+    return { yes: exploreSearchSaysYes(text), text }
   } catch {
-    return false
+    return { yes: false, text: '' }
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', onAbort)
   }
 }
 
-/** 逐个检索。同时最多 4 个，避免一次把名单里的人当成探店达人放进来。 */
+/** 两次结论要一致。一是一否时再查一次，以多数为准。 */
+async function exploreVerdictMajority(
+  name: string,
+  city: string,
+  signal?: AbortSignal,
+): Promise<{ yes: boolean; text: string }> {
+  let yesCount = 0
+  let noCount = 0
+  let yesText = ''
+  for (let attempt = 0; attempt < 3 && yesCount < 2 && noCount < 2; attempt += 1) {
+    if (signal?.aborted) break
+    const verdict = await oneExploreVerdict(name, city, signal)
+    if (verdict.yes) {
+      yesCount += 1
+      yesText = verdict.text
+    } else {
+      noCount += 1
+    }
+  }
+  return { yes: yesCount >= 2, text: yesText }
+}
+
+/** 对这一位达人单独联网检索。两次结论一致才收下。 */
+export async function searchConfirmsExploreCreator(
+  nickname: string,
+  city: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const name = nickname.trim()
+  if (isBrandPublicAccount(name)) return false
+  const verdict = await exploreVerdictMajority(name, city, signal)
+  return verdict.yes
+}
+
+/** 逐个检索。同时最多 6 个。同一人的真名和昵称只留昵称那一条。 */
 export async function nicknamesConfirmedExplore(
   names: string[],
   city: string,
   signal?: AbortSignal,
+  aliasOut?: Set<string>,
 ): Promise<Set<string>> {
   const unique = [...new Set(names.map((item) => item.trim()).filter((item) => !isBrandPublicAccount(item)))]
   const confirmed = new Set<string>()
+  const basis = new Map<string, string>()
   let cursor = 0
   async function worker() {
     while (cursor < unique.length) {
@@ -254,11 +297,21 @@ export async function nicknamesConfirmedExplore(
       const index = cursor
       cursor += 1
       const name = unique[index]!
-      if (await searchConfirmsExploreCreator(name, city, signal)) confirmed.add(name)
+      if (isBrandPublicAccount(name)) continue
+      const verdict = await exploreVerdictMajority(name, city, signal)
+      if (!verdict.yes) continue
+      confirmed.add(name)
+      basis.set(name, verdict.text)
     }
   }
   const workers = Math.min(6, unique.length)
   if (workers > 0) await Promise.all(Array.from({ length: workers }, () => worker()))
+  for (const text of basis.values()) {
+    for (const alias of exploreOperatorNames(text)) {
+      if (confirmed.has(alias)) confirmed.delete(alias)
+      aliasOut?.add(alias)
+    }
+  }
   return confirmed
 }
 
@@ -280,9 +333,12 @@ export function exploreFillQueries(city: string, industry: string): string[] {
     `${region} 抖音 美食探店博主`,
     `${region} 各县市区 抖音 探店达人`,
     `${region} 抖音 吃喝玩乐 探店`,
+    `${region} 市区 抖音 探店博主`,
+    `${region} 县城 抖音 探店达人`,
   ]
+  const local = /温州/.test(region) ? ['温州 鹿城 抖音 探店博主', '永嘉 抖音 探店达人'] : []
   const angled = angles.slice(0, 3).map((word) => `${region} 抖音 ${word} 探店达人`)
-  return [...new Set([...head, ...angled])].slice(0, 8)
+  return [...new Set([...head, ...local, ...angled])].slice(0, 12)
 }
 
 const PUBLIC_NAME_SKIP = /^(达人|公网|检索|粉丝|探店|本地生活|抖音|昵称|城市|无|主页|内容|实际内容|等级|推荐)$/
@@ -362,7 +418,7 @@ export async function searchPublicTalentBatch(opts: {
   }
 }
 
-/** 换检索词继续补，直到人数够，或 8 个不同检索词都用完。 */
+/** 换检索词继续补，直到人数够，或 12 个不同检索词都用完。 */
 export async function fillExploreTalentSeeds(opts: {
   city: string
   industry: string
@@ -375,14 +431,16 @@ export async function fillExploreTalentSeeds(opts: {
 }): Promise<PublicTalentSeed[]> {
   const gap = Math.max(0, Math.min(20, opts.gap))
   if (!gap) return []
-  const queries = (opts.queries?.length ? opts.queries : exploreFillQueries(opts.city, opts.industry)).slice(0, 8)
+  const queries = (opts.queries?.length ? opts.queries : exploreFillQueries(opts.city, opts.industry)).slice(0, 12)
   const searchBatch =
     opts.searchBatch ||
     ((query: string, count: number, skip: string[], signal?: AbortSignal) =>
       searchPublicTalentBatch({ query, city: opts.city, count, skipNames: skip, signal }))
+  const aliases = new Set<string>()
   const confirmNames =
     opts.confirmNames ||
-    ((names: string[], city: string, signal?: AbortSignal) => nicknamesConfirmedExplore(names, city, signal))
+    ((names: string[], city: string, signal?: AbortSignal) =>
+      nicknamesConfirmedExplore(names, city, signal, aliases))
   const kept: PublicTalentSeed[] = []
   const seen = new Set((opts.skipNames || []).map((name) => name.trim()).filter(Boolean))
   for (let index = 0; index < queries.length && kept.length < gap; index += 2) {
@@ -410,8 +468,11 @@ export async function fillExploreTalentSeeds(opts: {
     )
     for (const seed of fresh) {
       if (kept.length >= gap) break
-      if (!confirmed.has(seed.nickname)) continue
+      if (!confirmed.has(seed.nickname) || aliases.has(seed.nickname)) continue
       kept.push(seed)
+    }
+    for (let keptIndex = kept.length - 1; keptIndex >= 0; keptIndex -= 1) {
+      if (aliases.has(kept[keptIndex]!.nickname)) kept.splice(keptIndex, 1)
     }
   }
   return kept

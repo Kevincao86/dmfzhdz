@@ -231,4 +231,4 @@ source "$ENV_FILE"
 set +a
 
 export AUTH_API_PORT="$PORT"
-exec node --import tsx scripts/ecs-auth-api-server.ts
+exec node --import ./scripts/node-ws-preload.mjs --import tsx scripts/ecs-auth-api-server.ts
