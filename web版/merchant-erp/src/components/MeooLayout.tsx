@@ -144,6 +144,7 @@ export default function MeooLayout() {
           display_name?: string
           nickname?: string
           avatar_url?: string
+          erp_wxweb_openid?: string
         } | undefined
         setAdminName(
           (meta?.display_name || meta?.nickname || meta?.login_name || u.email?.split('@')[0] || '用户').trim(),
@@ -153,7 +154,11 @@ export default function MeooLayout() {
         setPhone(mobile ? maskCnPhone(mobile) : '—')
         const tok = session?.access_token || ''
         setBindAccessToken(tok || '')
-        if (tok) {
+        /** 微信网站扫码账号不拦登录；手机号在「我的」里自行绑定。 */
+        const wxWebLogin = Boolean(String(meta?.erp_wxweb_openid || '').trim())
+        if (wxWebLogin) {
+          setNeedPhoneBind(false)
+        } else if (tok) {
           const idn = await postAuthIdentity({ action: 'identities', access_token: tok })
           setNeedPhoneBind(Boolean(idn.needsPhoneBind))
         } else {
