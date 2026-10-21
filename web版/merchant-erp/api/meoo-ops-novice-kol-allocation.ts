@@ -140,7 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         '../vite-plugins/merchantRegistryVendorEnv.js'
       )
       const { callDoubaoWebSearch } = await import('../vite-plugins/merchantAiUpstream.js')
-      const { runDoubaoExploreFill } = await import('../src/lib/talentPlanRecommend.js')
+      const { hydrateListedPublicTalents, runDoubaoExploreFill } = await import('../src/lib/talentPlanRecommend.js')
       const env = await mergeMerchantAiEnvWithRegistrySnapshot(
         process.cwd(),
         process.env as Record<string, string>,
@@ -150,11 +150,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendOpsJson(res, 503, { ok: false, error: 'doubao_key_missing' })
         return
       }
-      const seeds = await runDoubaoExploreFill(
-        async (system, user) => (await callDoubaoWebSearch(key, env, system, user)).text,
-        { city, industry, gap, skipNames },
-      )
-      sendOpsJson(res, 200, { ok: true, seeds })
+      const search = async (system: string, user: string) =>
+        (await callDoubaoWebSearch(key, env, system, user)).text
+      const seeds = await runDoubaoExploreFill(search, { city, industry, gap, skipNames })
+      const hydrated = await hydrateListedPublicTalents(seeds, search, city)
+      sendOpsJson(res, 200, { ok: true, seeds: hydrated })
       return
     }
 

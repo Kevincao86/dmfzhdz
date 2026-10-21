@@ -1056,6 +1056,36 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               targetHeadcount?: number
               feeType?: 'tier' | 'fixed'
               platform?: string
+              industry?: string
+              gap?: number
+              skipNames?: string[]
+            }
+            if (body.mode === 'talent_public_fill') {
+              const city = String(body.city ?? '').trim()
+              const industry = String(body.industry ?? '').trim() || '本地生活'
+              const gap = Math.max(0, Math.min(20, Number(body.gap) || 0))
+              const skipNames = Array.isArray(body.skipNames) ? body.skipNames.map((name) => String(name || '')) : []
+              if (!city || gap < 1) {
+                json(res, 400, { ok: false, error: 'invalid_public_fill' })
+                return
+              }
+              const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
+              const { callDoubaoWebSearch } = await import('./merchantAiUpstream.js')
+              const { hydrateListedPublicTalents, runDoubaoExploreFill } = await import(
+                '../src/lib/talentPlanRecommend.js'
+              )
+              const env = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, process.env as Record<string, string>)
+              const key = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
+              if (!key) {
+                json(res, 503, { ok: false, error: 'doubao_key_missing' })
+                return
+              }
+              const search = async (system: string, user: string) =>
+                (await callDoubaoWebSearch(key, env, system, user)).text
+              const seeds = await runDoubaoExploreFill(search, { city, industry, gap, skipNames })
+              const hydrated = await hydrateListedPublicTalents(seeds, search, city)
+              json(res, 200, { ok: true, seeds: hydrated })
+              return
             }
             if (body.mode === 'talent_recommend') {
               const parsed = parseTalentPlanRecommendRequest(body)

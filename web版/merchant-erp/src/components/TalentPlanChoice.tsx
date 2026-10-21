@@ -9,24 +9,20 @@ import type { RegistryRecruitmentOrder } from '../lib/opsRegistryTypes'
 import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import { supabase } from '../lib/supabaseClient'
 import {
-  citedFollowerCount,
-  citedProfileUrls,
   displayTalentProfileLink,
   formatFollowerCount,
   isBrandPublicAccount,
   nicknamesConfirmedExplore,
-  publicTalentJumpLink,
-  searchConfirmsExploreCreator,
   talentCardFromPublicSeed,
   talentRosterNote,
   talentCardMatchesCloseWords,
   talentCloseWords,
+  type PublicTalentSeed,
   type TalentPlanCard,
   type TalentPlanSeat,
 } from '../lib/talentPlanRecommend'
 import { profileLinkLabel } from '../lib/talentProfileLink'
 import { requestPublicExploreFill, requestTalentPlanRecommend } from '../services/talentPlanRecommendApi'
-import { postAiChat } from '../services/ai/aiClient'
 
 function TalentAvatar({ url, name }: { url: string; name: string }) {
   const [failed, setFailed] = useState(false)
@@ -62,227 +58,46 @@ type Props = {
   onChoose?: () => void
 }
 
-function parsePublicTalentLines(
-  text: string,
-  cityHint = '',
-  limit = 20,
-): Array<{
-  nickname: string
-  city: string
-  followers: number
-  followersVerified: boolean
-  level: string
-  reason: string
-}> {
-  const cap = Math.min(20, Math.max(1, limit))
-  const out: Array<{
-    nickname: string
-    city: string
-    followers: number
-    followersVerified: boolean
-    level: string
-    reason: string
-  }> = []
-  const seen = new Set<string>()
-  const push = (row: {
-    nickname: string
-    city: string
-    followers: number
-    followersVerified: boolean
-    level: string
-    reason: string
-  }) => {
-    const key = row.nickname.trim()
-    if (key.length < 2 || seen.has(key) || out.length >= cap) return
-    seen.add(key)
-    out.push(row)
-  }
-  const want = cityHint.replace(/市$/, '').trim()
-  for (const line of text.split(/\n+/)) {
-    const row = line.replace(/^[\s\d.、\-•*]+/, '').replace(/\*\*/g, '').trim()
-    if (!row || /^公网暂无|^暂无符合/.test(row)) continue
-    const parts = row.split(/[|｜]/).map((s) => s.trim()).filter(Boolean)
-    if (parts.length >= 2) {
-      const nickname = parts[0]!.replace(/^昵称[:：]/, '').slice(0, 24)
-      if (/^达人$|^公网$|^检索$/.test(nickname)) continue
-      const followers = citedFollowerCount(nickname, text)
-      const direction = [parts[3], ...parts.slice(4)].filter(Boolean).join(' ')
-      if (isBrandPublicAccount(nickname, direction)) continue
-      push({
-        nickname,
-        city: parts[1] || cityHint,
-        followers,
-        followersVerified: followers > 0,
-        level: parts[3] || '',
-        reason: parts.slice(4).join(' ').slice(0, 80),
-      })
-      continue
-    }
-    if (want && !row.includes(want) && !/粉丝|万粉|探店/.test(row)) continue
-    const nickname = (row.match(/[\u4e00-\u9fffA-Za-z0-9_（）()]{2,16}/) || [])[0] || ''
-    if (!nickname || nickname === want || /^(达人|公网|检索|粉丝|探店|本地生活)$/.test(nickname)) continue
-    const name = nickname.replace(/[（(].*$/, '').slice(0, 24)
-    const followers = citedFollowerCount(name, text)
-    if (isBrandPublicAccount(name, row)) continue
-    push({
-      nickname: name,
-      city: cityHint,
-      followers,
-      followersVerified: followers > 0,
-      level: '',
-      reason: row.slice(0, 80),
-    })
-  }
-  return out
-}
-
-async function fetchPublicTalents(opts: {
-  city: string
-  talentType: string
-  platform: string
-  count: number
-  skipNames: string[]
-}): Promise<ReturnType<typeof parsePublicTalentLines>> {
-  const city = opts.city.trim() || '门店所在城市'
-  const need = opts.talentType.trim() || '本地生活'
-  const want = Math.min(20, Math.max(1, opts.count))
-  const skip = opts.skipNames.filter(Boolean).slice(0, 24)
-  const ac = new AbortController()
-  const timer = setTimeout(() => ac.abort(), 90000)
-  try {
-    const data = await postAiChat(
-      {
-        provider: 'doubao',
-        stream: false,
-        temperature: 0,
-        webSearch: true,
-        messages: [
-          {
-            role: 'system',
-            content: `你是豆包公网达人检索。请联网搜索「${city} 抖音 本地生活探店达人」。找自己在做探店的账号，昵称里不必出现「探店」。不要品牌官方号、旗舰店、门店自己的号。只写${opts.platform || '抖音'}、区域在「${city}」、内容贴近「${need}」的达人，凑满 ${want} 位。不要前言。每行严格：昵称｜${city}｜无｜等级｜实际内容。粉丝不要自己写数字。不要电话或微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
-          },
-          {
-            role: 'user',
-            content: `城市：${city}\n搜索：${city} 抖音 达人 探店 ${need}\n请列出 ${want} 位达人。`,
-          },
-        ],
-      },
-      { signal: ac.signal },
-    )
-    const parsed = parsePublicTalentLines(String(data.content || ''), city, want)
-    const confirmed = await nicknamesConfirmedExplore(
-      parsed.map((person) => person.nickname),
-      city,
-    )
-    return parsed.filter((person) => confirmed.has(person.nickname))
-  } catch {
-    return []
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-async function fetchPublicTalentsUntil(opts: {
-  city: string
-  talentType: string
-  platform: string
-  count: number
-  skipNames: string[]
-}): Promise<ReturnType<typeof parsePublicTalentLines>> {
-  const all: ReturnType<typeof parsePublicTalentLines> = []
-  const seen = new Set(opts.skipNames)
-  let left = Math.min(20, Math.max(0, opts.count))
-  for (let round = 0; round < 4 && left > 0; round += 1) {
-    const batch = await fetchPublicTalents({
-      ...opts,
-      count: left,
-      skipNames: [...seen],
-    })
-    if (!batch.length) break
-    for (const person of batch) {
-      if (seen.has(person.nickname)) continue
-      seen.add(person.nickname)
-      all.push(person)
-    }
-    left = Math.min(20, opts.count) - all.length
-  }
-  return all
-}
-
-function publicCard(
-  person: {
-    nickname: string
-    city: string
-    followers: number
-    followersVerified?: boolean
-    level: string
-    reason: string
-  },
-  base: TalentPlanCard,
-  city: string,
-  platform: string,
-): TalentPlanCard {
-  return {
-    ...base,
-    empty: false,
-    talentId: `public:${person.nickname}`,
-    nickname: person.nickname,
-    city: person.city || city,
-    platform: platform || base.platform || '抖音',
-    followers: person.followers,
-    followersVerified: Boolean(person.followersVerified),
-    level: person.level || base.tierLabel,
-    quoteYuan: null,
-    tags: [],
-    avatarUrl: '',
-    profileLink: '',
-    source: 'public',
-    exploreVerified: true,
-    reason: person.reason ? `公网 · ${person.reason}` : '公网补位',
-  }
-}
-
-function fillEmptyCardsFromPublic(
+function placePublicSeeds(
   cards: TalentPlanCard[],
-  people: ReturnType<typeof parsePublicTalentLines>,
+  seeds: PublicTalentSeed[],
   city: string,
-  platform: string,
+  talentType: string,
   target: number,
 ): { cards: TalentPlanCard[]; filled: number } {
   let cursor = 0
   let filled = 0
   const want = city.replace(/市$/, '').trim()
+  const people = seeds.filter((seed) => {
+    const cityName = seed.city || ''
+    return !want || !cityName || cityName.includes(want)
+  })
   const take = () => {
-    while (cursor < people.length) {
-      const cityName = people[cursor]?.city || ''
-      if (!want || !cityName || cityName.includes(want)) break
-      cursor += 1
-    }
     const person = people[cursor]
     if (!person) return null
     cursor += 1
     return person
+  }
+  const seatCard = (seed: PublicTalentSeed, seat: TalentPlanCard) => {
+    const card = talentCardFromPublicSeed(seed, seat.seatId, talentType || seat.talentType)
+    return {
+      ...card,
+      tierLabel: seat.tierLabel || card.tierLabel,
+      unitBudgetYuan: seat.unitBudgetYuan,
+    }
   }
   const next = cards.flatMap((card) => {
     if (!card.empty) return [card]
     const person = take()
     if (!person) return []
     filled += 1
-    return [publicCard(person, card, city, platform)]
+    return [seatCard(person, card)]
   })
-  const template = cards.find((card) => !card.empty) || cards[0]
-  while (template && next.length < target) {
+  while (next.length < target) {
     const person = take()
     if (!person) break
     filled += 1
-    next.push(
-      publicCard(
-        person,
-        { ...template, seatId: `public-extra-${filled}`, tierLabel: template.tierLabel || '公网' },
-        city,
-        platform,
-      ),
-    )
+    next.push(talentCardFromPublicSeed(person, `public-extra-${filled}`, talentType))
   }
   return { cards: next, filled }
 }
@@ -344,17 +159,16 @@ export function TalentPlanChoice({
     let note = res.cityNote || ''
     if (needPublic > 0) {
       setLoadingHint(`正在从公网补达人，还差 ${needPublic} 位…`)
-      const people = await fetchPublicTalentsUntil({
+      const people = await requestPublicExploreFill({
         city,
-        talentType,
-        platform,
-        count: needPublic,
+        industry: talentType || '本地生活',
+        gap: needPublic,
         skipNames: [
           ...skippedPublic.current,
           ...libraryFilled.map((c) => c.nickname).filter(Boolean),
         ],
       })
-      const filled = fillEmptyCardsFromPublic(res.cards, people, city, platform, target)
+      const filled = placePublicSeeds(res.cards, people.seeds || [], city, talentType, target)
       nextCards = filled.cards
       const short = Math.max(0, target - nextCards.length)
       note = [
@@ -495,6 +309,7 @@ export function TalentPlanChoice({
                     {card.unitBudgetYuan > 0 ? ` · 车马费¥${card.unitBudgetYuan}` : ''}
                     {card.quoteYuan != null ? ` · 报价¥${card.quoteYuan}` : ''}
                     {card.level ? ` · ${card.level}` : ''}
+                    {card.tags.length ? ` · ${card.tags.slice(0, 2).join('/')}` : ''}
                   </p>
                   {card.source === 'public' ? (
                     <p className="mt-0.5 text-xs text-violet-700">{card.reason || '公网补位'}</p>
@@ -543,76 +358,6 @@ function followerLabel(card: TalentPlanCard): string {
 function jumpLabel(platform: string, url: string): string {
   if (/\/search\//.test(url)) return '去抖音搜这位达人'
   return profileLinkLabel(platform, url)
-}
-
-async function fetchOnePublicCard(opts: {
-  city: string
-  talentType: string
-  skipNames: string[]
-  seatId: string
-}): Promise<TalentPlanCard | null> {
-  const city = opts.city.trim() || '门店所在城市'
-  const need = opts.talentType.trim() || '本地生活'
-  const skip = opts.skipNames.filter(Boolean).slice(0, 24)
-  const ac = new AbortController()
-  const timer = setTimeout(() => ac.abort(), 35000)
-  try {
-    const data = await postAiChat(
-      {
-        provider: 'doubao',
-        stream: false,
-        temperature: 0,
-        webSearch: true,
-        messages: [
-          {
-            role: 'system',
-            content: `你是豆包公网达人检索。只补 1 位本地生活探店达人，区域只限「${city}」，内容贴近「${need}」。昵称里不必出现「探店」。不要品牌官方号、旗舰店、门店自己的号。不要前言。只写一行：昵称｜城市｜无｜实际内容｜主页。粉丝不要自己写数字。主页只能原样复制检索结果里的用户主页，禁止自己编写链接；没有就写无。不要编造头像、电话、微信。${skip.length ? `不要重复：${skip.join('、')}。` : ''}`,
-          },
-          { role: 'user', content: `请检索 1 位${city}、${need}达人，并带上能打开的主页。` },
-        ],
-      },
-      { signal: ac.signal },
-    )
-    const line = String(data.content || '')
-      .split(/\n+/)
-      .map((row) => row.replace(/^[\s\d.、\-•*]+/, '').trim())
-      .find((row) => row.includes('｜') || row.includes('|'))
-    if (!line || /暂无/.test(line)) return null
-    const parts = line.split(/[|｜]/).map((part) => part.trim()).filter(Boolean)
-    const nickname = (parts[0] || '').replace(/^昵称[:：]/, '').slice(0, 24)
-    if (nickname.length < 2 || skip.includes(nickname)) return null
-    const direction = parts.find((part, index) => index >= 3 && part !== '无' && !/^https?:/.test(part)) || ''
-    const raw = String(data.content || '')
-    const profileLink = publicTalentJumpLink(nickname, line, citedProfileUrls(raw))
-    const followers = citedFollowerCount(nickname, raw)
-    if (isBrandPublicAccount(nickname, direction)) return null
-    if (!(await searchConfirmsExploreCreator(nickname, parts[1] || city))) return null
-    return {
-      seatId: opts.seatId,
-      talentId: `public:${nickname}`,
-      nickname,
-      city: parts[1] || city,
-      platform: '抖音',
-      followers,
-      followersVerified: followers > 0,
-      level: '',
-      quoteYuan: null,
-      tags: [],
-      avatarUrl: '',
-      profileLink,
-      profileVerified: Boolean(profileLink) && !/\/search\//.test(profileLink),
-      tierLabel: '公网',
-      unitBudgetYuan: 0,
-      talentType: direction || need,
-      source: 'public',
-      exploreVerified: true,
-      reason: direction ? `公网 · ${direction}` : '公网补位',
-    }
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
 async function sendTargetedInvites(
@@ -821,14 +566,24 @@ export function TalentChatRoster({
         !seenIdSet.current.has(item.talentId) &&
         talentCardMatchesCloseWords(item, closeWords),
     )
-    const next = fromLibrary
-      ? { ...fromLibrary, seatId: card.seatId }
-      : await fetchOnePublicCard({
-          city,
-          talentType: talentType || card.talentType,
-          skipNames,
-          seatId: card.seatId,
-        })
+    let next = fromLibrary ? { ...fromLibrary, seatId: card.seatId } : null
+    if (!next) {
+      const filled = await requestPublicExploreFill({
+        city,
+        industry: talentType || card.talentType || '本地生活',
+        gap: 1,
+        skipNames,
+      })
+      const seed = (filled.seeds || []).find((item) => item.nickname && !seenNameSet.current.has(item.nickname))
+      if (seed) {
+        const cardBuilt = talentCardFromPublicSeed(seed, card.seatId, talentType || card.talentType)
+        next = {
+          ...cardBuilt,
+          tierLabel: card.tierLabel || cardBuilt.tierLabel,
+          unitBudgetYuan: card.unitBudgetYuan,
+        }
+      }
+    }
     setReplacingId('')
     if (!next || seenNameSet.current.has(next.nickname)) {
       setError('星选库和公网暂时没有可替换的达人')

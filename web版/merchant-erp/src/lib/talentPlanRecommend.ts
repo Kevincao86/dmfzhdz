@@ -321,6 +321,14 @@ export type PublicTalentSeed = {
   direction: string
   sourceText: string
   rawUrl: string
+  /** 抖音用户资料接口核到的头像。没有核到就是空 */
+  avatarUrl?: string
+  /** 核到 sec_uid 后的用户主页 */
+  profileLink?: string
+  followers?: number
+  tags?: string[]
+  /** 主页、头像、粉丝来自抖音用户资料，并且昵称和名单一致 */
+  profileReady?: boolean
 }
 
 /** 先搜同城探店名单，再按类目和区县补。实测这两类检索词才能凑出人数。 */
@@ -566,6 +574,167 @@ export function citedFollowerCount(nickname: string, text: string): number {
   return best
 }
 
+function publicProfileUrlRe(): RegExp {
+  return /https?:\/\/(?:[\w.-]+\.)?(?:douyin\.com\/(?:user|share\/user)\/|iesdouyin\.com\/share\/user\/)(MS4w[A-Za-z0-9_-]{6,})/gi
+}
+
+function publicDouyinIdRe(): RegExp {
+  return /抖音号\s*[:：]?\s*([A-Za-z0-9._]{2,24})/g
+}
+const PUBLIC_TAG_WORDS = ['探店', '美食', '日料', '海鲜', '火锅', '烧烤', '甜品', '本地生活', '团购']
+
+function compactTalentName(raw: string): string {
+  return raw
+    .replace(/\p{Extended_Pictographic}/gu, '')
+    .replace(/[\uFE0F\u200D]/g, '')
+    .replace(/[\s·•.。！!？?]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+function talentNamesAlign(listed: string, live: string): boolean {
+  const left = compactTalentName(listed)
+  const right = compactTalentName(live)
+  return left.length >= 2 && left === right
+}
+
+function pushProfileQuery(queries: string[], query: string) {
+  if (query && !queries.includes(query)) queries.push(query)
+}
+
+/** 只从检索正文里拿主页和抖音号。loose 用于「只查这一个人」的第二次检索。 */
+function profileQueriesFromText(nickname: string, text: string, loose: boolean): string[] {
+  const queries: string[] = []
+  const body = String(text || '')
+  const cited = (body.split('【检索到的主页】')[1] || '').split('【检索摘录】')[0] || ''
+  const namedLines = body
+    .split('\n')
+    .filter((line) => line.includes(nickname))
+    .join('\n')
+  const urlBlob = loose ? body : `${namedLines}\n${cited}`
+  for (const match of urlBlob.matchAll(publicProfileUrlRe())) {
+    if (match[1]) pushProfileQuery(queries, `sec_uid=${encodeURIComponent(match[1])}`)
+  }
+  const idBlob = loose ? body : namedLines
+  for (const match of idBlob.matchAll(publicDouyinIdRe())) {
+    const id = match[1] || ''
+    if (/^[A-Za-z0-9._]{2,24}$/.test(id)) pushProfileQuery(queries, `unique_id=${encodeURIComponent(id)}`)
+  }
+  return queries.slice(0, 6)
+}
+
+function tagsFromDouyinSignature(signature: string, direction: string): string[] {
+  const tags = PUBLIC_TAG_WORDS.filter((word) => signature.includes(word))
+  const extra = direction.trim()
+  if (extra && extra.length <= 8 && extra !== '无' && !tags.includes(extra)) tags.unshift(extra)
+  return tags.slice(0, 3)
+}
+
+type DouyinListedProfile = {
+  nickname: string
+  secUid: string
+  followers: number
+  avatarUrl: string
+  tags: string[]
+}
+
+function avatarFromDouyinUser(user: Record<string, unknown>): string {
+  for (const key of ['avatar_medium', 'avatar_thumb', 'avatar_larger']) {
+    const image = user[key]
+    if (!image || typeof image !== 'object') continue
+    const list = (image as { url_list?: unknown }).url_list
+    if (!Array.isArray(list)) continue
+    const url = list.find((item) => typeof item === 'string' && /^https?:\/\//.test(item))
+    if (typeof url === 'string') return url
+  }
+  return ''
+}
+
+async function fetchDouyinListedProfile(query: string, direction: string): Promise<DouyinListedProfile | null> {
+  try {
+    const res = await fetch(`https://www.iesdouyin.com/web/api/v2/user/info/?${query}`, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+        Accept: 'application/json, text/plain, */*',
+        Referer: 'https://www.douyin.com/',
+      },
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { status_code?: number; user_info?: Record<string, unknown> }
+    const user = data.user_info
+    if (data.status_code !== 0 || !user) return null
+    const nickname = String(user.nickname || '').trim()
+    const secUid = String(user.sec_uid || '').trim()
+    if (!nickname || !secUid.startsWith('MS4w')) return null
+    const followers = Math.max(0, Number(user.mplatform_followers_count ?? user.follower_count ?? 0) || 0)
+    return {
+      nickname,
+      secUid,
+      followers,
+      avatarUrl: avatarFromDouyinUser(user),
+      tags: tagsFromDouyinSignature(String(user.signature || ''), direction),
+    }
+  } catch {
+    return null
+  }
+}
+
+async function profileForListedTalent(seed: PublicTalentSeed, text: string, loose: boolean): Promise<PublicTalentSeed | null> {
+  for (const query of profileQueriesFromText(seed.nickname, text, loose)) {
+    const profile = await fetchDouyinListedProfile(query, seed.direction)
+    if (!profile || !talentNamesAlign(seed.nickname, profile.nickname)) continue
+    return {
+      ...seed,
+      nickname: profile.nickname,
+      avatarUrl: profile.avatarUrl,
+      profileLink: `https://www.douyin.com/user/${profile.secUid}`,
+      followers: profile.followers,
+      tags: profile.tags,
+      profileReady: true,
+    }
+  }
+  return null
+}
+
+/** 公网名单列出后，用抖音用户资料接口核主页、头像和粉丝。昵称对不上的链接丢掉。 */
+export async function hydrateListedPublicTalents(
+  seeds: PublicTalentSeed[],
+  search: (system: string, user: string) => Promise<string>,
+  city: string,
+): Promise<PublicTalentSeed[]> {
+  const next = seeds.slice()
+  let cursor = 0
+  async function worker() {
+    while (cursor < next.length) {
+      const index = cursor
+      cursor += 1
+      const seed = next[index]
+      if (!seed) continue
+      const direct = await profileForListedTalent(seed, `${seed.rawUrl}\n${seed.nickname} ${seed.rawUrl}\n${seed.sourceText}`, false)
+      if (direct) {
+        next[index] = direct
+        continue
+      }
+      let looked = ''
+      try {
+        looked = await search(
+          '你是豆包公网检索。联网搜索这个抖音账号的用户主页和抖音号。只根据检索结果原样抄出主页链接或抖音号。没有就写无。不要编造链接，不要编造抖音号。',
+          `城市：${city || seed.city || ''}\n搜索：抖音 ${seed.nickname} ${city || seed.city || ''} 用户主页 抖音号`,
+        )
+      } catch {
+        looked = ''
+      }
+      const found = looked ? await profileForListedTalent(seed, looked, true) : null
+      if (found) next[index] = found
+    }
+  }
+  const workers = Math.min(3, next.length)
+  if (workers > 0) await Promise.all(Array.from({ length: workers }, () => worker()))
+  return next
+}
+
 export function formatFollowerCount(count: number): string {
   if (!Number.isFinite(count) || count <= 0) return ''
   if (count >= 10000) {
@@ -577,8 +746,12 @@ export function formatFollowerCount(count: number): string {
 }
 
 export function talentCardFromPublicSeed(seed: PublicTalentSeed, seatId: string, talentType: string): TalentPlanCard {
-  const followers = citedFollowerCount(seed.nickname, seed.sourceText)
-  const profileLink = publicTalentJumpLink(seed.nickname, seed.rawUrl, citedProfileUrls(seed.sourceText))
+  const ready = Boolean(seed.profileReady && seed.profileLink && !/\/search\//.test(seed.profileLink))
+  const citedFollowers = citedFollowerCount(seed.nickname, seed.sourceText)
+  const followers = ready && (seed.followers || 0) > 0 ? Math.round(seed.followers || 0) : citedFollowers
+  const profileLink = ready
+    ? String(seed.profileLink)
+    : publicTalentJumpLink(seed.nickname, seed.rawUrl, citedProfileUrls(seed.sourceText))
   return {
     seatId,
     talentId: `public:${seed.nickname}`,
@@ -589,10 +762,10 @@ export function talentCardFromPublicSeed(seed: PublicTalentSeed, seatId: string,
     followersVerified: followers > 0,
     level: '',
     quoteYuan: null,
-    tags: [],
-    avatarUrl: '',
+    tags: (seed.tags || []).slice(0, 3),
+    avatarUrl: ready ? String(seed.avatarUrl || '') : '',
     profileLink,
-    profileVerified: Boolean(profileLink) && !/\/search\//.test(profileLink),
+    profileVerified: ready,
     tierLabel: '公网',
     unitBudgetYuan: 0,
     talentType: seed.direction || talentType,
