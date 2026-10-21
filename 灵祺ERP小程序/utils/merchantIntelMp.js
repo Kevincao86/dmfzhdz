@@ -8,6 +8,7 @@ const featureMp = require('./merchantFeatureMp.js')
 const productListingMp = require('./productListingMp.js')
 const tokensMp = require('./platformTokensMp.js')
 const merchantApi = require('./merchantApi.js')
+const talentCities = require('./talentCityNamesMp.js')
 
 const LIVE_TIMEOUT_MS = 12000
 const STORE_PLATFORMS = [
@@ -73,9 +74,42 @@ function industryLabelFromMargin(marginRaw) {
   ).trim()
 }
 
-function cityFromText(text) {
-  const matched = String(text || '').match(/([\u4e00-\u9fa5]{2,12}市)/)
-  return matched ? matched[1] : ''
+function escapeReg(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 一行地址里的地级市。不把「北京路」认成北京。 */
+function cityInLine(text) {
+  const body = String(text || '')
+  if (!body) return ''
+  let best = ''
+  ;(Array.isArray(talentCities) ? talentCities : []).forEach((city) => {
+    const short = String(city || '').replace(/市$/, '')
+    if (short.length < 2) return
+    if (!new RegExp(escapeReg(short) + '(?!路|街|道|巷|弄)').test(body)) return
+    if (short.length > best.replace(/市$/, '').length) best = city
+  })
+  return best
+}
+
+/** 连锁多家门店时取出现最多的城市，避免地址里顺带出现的另一座城盖过门店所在地。 */
+function dominantStoreCity(lines) {
+  const counts = {}
+  ;(Array.isArray(lines) ? lines : []).forEach((line) => {
+    const city = cityInLine(line)
+    if (!city) return
+    counts[city] = (counts[city] || 0) + 1
+  })
+  let best = ''
+  let bestCount = 0
+  Object.keys(counts).forEach((city) => {
+    const n = counts[city]
+    if (n > bestCount || (n === bestCount && city.length > best.length)) {
+      best = city
+      bestCount = n
+    }
+  })
+  return best
 }
 
 function isPlaceholderIndustry(path, displayName) {
@@ -291,7 +325,10 @@ function formatMerchantIntelContext(live) {
   const draftRows = menuItems.length ? [] : industryAlignMp.loadDraftProductRows(tenantId)
   const draftSummary = draftRows.length ? industryAlignMp.summarizeDraftRows(draftRows) : ''
   const anchorName = boundStoreName || (!isPlaceholderIndustry(storeName, displayName) ? storeName : '')
-  const city = cityFromText([storeBlob, anchorName].join(' '))
+  const storeLines = (Array.isArray(facts.stores) ? facts.stores : []).reduce((acc, block) => {
+    return acc.concat((block && block.lines) || [])
+  }, [])
+  const city = dominantStoreCity(storeLines) || cityInLine([storeBlob, anchorName].join(' '))
   const accountName = isPlaceholderIndustry(displayName, '') ? '' : displayName
 
   const lines = [

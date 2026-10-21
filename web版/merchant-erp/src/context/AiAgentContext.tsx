@@ -754,10 +754,9 @@ async function fillPublicExploreCards(opts: {
 }
 
 async function loadTalentRecommendBlock(userText: string, priorText = '', quotedFull = ''): Promise<string> {
-  const named = cityAskedForTalents(userText)
-  const planCity = cityAskedForTalents(priorText)
-  let city = named || planCity
-  let regionSource = named ? '用户指定' : planCity ? '上文方案' : ''
+  const named = cityAskedForTalents(userText) || cityAskedForTalents(quotedFull)
+  let city = named
+  let regionSource = named ? '用户指定' : ''
   if (!city) {
     try {
       city = (await resolveStoreCityFromMerchantStores()).trim()
@@ -786,12 +785,14 @@ async function loadTalentRecommendBlock(userText: string, priorText = '', quoted
   const matched = sameCity.filter((c) => talentCardMatchesCloseWords(c, closeWords))
   const picked = pickLibraryForPlan(matched, headcount, planText)
   const gap = Math.max(0, headcount - picked.length)
-  const publicCards = await fillPublicExploreCards({
-    city,
-    talentType,
-    gap,
-    skipNames: picked.map((card) => card.nickname).filter(Boolean),
-  })
+  const publicCards = (
+    await fillPublicExploreCards({
+      city,
+      talentType,
+      gap,
+      skipNames: picked.map((card) => card.nickname).filter(Boolean),
+    })
+  ).filter((card) => cardMatchesCity(card, city))
   const cards = [...picked, ...publicCards]
   const note = talentRosterNote(headcount, picked.length, publicCards.length)
   pendingTalentRoster = cards.length

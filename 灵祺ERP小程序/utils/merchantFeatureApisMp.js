@@ -567,6 +567,27 @@ function cityAskedForTalents(text) {
   return nearestCity(intentText(text), ['推荐', '达人', '找'])
 }
 
+function canonicalTalentCity(raw) {
+  const text = String(raw || '').trim()
+  if (!text) return ''
+  let best = ''
+  ;(Array.isArray(talentCities) ? talentCities : []).forEach((city) => {
+    const short = String(city || '').replace(/市$/, '')
+    if (short.length < 2) return
+    if (text.indexOf(city) < 0 && text.indexOf(short) < 0) return
+    if (short.length > best.replace(/市$/, '').length) best = city
+  })
+  return best || text
+}
+
+function seedMatchesCity(seed, city) {
+  const short = String(city || '').replace(/市$/, '').trim()
+  if (short.length < 2) return false
+  const label = String((seed && seed.city) || '').replace(/市$/, '').trim()
+  if (!label) return false
+  return label.indexOf(short) >= 0 || short.indexOf(label) >= 0
+}
+
 function cityMentionedInText(text) {
   const body = String(text || '')
   if (!body.trim()) return ''
@@ -706,12 +727,33 @@ function talentRosterNote(headcount, libraryCount, publicCount) {
   return `${asked}星选库已按门店类目配满 ${libraryCount} 位。`
 }
 
+async function fetchSameCityPublicSeeds(city, industry, gap, skipNames) {
+  const need = Math.max(0, Math.min(20, Number(gap) || 0))
+  if (!city || need < 1) return []
+  const kept = []
+  const skip = (skipNames || []).slice()
+  for (let round = 0; round < 3 && kept.length < need; round += 1) {
+    const seeds = await fetchPublicExploreSeeds(city, industry, need - kept.length, skip)
+    if (!seeds.length) break
+    let added = 0
+    seeds.forEach((seed) => {
+      const name = String((seed && seed.nickname) || '').trim()
+      if (!name || skip.indexOf(name) >= 0) return
+      skip.push(name)
+      if (!seedMatchesCity(seed, city) || kept.length >= need) return
+      kept.push(seed)
+      added += 1
+    })
+    if (!added) continue
+  }
+  return kept
+}
+
 async function buildTalentChatRoster(userText, priorText, intelText, quotedFull) {
   if (!isTalentRecommendAsk(userText)) return null
   const named = cityAskedForTalents(userText) || cityAskedForTalents(quotedFull)
-  const planCity = cityAskedForTalents(priorText)
-  let city = named || planCity
-  if (!city) city = intelField(intelText, '门店所在城市')
+  let city = canonicalTalentCity(named)
+  if (!city) city = canonicalTalentCity(intelField(intelText, '门店所在城市'))
   const industryRaw = intelField(intelText, '经营类目').replace(/（.*$/, '').trim()
   const industry = industryRaw && industryRaw.indexOf('绑定接口未返回') < 0 ? industryRaw : ''
   const storeName = intelField(intelText, '当前门店')
@@ -733,14 +775,14 @@ async function buildTalentChatRoster(userText, priorText, intelText, quotedFull)
   const matched = sameCity.filter((c) => cardMatchesStore(c, needles))
   const picked = matched.slice(0, headcount)
   const gap = Math.max(0, headcount - picked.length)
-  const seeds = await fetchPublicExploreSeeds(
+  const seeds = await fetchSameCityPublicSeeds(
     city,
     talentType,
     gap,
     picked.map((c) => c.nickname).filter(Boolean),
   )
   const publicCards = seeds
-    .filter((seed) => seed && String(seed.nickname || '').trim())
+    .filter((seed) => seed && String(seed.nickname || '').trim() && seedMatchesCity(seed, city))
     .slice(0, gap)
     .map((seed, index) => cardFromPublicSeed(seed, `public-${index + 1}`, talentType))
   const all = picked.concat(publicCards)
@@ -761,8 +803,14 @@ async function replaceTalentChatCard(roster, nickname) {
   const current = (roster && roster.cards) || []
   const skipNames = current.map((c) => String(c.nickname || '').trim()).filter(Boolean)
   if (nickname) skipNames.push(String(nickname).trim())
-  const seeds = await fetchPublicExploreSeeds(roster.city, roster.talentType, 1, skipNames)
-  const seed = seeds.find((item) => item && String(item.nickname || '').trim() && skipNames.indexOf(String(item.nickname).trim()) < 0)
+  const seeds = await fetchSameCityPublicSeeds(roster.city, roster.talentType, 1, skipNames)
+  const seed = seeds.find(
+    (item) =>
+      item &&
+      String(item.nickname || '').trim() &&
+      skipNames.indexOf(String(item.nickname).trim()) < 0 &&
+      seedMatchesCity(item, roster.city),
+  )
   if (!seed) return null
   const decorated = decorateTalentCards([cardFromPublicSeed(seed, `public-replace-${Date.now()}`, roster.talentType)], [])
   return decorated[0] || null
