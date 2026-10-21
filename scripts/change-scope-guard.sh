@@ -2367,6 +2367,15 @@ mine-pr-addon-ai-review.js
 change-scope-guard
 PAT
       ;;
+    talent_membership_login)
+      cat <<'PAT'
+mpRegistryProfileGet.ts
+mpAccountAuth.ts
+灵祺达人撮合小程序/utils/registryProfileSync.js
+灵祺达人履约管理后台/src/lib/registryProfileSync.ts
+change-scope-guard
+PAT
+      ;;
     pr_logo_share_chat)
       cat <<'PAT'
 RecommendOrderCard.tsx

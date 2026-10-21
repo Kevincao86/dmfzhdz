@@ -9,7 +9,11 @@ import {
   allocateLingqiTalentId,
 } from './lingqiIdentity.js'
 import { dedupeMpTalentMembersByOpenId, upsertMpTalentMember } from './mpTalentMemberUpsert.js'
-import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
+import {
+  findRegistryMemberForAccount,
+  findRegistryPrForAccount,
+  resolveTalentMembershipForAccount,
+} from './mpRegistryProfileGet.js'
 import { findTalentLibraryEntriesForAccount } from './mpRegistryProfileEnrich.js'
 import { resolveEffectiveFeatureAccess } from './mpMembershipCatalog.js'
 import { DEFAULT_PR_FEATURE_ACCESS } from './prFeatureAccess.js'
@@ -629,10 +633,13 @@ export async function accountPayloadWithMemberExtras(
       await updateAccount(rest, acc.id, { active_role: 'pr' })
       acc = { ...acc, active_role: 'pr' }
     }
-    if (member) {
+    const talentMembership = resolveTalentMembershipForAccount(data, acc, linkedMember)
+    const talentWorkbench =
+      acc.active_role === 'talent' || acc.active_role === 'shoot' || acc.active_role === 'edit'
+    if (member || talentWorkbench) {
       extras = {
-        lingqiShootTeamId: member.lingqiShootTeamId || null,
-        lingqiEditTeamId: member.lingqiEditTeamId || null,
+        lingqiShootTeamId: member?.lingqiShootTeamId || null,
+        lingqiEditTeamId: member?.lingqiEditTeamId || null,
         workIdentity: fixedIdentity,
         ownedWorkIdentities,
       }
@@ -640,22 +647,25 @@ export async function accountPayloadWithMemberExtras(
         extras.prFeatureAccess = resolveEffectiveFeatureAccess(
           'talent',
           {
-            mpMembershipPlan: member.mpMembershipPlan,
-            mpMembershipExpiresAt: member.mpMembershipExpiresAt,
-            mpFeatureAccess: member.mpFeatureAccess,
+            mpMembershipPlan: talentMembership.plan,
+            mpMembershipExpiresAt: talentMembership.expiresAt,
+            mpFeatureAccess: talentMembership.featureAccess ?? member?.mpFeatureAccess,
           },
           data,
         )
-        extras.mpMembershipPlan = member.mpMembershipPlan || 'basic'
-        extras.mpMembershipExpiresAt = member.mpMembershipExpiresAt || ''
+        extras.mpMembershipPlan = talentMembership.plan
+        extras.mpMembershipExpiresAt = talentMembership.expiresAt || ''
       }
     }
     // 达人/拍摄/剪辑身份保留达人会员权限。仅有 PR 编号时不能覆盖，否则专业版达人评估会被 PR 套餐关掉。
-    if (!member) {
+    if (!member && !talentWorkbench) {
       extras.workIdentity = fixedIdentity
       extras.ownedWorkIdentities = ownedWorkIdentities
     }
-    if (acc.active_role === 'pr' || (!extras.prFeatureAccess && (acc.lingqi_pr_id || acc.registry_pr_id))) {
+    if (
+      !talentWorkbench &&
+      (acc.active_role === 'pr' || (!extras.prFeatureAccess && (acc.lingqi_pr_id || acc.registry_pr_id)))
+    ) {
       const pr = findRegistryPrForAccount(data, acc)
       extras.prFeatureAccess = pr
         ? resolveEffectiveFeatureAccess(

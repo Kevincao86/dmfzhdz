@@ -133,6 +133,81 @@ export function findRegistryPrForAccount(
   return null
 }
 
+function storedMembershipPlan(raw: string | null | undefined): string {
+  return String(raw ?? '').trim()
+}
+
+/**
+ * 达人档位与运营台权限详情同一顺序：灵祺达人编号上的会员，否则达人库条目。
+ * 登录会话按 registry_member_id 取档，不能再被「手机号不一致」滤成基础版。
+ */
+export function resolveTalentMembershipForAccount(
+  data: RegistryFile,
+  account: MpAccountRow,
+  phoneSafeMember: RegistryMpTalentMember | null,
+): {
+  plan: string
+  expiresAt?: string
+  featureAccess?: RegistryMpTalentMember['mpFeatureAccess']
+} {
+  const members = data.mpTalentMembers ?? []
+  const talentId = String(account.lingqi_talent_id || phoneSafeMember?.lingqiTalentId || '').trim()
+  const memberId = String(account.registry_member_id || '').trim()
+  const byTalent = talentId
+    ? members.find((m) => String(m.lingqiTalentId || '').trim() === talentId)
+    : undefined
+  const byId = memberId ? members.find((m) => m.id === memberId) : undefined
+  const entry = talentId
+    ? (data.talentLibraryEntries ?? []).find((e) => String(e.lingqiTalentId || '').trim() === talentId)
+    : undefined
+  const sources: Array<{
+    plan?: string | null
+    expiresAt?: string | null
+    featureAccess?: RegistryMpTalentMember['mpFeatureAccess']
+  } | null> = [
+    byTalent
+      ? {
+          plan: byTalent.mpMembershipPlan,
+          expiresAt: byTalent.mpMembershipExpiresAt,
+          featureAccess: byTalent.mpFeatureAccess,
+        }
+      : null,
+    byId && byId !== byTalent
+      ? {
+          plan: byId.mpMembershipPlan,
+          expiresAt: byId.mpMembershipExpiresAt,
+          featureAccess: byId.mpFeatureAccess,
+        }
+      : null,
+    entry
+      ? {
+          plan: entry.mpMembershipPlan,
+          expiresAt: entry.mpMembershipExpiresAt,
+          featureAccess: entry.mpFeatureAccess,
+        }
+      : null,
+    phoneSafeMember && phoneSafeMember !== byTalent && phoneSafeMember !== byId
+      ? {
+          plan: phoneSafeMember.mpMembershipPlan,
+          expiresAt: phoneSafeMember.mpMembershipExpiresAt,
+          featureAccess: phoneSafeMember.mpFeatureAccess,
+        }
+      : null,
+  ]
+  for (const src of sources) {
+    if (!src) continue
+    const plan = storedMembershipPlan(src.plan)
+    if (!plan) continue
+    const expiresAt = String(src.expiresAt || '').trim()
+    return {
+      plan,
+      expiresAt: expiresAt || undefined,
+      featureAccess: src.featureAccess,
+    }
+  }
+  return { plan: 'basic', featureAccess: phoneSafeMember?.mpFeatureAccess }
+}
+
 /** 当前身份是达人/拍摄/剪辑时用达人会员权限；PR 身份才用 PR 套餐。 */
 function usePrFeatureAccess(
   account: MpAccountRow,
@@ -184,6 +259,13 @@ export async function mpAuthGetRegistryProfile(
     boundByMemberId && !memberPhoneMatchesAccount(boundByMemberId, phone) ? '' : accMemberId
   // enrich 已按登录手机号纠偏；优先用 enrich 结果，避免账号上错绑的 LQ-D 覆盖
   const safeAccTalentId = String(member?.lingqiTalentId || accTalentId || '').trim()
+  const talentMembership = resolveTalentMembershipForAccount(data, account, member)
+  const featureAsPr = usePrFeatureAccess(
+    account,
+    Boolean(pr),
+    Boolean(member) || talentMembership.plan !== 'basic',
+    opts?.roleHint,
+  )
   let talentMember = member ? registryMemberToClientDraft(member) : null
   if (talentMember && typeof talentMember === 'object') {
     talentMember = {
@@ -191,8 +273,12 @@ export async function mpAuthGetRegistryProfile(
       // 大厅站内信按 registry 会员 id 匹配；勿用「同 LQ-D 但手机号不同」的错误绑定覆盖
       id: member?.id || safeAccMemberId || talentMember.id,
       lingqiTalentId: safeAccTalentId || talentMember.lingqiTalentId,
-      mpMembershipPlan: member?.mpMembershipPlan || 'basic',
-      mpMembershipExpiresAt: member?.mpMembershipExpiresAt,
+      mpMembershipPlan: featureAsPr
+        ? member?.mpMembershipPlan || 'basic'
+        : talentMembership.plan,
+      mpMembershipExpiresAt: featureAsPr
+        ? member?.mpMembershipExpiresAt
+        : talentMembership.expiresAt,
     }
   }
   let prProfile = pr ? registryPrToClientDraft(pr) : null
@@ -205,12 +291,12 @@ export async function mpAuthGetRegistryProfile(
       mpMembershipExpiresAt: pr.mpMembershipExpiresAt,
     }
   }
-  const mpMembershipPlan = pr
-    ? String(pr.mpMembershipPlan || 'basic').trim() || 'basic'
-    : member
-      ? String(member.mpMembershipPlan || 'basic').trim() || 'basic'
-      : 'basic'
-  const mpMembershipExpiresAt = pr?.mpMembershipExpiresAt || member?.mpMembershipExpiresAt
+  const mpMembershipPlan = featureAsPr
+    ? String(pr?.mpMembershipPlan || 'basic').trim() || 'basic'
+    : talentMembership.plan
+  const mpMembershipExpiresAt = featureAsPr
+    ? pr?.mpMembershipExpiresAt
+    : talentMembership.expiresAt || member?.mpMembershipExpiresAt
   const mpMembershipPlanEffective = resolveEffectiveMembershipTier(mpMembershipPlan, mpMembershipExpiresAt)
   const mpMembershipExpired =
     mpMembershipPlanEffective === 'basic' && mpMembershipPlan !== 'basic' && Boolean(String(mpMembershipExpiresAt || '').trim())
@@ -234,15 +320,17 @@ export async function mpAuthGetRegistryProfile(
     memberAfterReset,
     douyinSalesLevelResetYm,
   )
-  const libRole = pr ? 'pr' : 'talent'
-  const accessRecord = pr
+  const libRole = featureAsPr ? 'pr' : 'talent'
+  const accessRecord = featureAsPr
     ? buildMembershipAccessRecord('pr', pr)
-    : member
-      ? buildMembershipAccessRecord('talent', member)
-      : { mpMembershipPlan: 'basic' }
-  const usageEntity = pr ?? member ?? null
+    : buildMembershipAccessRecord('talent', {
+        ...(member ?? {}),
+        mpMembershipPlan: talentMembership.plan as RegistryMpTalentMember['mpMembershipPlan'],
+        mpMembershipExpiresAt: talentMembership.expiresAt,
+        mpFeatureAccess: talentMembership.featureAccess ?? member?.mpFeatureAccess,
+      } as RegistryMpTalentMember)
+  const usageEntity = featureAsPr ? pr ?? member ?? null : member ?? pr ?? null
   const mpPermissionEffective = resolvePermissionEffectiveMap(libRole, accessRecord, data, usageEntity)
-  const featureAsPr = usePrFeatureAccess(account, Boolean(pr), Boolean(member), opts?.roleHint)
   const prFeatureAccess = featureAsPr
     ? pr
       ? resolveEffectiveFeatureAccess(
@@ -255,17 +343,15 @@ export async function mpAuthGetRegistryProfile(
           data,
         )
       : { ...DEFAULT_PR_FEATURE_ACCESS }
-    : member
-      ? resolveEffectiveFeatureAccess(
-          'talent',
-          {
-            mpMembershipPlan: member.mpMembershipPlan,
-            mpMembershipExpiresAt: member.mpMembershipExpiresAt,
-            mpFeatureAccess: member.mpFeatureAccess,
-          },
-          data,
-        )
-      : { ...DEFAULT_PR_FEATURE_ACCESS }
+    : resolveEffectiveFeatureAccess(
+        'talent',
+        {
+          mpMembershipPlan: talentMembership.plan,
+          mpMembershipExpiresAt: talentMembership.expiresAt,
+          mpFeatureAccess: talentMembership.featureAccess ?? member?.mpFeatureAccess,
+        },
+        data,
+      )
   return {
     talentMember,
     prProfile,

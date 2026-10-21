@@ -1,4 +1,5 @@
 import { fetchRegistryProfile, fetchSession } from './mpApi'
+import { getWorkIdentity } from './mpWorkIdentity'
 import { getAccount, getToken, isDevPreviewSession, persistAccount, type MpAccount } from './mpSession'
 import { patchAccountPrFeatureAccess, readAccountPrFeatureAccess } from './prFeatureAccess'
 import { triggerShellRefresh } from './shellRefresh'
@@ -83,7 +84,16 @@ export async function pullRegistryProfileAfterLogin(): Promise<boolean> {
     }
     let applied = false
     let nextAccount = account
-    const mpMembershipPlan = String(profile.mpMembershipPlan || 'basic').trim() || 'basic'
+    const billingRole = getWorkIdentity()
+    let mpMembershipPlan = String(profile.mpMembershipPlan || 'basic').trim() || 'basic'
+    if (billingRole === 'pr') {
+      const prPlan =
+        prProfile && typeof prProfile.mpMembershipPlan === 'string' ? prProfile.mpMembershipPlan.trim() : ''
+      if (prPlan) mpMembershipPlan = prPlan
+    } else if (talentMember && typeof talentMember.mpMembershipPlan === 'string') {
+      const talentPlan = talentMember.mpMembershipPlan.trim()
+      if (talentPlan) mpMembershipPlan = talentPlan
+    }
     const mpMembershipExpiresAt = String(profile.mpMembershipExpiresAt || '').trim()
     const mpAiPointsBalance = Math.max(0, Math.floor(Number(profile.mpAiPointsBalance) || 0))
     const accountPatch: Partial<MpAccount> & {

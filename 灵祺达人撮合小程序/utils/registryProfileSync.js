@@ -57,7 +57,15 @@ async function pullRegistryProfileAfterLogin() {
     if (epoch !== sessionStore.readSessionEpoch() || sessionStore.readSessionToken() !== token) return false
     if (!data || data.ok === false) return false
     let applied = false
-    const mpMembershipPlan = String(data.mpMembershipPlan || 'basic').trim() || 'basic'
+    const billingRole = mpBillingRoleHint.readMpBillingRoleHint()
+    let mpMembershipPlan = String(data.mpMembershipPlan || 'basic').trim() || 'basic'
+    if (billingRole === 'pr') {
+      const prPlan = data.prProfile && data.prProfile.mpMembershipPlan
+      if (prPlan) mpMembershipPlan = String(prPlan).trim() || mpMembershipPlan
+    } else if (data.talentMember && data.talentMember.mpMembershipPlan) {
+      // 达人工作台用达人档。顶层 mpMembershipPlan 在同时有 PR 档案时会是 PR 基础版，不能盖掉刚登录读到的旗舰版。
+      mpMembershipPlan = String(data.talentMember.mpMembershipPlan).trim() || mpMembershipPlan
+    }
     const mpMembershipExpiresAt = String(data.mpMembershipExpiresAt || '').trim()
     const mpAiPointsBalance = Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0))
     let nextAccount = account
