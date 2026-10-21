@@ -13,6 +13,7 @@ function merchantSessionSync() {
 
 function persistSession(tokens, loginName) {
   if (!tokens || !tokens.access_token) return
+  deadRefreshHandled = false
   wx.setStorageSync('meoo_access_token', tokens.access_token)
   wx.setStorageSync('meoo_refresh_token', tokens.refresh_token || '')
   try {
@@ -264,6 +265,21 @@ function isStaleAccessError(statusCode, payload) {
 }
 
 let refreshInflight = null
+let refreshOnce = null
+let deadRefreshHandled = false
+
+function isDeadRefreshMessage(message) {
+  return /invalid refresh token|refresh token not found|refresh_token_not_found|already used/i.test(
+    String(message || ''),
+  )
+}
+
+/** GoTrue 轮换后旧票作废。并发刷新会把整段会话一起废掉，所以全局只打一次。 */
+function noteDeadRefresh() {
+  if (deadRefreshHandled) return
+  deadRefreshHandled = true
+  logoutAndGoLogin()
+}
 
 /**
  * 临近过期或已过期时用 refresh_token 换新 access_token。
@@ -278,17 +294,21 @@ function ensureFreshAccessToken() {
   refreshInflight = supabaseCfg
     .bootstrap()
     .then(() => refreshAccessToken())
-    .catch(() => getStoredAccessToken())
+    .catch((err) => {
+      const message = String((err && err.message) || '')
+      if (isDeadRefreshMessage(message) || /登录已过期/.test(message)) throw err
+      return getStoredAccessToken()
+    })
     .finally(() => {
       refreshInflight = null
     })
   return refreshInflight
 }
 
-/** access_token 过期时用 refresh_token 换发；失败需重新登录 */
-function refreshAccessToken() {
+function refreshAccessTokenOnce() {
   const rt = getRefreshToken()
   if (!rt) {
+    noteDeadRefresh()
     return Promise.reject(new Error('登录已过期，请重新登录'))
   }
   const supabaseUrl = supabaseCfg.resolveSupabaseUrl()
@@ -308,6 +328,7 @@ function refreshAccessToken() {
       data: { refresh_token: rt },
       success(res) {
         if (res.statusCode === 200 && res.data && res.data.access_token) {
+          deadRefreshHandled = false
           wx.setStorageSync('meoo_access_token', res.data.access_token)
           if (res.data.refresh_token) {
             wx.setStorageSync('meoo_refresh_token', res.data.refresh_token)
@@ -320,7 +341,13 @@ function refreshAccessToken() {
         const msg =
           (res.data && (res.data.error_description || res.data.msg || res.data.message)) ||
           `刷新登录失败 (${res.statusCode})`
-        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+        const text = typeof msg === 'string' ? msg : JSON.stringify(msg)
+        if (isDeadRefreshMessage(text)) {
+          noteDeadRefresh()
+          reject(new Error('登录已过期，请重新登录'))
+          return
+        }
+        reject(new Error(text))
       },
       fail(err) {
         const em =
@@ -338,6 +365,15 @@ function refreshAccessToken() {
       },
     })
   })
+}
+
+/** access_token 过期时用 refresh_token 换发；失败需重新登录 */
+function refreshAccessToken() {
+  if (refreshOnce) return refreshOnce
+  refreshOnce = refreshAccessTokenOnce().finally(() => {
+    refreshOnce = null
+  })
+  return refreshOnce
 }
 
 function bootstrapSupabaseConfig() {
