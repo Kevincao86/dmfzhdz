@@ -121,10 +121,6 @@
       <text class="report-text">{{item}}</text>
     </view>
   </view>
-  <view class="card report" wx:if="{{sources.length}}">
-    <text class="advice-title">公开来源</text>
-    <text class="source-chip" wx:for="{{sources}}" wx:key="*this">{{item}}</text>
-  </view>
 
   <view class="card advice" wx:if="{{scoreReady}}">
     <text class="advice-title">竞争对手分析</text>
@@ -137,6 +133,11 @@
         <text class="plan-text" wx:if="{{item.meta}}">{{item.meta}}</text>
       </view>
     </block>
+  </view>
+
+  <view class="card report" wx:if="{{sources.length}}">
+    <text class="advice-title">公开来源</text>
+    <text class="source-chip" wx:for="{{sources}}" wx:key="*this">{{item}}</text>
   </view>
 
   <view class="card gains" wx:if="{{showGains}}">

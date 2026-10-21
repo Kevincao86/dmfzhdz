@@ -1184,16 +1184,6 @@ export default function MerchantShopEvalPanel() {
           </div>
         ) : null}
 
-        {score?.sources?.length ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {score.sources.map((title) => (
-              <span key={title} className="max-w-full truncate rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
-                {title}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
         {score ? (
           <div className="mt-4 rounded-2xl border border-orange-100 bg-[#fff7ed] p-4 text-left">
             <p className="text-sm font-extrabold text-[#c2410c]">竞争对手分析</p>
@@ -1214,6 +1204,16 @@ export default function MerchantShopEvalPanel() {
                 ) : null}
               </>
             ) : null}
+          </div>
+        ) : null}
+
+        {score?.sources?.length ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {score.sources.map((title) => (
+              <span key={title} className="max-w-full truncate rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+                {title}
+              </span>
+            ))}
           </div>
         ) : null}
 
