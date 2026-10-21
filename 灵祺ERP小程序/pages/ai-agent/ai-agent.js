@@ -764,6 +764,11 @@ Page({
     return next
   },
 
+  onTalentBack(e) {
+    const id = e.currentTarget.dataset.id
+    this.patchRecruitBrief(id, { talentPath: 'pending' })
+  },
+
   onTalentRecruit(e) {
     const id = e.currentTarget.dataset.id
     const msg = this.findPreview(id)
@@ -834,22 +839,62 @@ Page({
     const index = messages.findIndex((m) => m && m.id === id)
     const msg = index >= 0 ? messages[index] : null
     const roster = msg && msg.talentRoster
-    if (!roster || !feat || this.data.sending) return
-    this.setData({ sending: true, thinkingText: '正在替换这一位…' })
+    if (!roster || !feat || this.data.sending || roster.publishing) return
+    const nextMessages = messages.slice()
+    nextMessages[index] = Object.assign({}, msg, {
+      talentRoster: Object.assign({}, roster, { replacingName: nickname }),
+    })
+    this.setData({ messages: nextMessages, sending: true, thinkingText: '正在替换这一位…' })
     const nextCard = await feat.replaceTalentChatCard(roster, nickname)
     if (!nextCard) {
-      this.setData({ sending: false, thinkingText: '' })
+      nextMessages[index] = Object.assign({}, msg, {
+        talentRoster: Object.assign({}, roster, { replacingName: '' }),
+      })
+      this.persist(nextMessages, { sending: false, thinkingText: '' })
       wx.showToast({ title: '暂时没有可替换的达人', icon: 'none' })
       return
     }
     const cards = (roster.cards || []).slice()
     const at = cards.findIndex((c) => c && c.nickname === nickname)
     if (at >= 0) cards[at] = Object.assign({}, nextCard, { seatId: cards[at].seatId || nextCard.seatId })
-    const nextMessages = messages.slice()
     nextMessages[index] = Object.assign({}, msg, {
-      talentRoster: Object.assign({}, roster, { cards }),
+      talentRoster: Object.assign({}, roster, { cards, replacingName: '', notice: '', noticePeople: [] }),
     })
     this.persist(nextMessages, { sending: false, thinkingText: '' })
+  },
+
+  async onRosterPublish(e) {
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
+    const messages = this.data.messages || []
+    const index = messages.findIndex((m) => m && m.id === id)
+    const msg = index >= 0 ? messages[index] : null
+    const roster = msg && msg.talentRoster
+    if (!roster || !feat || this.data.sending || roster.publishing) return
+    const nextMessages = messages.slice()
+    nextMessages[index] = Object.assign({}, msg, {
+      talentRoster: Object.assign({}, roster, { publishing: true, publishError: '' }),
+    })
+    this.setData({ messages: nextMessages, sending: true, thinkingText: '正在发布定向招募…' })
+    try {
+      const result = await feat.publishTargetedRoster(roster)
+      nextMessages[index] = Object.assign({}, msg, {
+        talentRoster: Object.assign({}, roster, {
+          publishing: false,
+          publishError: '',
+          notice: result.summary,
+          noticePeople: result.people || [],
+        }),
+      })
+      this.persist(nextMessages, { sending: false, thinkingText: '' })
+    } catch (err) {
+      nextMessages[index] = Object.assign({}, msg, {
+        talentRoster: Object.assign({}, roster, {
+          publishing: false,
+          publishError: (err && err.message) || '定向招募没有发出去',
+        }),
+      })
+      this.persist(nextMessages, { sending: false, thinkingText: '' })
+    }
   },
 
   onCopyTalentProfile(e) {

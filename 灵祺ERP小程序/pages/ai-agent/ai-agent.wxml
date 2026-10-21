@@ -65,7 +65,11 @@
           data-url="{{img}}"
         />
         <view wx:if="{{item.talentRoster && item.talentRoster.cards.length}}" class="recruit-card">
-          <text class="plan-name">推荐 {{item.talentRoster.cards.length}} 位达人</text>
+          <view class="roster-head">
+            <text class="plan-name">推荐 {{item.talentRoster.cards.length}} 位达人</text>
+            <view class="btn-primary roster-publish" data-id="{{item.id}}" bindtap="onRosterPublish">{{item.talentRoster.publishing ? '正在发布…' : '定向招募'}}</view>
+          </view>
+          <text wx:if="{{item.talentRoster.publishError}}" class="plan-warn">{{item.talentRoster.publishError}}</text>
           <view wx:for="{{item.talentRoster.cards}}" wx:for-item="card" wx:key="seatId" class="shoot-box">
             <view class="talent-card-row">
               <view wx:if="{{!card.empty}}" class="talent-avatar">
@@ -73,20 +77,44 @@
                 <text wx:else>{{card.avatarInitial}}</text>
               </view>
               <view class="talent-card-text">
-                <text class="plan-desc">{{card.line}}</text>
+                <text class="plan-name">{{card.nickname}}</text>
+                <text class="plan-desc">{{card.metaLine}}</text>
+                <text wx:if="{{card.subLine}}" class="plan-desc">{{card.subLine}}</text>
                 <text wx:if="{{card.profileLink}}" class="talent-home" data-link="{{card.profileLink}}" catchtap="onCopyTalentProfile">{{card.profileLabel}}</text>
-                <text wx:if="{{card.reason}}" class="plan-desc">{{card.reason}}</text>
+                <text wx:else class="plan-desc muted">主页未核到</text>
               </view>
             </view>
-            <view wx:if="{{!card.empty}}" class="btn-ghost" data-id="{{item.id}}" data-talent="{{card.talentId}}" data-name="{{card.nickname}}" bindtap="onRosterReplace">替换</view>
+            <view wx:if="{{!card.empty}}" class="btn-ghost" data-id="{{item.id}}" data-name="{{card.nickname}}" bindtap="onRosterReplace">{{item.talentRoster.replacingName === card.nickname ? '替换中…' : '替换'}}</view>
+          </view>
+          <view wx:if="{{item.talentRoster.notice}}" class="roster-notice">
+            <text class="plan-desc">{{item.talentRoster.notice}}</text>
+            <view wx:for="{{item.talentRoster.noticePeople}}" wx:for-item="person" wx:key="seatId" class="plan-desc">
+              <text>{{person.nickname}}</text>
+              <text wx:if="{{person.profileLink}}" class="talent-home" data-link="{{person.profileLink}}" catchtap="onCopyTalentProfile"> {{person.profileLabel}}</text>
+              <text wx:else class="muted"> 主页未核到</text>
+            </view>
           </view>
         </view>
         <view wx:if="{{item.preview && item.preview.taskType === 'create_product' && item.preview.productPlans.length}}" class="plan-list">
           <view wx:for="{{item.preview.productPlans}}" wx:for-item="plan" wx:key="slotKey" class="plan-card">
-            <text class="plan-name">{{plan.productName || plan.slotLabel}}</text>
-            <text class="plan-price">{{plan.suggestedPriceYuan > 0 ? '建议 ¥' + plan.suggestedPriceYuan : '建议售价生成中'}}</text>
-            <text wx:if="{{plan.description}}" class="plan-desc">{{plan.description}}</text>
-            <text wx:if="{{plan.comboText}}" class="plan-desc">{{plan.comboText}}</text>
+            <block wx:if="{{plan.enrichStatus === 'loading'}}">
+              <text class="plan-desc">正在优化标题并生成团购主图…</text>
+              <text class="plan-foot">完成后将展示 C 端预览效果</text>
+            </block>
+            <block wx:else>
+              <text wx:if="{{plan.slotLabel}}" class="plan-slot">{{plan.slotLabel}}</text>
+              <text class="plan-caption">抖音来客团购 · C 端预览</text>
+              <image wx:if="{{plan.headUrl}}" class="plan-head" src="{{plan.headUrl}}" mode="aspectFill" />
+              <text class="plan-name">{{plan.productName || plan.slotLabel}}</text>
+              <text wx:if="{{plan.description}}" class="plan-desc">{{plan.description}}</text>
+              <view class="plan-price-row">
+                <text class="plan-price">{{plan.suggestedPriceYuan > 0 ? '¥' + plan.suggestedPriceYuan : '价格生成中'}}</text>
+                <text wx:if="{{plan.originYuan}}" class="plan-origin">¥{{plan.originYuan}}</text>
+              </view>
+              <text wx:if="{{plan.comboText}}" class="plan-desc">{{plan.comboText}}</text>
+              <text wx:if="{{plan.enrichError}}" class="plan-warn">{{plan.enrichError}}</text>
+              <text class="plan-foot">确认后将按此方案提交抖音来客审核；如需改价、换图或售后规则，可在提交前于创建页微调。</text>
+            </block>
           </view>
         </view>
         <view wx:if="{{item.uploadSheets && item.uploadSheets.length && item.previewStatus === 'pending'}}" class="upload-sheets">
@@ -166,9 +194,13 @@
         >去商品列表</view>
         <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType === 'recruit_influencer' && item.preview.recruitmentBrief}}" class="recruit-card">
           <view wx:if="{{item.preview.recruitmentBrief.talentPath === 'pending' || item.preview.recruitmentBrief.talentPath === 'recommend'}}">
-            <text class="plan-desc">{{item.preview.recruitmentBrief.talentPath === 'recommend' ? '已按方案人数推荐。确认后进入招募，不会自动发出去。' : '请先选择：给我推荐，或我要招募。推荐只换点到的这一位，不会自动发招募。'}}</text>
+            <view wx:if="{{item.preview.recruitmentBrief.talentPath === 'recommend'}}" class="roster-head">
+              <text class="plan-name">推荐 {{item.preview.recruitmentBrief.talentCards.length}} 位达人</text>
+              <text class="plan-back" data-id="{{item.id}}" bindtap="onTalentBack">返回选择</text>
+            </view>
+            <text class="plan-desc">{{item.preview.recruitmentBrief.talentPath === 'recommend' ? '已按方案人数推荐。确认后进入招募，不会自动发出去。' : (item.preview.recruitmentBrief.wizardBudget.headcount > 0 ? '按当前方案约 ' + item.preview.recruitmentBrief.wizardBudget.headcount + ' 人。先选一件事，系统不会自动发出去。' : '先选一件事，系统不会自动发出去。')}}</text>
             <view wx:if="{{item.preview.recruitmentBrief.talentPath === 'pending'}}" class="preview-actions">
-              <view class="btn-primary" data-id="{{item.id}}" bindtap="onTalentRecommend">给我推荐</view>
+              <view class="btn-primary" data-id="{{item.id}}" bindtap="onTalentRecommend">{{item.preview.recruitmentBrief.wizardBudget.headcount > 0 ? '给我推荐（' + item.preview.recruitmentBrief.wizardBudget.headcount + ' 人）' : '给我推荐'}}</view>
               <view class="btn-ghost" data-id="{{item.id}}" bindtap="onTalentRecruit">我要招募</view>
             </view>
             <text wx:if="{{item.preview.recruitmentBrief.talentNote}}" class="plan-desc">{{item.preview.recruitmentBrief.talentNote}}</text>
@@ -179,9 +211,18 @@
                   <text wx:else>{{card.avatarInitial}}</text>
                 </view>
                 <view class="talent-card-text">
-                  <text class="plan-desc">{{card.line}}</text>
-                  <text wx:if="{{card.profileLink}}" class="talent-home" data-link="{{card.profileLink}}" catchtap="onCopyTalentProfile">{{card.profileLabel}}</text>
-                  <text wx:if="{{card.reason}}" class="plan-desc">{{card.reason}}</text>
+                  <block wx:if="{{card.empty}}">
+                    <text class="plan-name">{{card.tierLabel}}</text>
+                    <text class="plan-desc">{{card.reason}}</text>
+                  </block>
+                  <block wx:else>
+                    <text class="plan-name">{{card.nickname}}</text>
+                    <text class="plan-desc">{{card.planMeta}}</text>
+                    <text wx:if="{{card.planSub}}" class="plan-desc">{{card.planSub}}</text>
+                    <text wx:if="{{card.source === 'public' && card.reason}}" class="plan-desc">{{card.reason}}</text>
+                    <text wx:if="{{card.profileLink}}" class="talent-home" data-link="{{card.profileLink}}" catchtap="onCopyTalentProfile">{{card.profileLabel}}</text>
+                    <text wx:else class="plan-desc muted">主页未核到</text>
+                  </block>
                 </view>
               </view>
               <view wx:if="{{!card.empty}}" class="btn-ghost" data-id="{{item.id}}" data-talent="{{card.talentId}}" data-name="{{card.nickname}}" bindtap="onTalentReplace">替换</view>

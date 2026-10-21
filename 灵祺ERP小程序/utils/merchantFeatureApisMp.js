@@ -371,7 +371,12 @@ function decorateTalentCards(cards, seats) {
     const platform = String(c.platform || seat.platform || '抖音')
     const profileLink = empty ? '' : httpsUrl(c.profileLink)
     const fansBit = followerBit(c)
-    const tagBit = (Array.isArray(c.tags) ? c.tags : []).slice(0, 2).filter(Boolean).join(' / ')
+    const tagBit = (Array.isArray(c.tags) ? c.tags : []).slice(0, 2).filter(Boolean).join('/')
+    const sourceLabel = empty ? '' : c.source === 'public' ? '公网' : '星选库'
+    const quoteBit = c.quoteYuan != null && c.quoteYuan !== '' ? `报价¥${c.quoteYuan}` : ''
+    const feeYuan = Number(c.unitBudgetYuan || seat.unitBudgetYuan || 0)
+    const feeBit = feeYuan > 0 ? `车马费¥${feeYuan}` : ''
+    const levelBit = c.level && c.level !== (c.tierLabel || seat.tierLabel) ? String(c.level) : ''
     return {
       seatId: String(c.seatId || ''),
       talentId: String(c.talentId || ''),
@@ -387,6 +392,14 @@ function decorateTalentCards(cards, seats) {
       level: String(c.level || c.tierLabel || ''),
       tags: Array.isArray(c.tags) ? c.tags : [],
       source: String(c.source || ''),
+      sourceLabel,
+      memberId: String(c.memberId || ''),
+      metaLine: [sourceLabel, c.city || '', fansBit].filter(Boolean).join(' · '),
+      subLine: [quoteBit || String(c.reason || ''), tagBit].filter(Boolean).join(' · '),
+      planMeta: empty ? '' : [platform, c.city || '', fansBit].filter(Boolean).join(' · '),
+      planSub: empty
+        ? ''
+        : [c.tierLabel || seat.tierLabel || '', feeBit, quoteBit, levelBit, tagBit].filter(Boolean).join(' · '),
       avatarUrl: empty ? '' : httpsUrl(c.avatarUrl),
       avatarInitial: (nickname || '达').slice(0, 1),
       profileLink,
@@ -1168,6 +1181,152 @@ async function runSiteSelection(body) {
   }
 }
 
+function rosterPeople(list) {
+  return (list || [])
+    .filter((c) => c && c.nickname)
+    .map((c) => ({
+      seatId: c.seatId || c.nickname,
+      nickname: c.nickname,
+      profileLink: c.profileLink || '',
+      profileLabel: c.profileLabel || '主页',
+    }))
+}
+
+/**
+ * 与网页 TalentChatRoster.publishTargeted 同一条发布：
+ * 星选库有 memberId 的人写入招募单并站内邀约；公网达人只提示自行联系。
+ */
+async function publishTargetedRoster(roster) {
+  const cards = ((roster && roster.cards) || []).filter((c) => c && !c.empty && c.nickname)
+  const library = cards.filter((c) => c.source !== 'public')
+  const publicCards = cards.filter((c) => c.source === 'public')
+  const inviteIds = []
+  library.forEach((c) => {
+    if (c.memberId && inviteIds.indexOf(c.memberId) < 0) inviteIds.push(c.memberId)
+  })
+  if (!inviteIds.length) {
+    return {
+      ok: true,
+      summary: '这些达人还不在星选库，定向招募发不进站内。请通过主页自行联系。',
+      people: rosterPeople(publicCards.length ? publicCards : library),
+    }
+  }
+  const ops = require('./opsRegistryMp.js')
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const names = library.map((c) => c.nickname).join('、')
+  let merchantName = ''
+  try {
+    merchantName = String(wx.getStorageSync('meoo_erp_merchant_display_name') || '').trim()
+  } catch (_) {
+    merchantName = ''
+  }
+  const storeName = (roster && roster.storeName) || (roster && roster.city) || '门店'
+  const talentType = (roster && roster.talentType) || '达人'
+  const city = (roster && roster.city) || storeName
+  const orderId = `RO-AI${Date.now()}`
+  const mpOrderId = `MPO${Date.now()}`
+  const tid = tenantId()
+  const order = {
+    id: orderId,
+    customerName: merchantName || storeName || '灵祺 ERP 商户',
+    storeName,
+    talentId: '—',
+    talentName: names.slice(0, 80) || '定向达人',
+    fans: inviteIds.length,
+    accountType: '抖音',
+    recruitmentPlatform: '抖音',
+    coopTimes: 0,
+    createdAt: now,
+    status: 'pending',
+    serviceAmount: 0,
+    commissionPct: 0,
+    netAmount: 0,
+    storeAddress: city,
+    category: talentType || '本地生活',
+    infoSummary: `【定向招募】${storeName} · ${talentType} · ${names}`,
+    fulfillmentLoop: 'open',
+    orderKind: 'recruitment',
+    autoPublishMp: true,
+    workflowStage: 'submitted',
+    acceptMode: 'miniprogram',
+  }
+  if (tid) order.tenantId = tid
+  await ops.appendRecruitmentOrder(order)
+  const mpOrder = {
+    id: mpOrderId,
+    sourceMerchantOrderId: orderId,
+    customerName: order.customerName,
+    storeName,
+    merchantRequirements: order.infoSummary,
+    status: 'open',
+    createdAt: now,
+    updatedAt: now,
+    applicants: [],
+    orderKind: 'recruitment',
+    hall: 'normal',
+    fulfillmentLoop: 'open',
+    title: `${storeName}·定向招募`,
+    recruitmentInfo: order.infoSummary,
+    taskDetail: '商家通过 ERP 发起招募；达人报名后由商家在 ERP 反选，确认后推送群码与探店排期。',
+    platform: '抖音',
+    fansRequirement: '按招募方案档位',
+    recruitCount: inviteIds.length,
+    region: city,
+    category: talentType || '本地生活',
+    serviceAmount: 0,
+    urgent: false,
+    publisherIdentity: 'merchant',
+    mpPublishMeta: {
+      recruitTarget: 'talent',
+      recruitScope: 'targeted',
+      targetedStatus: 'inviting',
+      merchantWorkflow: true,
+      ...(tid ? { tenantId: tid } : {}),
+    },
+  }
+  const appended = await postJson('/api/meoo-ops-mp-recruitment-orders-append', { order: mpOrder })
+  if (appended && appended.ok === false) {
+    throw new Error(appended.message || appended.error || '发布星选招募单失败')
+  }
+  const realMpId = (appended && (appended.id || appended.existingId)) || mpOrderId
+  try {
+    await postJson('/api/meoo-ops-recruitment-orders-patch', {
+      id: orderId,
+      linkedMpOrderId: realMpId,
+      workflowStage: 'recruiting',
+      status: 'accepted',
+      acceptMode: 'miniprogram',
+    })
+  } catch (_) {
+    /* 邀约仍以星选招募单为准 */
+  }
+  const invited = await postJson('/api/meoo-ops-mp-targeted-recruit', {
+    action: 'send_invites',
+    mpOrderId: realMpId,
+    talentMemberIds: inviteIds,
+  })
+  if (invited && invited.ok === false) {
+    throw new Error(invited.message || invited.error || '定向招募没有发出去')
+  }
+  const invitedIds = {}
+  ;((invited && invited.newInvites) || []).forEach((row) => {
+    const mid = row && (row.talentMemberId || row.memberId)
+    if (mid) invitedIds[String(mid)] = true
+  })
+  const missed = Object.keys(invitedIds).length
+    ? library.filter((c) => c.memberId && !invitedIds[c.memberId])
+    : []
+  const people = publicCards.concat(missed)
+  const invitedCount = invited && invited.added != null ? invited.added : inviteIds.length
+  return {
+    ok: true,
+    summary: people.length
+      ? `已发布定向招募，站内已邀请 ${invitedCount} 位星选达人。下面这些达人还不在星选库，需要您自行联系。`
+      : `已发布定向招募，已向 ${invitedCount} 位星选达人发出邀约。`,
+    people: rosterPeople(people),
+  }
+}
+
 module.exports = {
   tenantId,
   readStoreMenu,
@@ -1191,6 +1350,7 @@ module.exports = {
   buildTalentRecommendChatBlock,
   buildTalentChatRoster,
   replaceTalentChatCard,
+  publishTargetedRoster,
   cityAskedForTalents,
   cityMentionedInText,
   isTalentRecommendAsk,

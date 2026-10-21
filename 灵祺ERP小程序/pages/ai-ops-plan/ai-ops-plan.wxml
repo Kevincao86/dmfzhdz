@@ -157,9 +157,9 @@
   </block>
 
   <view wx:if="{{plan}}" class="op-card">
-    <text class="op-card-title">达人名单</text>
-    <text class="op-body muted">先选：给我推荐，或我要招募。推荐只换点到的这一位，不会自动发招募。</text>
-    <button class="op-btn" loading="{{talentBusy}}" disabled="{{talentBusy}}" bindtap="onTalentRecommend">给我推荐</button>
+    <text class="op-card-title">{{talentCards.length ? '推荐 ' + talentCards.length + ' 位达人' : '达人名单'}}</text>
+    <text class="op-body muted">{{talentRecommendCount > 0 ? '按当前方案约 ' + talentRecommendCount + ' 人。先选一件事，系统不会自动发出去。' : '先选一件事，系统不会自动发出去。'}}</text>
+    <button class="op-btn" loading="{{talentBusy}}" disabled="{{talentBusy}}" bindtap="onTalentRecommend">{{talentRecommendCount > 0 ? '给我推荐（' + talentRecommendCount + ' 人）' : '给我推荐'}}</button>
     <button class="op-btn" bindtap="onTalentRecruit">我要招募</button>
     <text wx:if="{{talentNote}}" class="op-meta">{{talentNote}}</text>
     <view wx:for="{{talentCards}}" wx:key="seatId" class="op-li talent-card">
@@ -169,9 +169,18 @@
           <text wx:else>{{item.avatarInitial}}</text>
         </view>
         <view class="talent-card-text">
-          <text class="op-body">{{item.line}}</text>
-          <text wx:if="{{item.profileLink}}" class="talent-home" data-link="{{item.profileLink}}" catchtap="onCopyTalentProfile">{{item.profileLabel}}</text>
-          <text wx:if="{{item.reason}}" class="op-body muted">{{item.reason}}</text>
+          <block wx:if="{{item.empty}}">
+            <text class="op-body">{{item.tierLabel}}</text>
+            <text class="op-body muted">{{item.reason}}</text>
+          </block>
+          <block wx:else>
+            <text class="op-body">{{item.nickname}}</text>
+            <text class="op-body muted">{{item.planMeta}}</text>
+            <text wx:if="{{item.planSub}}" class="op-body muted">{{item.planSub}}</text>
+            <text wx:if="{{item.source === 'public' && item.reason}}" class="op-body muted">{{item.reason}}</text>
+            <text wx:if="{{item.profileLink}}" class="talent-home" data-link="{{item.profileLink}}" catchtap="onCopyTalentProfile">{{item.profileLabel}}</text>
+            <text wx:else class="op-body muted">主页未核到</text>
+          </block>
         </view>
       </view>
       <button wx:if="{{!item.empty}}" class="op-btn" data-id="{{item.talentId}}" data-name="{{item.nickname}}" bindtap="onTalentReplace">替换</button>

@@ -24,6 +24,14 @@ const GOAL_TEMPLATES = [
   { id: 'shequn', label: '社群私域', note: '视频号+社群裂变，老带新券与到店核销，降低公域获客依赖。', budget: '16000' },
 ]
 
+function talentRecommendCount(plan) {
+  const seats = plan && Array.isArray(plan.talentSeats) ? plan.talentSeats.length : 0
+  if (seats > 0) return seats
+  const budget = Number(plan && plan.totalBudget) || 0
+  if (budget > 0) return Math.max(3, Math.min(12, Math.round(budget / 1200)))
+  return 0
+}
+
 function monthRange() {
   const now = new Date()
   const y = now.getFullYear()
@@ -98,6 +106,7 @@ Page({
     talentBusy: false,
     talentCards: [],
     talentNote: '',
+    talentRecommendCount: 0,
     opsPoints: economics.MP_POINTS_OPS_PLAN_PER_USE,
     editionTip: '简易版：白话步骤 + 图文卡片，默认推荐中小商家。',
   },
@@ -177,7 +186,7 @@ Page({
       return
     }
     this._excludedIds = []
-    this.setData({ busy: true, err: '', plan: null, simple: null, pointsHint: '', talentCards: [], talentNote: '' })
+    this.setData({ busy: true, err: '', plan: null, simple: null, pointsHint: '', talentCards: [], talentNote: '', talentRecommendCount: 0 })
     void (async () => {
       const menu = feat.readStoreMenu()
       const r = await feat.generateAiOpsPlan({
@@ -208,6 +217,7 @@ Page({
         pointsHint,
         talentCards: [],
         talentNote: '',
+        talentRecommendCount: talentRecommendCount(r.plan),
       })
     })()
   },
