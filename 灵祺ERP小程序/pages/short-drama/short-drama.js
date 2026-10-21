@@ -231,15 +231,27 @@ Page({
   onShow() {
     if (!api.getAccessToken()) {
       wx.redirectTo({ url: '/pages/login/login' })
+      return
     }
-  },
-
-  onShow() {
-    const saved = castStore.loadCurrent()
+    const packs = (castStore.loadPacks() || []).map((pack) =>
+      Object.assign({}, pack, {
+        members: (pack.members || []).map((member) => this._slimMember(member)),
+      }),
+    )
+    if (this._castTouched) {
+      this.setData({ castPacks: packs })
+      return
+    }
+    const saved = (castStore.loadCurrent() || []).map((member) => this._sanitizeMember(member))
     this.setData({
-      castPacks: castStore.loadPacks(),
+      castPacks: packs,
       cast: saved.length ? saved : this.data.cast,
     })
+    if (saved.length) {
+      try {
+        castStore.saveCurrent(saved.map((member) => this._slimMember(member)))
+      } catch (_) {}
+    }
   },
 
   onDramaStep(e) {
@@ -263,7 +275,78 @@ Page({
     this.setData({ dramaStep: Math.max(1, this.data.dramaStep - 1), err: '' })
   },
 
+  _rememberCastImage(key, dataUrl) {
+    if (!this._castImageData) this._castImageData = {}
+    const url = String(dataUrl || '')
+    if (/^data:image\//i.test(url)) this._castImageData[key] = url
+  },
+  _castImageDataOf(member) {
+    const bag = this._castImageData || {}
+    const id = member && member.id
+    return (id && bag[id]) || ''
+  },
+  _writeDataUrlFile(id, dataUrl) {
+    const matched = String(dataUrl || '').match(/^data:image\/[a-z0-9.+-]+;base64,([\s\S]+)$/i)
+    if (!matched) return ''
+    const b64 = matched[1].replace(/\s/g, '')
+    if (b64.length < 32) return ''
+    const safe = String(id || 'cast').replace(/[^\w-]/g, '').slice(0, 48) || 'cast'
+    const path = `${wx.env.USER_DATA_PATH}/drama-cast-${safe}.jpg`
+    try {
+      wx.getFileSystemManager().writeFileSync(path, b64, 'base64')
+      return path
+    } catch (_) {
+      return ''
+    }
+  },
+  /** 页面数据里不放 data URL。超大 base64 会撑爆 setData，图片组件只剩蓝色底。 */
+  _sanitizeMember(member) {
+    const next = Object.assign({}, member)
+    const previewData = /^data:image\//i.test(next.previewDataUrl || '') ? next.previewDataUrl : ''
+    const previewPathData = /^data:image\//i.test(next.previewPath || '') ? next.previewPath : ''
+    const dataUrl = previewData || previewPathData
+    if (dataUrl) this._rememberCastImage(next.id, dataUrl)
+    if (previewPathData || (!next.previewPath && dataUrl)) {
+      next.previewPath = this._writeDataUrlFile(next.id, dataUrl) || ''
+    }
+    next.previewDataUrl = ''
+    if (/^data:image\//i.test(next.sourcePath || '')) {
+      this._rememberCastImage(`${next.id}:src`, next.sourcePath)
+      next.sourcePath = this._writeDataUrlFile(`${next.id}-src`, next.sourcePath) || ''
+    }
+    if (/^data:image\//i.test(next.sourceDataUrl || '') && String(next.sourceDataUrl).length > 4096) {
+      this._rememberCastImage(`${next.id}:src`, next.sourceDataUrl)
+      next.sourceDataUrl = ''
+    }
+    return next
+  },
+  _slimMember(member) {
+    const next = Object.assign({}, member)
+    if (/^data:image\//i.test(next.previewPath || '')) next.previewPath = ''
+    if (/^data:image\//i.test(next.previewDataUrl || '')) next.previewDataUrl = ''
+    if (/^data:image\//i.test(next.sourcePath || '')) next.sourcePath = ''
+    if (/^data:image\//i.test(next.sourceDataUrl || '') && next.sourceDataUrl.length > 4096) next.sourceDataUrl = ''
+    return next
+  },
+  async _placeCastPreview(id, imageUrl) {
+    const src = String(imageUrl || '').trim()
+    if (!src) return ''
+    if (/^data:image\//i.test(src)) {
+      this._rememberCastImage(id, src)
+      return this._writeDataUrlFile(id, src)
+    }
+    if (/^https?:/i.test(src)) {
+      const dataUrl = await this.downloadImageAsDataUrl(src)
+      if (dataUrl) {
+        this._rememberCastImage(id, dataUrl)
+        const file = this._writeDataUrlFile(id, dataUrl)
+        if (file) return file
+      }
+    }
+    return this._isLocalImagePath(src) ? src : ''
+  },
   _patchCast(id, patch) {
+    this._castTouched = true
     const cast = (this.data.cast || []).map((m) => (m.id === id ? Object.assign({}, m, patch) : m))
     this.setData({ cast })
     return cast
@@ -530,11 +613,16 @@ Page({
       referenceImage: usePhoto ? member.sourceDataUrl || '' : '',
     })
     if (!r.ok || !r.imageUrl) throw new Error(r.message || '角色生成失败')
-    this._patchCast(member.id, {
-      previewPath: r.imageUrl,
+    const previewPath = await this._placeCastPreview(member.id, r.imageUrl)
+    if (!previewPath) throw new Error('角色图已生成，但无法在小程序里显示，请再试一次')
+    const cast = this._patchCast(member.id, {
+      previewPath,
       previewDataUrl: '',
       confirmed: false,
     })
+    try {
+      castStore.saveCurrent(cast.map((item) => this._slimMember(item)))
+    } catch (_) {}
     this.setData({ hint: `已为${name}生成预览，请点「用此图确认角色」后再出片。` })
   },
   async onGenCast(e) {
@@ -609,42 +697,44 @@ Page({
     const member = this._member(e.currentTarget.dataset.id)
     if (!member) return
     const preview = String(member.previewPath || member.sourcePath || '').trim()
-    if (!preview) {
+    if (!preview || /^data:image\//i.test(preview)) {
       wx.showToast({ title: '请先生成或上传角色预览', icon: 'none' })
       return
     }
-    if (member.previewDataUrl || (member.sourceDataUrl && member.refMode === 'beautify' && member.previewPath === member.sourcePath)) {
-      const cast = this._patchCast(member.id, { confirmed: true })
-      castStore.saveCurrent(cast)
-      this.setData({ hint: `已确认${member.name || '角色'}，出片将锁这张脸。` })
+    const bag = this._castImageData || {}
+    let dataUrl = this._castImageDataOf(member) || bag[`${member.id}:src`] || ''
+    if (!dataUrl && /^data:image\//i.test(member.sourceDataUrl || '')) dataUrl = member.sourceDataUrl
+    if (!dataUrl && this._isLocalImagePath(preview)) dataUrl = await this._fileToDataUrl(preview)
+    if (!dataUrl && /^https?:/i.test(preview)) {
+      wx.showLoading({ title: '确认角色…', mask: true })
+      try {
+        dataUrl = await this.downloadImageAsDataUrl(preview)
+      } catch (err) {
+        this.setData({ err: (err && err.message) || '确认角色失败' })
+        return
+      } finally {
+        wx.hideLoading()
+      }
+    }
+    if (!/^data:image\//i.test(dataUrl)) {
+      this.setData({ hint: '角色图未能转成本地文件' })
       return
     }
-    const src = member.previewPath || member.sourcePath
-    if (member.sourceDataUrl && !member.previewPath) {
-      const cast = this._patchCast(member.id, {
-        previewPath: member.sourcePath,
-        previewDataUrl: member.sourceDataUrl,
-        confirmed: true,
-        refMode: 'beautify',
-      })
-      castStore.saveCurrent(cast)
-      this.setData({ hint: `已确认${member.name || '角色'}，出片将锁这张脸。` })
+    this._rememberCastImage(member.id, dataUrl)
+    const showPath = this._isLocalImagePath(preview) ? preview : this._writeDataUrlFile(member.id, dataUrl)
+    if (!this._isLocalImagePath(showPath)) {
+      this.setData({ hint: '角色图未能转成本地文件' })
       return
     }
-    wx.showLoading({ title: '确认角色…', mask: true })
+    const cast = this._patchCast(member.id, {
+      previewPath: showPath,
+      previewDataUrl: '',
+      confirmed: true,
+    })
     try {
-      const local = await this.downloadImageAsDataUrl(src)
-      const cast = this._patchCast(member.id, {
-        previewDataUrl: local,
-        confirmed: Boolean(local),
-      })
-      if (local) castStore.saveCurrent(cast)
-      this.setData({ hint: local ? `已确认${member.name || '角色'}，出片将锁这张脸。` : '角色图未能转成本地文件' })
-    } catch (err) {
-      this.setData({ err: (err && err.message) || '确认角色失败' })
-    } finally {
-      wx.hideLoading()
-    }
+      castStore.saveCurrent(cast.map((item) => this._slimMember(item)))
+    } catch (_) {}
+    this.setData({ hint: `已确认${member.name || '角色'}，出片将锁这张脸。` })
   },
   onPreviewCast(e) {
     const member = this._member(e.currentTarget.dataset.id)
@@ -664,7 +754,12 @@ Page({
     })
   },
   onToggleCastLibrary() {
-    this.setData({ showCastLibrary: !this.data.showCastLibrary, showCastSave: false, castPacks: castStore.loadPacks() })
+    const packs = (castStore.loadPacks() || []).map((pack) =>
+      Object.assign({}, pack, {
+        members: (pack.members || []).map((member) => this._slimMember(member)),
+      }),
+    )
+    this.setData({ showCastLibrary: !this.data.showCastLibrary, showCastSave: false, castPacks: packs })
   },
   onCastPackName(e) {
     this.setData({ castPackName: e.detail.value.slice(0, 32) })
@@ -676,30 +771,43 @@ Page({
       return
     }
     const name = String(this.data.castPackName || '').trim() || '续集角色'
+    const slimMembers = members.map((member) => this._slimMember(member))
     const packs = castStore.loadPacks().filter((p) => p.name !== name)
     packs.unshift({
       id: `p${Date.now().toString(36)}`,
       name,
       savedAt: Date.now(),
-      members,
+      members: slimMembers,
     })
     try {
       castStore.savePacks(packs)
-      castStore.saveCurrent(members)
-      this.setData({ castPacks: castStore.loadPacks(), showCastSave: false, hint: `已保存角色组「${name}」。` })
+      castStore.saveCurrent(slimMembers)
+      this.setData({
+        castPacks: packs.map((pack) =>
+          Object.assign({}, pack, {
+            members: (pack.members || []).map((member) => this._slimMember(member)),
+          }),
+        ),
+        showCastSave: false,
+        hint: `已保存角色组「${name}」。`,
+      })
     } catch (err) {
       this.setData({ err: '角色图太大，保存失败。可去掉原图、只保留形象词后再存。' })
     }
   },
   onLoadCastPack(e) {
-    const pack = (this.data.castPacks || []).find((p) => p.id === e.currentTarget.dataset.id)
+    const pack = (castStore.loadPacks() || []).find((p) => p.id === e.currentTarget.dataset.id)
     if (!pack || !pack.members || !pack.members.length) return
+    const members = pack.members.slice(0, castStore.MAX).map((member) => this._sanitizeMember(member))
+    this._castTouched = true
     this.setData({
-      cast: pack.members.slice(0, castStore.MAX),
+      cast: members,
       showCastLibrary: false,
       hint: `已载入「${pack.name}」。`,
     })
-    castStore.saveCurrent(pack.members)
+    try {
+      castStore.saveCurrent(members.map((member) => this._slimMember(member)))
+    } catch (_) {}
   },
   onDeleteCastPack(e) {
     const id = e.currentTarget.dataset.id
@@ -852,11 +960,21 @@ Page({
     return { ok: false, message: (done && done.message) || '生成未完成', taskId: r.taskId }
   },
 
-  collectDramaImages() {
-    const faces = (this.data.cast || [])
-      .filter((m) => m.confirmed && (m.previewDataUrl || (m.refMode === 'beautify' && m.sourceDataUrl)))
-      .map((m) => m.previewDataUrl || m.sourceDataUrl)
-      .filter(Boolean)
+  async collectDramaImages() {
+    const faces = []
+    for (const member of this.data.cast || []) {
+      if (!member.confirmed) continue
+      let dataUrl = this._castImageDataOf(member)
+      const local = member.previewPath || member.sourcePath
+      if (!dataUrl && this._isLocalImagePath(local)) dataUrl = await this._fileToDataUrl(local)
+      if (!dataUrl && member.refMode === 'beautify') {
+        dataUrl = (this._castImageData && this._castImageData[`${member.id}:src`]) || member.sourceDataUrl || ''
+      }
+      if (/^data:image\//i.test(dataUrl)) {
+        this._rememberCastImage(member.id, dataUrl)
+        faces.push(dataUrl)
+      }
+    }
     const refs = this.data.refDataUrls || []
     return faces.concat(refs).slice(0, 3)
   },
@@ -1019,7 +1137,7 @@ Page({
     this._cancel = false
     this.setData({ busy: true, err: '', hint: '', resultUrl: '', progress: '排队中…' })
     try {
-      const images0 = this.collectDramaImages()
+      const images0 = await this.collectDramaImages()
       if (plan.length <= 1) {
         const done = await this.runDramaClip(prompt, total, images0)
         if (done.ok && done.videoUrl) {
