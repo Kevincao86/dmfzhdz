@@ -265,17 +265,82 @@ function describeShopBackend(summary, adviceFacts, range) {
     .join('\n')
 }
 
+function rosterLines(storeNames) {
+  const text = String(storeNames || '').trim()
+  if (!text) return []
+  if (text.indexOf('\n') >= 0 || text.indexOf('｜') >= 0) {
+    return text
+      .split(/\n+/)
+      .map((line) => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(Boolean)
+  }
+  return text
+    .split('、')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function rosterStoreLabels(storeNames) {
+  return rosterLines(storeNames)
+    .map((line) => line.split('｜')[0].replace(/^\d+\.\s*/, '').trim())
+    .filter(Boolean)
+}
+
+function formatStoreRoster(stores) {
+  const lines = []
+  const seen = {}
+  ;(Array.isArray(stores) ? stores : []).forEach((store) => {
+    const name = String((store && store.name) || '').trim()
+    if (!name || seen[name]) return
+    seen[name] = true
+    const bits = [name]
+    const address = String((store && store.address) || '').trim()
+    const phone = String((store && store.phone) || '').trim()
+    if (address) bits.push(address)
+    if (phone) bits.push(phone)
+    lines.push(bits.join('｜'))
+  })
+  return lines.join('\n')
+}
+
+function mergeBrandStoreNames(roster, extraNames) {
+  const lines = rosterLines(roster)
+  const seen = {}
+  lines.forEach((line) => {
+    seen[line.split('｜')[0].trim()] = true
+  })
+  ;(Array.isArray(extraNames) ? extraNames : []).forEach((raw) => {
+    const text = String(raw || '').trim()
+    const key = text.split('（')[0].trim()
+    if (!text || !key || seen[key]) return
+    seen[key] = true
+    lines.push(text)
+  })
+  return lines.join('\n')
+}
+
 function shopFacts(spec, row) {
+  const chain = spec.scope === 'chain'
+  const stores = rosterLines(row.storeNames)
+  const listed = stores.map((line, index) => `${index + 1}. ${line}`).join('\n')
   return [
     `平台：${spec.name}`,
-    `经营形态：${spec.scope === 'chain' ? `连锁品牌（${row.storeCount || '多家'}）` : '单门店'}`,
-    `品牌：${filledOr(row.brandName, spec.scope === 'chain' ? '未填写' : '无')}`,
-    `门店名称：${filledOr(row.storeName, '未填写')}`,
-    `分店示例：${filledOr(row.storeNames, spec.scope === 'chain' ? '未列出' : '无')}`,
+    `经营形态：${chain ? `连锁品牌（${Math.max(Number(row.storeCount) || 0, stores.length) || '多家'}）` : '单门店'}`,
+    `品牌：${filledOr(row.brandName, chain ? '未填写' : '无')}`,
+    chain && listed
+      ? `全部门店（必须覆盖下面每一家。禁止只用其中一家的团购、地址、电话或评价代表全品牌。某一家材料多，不能写成其余门店线上空白）：\n${listed}`
+      : `门店名称：${filledOr(row.storeName, '未填写')}`,
+    chain && listed ? '' : `分店示例：${filledOr(row.storeNames, chain ? '未列出' : '无')}`,
     `城市：${filledOr(row.city, '未填写')}`,
-    `地址：${filledOr(row.address, '未填写')}`,
-    `电话：${filledOr(row.phone, '商家档案未填。公开检索里有这一家的号码就写入线上运营')}`,
-    `营业时间：${filledOr(row.businessHours, '商家档案未填。公开检索里有这一家的钟点就写入线上运营。不要把店名里的24时当成营业时间')}`,
+    chain && listed
+      ? '地址和电话以全部门店清单为准。不要把清单里的某一家写成唯一在营业或唯一有团购的店。'
+      : `地址：${filledOr(row.address, '未填写')}`,
+    chain && listed
+      ? ''
+      : `电话：${filledOr(row.phone, '商家档案未填。公开检索里有这一家的号码就写入线上运营')}`,
+    chain && listed
+      ? ''
+      : `营业时间：${filledOr(row.businessHours, '商家档案未填。公开检索里有这一家的钟点就写入线上运营。不要把店名里的24时当成营业时间')}`,
     `主推套餐：${filledOr(row.offerName, '未填写')}`,
     `套餐价格：${filledOr(row.offerPrice, /\d+\s*元|套餐/.test(String(row.publicNote || '')) ? '公开检索里已经有团购价格，写进套餐竞争力，禁止写成未上架' : '未填写，不要编造')}`,
     `经营分类：${filledOr(row.category, '未填写')}`,
@@ -994,11 +1059,7 @@ function resolveShopEvalFromStores(platformId, stores, total) {
       }
     }
   }
-  const storeNames = list
-    .slice(0, 8)
-    .map((row) => String(row && row.name ? row.name : '').trim())
-    .filter(Boolean)
-    .join('、')
+  const storeNames = formatStoreRoster(list)
   return {
     platformId,
     scope,
@@ -1053,11 +1114,7 @@ function boundEvalBrandTarget(stores) {
   return {
     brandName,
     storeCount: members.length,
-    storeNames: members
-      .slice(0, 8)
-      .map((store) => String(store.name || '').trim())
-      .filter(Boolean)
-      .join('、'),
+    storeNames: formatStoreRoster(members),
     anchor: members[0] || null,
   }
 }
@@ -1270,6 +1327,7 @@ function httpGet(url) {
 
 function keepNoteLine(line) {
   if (line.length < 6) return false
+  if (/^未检索到[:：]/.test(line)) return true
   if (/\d+\s*元|套餐|评价|探店|团购|人均|已售|月售|点评/.test(line)) return true
   return !/暂未检索|未检索到|没有找到|无法查询|无公开/.test(line)
 }
@@ -1277,12 +1335,33 @@ function keepNoteLine(line) {
 async function doubaoPublicNotes(askText, row) {
   const name = row.brandName || row.storeName
   const core = brandCore(name)
-  const rounds = [
+  const stores = rosterStoreLabels(row.storeNames)
+  const rounds = []
+  if (stores.length >= 2) {
+    rounds.push({
+      system: [
+        '这是连锁品牌，下面是全部门店。请联网按店检索团购、评价和探店。',
+        '每家一行，开头写店名。没有检索到的店写「未检索到：店名」。',
+        '禁止只写曝光最高的一家，再推断其他店没有团购或内容。',
+      ].join(''),
+      user:
+        '品牌：' +
+        name +
+        '\n城市：' +
+        (row.city || '') +
+        '\n全部门店：\n' +
+        stores.join('\n') +
+        '\n请按店检索美团、大众点评、抖音团购和评价。',
+    })
+  }
+  rounds.push(
     {
       system: [
         '你在用方舟联网检索这个品牌。每条一行，最多 12 行。',
         '要写套餐名、价格、已售或月售、评价说法、探店或短视频。数字按检索原文写。',
-        '店名里的「24时」不要当成全天营业。其他分店的电话不要安到被点名的这一家。',
+        stores.length >= 2
+          ? '店名里的「24时」不要当成全天营业。按全部门店写，不要把某一家的电话或团购安到其他店。'
+          : '店名里的「24时」不要当成全天营业。其他分店的电话不要安到被点名的这一家。',
       ].join(''),
       user:
         '品牌：' +
@@ -1311,10 +1390,10 @@ async function doubaoPublicNotes(askText, row) {
         (row.category || '') +
         '\n请把能对上这个品牌的套餐、评价、探店，以及同城同品类可对照的价格带都写出来。',
     },
-  ]
+  )
   const lines = []
   for (const round of rounds) {
-    if (lines.length >= 8) break
+    if (lines.length >= 24) break
     try {
       const text = await askText(round.system, round.user, { webSearch: true })
       const parts = String(text || '').split('\n')
@@ -1322,7 +1401,7 @@ async function doubaoPublicNotes(askText, row) {
         const clean = line.replace(/^\d+[.、]\s*/, '').trim()
         if (!keepNoteLine(clean) || lines.indexOf(clean) >= 0) continue
         lines.push(clean)
-        if (lines.length >= 16) break
+        if (lines.length >= 24) break
       }
     } catch (e) {
       /* 下一轮 */
@@ -1357,7 +1436,11 @@ async function searchPublicBrand(row) {
     .split('\n')
     .map((line) => line.replace(/^\d+\.\s*/, '').trim())
     .filter((line) => keepStoreTitle(line, core))
-  const titles = preset.slice(0, 8)
+  const titles = preset.slice(0, 24)
+  const branchQueries = rosterStoreLabels(row.storeNames)
+    .filter((label) => label && label !== name && label !== row.storeName)
+    .slice(0, 8)
+    .map((label) => label + ' 团购')
   const brandQueries = [
     name + ' ' + city + ' 团购',
     name + ' 抖音 探店',
@@ -1365,17 +1448,21 @@ async function searchPublicBrand(row) {
     core + ' ' + city + ' 美团 套餐',
     core + ' ' + city + ' 评价',
     name + ' 抖音 已售',
-  ]
+  ].concat(branchQueries)
   const peerQueries = [category + ' ' + city + ' 团购 套餐', category + ' ' + city + ' 点评 人均']
-  for (const query of brandQueries) {
-    const q = query.replace(/\s+/g, ' ').trim()
-    if (q.length < 2) continue
-    const html = await httpGet('https://www.sogou.com/web?query=' + encodeURIComponent(q))
+  const htmls = await Promise.all(
+    brandQueries.map((query) => {
+      const q = query.replace(/\s+/g, ' ').trim()
+      if (q.length < 2) return ''
+      return httpGet('https://www.sogou.com/web?query=' + encodeURIComponent(q))
+    }),
+  )
+  htmls.forEach((html) => {
     for (const title of parseSogouTitles(html)) {
       if (!keepStoreTitle(title, core) || titles.indexOf(title) >= 0) continue
       titles.push(title)
     }
-  }
+  })
   if (titles.length < 4) {
     for (const query of peerQueries) {
       const q = query.replace(/\s+/g, ' ').trim()
@@ -1389,7 +1476,7 @@ async function searchPublicBrand(row) {
       }
     }
   }
-  return titles.slice(0, 16)
+  return titles.slice(0, 24)
 }
 
 function publicScoreSystem(scope) {
@@ -1399,6 +1486,7 @@ function publicScoreSystem(scope) {
     scope === 'chain'
       ? [
           '这次用连锁品牌公网六维。口碑权重最高。不看单店多猛，看总量、单店均值和能不能复制。',
+          '全部门店清单里的每一家都要在定位或点评里有着落。只检索到一部分店时，写明哪些店有材料、哪些店公开材料未覆盖。禁止把未覆盖写成线上空白，或写成只有一家有团购。',
           '品牌全域套餐预估下单规模：看全部店的预估下单总量和单店均值，一家独大不能代表全品牌。',
           '价格体系与内卷控制：看各店套餐是否同价。门店之间低价互踩要重点扣分。',
           '品牌内容与达人矩阵：看品牌号、门店号、达人是否都有，内容有没有落到具体门店。单个账号爆款不等于矩阵。',
@@ -1777,6 +1865,7 @@ module.exports = {
   formatVerifyYuan,
   resolveShopEvalFromStores,
   boundEvalBrandTarget,
+  mergeBrandStoreNames,
   splitCnRegion,
   readSavedShopEval,
   hydrateShopEval,

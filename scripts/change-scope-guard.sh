@@ -1823,6 +1823,7 @@ PAT
       cat <<'PAT'
 merchantShopEval
 MerchantShopEvalPanel
+meoo-shop-eval-locate
 HomeDashboard.tsx
 灵祺ERP小程序/pages/shop-eval/
 灵祺ERP小程序/utils/merchantShopEval.js

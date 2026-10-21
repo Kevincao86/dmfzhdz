@@ -215,6 +215,39 @@ async function publicTitlesFor(name: string, city: string) {
   return [...packages, ...titles.filter((title) => !packages.some((line) => line.includes(title)))].slice(0, 8)
 }
 
+async function branchPublicTitles(names: string[], city: string) {
+  const cityShort = city.replace(/市$/u, '').trim()
+  const headers = {
+    Accept: 'text/html',
+    'User-Agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  }
+  const jobs = names.slice(0, 8).map(async (name) => {
+    const core = brandCore(name) || name.trim()
+    const query = `${name} ${cityShort} 团购`.replace(/\s+/g, ' ').trim()
+    if (query.length < 2) return [] as string[]
+    try {
+      const res = await fetch(`https://www.sogou.com/web?query=${encodeURIComponent(query)}`, {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      })
+      if (!res.ok) return [] as string[]
+      const html = await res.text()
+      return [...extractPackageLines(html, core), ...parseSearchTitles(html, core)]
+    } catch {
+      return [] as string[]
+    }
+  })
+  const groups = await Promise.all(jobs)
+  const out: string[] = []
+  for (const group of groups) {
+    for (const line of group) {
+      if (line && !out.includes(line)) out.push(line)
+    }
+  }
+  return out
+}
+
 async function brandPlaces(name: string, city: string, env: Record<string, string | undefined>) {
   const key = amapKey(env)
   const token = name.trim()
@@ -222,7 +255,7 @@ async function brandPlaces(name: string, city: string, env: Record<string, strin
   const qs = new URLSearchParams({
     key,
     keywords: token,
-    offset: '20',
+    offset: '25',
     page: '1',
     extensions: 'base',
     output: 'JSON',
@@ -238,7 +271,7 @@ async function brandPlaces(name: string, city: string, env: Record<string, strin
   const listed = pois.length
   const reported = Number(json.count)
   const count = listed > 0 && listed === (json.pois || []).length && Number.isFinite(reported) && reported > listed ? reported : listed
-  const names = pois.slice(0, 12).map((row) => {
+  const names = pois.slice(0, 25).map((row) => {
     const addr = String(row.address || '').trim()
     return addr ? `${row.name}（${addr}）` : String(row.name || '')
   })
@@ -324,11 +357,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
   const query = amapQueryForIndustry(category || '餐饮')
-  const [nearby, brand, titles] = await Promise.all([
+  const [nearby, brand] = await Promise.all([
     amapPlaceNearby(env, { location: geo.location, query, radiusM: 3000, pageSize: 8 }),
     brandPlaces(storeName, city, env),
-    storeName ? publicTitlesFor(storeName, city) : Promise.resolve([] as string[]),
   ])
+  const branchLabels = brand.count >= 2
+    ? brand.names
+        .map((item) => item.split('（')[0].trim())
+        .filter((item) => item && item !== storeName)
+    : []
+  const [titles, branchTitles] = await Promise.all([
+    storeName ? publicTitlesFor(storeName, city) : Promise.resolve([] as string[]),
+    branchLabels.length ? branchPublicTitles(branchLabels, city) : Promise.resolve([] as string[]),
+  ])
+  const publicTitles = [...titles]
+  for (const line of branchTitles) {
+    if (line && !publicTitles.includes(line)) publicTitles.push(line)
+  }
   const pois = nearby.ok
     ? nearby.pois.slice(0, 8).map((poi) => ({
         name: poi.name,
@@ -347,6 +392,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     brandCount: brand.count,
     brandNames: brand.names,
     brandNote: brand.note,
-    publicTitles: titles,
+    publicTitles: publicTitles.slice(0, 24),
   })
 }

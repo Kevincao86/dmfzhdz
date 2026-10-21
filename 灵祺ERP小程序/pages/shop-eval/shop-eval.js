@@ -461,7 +461,7 @@ Page({
         input = Object.assign({}, input, {
           storeCount: brandCount,
           scope: brandCount >= 2 ? 'chain' : 'single',
-          storeNames: brandNames.slice(0, 8).join('、'),
+          storeNames: brandNames.join('\n'),
           brandName: base.storeName,
           mapNote: [located.mapNote, located.brandNote].filter(Boolean).join('\n'),
           publicNote: titles.join('\n'),
@@ -1140,12 +1140,12 @@ Page({
                 storeCount: Math.max(Number(draft.storeCount) || 0, brandCount, (this._boundStores || []).length, 2),
                 storeName: draft.brandName || name,
                 brandName: draft.brandName || name,
-                storeNames: draft.storeNames || brandNames.slice(0, 8).join('、'),
+                storeNames: evalApi.mergeBrandStoreNames(draft.storeNames, brandNames),
               })
             : Object.assign(base, {
                 storeName: name,
                 brandName: name,
-                storeNames: brandNames.slice(0, 8).join('、'),
+                storeNames: brandNames.join('\n'),
                 storeCount: brandCount,
                 scope: brandCount >= 2 ? 'chain' : 'single',
               })
