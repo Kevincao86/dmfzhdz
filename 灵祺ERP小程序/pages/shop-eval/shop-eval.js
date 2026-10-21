@@ -83,10 +83,7 @@ function loadShopEvalRival(input) {
     storeCount: focus === 'brand' ? Number(input.storeCount) || 0 : 1,
     storeLocations: focus === 'brand' ? input.storeNames || '' : '',
   })
-  const timeout = new Promise((resolve) => {
-    setTimeout(() => resolve({ ok: false, message: '周边竞品读取超时，套餐建议和竞争调整建议这次没有写入。' }), 50000)
-  })
-  return Promise.race([task, timeout]).then((result) =>
+  return task.then((result) =>
     evalApi.shopEvalRivalView(focus, placeName, result && result.ok ? result : { ok: false, message: (result && result.message) || '周边竞品没有返回。' }),
   )
 }

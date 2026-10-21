@@ -757,14 +757,14 @@ function readCachedRival(raw: unknown): ShopEvalRival | null {
   const adjustments = Array.isArray(row.adjustments)
     ? row.adjustments.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 6)
     : []
-  return {
+  return fillRivalPlan({
     focus: row.focus,
     headline: String(row.headline || '').trim() || (row.focus === 'brand' ? '同商圈类似品牌' : '本店周边竞争对手'),
     summary,
     competitors,
     packages,
     adjustments,
-  }
+  })
 }
 
 function savedFromCache(cached: Record<string, unknown> | null): {
@@ -1590,7 +1590,38 @@ export function shopEvalRivalView(
     .filter(Boolean)
     .slice(0, 6)
   const summaryBody = String(raw.summary || '').trim() || '周边同品类门店已列出。'
-  return { focus, headline, summary: `${lead}${summaryBody}`, competitors, packages, adjustments }
+  return fillRivalPlan({ focus, headline, summary: `${lead}${summaryBody}`, competitors, packages, adjustments })
+}
+
+function fillRivalPlan(view: ShopEvalRival): ShopEvalRival {
+  if (!view.competitors.length) return view
+  const named = view.competitors.slice(0, 4)
+  const who = named.map((row) => row.name).join('、')
+  const adjustments = view.adjustments.length
+    ? view.adjustments
+    : named.map((row) => {
+        const extra = row.meta ? `，对方现在是${row.meta}` : ''
+        return `对标${row.name}${extra}。本店套餐价和卖点要落在同一档，并写出和它不一样的一项，避免只被搜到、点进去没有可核销的团购。`
+      })
+  const packages = view.packages.length
+    ? view.packages
+    : [
+        {
+          title: `对标${named[0]?.name || '周边竞品'}的可核销团购`,
+          detail: `按${who}的价格带上一套团购。售价落在他们的区间里，卖点写本店差异，不要空着套餐。`,
+        },
+      ]
+  return { ...view, adjustments, packages }
+}
+
+function rivalPlanText(rival: ShopEvalRival | null): string {
+  if (!rival || (!rival.competitors.length && !rival.adjustments.length)) return ''
+  const names = rival.competitors.map((row) => (row.meta ? `${row.name}（${row.meta}）` : row.name)).join('；')
+  const acts = rival.adjustments.map((line, index) => `${index + 1}. ${line}`).join('\n')
+  const packs = rival.packages.map((row) => `${row.title}：${row.detail}`).join('\n')
+  return ['竞争对手方案：', names ? `竞品：${names}` : '', acts ? `打法：\n${acts}` : '', packs ? `套餐：\n${packs}` : '']
+    .filter(Boolean)
+    .join('\n')
 }
 
 function erpAdviceSystem(focus?: string) {
@@ -1616,6 +1647,7 @@ function erpAdviceSystem(focus?: string) {
     'finding 先写后台读到的数字，再写它和这项短板的关系，60 到 120 字。',
     'adjust 写去哪个功能里改什么，改完应看到什么，80 到 160 字。',
     'soon 是近两周的 3 件事，用「1.」「2.」「3.」分开。',
+    '若用户消息里有竞争对手方案，商品、价格、内容和达人相关的维度必须点出竞品店名，并写出对标后的改法。',
   ].join('')
 }
 
@@ -1703,10 +1735,19 @@ export async function adviseShop(
   }
   const backend = row.backendFacts
   if (!backend) throw new Error('请先绑定门店并同步商家后台，再生成提升方案')
+  let competitor: ShopEvalRival | null = null
+  try {
+    const pending = opts.competitor
+    const resolved = pending && typeof (pending as Promise<ShopEvalRival | null>).then === 'function' ? await pending : pending
+    competitor = readCachedRival(resolved)
+  } catch {
+    competitor = null
+  }
   const names = (score.indicators || []).map((item) => item.name)
   const listed = (score.indicators || []).map((item) => `${item.name} ${item.score}/${item.weight}`).join('、')
   const lines = (score.indicators || []).map((item) => `${item.name} ${item.score}/${item.weight}：${item.comment}`).join('\n')
-  const user = `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n公网六维：\n${lines}\n商家后台：\n${backend}\n六维都要各写一套方案，顺序不能变，一项都不能少：${listed}。`
+  const rivalText = rivalPlanText(competitor)
+  const user = `${shopFacts(spec, row)}\n综合得分：${score.score}/100。\n定位：${score.positioning || ''}\n公网六维：\n${lines}\n商家后台：\n${backend}\n${rivalText ? `${rivalText}\n` : ''}六维都要各写一套方案，顺序不能变，一项都不能少：${listed}。`
   const indicators = score.indicators || []
   let parsed: Record<string, unknown> | null = null
   let sections: ShopEvalSuggestion[] = []
@@ -1733,14 +1774,6 @@ export async function adviseShop(
     }
   }
   sections = completeAdviceSections(sections.length === names.length ? sections : mapSuggestions(parsed?.sections), indicators)
-  let competitor: ShopEvalRival | null = null
-  try {
-    const pending = opts.competitor
-    const resolved = pending && typeof (pending as Promise<ShopEvalRival | null>).then === 'function' ? await pending : pending
-    competitor = readCachedRival(resolved)
-  } catch {
-    competitor = null
-  }
   const advice: ShopEvalAdvice = {
     lift: clampLift(parsed?.lift),
     sections,

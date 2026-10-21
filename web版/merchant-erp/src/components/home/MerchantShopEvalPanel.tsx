@@ -61,12 +61,7 @@ function loadShopEvalRival(input: ShopEvalInput) {
   }).then((result) =>
     shopEvalRivalView(focus, placeName, result.ok ? result : { ok: false, message: result.message }),
   )
-  const timeout = new Promise<ReturnType<typeof shopEvalRivalView>>((resolve) => {
-    window.setTimeout(() => {
-      resolve(shopEvalRivalView(focus, placeName, { ok: false, message: '周边竞品读取超时，套餐建议和竞争调整建议这次没有写入。' }))
-    }, 50000)
-  })
-  return Promise.race([task, timeout])
+  return task
 }
 
 function readableLines(rows?: string[]) {
@@ -1217,8 +1212,8 @@ export default function MerchantShopEvalPanel() {
         {score ? (
           <div className="mt-4 rounded-2xl border border-orange-100 bg-[#fff7ed] p-4 text-left">
             <p className="text-sm font-extrabold text-[#c2410c]">竞争对手分析</p>
-            {rivalLoading ? <p className="mt-2 text-sm text-slate-500">正在读取同商圈竞争对手…</p> : null}
-            {rival ? (
+            {rivalLoading && !rival ? <p className="mt-2 text-sm text-slate-500">正在读取同商圈竞争对手…</p> : null}
+            {!rivalLoading && rival ? (
               <>
                 <p className="mt-2 text-sm font-bold text-[#9a3412]">{rival.headline}</p>
                 <p className="mt-1 text-sm leading-6 text-slate-700">{rival.summary}</p>
@@ -1232,20 +1227,7 @@ export default function MerchantShopEvalPanel() {
                     ))}
                   </div>
                 ) : null}
-                <p className="mt-4 text-sm font-bold text-[#9a3412]">套餐建议</p>
-                {rival.packages.length ? (
-                  <div className="mt-2 space-y-2">
-                    {rival.packages.map((row) => (
-                      <div key={row.title} className="rounded-lg bg-[#f3e8ff] p-3">
-                        <p className="text-sm font-bold text-slate-900">{row.title}</p>
-                        {row.detail ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.detail}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-sm text-slate-500">这次没有写出套餐建议。</p>
-                )}
-                <p className="mt-4 text-sm font-bold text-[#9a3412]">竞争调整建议</p>
+                <p className="mt-4 text-sm font-bold text-[#9a3412]">竞争对手方案</p>
                 {rival.adjustments.length ? (
                   <div className="mt-2 space-y-2">
                     {rival.adjustments.map((line) => (
@@ -1256,6 +1238,19 @@ export default function MerchantShopEvalPanel() {
                   </div>
                 ) : (
                   <p className="mt-1 text-sm text-slate-500">这次没有写出竞争调整建议。</p>
+                )}
+                <p className="mt-4 text-sm font-bold text-[#9a3412]">套餐方案</p>
+                {rival.packages.length ? (
+                  <div className="mt-2 space-y-2">
+                    {rival.packages.map((row) => (
+                      <div key={row.title} className="rounded-lg bg-[#f3e8ff] p-3">
+                        <p className="text-sm font-bold text-slate-900">{row.title}</p>
+                        {row.detail ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.detail}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">这次没有写出套餐方案。</p>
                 )}
               </>
             ) : null}
@@ -1321,6 +1316,22 @@ export default function MerchantShopEvalPanel() {
                 </div>
               ))}
             </div>
+            {advice.competitor && (advice.competitor.adjustments.length || advice.competitor.packages.length) ? (
+              <div className="mt-4 border-t border-orange-200 pt-4 text-left">
+                <p className="text-sm font-extrabold text-[#c2410c]">竞争对手方案</p>
+                {advice.competitor.adjustments.map((line) => (
+                  <div key={line} className="mt-2 rounded-lg bg-[#ffedd5] p-3 text-sm leading-6 text-slate-700">
+                    {line}
+                  </div>
+                ))}
+                {advice.competitor.packages.map((row) => (
+                  <div key={row.title} className="mt-2 rounded-lg bg-[#f3e8ff] p-3">
+                    <p className="text-sm font-bold text-slate-900">{row.title}</p>
+                    {row.detail ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.detail}</p> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
