@@ -24,9 +24,18 @@ function formReady(data) {
 function rivalState(advice) {
   const rival = advice && advice.competitor
   if (!rival || !rival.summary) {
-    return { rivalReady: false, rivalHeadline: '', rivalSummary: '', rivalRows: [], rivalPackages: [], rivalAdjustments: [] }
+    return {
+      rivalLoading: false,
+      rivalReady: false,
+      rivalHeadline: '',
+      rivalSummary: '',
+      rivalRows: [],
+      rivalPackages: [],
+      rivalAdjustments: [],
+    }
   }
   return {
+    rivalLoading: false,
     rivalReady: true,
     rivalHeadline: rival.headline || '',
     rivalSummary: rival.summary || '',
@@ -34,6 +43,25 @@ function rivalState(advice) {
     rivalPackages: rival.packages || [],
     rivalAdjustments: rival.adjustments || [],
   }
+}
+
+function showRival(page, input, advice) {
+  const ready = rivalState(advice)
+  if (ready.rivalReady) {
+    page.setData(ready)
+    return
+  }
+  const token = (page._rivalToken = (page._rivalToken || 0) + 1)
+  page.setData({ rivalLoading: true, rivalReady: false })
+  loadShopEvalRival(input)
+    .then((view) => {
+      if (token !== page._rivalToken) return
+      page.setData(rivalState({ competitor: view }))
+    })
+    .catch(() => {
+      if (token !== page._rivalToken) return
+      page.setData({ rivalLoading: false })
+    })
 }
 
 function loadShopEvalRival(input) {
@@ -303,6 +331,7 @@ Page({
     sources: [],
     adviceReady: false,
     sections: [],
+    rivalLoading: false,
     rivalReady: false,
     rivalHeadline: '',
     rivalSummary: '',
@@ -517,7 +546,10 @@ Page({
       }, rivalState(null))
     }
     this.setData(patch)
-    if (score) this.queueRadar(1)
+    if (score) {
+      this.queueRadar(1)
+      showRival(this, input, advice)
+    }
   },
 
   async refreshQuota() {
@@ -694,6 +726,7 @@ Page({
     if (score) {
       const gains = evalApi.shopEvalGainTargets(score, viewed)
       if (gains) this.playGains(gains.exposure, gains.verify)
+      showRival(this, viewed, advice)
     } else {
       this.setData({ showGains: false, exposureText: '', salesText: '' })
     }
@@ -1174,6 +1207,7 @@ Page({
       this.playScore(score.score)
       const gains = evalApi.shopEvalGainTargets(score, input)
       if (gains) this.playGains(gains.exposure, gains.verify)
+      showRival(this, input, null)
     } catch (e) {
       failed = e
     }
@@ -1297,7 +1331,15 @@ Page({
         force: true,
         storage,
         askText: askTextForAdvice,
-        competitor: loadShopEvalRival(base),
+        competitor: this.data.rivalReady
+          ? Promise.resolve({
+              headline: this.data.rivalHeadline,
+              summary: this.data.rivalSummary,
+              competitors: this.data.rivalRows,
+              packages: this.data.rivalPackages,
+              adjustments: this.data.rivalAdjustments,
+            })
+          : loadShopEvalRival(base),
       })
       this.setData(Object.assign({
         advising: false,
