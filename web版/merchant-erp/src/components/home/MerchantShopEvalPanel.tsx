@@ -1157,54 +1157,6 @@ export default function MerchantShopEvalPanel() {
           </div>
         ) : null}
 
-        {score ? (
-          <div className="mt-4 rounded-2xl border border-orange-100 bg-[#fff7ed] p-4 text-left">
-            <p className="text-sm font-extrabold text-[#c2410c]">竞争对手分析</p>
-            {rivalLoading && !rival ? <p className="mt-2 text-sm text-slate-500">正在读取同商圈竞争对手…</p> : null}
-            {rival ? (
-              <>
-                <p className="mt-2 text-sm font-bold text-[#9a3412]">{rival.headline}</p>
-                <p className="mt-1 text-sm leading-6 text-slate-700">{rival.summary}</p>
-                {rival.competitors.length ? (
-                  <div className="mt-3 space-y-2">
-                    {rival.competitors.map((row) => (
-                      <div key={row.name} className="rounded-lg bg-[#e8f1ff] p-3">
-                        <p className="text-sm font-bold text-slate-900">{row.name}</p>
-                        {row.meta ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.meta}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                <p className="mt-4 text-sm font-bold text-[#9a3412]">竞争对手方案</p>
-                {rival.adjustments.length ? (
-                  <div className="mt-2 space-y-2">
-                    {rival.adjustments.map((line) => (
-                      <div key={line} className="rounded-lg bg-[#ffedd5] p-3 text-sm leading-6 text-slate-700">
-                        {line}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-sm text-slate-500">这次没有写出竞争调整建议。</p>
-                )}
-                <p className="mt-4 text-sm font-bold text-[#9a3412]">套餐方案</p>
-                {rival.packages.length ? (
-                  <div className="mt-2 space-y-2">
-                    {rival.packages.map((row) => (
-                      <div key={row.title} className="rounded-lg bg-[#f3e8ff] p-3">
-                        <p className="text-sm font-bold text-slate-900">{row.title}</p>
-                        {row.detail ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.detail}</p> : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-sm text-slate-500">这次没有写出套餐方案。</p>
-                )}
-              </>
-            ) : null}
-          </div>
-        ) : null}
-
         {highlightLines.length || gapLines.length ? (
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
             <div className="rounded-2xl bg-[#f3f7ff] p-4 text-left">
@@ -1256,6 +1208,29 @@ export default function MerchantShopEvalPanel() {
         ) : (
           <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">完成评估后，这里显示预计提升的曝光和核销额</div>
         )}
+
+        {score ? (
+          <div className="mt-4 rounded-2xl border border-orange-100 bg-[#fff7ed] p-4 text-left">
+            <p className="text-sm font-extrabold text-[#c2410c]">竞争对手分析</p>
+            {rivalLoading && !rival ? <p className="mt-2 text-sm text-slate-500">正在读取同商圈竞争对手…</p> : null}
+            {rival ? (
+              <>
+                <p className="mt-2 text-sm font-bold text-[#9a3412]">{rival.headline}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-700">{rival.summary}</p>
+                {rival.competitors.length ? (
+                  <div className="mt-3 space-y-2">
+                    {rival.competitors.map((row) => (
+                      <div key={row.name} className="rounded-lg bg-[#e8f1ff] p-3">
+                        <p className="text-sm font-bold text-slate-900">{row.name}</p>
+                        {row.meta ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.meta}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+        ) : null}
 
         <button
           type="button"
@@ -1316,20 +1291,33 @@ export default function MerchantShopEvalPanel() {
                 </div>
               ))}
             </div>
-            {advice.competitor && (advice.competitor.adjustments.length || advice.competitor.packages.length) ? (
+            {rival && (rival.adjustments.length || rival.packages.length) ? (
               <div className="mt-4 border-t border-orange-200 pt-4 text-left">
                 <p className="text-sm font-extrabold text-[#c2410c]">竞争对手方案</p>
-                {advice.competitor.adjustments.map((line) => (
-                  <div key={line} className="mt-2 rounded-lg bg-[#ffedd5] p-3 text-sm leading-6 text-slate-700">
-                    {line}
+                {rival.adjustments.length ? (
+                  <div className="mt-2 space-y-2">
+                    {rival.adjustments.map((line) => (
+                      <div key={line} className="rounded-lg bg-[#ffedd5] p-3 text-sm leading-6 text-slate-700">
+                        {line}
+                      </div>
+                    ))}
                   </div>
-                ))}
-                {advice.competitor.packages.map((row) => (
-                  <div key={row.title} className="mt-2 rounded-lg bg-[#f3e8ff] p-3">
-                    <p className="text-sm font-bold text-slate-900">{row.title}</p>
-                    {row.detail ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.detail}</p> : null}
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">这次没有写出竞争对手方案。</p>
+                )}
+                <p className="mt-4 text-sm font-bold text-[#9a3412]">套餐方案</p>
+                {rival.packages.length ? (
+                  <div className="mt-2 space-y-2">
+                    {rival.packages.map((row) => (
+                      <div key={row.title} className="rounded-lg bg-[#f3e8ff] p-3">
+                        <p className="text-sm font-bold text-slate-900">{row.title}</p>
+                        {row.detail ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.detail}</p> : null}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">这次没有写出套餐方案。</p>
+                )}
               </div>
             ) : null}
           </div>

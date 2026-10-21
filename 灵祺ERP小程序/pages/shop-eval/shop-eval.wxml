@@ -107,30 +107,6 @@
     </view>
   </view>
 
-  <view class="card advice" wx:if="{{scoreReady}}">
-    <text class="advice-title">竞争对手分析</text>
-    <text class="need" wx:if="{{rivalLoading && !rivalReady}}">正在读取同商圈竞争对手…</text>
-    <block wx:elif="{{rivalReady}}">
-      <text class="rival-k">{{rivalHeadline}}</text>
-      <text class="plan-text">{{rivalSummary}}</text>
-      <view class="plan-block plan-block--find" wx:for="{{rivalRows}}" wx:key="name">
-        <text class="plan-tag">{{item.name}}</text>
-        <text class="plan-text" wx:if="{{item.meta}}">{{item.meta}}</text>
-      </view>
-      <text class="rival-k">竞争对手方案</text>
-      <view class="plan-block plan-block--soon" wx:for="{{rivalAdjustments}}" wx:for-item="line" wx:key="*this">
-        <text class="plan-text">{{line}}</text>
-      </view>
-      <text class="need" wx:if="{{!rivalAdjustments.length}}">这次没有写出竞争对手方案。</text>
-      <text class="rival-k">套餐方案</text>
-      <view class="plan-block plan-block--adjust" wx:for="{{rivalPackages}}" wx:for-item="pkg" wx:key="title">
-        <text class="plan-tag">{{pkg.title}}</text>
-        <text class="plan-text" wx:if="{{pkg.detail}}">{{pkg.detail}}</text>
-      </view>
-      <text class="need" wx:if="{{!rivalPackages.length}}">这次没有写出套餐方案。</text>
-    </block>
-  </view>
-
   <view class="card report" wx:if="{{highlights.length}}">
     <text class="advice-title">优势亮点</text>
     <view class="report-line" wx:for="{{highlights}}" wx:key="*this">
@@ -172,6 +148,19 @@
     <text class="need">完成评估后，这里显示预计提升的曝光和核销额</text>
   </view>
 
+  <view class="card advice" wx:if="{{scoreReady}}">
+    <text class="advice-title">竞争对手分析</text>
+    <text class="need" wx:if="{{rivalLoading && !rivalReady}}">正在读取同商圈竞争对手…</text>
+    <block wx:elif="{{rivalReady}}">
+      <text class="rival-k">{{rivalHeadline}}</text>
+      <text class="plan-text">{{rivalSummary}}</text>
+      <view class="plan-block plan-block--find" wx:for="{{rivalRows}}" wx:key="name">
+        <text class="plan-tag">{{item.name}}</text>
+        <text class="plan-text" wx:if="{{item.meta}}">{{item.meta}}</text>
+      </view>
+    </block>
+  </view>
+
   <view class="btn-sub {{!scoreReady || evaluating || advising ? 'btn--off' : ''}}" bindtap="onAdvise">
     {{advising ? '分析提升中…' : '分析提升 · 5积分'}}
   </view>
@@ -206,10 +195,13 @@
       <view class="plan-block plan-block--soon" wx:for="{{rivalAdjustments}}" wx:for-item="line" wx:key="*this">
         <text class="plan-text">{{line}}</text>
       </view>
+      <text class="need" wx:if="{{!rivalAdjustments.length}}">这次没有写出竞争对手方案。</text>
+      <text class="rival-k">套餐方案</text>
       <view class="plan-block plan-block--adjust" wx:for="{{rivalPackages}}" wx:for-item="pkg" wx:key="title">
         <text class="plan-tag">{{pkg.title}}</text>
         <text class="plan-text" wx:if="{{pkg.detail}}">{{pkg.detail}}</text>
       </view>
+      <text class="need" wx:if="{{!rivalPackages.length}}">这次没有写出套餐方案。</text>
     </view>
   </view>
 
