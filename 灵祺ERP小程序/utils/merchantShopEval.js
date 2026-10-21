@@ -1431,19 +1431,80 @@ async function publishShopEval(storage, key, slot) {
   })
 }
 
+function normEvalName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[·•.\s]/g, '')
+}
+
+function evalNamesAlign(a, b) {
+  const x = normEvalName(a)
+  const y = normEvalName(b)
+  if (!x || !y) return false
+  if (x === y) return true
+  const short = x.length <= y.length ? x : y
+  const long = x.length <= y.length ? y : x
+  return short.length >= 2 && long.indexOf(short) === 0
+}
+
+function evalFocusOf(row) {
+  if (row && (row.evalFocus === 'brand' || row.evalFocus === 'store')) return row.evalFocus
+  if (row && (row.scope === 'chain' || Number(row.storeCount) >= 2)) return 'brand'
+  return 'store'
+}
+
+function cloudSlotMatches(row, key, payload) {
+  const profile = payload && payload.profile && typeof payload.profile === 'object' ? payload.profile : null
+  if (!profile) return false
+  const platform = String(row.platformId || '')
+  if (platform && String(key).indexOf(platform) < 0) return false
+  if (evalFocusOf(row) !== evalFocusOf(profile)) return false
+  if (evalFocusOf(row) === 'store') {
+    const id = String(row.storeId || '').trim()
+    const remoteId = String(profile.storeId || '').trim()
+    if (id && remoteId) return id === remoteId
+    return evalNamesAlign(row.storeName, profile.storeName)
+  }
+  return evalNamesAlign(row.brandName || row.storeName, profile.brandName || profile.storeName)
+}
+
+function pickCloudSlot(platforms, row) {
+  if (!platforms) return null
+  let bestKey = ''
+  let best = null
+  let bestAt = -1
+  Object.keys(platforms).forEach((key) => {
+    const entry = platforms[key]
+    if (!entry || !entry.payload || !cloudSlotMatches(row, key, entry.payload)) return
+    const at = Date.parse(String(entry.savedAt || '')) || 0
+    if (!best || at >= bestAt) {
+      best = entry
+      bestKey = key
+      bestAt = at
+    }
+  })
+  if (!best) return null
+  return { key: bestKey, entry: best, savedAt: bestAt }
+}
+
 async function hydrateShopEval(raw, storage) {
   const { row } = normalizeInput(raw)
   const remote = await requestShopEvalCloud('GET')
   const fresh = loadCache(storage, row)
   const localAt = Date.parse(String((fresh.data && fresh.data.savedAt) || '')) || 0
   const cloud = readShopEvalCloud(remote && remote.habits)
-  const slot = cloud && cloud.platforms ? cloud.platforms[slotId(row)] : null
-  const remoteAt = Date.parse(String((slot && slot.savedAt) || '')) || 0
-  if (slot && slot.payload && remoteAt > localAt && savedFromCache(slot.payload)) {
-    storage.setItem(fresh.key, JSON.stringify(slot.payload))
-    return savedFromCache(slot.payload)
+  const picked = pickCloudSlot(cloud && cloud.platforms, row)
+  const remoteAt = picked ? picked.savedAt : 0
+  const sameKey = Boolean(picked && picked.key === slotId(row))
+  if (picked && picked.entry.payload && savedFromCache(picked.entry.payload)) {
+    const localOk = Boolean(fresh.data && savedFromCache(fresh.data))
+    if (!localOk || remoteAt >= localAt || !sameKey) {
+      storage.setItem(fresh.key, JSON.stringify(picked.entry.payload))
+      return savedFromCache(picked.entry.payload)
+    }
   }
-  if (fresh.data && savedFromCache(fresh.data) && localAt >= remoteAt && (localAt > remoteAt || remoteAt === 0)) {
+  if (fresh.data && savedFromCache(fresh.data) && (localAt > remoteAt || remoteAt === 0)) {
     if (!localAt) writeCache(storage, fresh.key, { savedAt: new Date().toISOString() })
     void publishShopEval(storage, fresh.key, slotId(row))
   }
