@@ -131,10 +131,20 @@ export type ShopEvalScore = {
   disclaimer?: string
 }
 
+export type ShopEvalRival = {
+  focus: 'brand' | 'store'
+  headline: string
+  summary: string
+  competitors: { name: string; meta: string }[]
+  packages: { title: string; detail: string }[]
+  adjustments: string[]
+}
+
 export type ShopEvalAdvice = {
   lift: number
   sections: ShopEvalSuggestion[]
   fromModel?: boolean
+  competitor?: ShopEvalRival
 }
 
 type ScoreBlock = { name: string; weight: number }
@@ -654,6 +664,45 @@ function profileFromRow(row: ReturnType<typeof normalizeInput>['row']): ShopEval
   }
 }
 
+function readCachedRival(raw: unknown): ShopEvalRival | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Partial<ShopEvalRival>
+  if (row.focus !== 'brand' && row.focus !== 'store') return null
+  const summary = typeof row.summary === 'string' ? row.summary.trim() : ''
+  if (!summary) return null
+  const competitors = Array.isArray(row.competitors)
+    ? row.competitors
+        .map((item) => {
+          const name = String(item?.name || '').trim()
+          if (!name) return null
+          return { name, meta: String(item?.meta || '').trim() }
+        })
+        .filter((item): item is { name: string; meta: string } => Boolean(item))
+        .slice(0, 6)
+    : []
+  const packages = Array.isArray(row.packages)
+    ? row.packages
+        .map((item) => {
+          const title = String(item?.title || '').trim()
+          if (!title) return null
+          return { title, detail: String(item?.detail || '').trim() }
+        })
+        .filter((item): item is { title: string; detail: string } => Boolean(item))
+        .slice(0, 4)
+    : []
+  const adjustments = Array.isArray(row.adjustments)
+    ? row.adjustments.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 6)
+    : []
+  return {
+    focus: row.focus,
+    headline: String(row.headline || '').trim() || (row.focus === 'brand' ? '同商圈类似品牌' : '本店周边竞争对手'),
+    summary,
+    competitors,
+    packages,
+    adjustments,
+  }
+}
+
 function savedFromCache(cached: Record<string, unknown> | null): {
   score: ShopEvalScore
   advice: ShopEvalAdvice | null
@@ -670,7 +719,10 @@ function savedFromCache(cached: Record<string, unknown> | null): {
       mapSuggestions((adviceRaw as ShopEvalAdvice).sections),
       indicators.map((item) => item.name),
     )
-    if (sections.length === indicators.length) advice = { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections }
+    if (sections.length === indicators.length) {
+      const competitor = readCachedRival((adviceRaw as ShopEvalAdvice).competitor)
+      advice = { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections, ...(competitor ? { competitor } : {}) }
+    }
   }
   const rawProfile = cached.profile
   const profile = rawProfile && typeof rawProfile === 'object' ? profileFromRow(rawProfile as ReturnType<typeof normalizeInput>['row']) : null
@@ -1391,6 +1443,75 @@ export async function hydrateShopEval(raw: ShopEvalInput, storage: StorageLike) 
   return savedFromCache(fresh.data)
 }
 
+function rivalLead(focus: 'brand' | 'store', placeName: string) {
+  const name = placeName.trim() || (focus === 'brand' ? '该品牌' : '这家店')
+  return focus === 'brand'
+    ? `对照「${name}」所在商圈里的同品类品牌。`
+    : `已按「${name}」的地址定位，说明周边竞争对手。`
+}
+
+export function shopEvalRivalView(
+  focus: 'brand' | 'store',
+  placeName: string,
+  raw: {
+    ok?: boolean
+    summary?: string
+    message?: string
+    competitors?: unknown
+    suggestions?: unknown
+    bundleSuggestions?: unknown
+  } | null,
+): ShopEvalRival {
+  const headline = focus === 'brand' ? '同商圈类似品牌' : '本店周边竞争对手'
+  const lead = rivalLead(focus, placeName)
+  if (!raw || raw.ok === false) {
+    const message = String(raw?.message || '').trim() || '这次没有读到周边竞品，套餐建议和竞争调整建议先空着。'
+    return { focus, headline, summary: `${lead}${message}`, competitors: [], packages: [], adjustments: [] }
+  }
+  const competitors = (Array.isArray(raw.competitors) ? raw.competitors : [])
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const name = String(row.name ?? '').trim()
+      if (!name) return null
+      const meta = [row.distanceHint, row.category, row.priceRange, row.highlights]
+        .map((part) => String(part ?? '').trim())
+        .filter(Boolean)
+        .join(' · ')
+      return { name, meta }
+    })
+    .filter((item): item is { name: string; meta: string } => Boolean(item))
+    .slice(0, 6)
+  const packages = (Array.isArray(raw.bundleSuggestions) ? raw.bundleSuggestions : [])
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as Record<string, unknown>
+      const title = String(row.title ?? '').trim()
+      if (!title) return null
+      const price = Number(row.suggestedPriceYuan)
+      const lines = Array.isArray(row.comboLines)
+        ? row.comboLines.map((line) => String(line).trim()).filter(Boolean).join('、')
+        : ''
+      const detail = [
+        Number.isFinite(price) ? `建议售价 ${price} 元` : '',
+        lines ? `包含 ${lines}` : '',
+        String(row.competitorRef ?? '').trim(),
+        String(row.rationale ?? '').trim(),
+      ]
+        .filter(Boolean)
+        .join('。')
+      return { title, detail }
+    })
+    .filter((item): item is { title: string; detail: string } => Boolean(item))
+    .slice(0, 4)
+  const adjustments = (Array.isArray(raw.suggestions) ? raw.suggestions : [])
+    .map((item) => String(item ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 6)
+  const summaryBody = String(raw.summary || '').trim() || '周边同品类门店已列出。'
+  return { focus, headline, summary: `${lead}${summaryBody}`, competitors, packages, adjustments }
+}
+
 function erpAdviceSystem(focus?: string) {
   const modules = ERP_SOLUTION_MODULES.join('、')
   const rangeRule =
@@ -1474,7 +1595,12 @@ export async function evaluateShop(
 export async function adviseShop(
   raw: ShopEvalInput,
   score: ShopEvalScore | null,
-  opts: { force?: boolean; storage: StorageLike; askText: AskText },
+  opts: {
+    force?: boolean
+    storage: StorageLike
+    askText: AskText
+    competitor?: ShopEvalRival | null | Promise<ShopEvalRival | null>
+  },
 ): Promise<ShopEvalAdvice> {
   if (!score?.indicators?.length) throw new Error('请先完成门店评估')
   const { spec, row } = normalizeInput(raw)
@@ -1488,7 +1614,10 @@ export async function adviseShop(
         mapSuggestions((adviceRaw as ShopEvalAdvice).sections),
         (score.indicators || []).map((item) => item.name),
       )
-      if (sections.length === (score.indicators || []).length) return { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections }
+      if (sections.length === (score.indicators || []).length) {
+        const competitor = readCachedRival((adviceRaw as ShopEvalAdvice).competitor)
+        return { lift: clampLift((adviceRaw as ShopEvalAdvice).lift), sections, ...(competitor ? { competitor } : {}) }
+      }
     }
   }
   const backend = row.backendFacts
@@ -1523,9 +1652,18 @@ export async function adviseShop(
     }
   }
   sections = completeAdviceSections(sections.length === names.length ? sections : mapSuggestions(parsed?.sections), indicators)
+  let competitor: ShopEvalRival | null = null
+  try {
+    const pending = opts.competitor
+    const resolved = pending && typeof (pending as Promise<ShopEvalRival | null>).then === 'function' ? await pending : pending
+    competitor = readCachedRival(resolved)
+  } catch {
+    competitor = null
+  }
   const advice: ShopEvalAdvice = {
     lift: clampLift(parsed?.lift),
     sections,
+    ...(competitor ? { competitor } : {}),
   }
   writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
   void publishShopEval(opts.storage, key, slotId(row))

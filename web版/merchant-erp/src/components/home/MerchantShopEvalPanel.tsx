@@ -17,6 +17,7 @@ import {
   publicEvalIndicators,
   shopEvalGrade,
   shopEvalGrades,
+  shopEvalRivalView,
   shopEvalScopeOf,
   splitCnRegion,
   type ShopEvalAdvice,
@@ -33,6 +34,38 @@ import { checkErpPointsAffordable, spendErpPointsForUsage, type ErpPointsSpendKi
 import { MOCK_CATEGORY_TREE } from '../../data/douyinCategoryMock'
 import { fetchStoresForPlatform, storeTabToken, type StorePlatformTab } from '../../services/merchantStoresApi'
 import { fetchShopAnalysis } from '../../services/merchantOrdersApi'
+import { analyzeCompetitors } from '../../services/storeIntelApi'
+
+function loadShopEvalRival(input: ShopEvalInput) {
+  const focus = input.evalFocus === 'brand' ? 'brand' : 'store'
+  const placeName = focus === 'brand' ? input.brandName || input.storeName || '' : input.storeName || ''
+  const address = String(input.address || '').trim()
+  const storeName = String(input.storeName || input.brandName || '').trim()
+  if (!storeName || !address) {
+    return Promise.resolve(
+      shopEvalRivalView(focus, placeName, { ok: false, message: '还没有门店地址，无法定位周边。请先完善地址后再分析。' }),
+    )
+  }
+  const task = analyzeCompetitors({
+    storeName,
+    address,
+    city: input.city,
+    industryHint: input.category,
+    industryName: input.category,
+    analysisMode: focus,
+    brandName: focus === 'brand' ? placeName : undefined,
+    storeCount: focus === 'brand' ? Number(input.storeCount) || undefined : 1,
+    storeLocations: focus === 'brand' ? input.storeNames : undefined,
+  }).then((result) =>
+    shopEvalRivalView(focus, placeName, result.ok ? result : { ok: false, message: result.message }),
+  )
+  const timeout = new Promise<ReturnType<typeof shopEvalRivalView>>((resolve) => {
+    window.setTimeout(() => {
+      resolve(shopEvalRivalView(focus, placeName, { ok: false, message: '周边竞品读取超时，套餐建议和竞争调整建议这次没有写入。' }))
+    }, 50000)
+  })
+  return Promise.race([task, timeout])
+}
 
 function readableLines(rows?: string[]) {
   return (rows || []).filter((line) => typeof line === 'string' && line.trim() && !line.includes('[object Object]'))
@@ -769,6 +802,7 @@ export default function MerchantShopEvalPanel() {
         force: true,
         storage,
         askText: askTextBounded,
+        competitor: loadShopEvalRival({ ...input, platformId }),
       })
       setAdvice(advice)
       if (advice.fromModel) {
@@ -1201,6 +1235,48 @@ export default function MerchantShopEvalPanel() {
                 </div>
               ))}
             </div>
+            {advice.competitor ? (
+              <div className="mt-4 border-t border-orange-200 pt-4 text-left">
+                <p className="text-sm font-extrabold text-[#c2410c]">竞争对手分析</p>
+                <p className="mt-2 text-sm font-bold text-[#9a3412]">{advice.competitor.headline}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-700">{advice.competitor.summary}</p>
+                {advice.competitor.competitors.length ? (
+                  <div className="mt-3 space-y-2">
+                    {advice.competitor.competitors.map((row) => (
+                      <div key={row.name} className="rounded-lg bg-[#e8f1ff] p-3">
+                        <p className="text-sm font-bold text-slate-900">{row.name}</p>
+                        {row.meta ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.meta}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="mt-4 text-sm font-bold text-[#9a3412]">套餐建议</p>
+                {advice.competitor.packages.length ? (
+                  <div className="mt-2 space-y-2">
+                    {advice.competitor.packages.map((row) => (
+                      <div key={row.title} className="rounded-lg bg-[#f3e8ff] p-3">
+                        <p className="text-sm font-bold text-slate-900">{row.title}</p>
+                        {row.detail ? <p className="mt-1 text-sm leading-6 text-slate-700">{row.detail}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">这次没有写出套餐建议。</p>
+                )}
+                <p className="mt-4 text-sm font-bold text-[#9a3412]">竞争调整建议</p>
+                {advice.competitor.adjustments.length ? (
+                  <div className="mt-2 space-y-2">
+                    {advice.competitor.adjustments.map((line) => (
+                      <div key={line} className="rounded-lg bg-[#ffedd5] p-3 text-sm leading-6 text-slate-700">
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-500">这次没有写出竞争调整建议。</p>
+                )}
+              </div>
+            ) : null}
           </div>
         ) : null}
 

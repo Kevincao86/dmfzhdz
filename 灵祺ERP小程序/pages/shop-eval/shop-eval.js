@@ -5,6 +5,7 @@ const feature = require('../../utils/merchantFeatureMp.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const evalApi = require('../../utils/merchantShopEval.js')
 const shopAnalysis = require('../../utils/shopAnalysisApiMp.js')
+const featureApi = require('../../utils/merchantFeatureApisMp.js')
 const { readPlatformToken } = require('../../utils/platformTokensMp.js')
 
 const CATEGORIES = evalApi.SHOP_EVAL_CATEGORIES || {}
@@ -18,6 +19,48 @@ function formReady(data) {
   const cat1 = (data.cat1List || [])[data.cat1Index]
   const cat2 = (data.cat2List || [])[data.cat2Index]
   return Boolean(name && region.length === 3 && region[0] && detail && cat1 && cat2)
+}
+
+function rivalState(advice) {
+  const rival = advice && advice.competitor
+  if (!rival || !rival.summary) {
+    return { rivalReady: false, rivalHeadline: '', rivalSummary: '', rivalRows: [], rivalPackages: [], rivalAdjustments: [] }
+  }
+  return {
+    rivalReady: true,
+    rivalHeadline: rival.headline || '',
+    rivalSummary: rival.summary || '',
+    rivalRows: rival.competitors || [],
+    rivalPackages: rival.packages || [],
+    rivalAdjustments: rival.adjustments || [],
+  }
+}
+
+function loadShopEvalRival(input) {
+  const focus = input && input.evalFocus === 'brand' ? 'brand' : 'store'
+  const placeName = focus === 'brand' ? (input && (input.brandName || input.storeName)) || '' : (input && input.storeName) || ''
+  const address = String((input && input.address) || '').trim()
+  const storeName = String((input && (input.storeName || input.brandName)) || '').trim()
+  if (!storeName || !address) {
+    return Promise.resolve(evalApi.shopEvalRivalView(focus, placeName, { ok: false, message: '还没有门店地址，无法定位周边。请先完善地址后再分析。' }))
+  }
+  const task = featureApi.runCompetitorAnalysis({
+    storeName,
+    address,
+    city: input.city,
+    industryHint: input.category,
+    industryName: input.category,
+    analysisMode: focus,
+    brandName: focus === 'brand' ? placeName : '',
+    storeCount: focus === 'brand' ? Number(input.storeCount) || 0 : 1,
+    storeLocations: focus === 'brand' ? input.storeNames || '' : '',
+  })
+  const timeout = new Promise((resolve) => {
+    setTimeout(() => resolve({ ok: false, message: '周边竞品读取超时，套餐建议和竞争调整建议这次没有写入。' }), 50000)
+  })
+  return Promise.race([task, timeout]).then((result) =>
+    evalApi.shopEvalRivalView(focus, placeName, result && result.ok ? result : { ok: false, message: (result && result.message) || '周边竞品没有返回。' }),
+  )
 }
 
 async function postLocate(body) {
@@ -260,6 +303,12 @@ Page({
     sources: [],
     adviceReady: false,
     sections: [],
+    rivalReady: false,
+    rivalHeadline: '',
+    rivalSummary: '',
+    rivalRows: [],
+    rivalPackages: [],
+    rivalAdjustments: [],
     err: '',
     formName: '',
     region: [],
@@ -336,6 +385,12 @@ Page({
         scorePop: false,
         adviceReady: false,
         sections: [],
+        rivalReady: false,
+        rivalHeadline: '',
+        rivalSummary: '',
+        rivalRows: [],
+        rivalPackages: [],
+        rivalAdjustments: [],
         showGrade: false,
         showGains: false,
       })
@@ -445,7 +500,7 @@ Page({
         sources: score.sources || [],
         adviceReady: Boolean(advice && advice.sections && advice.sections.length),
         sections: advice && advice.sections ? advice.sections : [],
-      })
+      }, rivalState(advice))
     } else {
       Object.assign(patch, {
         scoreReady: false,
@@ -459,7 +514,7 @@ Page({
         sources: [],
         adviceReady: false,
         sections: [],
-      })
+      }, rivalState(null))
     }
     this.setData(patch)
     if (score) this.queueRadar(1)
@@ -632,6 +687,7 @@ Page({
       gradeNote: grade ? grade.note : '',
       adviceReady: Boolean(advice && advice.sections && advice.sections.length),
       sections: advice ? advice.sections : [],
+      ...rivalState(advice),
       err: '',
     })
     if (score) this.queueRadar(1)
@@ -929,7 +985,7 @@ Page({
     })
     this._input = next
     this._score = null
-    this.setData(Object.assign({ chooser: '', scoreReady: false, displayScore: 0, adviceReady: false, sections: [], showGrade: false }, identityPatch(next, null)))
+    this.setData(Object.assign({ chooser: '', scoreReady: false, displayScore: 0, adviceReady: false, sections: [], showGrade: false }, rivalState(null), identityPatch(next, null)))
   },
 
   onPickStore(e) {
@@ -963,7 +1019,7 @@ Page({
     })
     this._input = next
     this._score = null
-    this.setData(Object.assign({ chooser: '', scoreReady: false, displayScore: 0, adviceReady: false, sections: [], showGrade: false }, identityPatch(next, null)))
+    this.setData(Object.assign({ chooser: '', scoreReady: false, displayScore: 0, adviceReady: false, sections: [], showGrade: false }, rivalState(null), identityPatch(next, null)))
   },
 
   applySnap(snap) {
@@ -1009,6 +1065,12 @@ Page({
       showGains: false,
       adviceReady: false,
       sections: [],
+      rivalReady: false,
+      rivalHeadline: '',
+      rivalSummary: '',
+      rivalRows: [],
+      rivalPackages: [],
+      rivalAdjustments: [],
     })
     this._radarCtx = null
     this.startEvalSweep()
@@ -1235,13 +1297,14 @@ Page({
         force: true,
         storage,
         askText: askTextForAdvice,
+        competitor: loadShopEvalRival(base),
       })
-      this.setData({
+      this.setData(Object.assign({
         advising: false,
         adviceReady: true,
         sections: advice.sections,
         err: advice.fromModel ? '' : '模型这次没有返回完整方案，已按当前六维评分写出改法，未扣积分。',
-      })
+      }, rivalState(advice)))
       if (advice.fromModel) {
         try {
           await withTimeout(

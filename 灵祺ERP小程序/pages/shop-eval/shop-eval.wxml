@@ -177,6 +177,26 @@
         <text class="plan-text">{{item.soon}}</text>
       </view>
     </view>
+    <view class="rival" wx:if="{{rivalReady}}">
+      <text class="advice-title">竞争对手分析</text>
+      <text class="rival-k">{{rivalHeadline}}</text>
+      <text class="plan-text">{{rivalSummary}}</text>
+      <view class="plan-block plan-block--find" wx:for="{{rivalRows}}" wx:key="name">
+        <text class="plan-tag">{{item.name}}</text>
+        <text class="plan-text" wx:if="{{item.meta}}">{{item.meta}}</text>
+      </view>
+      <text class="rival-k">套餐建议</text>
+      <view class="plan-block plan-block--adjust" wx:for="{{rivalPackages}}" wx:for-item="pkg" wx:key="title">
+        <text class="plan-tag">{{pkg.title}}</text>
+        <text class="plan-text" wx:if="{{pkg.detail}}">{{pkg.detail}}</text>
+      </view>
+      <text class="need" wx:if="{{!rivalPackages.length}}">这次没有写出套餐建议。</text>
+      <text class="rival-k">竞争调整建议</text>
+      <view class="plan-block plan-block--soon" wx:for="{{rivalAdjustments}}" wx:for-item="line" wx:key="*this">
+        <text class="plan-text">{{line}}</text>
+      </view>
+      <text class="need" wx:if="{{!rivalAdjustments.length}}">这次没有写出竞争调整建议。</text>
+    </view>
   </view>
 
   <view class="card advice" wx:if="{{showGrade}}">

@@ -849,6 +849,44 @@ function profileFromRow(row) {
   }
 }
 
+function readCachedRival(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  if (raw.focus !== 'brand' && raw.focus !== 'store') return null
+  const summary = typeof raw.summary === 'string' ? raw.summary.trim() : ''
+  if (!summary) return null
+  const competitors = Array.isArray(raw.competitors)
+    ? raw.competitors
+        .map((item) => {
+          const name = String((item && item.name) || '').trim()
+          if (!name) return null
+          return { name, meta: String((item && item.meta) || '').trim() }
+        })
+        .filter(Boolean)
+        .slice(0, 6)
+    : []
+  const packages = Array.isArray(raw.packages)
+    ? raw.packages
+        .map((item) => {
+          const title = String((item && item.title) || '').trim()
+          if (!title) return null
+          return { title, detail: String((item && item.detail) || '').trim() }
+        })
+        .filter(Boolean)
+        .slice(0, 4)
+    : []
+  const adjustments = Array.isArray(raw.adjustments)
+    ? raw.adjustments.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 6)
+    : []
+  return {
+    focus: raw.focus,
+    headline: String(raw.headline || '').trim() || (raw.focus === 'brand' ? '同商圈类似品牌' : '本店周边竞争对手'),
+    summary,
+    competitors,
+    packages,
+    adjustments,
+  }
+}
+
 function savedFromCache(cached) {
   if (!cached || cached.sourcesSearch !== 'store-search-v8') return null
   const blocks = publicEvalIndicators(scopeFromCached(cached))
@@ -861,7 +899,11 @@ function savedFromCache(cached) {
       mapSuggestions(adviceRaw.sections),
       indicators.map((item) => item.name),
     )
-    if (sections.length === indicators.length) advice = { lift: clampLift(adviceRaw.lift), sections }
+    if (sections.length === indicators.length) {
+      const competitor = readCachedRival(adviceRaw.competitor)
+      advice = { lift: clampLift(adviceRaw.lift), sections }
+      if (competitor) advice.competitor = competitor
+    }
   }
   const rawProfile = cached.profile && typeof cached.profile === 'object' ? cached.profile : null
   return {
@@ -1511,6 +1553,57 @@ async function hydrateShopEval(raw, storage) {
   return savedFromCache(fresh.data)
 }
 
+function shopEvalRivalView(focus, placeName, raw) {
+  const mode = focus === 'brand' ? 'brand' : 'store'
+  const name = String(placeName || '').trim() || (mode === 'brand' ? '该品牌' : '这家店')
+  const headline = mode === 'brand' ? '同商圈类似品牌' : '本店周边竞争对手'
+  const lead = mode === 'brand' ? `对照「${name}」所在商圈里的同品类品牌。` : `已按「${name}」的地址定位，说明周边竞争对手。`
+  if (!raw || raw.ok === false) {
+    const message = String((raw && raw.message) || '').trim() || '这次没有读到周边竞品，套餐建议和竞争调整建议先空着。'
+    return { focus: mode, headline, summary: lead + message, competitors: [], packages: [], adjustments: [] }
+  }
+  const competitors = (Array.isArray(raw.competitors) ? raw.competitors : [])
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const title = String(item.name || '').trim()
+      if (!title) return null
+      const meta = [item.distanceHint, item.category, item.priceRange, item.highlights]
+        .map((part) => String(part || '').trim())
+        .filter(Boolean)
+        .join(' · ')
+      return { name: title, meta }
+    })
+    .filter(Boolean)
+    .slice(0, 6)
+  const packages = (Array.isArray(raw.bundleSuggestions) ? raw.bundleSuggestions : [])
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const title = String(item.title || '').trim()
+      if (!title) return null
+      const price = Number(item.suggestedPriceYuan)
+      const lines = Array.isArray(item.comboLines)
+        ? item.comboLines.map((line) => String(line || '').trim()).filter(Boolean).join('、')
+        : ''
+      const detail = [
+        Number.isFinite(price) ? `建议售价 ${price} 元` : '',
+        lines ? `包含 ${lines}` : '',
+        String(item.competitorRef || '').trim(),
+        String(item.rationale || '').trim(),
+      ]
+        .filter(Boolean)
+        .join('。')
+      return { title, detail }
+    })
+    .filter(Boolean)
+    .slice(0, 4)
+  const adjustments = (Array.isArray(raw.suggestions) ? raw.suggestions : [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .slice(0, 6)
+  const summaryBody = String(raw.summary || '').trim() || '周边同品类门店已列出。'
+  return { focus: mode, headline, summary: lead + summaryBody, competitors, packages, adjustments }
+}
+
 function erpAdviceSystem(focus) {
   const rangeRule =
     focus === 'store'
@@ -1590,7 +1683,12 @@ async function adviseShop(raw, score, opts) {
     if (adviceRaw && typeof adviceRaw === 'object') {
       const names = score.indicators.map((item) => item.name)
       const sections = alignAdviceSections(mapSuggestions(adviceRaw.sections), names)
-      if (sections.length === names.length) return { lift: clampLift(adviceRaw.lift), sections }
+      if (sections.length === names.length) {
+        const competitor = readCachedRival(adviceRaw.competitor)
+        const cachedAdvice = { lift: clampLift(adviceRaw.lift), sections }
+        if (competitor) cachedAdvice.competitor = competitor
+        return cachedAdvice
+      }
     }
   }
   const backend = row.backendFacts
@@ -1625,10 +1723,19 @@ async function adviseShop(raw, score, opts) {
     }
   }
   sections = completeAdviceSections(sections.length === names.length ? sections : mapSuggestions(parsed && parsed.sections), indicators)
+  let competitor = null
+  try {
+    const pending = opts && opts.competitor
+    const resolved = pending && typeof pending.then === 'function' ? await pending : pending
+    competitor = readCachedRival(resolved)
+  } catch (e) {
+    competitor = null
+  }
   const advice = {
     lift: clampLift(parsed && parsed.lift),
     sections,
   }
+  if (competitor) advice.competitor = competitor
   writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
   void publishShopEval(opts.storage, key, slotId(row))
   return Object.assign({}, advice, { fromModel: Boolean(parsed) })
@@ -1675,6 +1782,7 @@ module.exports = {
   hydrateShopEval,
   evaluateShop,
   adviseShop,
+  shopEvalRivalView,
   describeShopBackend,
   publicEvalIndicators,
   shopEvalGainTargets,
