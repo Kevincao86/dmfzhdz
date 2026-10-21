@@ -680,13 +680,14 @@ export function buildAiOpsRoiLookupForPrompt(platforms: string[], industryPath?:
   const plats = platforms.length ? platforms : ['抖音', '小红书']
   const lines = plats.map((p) => {
     const b = resolveAiOpsRoiIndustryBench(p, industryPath)
-    return `- ${p}：核销转化 ${b.convLow}%～${b.convHigh}% · 参考周期GMV投产中位≈${b.roiMid} · 客单约¥${b.aovYuan}（${b.evidence}）`
+    const band = reasonableWriteoffMultiple(p)
+    return `- ${p}：核销转化 ${b.convLow}%～${b.convHigh}% · 周期核销额按投入的 ${band.low}～${band.high} 倍（中位 ${band.mid}，不是广告消耗的 3 倍）· 客单约¥${b.aovYuan}（${b.evidence}）`
   })
   const ind = industryPath?.trim() || '未指定（按本地生活综合）'
   return [
     `【转化率查询结果 · 须据此填写 roiAnalysis，禁止写「假设转化率」】`,
     `商家类目：${ind}`,
-    `口径：expectedGmvYuan=活动周期总GMV；roi=毛利ROI=(GMV×品类毛利率)÷投入；paybackDays=投入÷日均毛利`,
+    `口径：expectedGmvYuan=活动周期合计核销额（非每天）；roi=毛利ROI，按该渠道已配置毛利单独计算，禁止把多档毛利做简单平均；paybackDays=投入÷日均毛利`,
     ...lines,
     `- 抖音直播（若方案含直播）：8%～15%（再按业态校正）`,
     `- 抖音本地推：1.8%～3.5%（再按业态校正）`,
@@ -2665,7 +2666,47 @@ export function isAiOpsPlanResultUsable(plan: AiOpsPlanResult): boolean {
   )
 }
 
-/** 用「勾选平台 × 商家类目」查询转化率区间；GMV=周期合计；ROI/回本按品类毛利重算 */
+/**
+ * 本地生活核销额：达人费和投流换来的是券面核销，不是广告消耗的 3 倍。
+ * low/mid/high 都是「周期核销 GMV ÷ 该渠道投入」。
+ */
+export function reasonableWriteoffMultiple(channel: string): { low: number; mid: number; high: number } {
+  const t = String(channel || '')
+  if (/直播/.test(t)) return { low: 6, mid: 8, high: 12 }
+  if (/本地推|信息流|投流|DOU\+|dou\+/i.test(t)) return { low: 4, mid: 5.5, high: 8 }
+  if (/小红书|种草|笔记/i.test(t)) return { low: 3.5, mid: 4.5, high: 6 }
+  if (/美团|点评|大众点评|到店/.test(t)) return { low: 4.5, mid: 6, high: 9 }
+  if (/快手/.test(t)) return { low: 4, mid: 5, high: 7 }
+  if (/微信|视频号/.test(t)) return { low: 3.5, mid: 4.5, high: 6.5 }
+  if (/抖音|短视频|达人|探店|KOC|KOL/i.test(t)) return { low: 5, mid: 6.5, high: 9 }
+  return { low: 4.5, mid: 6, high: 8 }
+}
+
+export function allocateYuanByWeight(total: number, weights: number[]): number[] {
+  const n = Math.max(0, Math.round(total))
+  if (!weights.length || n <= 0) return weights.map(() => 0)
+  const sum = weights.reduce((s, w) => s + Math.max(0, w), 0)
+  if (sum <= 0) {
+    const base = Math.floor(n / weights.length)
+    const out = weights.map(() => base)
+    out[0] = (out[0] ?? 0) + (n - base * weights.length)
+    return out
+  }
+  const raw = weights.map((w) => (n * Math.max(0, w)) / sum)
+  const floors = raw.map((v) => Math.floor(v))
+  let left = n - floors.reduce((s, v) => s + v, 0)
+  const order = raw
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac)
+  for (const item of order) {
+    if (left <= 0) break
+    floors[item.i] = (floors[item.i] ?? 0) + 1
+    left -= 1
+  }
+  return floors
+}
+
+/** 用「勾选平台 × 商家类目」查询转化率区间；GMV=周期合计；ROI/回本按各渠道已配置毛利重算 */
 export function ensureMarketingRoiFallback(
   plan: AiOpsPlanResult,
   opts?: {
@@ -2673,6 +2714,7 @@ export function ensureMarketingRoiFallback(
     margins?: AiOpsPlatformMargins | null
     periodStart?: string
     periodEnd?: string
+    preserveRoiRows?: boolean
   },
 ): AiOpsPlanResult {
   const industryPath = opts?.industryPath?.trim() || undefined
@@ -2692,12 +2734,14 @@ export function ensureMarketingRoiFallback(
     let expectedGmvYuan = r.expectedGmvYuan
     let expectedOrders = r.expectedOrders
 
+    const band = reasonableWriteoffMultiple(r.channel)
     const breakEvenGmv =
       r.investYuan > 0 && marginPct > 0
         ? Math.round((r.investYuan / (marginPct / 100)) * 1.2)
         : 0
-    const industryGmv = r.investYuan > 0 ? Math.round(r.investYuan * bench.roiMid) : 0
-    const floorGmv = Math.max(breakEvenGmv, industryGmv)
+    const industryGmv = r.investYuan > 0 ? Math.round(r.investYuan * band.mid) : 0
+    const floorGmv = Math.max(breakEvenGmv, r.investYuan > 0 ? Math.round(r.investYuan * band.low) : 0)
+    const capGmv = r.investYuan > 0 ? Math.round(r.investYuan * band.high) : 0
 
     const gmvInvestRatio = r.investYuan > 0 ? expectedGmvYuan / r.investYuan : 0
     const provisional = computeAiOpsRoiMetrics({
@@ -2710,13 +2754,14 @@ export function ensureMarketingRoiFallback(
       r.investYuan > 0 &&
       (expectedGmvYuan <= 0 ||
         looksLikeAssumedConvNote(r.note) ||
-        gmvInvestRatio < 1.5 ||
-        gmvInvestRatio > 20 ||
+        gmvInvestRatio < band.low ||
+        gmvInvestRatio > band.high ||
         provisional.marginRoi < 1 ||
-        (floorGmv > 0 && expectedGmvYuan < floorGmv))
+        (floorGmv > 0 && expectedGmvYuan < floorGmv) ||
+        (capGmv > 0 && expectedGmvYuan > capGmv))
 
-    if (needRecalc && floorGmv > 0) {
-      expectedGmvYuan = floorGmv
+    if (needRecalc && industryGmv > 0) {
+      expectedGmvYuan = industryGmv
       expectedOrders = Math.max(1, Math.round(expectedGmvYuan / bench.aovYuan))
     } else if (expectedOrders <= 0 && expectedGmvYuan > 0) {
       expectedOrders = Math.max(1, Math.round(expectedGmvYuan / bench.aovYuan))
@@ -2744,7 +2789,7 @@ export function ensureMarketingRoiFallback(
       `${baseNote}；口径：周期合计GMV（非日GMV）¥${expectedGmvYuan.toLocaleString('zh-CN')}` +
       `≈客单¥${bench.aovYuan}×约${expectedOrders}单` +
       `×品类毛利${marginPct}%→预计毛利¥${m.grossProfitYuan.toLocaleString('zh-CN')}` +
-      `；毛利ROI=${m.marginRoi}（GMV投产=${m.gmvRoi}；盈亏线×1.2≈¥${breakEvenGmv.toLocaleString('zh-CN')}）` +
+      `；毛利ROI=${m.marginRoi}（核销投产=${m.gmvRoi}，本地生活合理区间 ${band.low}～${band.high} 倍；盈亏线×1.2≈¥${breakEvenGmv.toLocaleString('zh-CN')}）` +
       `；回本=投入÷日均毛利≈${m.paybackDays || '—'}天（活动${periodDays}天）`
 
     return {
@@ -2758,66 +2803,102 @@ export function ensureMarketingRoiFallback(
     }
   }
 
-  if (roiAnalysis.length < 2) {
-    const channels = plan.marketingBudget.channels.length
-      ? plan.marketingBudget.channels
-      : [
-          {
-            channel: '综合投放',
-            amountYuan: plan.marketingBudget.totalBudget || 0,
-            ratioPct: 100,
-            month: '',
-            note: '',
-          },
-        ]
-    roiAnalysis = channels
-      .filter((c) => c.amountYuan > 0)
-      .slice(0, 8)
-      .map((c) => {
-        const bench = resolveAiOpsRoiIndustryBench(c.channel, industryPath)
-        const invest = c.amountYuan
-        const expectedGmvYuan = Math.round(invest * bench.roiMid)
-        const expectedOrders = Math.max(1, Math.round(expectedGmvYuan / bench.aovYuan))
-        return finalizeRow({
-          channel: c.channel,
-          investYuan: invest,
-          expectedGmvYuan,
-          expectedOrders,
-          note: '',
-        })
-      })
-  } else {
-    roiAnalysis = roiAnalysis.map((r) =>
-      finalizeRow({
-        channel: r.channel,
-        investYuan: r.investYuan,
-        expectedGmvYuan: r.expectedGmvYuan,
-        expectedOrders: r.expectedOrders,
-        note: r.note,
-      }),
-    )
+  const lockedBudget = Math.round(plan.marketingBudget.totalBudget || 0)
+  const channelSeeds = (plan.marketingBudget.channels || []).filter((c) => c.amountYuan > 0).slice(0, 8)
+  const channelSum = channelSeeds.reduce((s, c) => s + c.amountYuan, 0)
+  const preserveRows = Boolean(opts?.preserveRoiRows) && roiAnalysis.length > 0
+  const channelsMatchBudget =
+    !preserveRows &&
+    channelSeeds.length > 0 &&
+    lockedBudget > 0 &&
+    Math.abs(channelSum - lockedBudget) / lockedBudget <= 0.08
+
+  type RoiSeed = {
+    channel: string
+    investYuan: number
+    expectedGmvYuan: number
+    expectedOrders: number
+    note: string
   }
+  let seeds: RoiSeed[]
+  if (channelsMatchBudget) {
+    seeds = channelSeeds.map((c) => ({
+      channel: c.channel,
+      investYuan: c.amountYuan,
+      expectedGmvYuan: 0,
+      expectedOrders: 0,
+      note: '',
+    }))
+  } else if (roiAnalysis.length) {
+    seeds = roiAnalysis.map((r) => ({
+      channel: r.channel,
+      investYuan: r.investYuan,
+      expectedGmvYuan: r.expectedGmvYuan,
+      expectedOrders: r.expectedOrders,
+      note: r.note,
+    }))
+  } else if (channelSeeds.length) {
+    seeds = channelSeeds.map((c) => ({
+      channel: c.channel,
+      investYuan: c.amountYuan,
+      expectedGmvYuan: 0,
+      expectedOrders: 0,
+      note: '',
+    }))
+  } else {
+    seeds = [
+      {
+        channel: '综合投放',
+        investYuan: lockedBudget,
+        expectedGmvYuan: 0,
+        expectedOrders: 0,
+        note: '',
+      },
+    ]
+  }
+
+  if (lockedBudget > 0) {
+    const alloc = allocateYuanByWeight(
+      lockedBudget,
+      seeds.map((s) => s.investYuan),
+    )
+    seeds = seeds.map((s, i) => ({ ...s, investYuan: alloc[i] ?? 0 })).filter((s) => s.investYuan > 0)
+  }
+
+  roiAnalysis = seeds.map((s) => finalizeRow(s))
 
   const totalInvest = roiAnalysis.reduce((s, r) => s + r.investYuan, 0)
   const totalGmv = roiAnalysis.reduce((s, r) => s + r.expectedGmvYuan, 0)
-  const avgMargin =
-    roiAnalysis.length > 0
-      ? roiAnalysis.reduce((s, r) => s + resolveChannelMarginPct(r.channel, margins), 0) /
-        roiAnalysis.length
-      : resolveChannelMarginPct('', margins)
-  const totalMetrics = computeAiOpsRoiMetrics({
-    investYuan: totalInvest,
-    expectedGmvYuan: totalGmv,
-    marginPct: avgMargin,
-    periodDays,
+  const channelProfits = roiAnalysis.map((r) => {
+    const marginPct = resolveChannelMarginPct(r.channel, margins)
+    const metrics = computeAiOpsRoiMetrics({
+      investYuan: r.investYuan,
+      expectedGmvYuan: r.expectedGmvYuan,
+      marginPct,
+      periodDays,
+    })
+    return { channel: r.channel, marginPct, profit: metrics.grossProfitYuan }
   })
+  const totalProfit = channelProfits.reduce((s, row) => s + row.profit, 0)
+  const blendedMargin = totalGmv > 0 ? (totalProfit / totalGmv) * 100 : resolveChannelMarginPct('', margins)
+  const distinctMargins = [...new Set(channelProfits.map((row) => row.marginPct))]
+  const marginPhrase =
+    distinctMargins.length <= 1
+      ? `按已配置毛利 ${distinctMargins[0] ?? Math.round(blendedMargin * 10) / 10}%`
+      : `按各渠道已配置毛利分别计算（${channelProfits
+          .map((row) => `${row.channel}${row.marginPct}%`)
+          .join('、')}），不做简单平均`
+  const blendedRoi = totalInvest > 0 ? Math.round((totalProfit / totalInvest) * 100) / 100 : 0
+  const gmvRoi = totalInvest > 0 ? Math.round((totalGmv / totalInvest) * 100) / 100 : 0
+  const paybackDays =
+    totalProfit > 0 && periodDays > 0 ? Math.max(1, Math.ceil((totalInvest * periodDays) / totalProfit)) : 0
   const roiSummary =
-    `活动周期 ${periodDays} 天内：总投入约 ¥${Math.round(totalInvest).toLocaleString('zh-CN')}，` +
-    `周期合计预计 GMV 约 ¥${Math.round(totalGmv).toLocaleString('zh-CN')}（非日 GMV），` +
-    `按品类毛利约 ${Math.round(avgMargin * 10) / 10}% 计预计毛利约 ¥${totalMetrics.grossProfitYuan.toLocaleString('zh-CN')}，` +
-    `综合毛利 ROI ≈ ${totalMetrics.marginRoi}（GMV 投产 ≈ ${totalMetrics.gmvRoi}），` +
-    `综合回本约 ${totalMetrics.paybackDays || '—'} 天。` +
-    `分渠道核销转化取行业中位区间；回本=投入÷日均毛利。`
+    `活动周期 ${periodDays} 天内：总投入 ¥${Math.round(totalInvest).toLocaleString('zh-CN')}（等于已锁定预算），` +
+    `周期合计预计核销 GMV ¥${Math.round(totalGmv).toLocaleString('zh-CN')}（非日 GMV），` +
+    `${marginPhrase}，预计毛利 ¥${Math.round(totalProfit).toLocaleString('zh-CN')}，` +
+    `综合毛利 ROI ≈ ${blendedRoi}（核销投产 ≈ ${gmvRoi}），` +
+    `综合回本约 ${paybackDays || '—'} 天。` +
+    `核销额按本地生活平台性质测算（达人费与投流对应券面核销，不是广告消耗的 3 倍）；回本=投入÷日均毛利。`
 
   const assumptions =
     '测算口径：预计GMV=活动周期总产出（非每天）；毛利ROI=(周期GMV×品类毛利率)÷投入；回本天数=投入÷(周期毛利÷活动天数)。核销转化取各平台行业中位区间；实际受货盘、核销率、达人与档期影响，建议按周复盘。'
@@ -2833,12 +2914,40 @@ export function ensureMarketingRoiFallback(
   }
 }
 
+/** 豆包给出的周期核销额：只接受落在该渠道合理区间内的数字，再重算毛利与回本 */
+export function applyPreferredWriteoffGmv(
+  plan: AiOpsPlanResult,
+  preferred: { channel: string; expectedGmvYuan: number }[],
+  opts?: AiOpsPlanEnrichOpts,
+): AiOpsPlanResult {
+  const rows = plan.marketingBudget.roiAnalysis || []
+  if (!rows.length || !preferred.length) return plan
+  const nextRows = rows.map((row) => {
+    const exact = preferred.find((item) => item.channel === row.channel)
+    const fuzzy = preferred.filter(
+      (item) => row.channel.includes(item.channel) || item.channel.includes(row.channel),
+    )
+    const hit = exact || (fuzzy.length === 1 ? fuzzy[0] : undefined)
+    if (!hit || !(hit.expectedGmvYuan > 0)) return row
+    return { ...row, expectedGmvYuan: Math.round(hit.expectedGmvYuan), note: '' }
+  })
+  return ensureMarketingRoiFallback(
+    {
+      ...plan,
+      marketingBudget: { ...plan.marketingBudget, roiAnalysis: nextRows },
+    },
+    { ...opts, preserveRoiRows: true },
+  )
+}
+
 export type AiOpsPlanEnrichOpts = {
   industryPath?: string
   margins?: AiOpsPlatformMargins | null
   periodStart?: string
   periodEnd?: string
   platforms?: string[]
+  /** 豆包已给出核销额时，沿用现有分渠道投入，只重算 GMV 与毛利 */
+  preserveRoiRows?: boolean
 }
 
 /** 将运营目标中的核销 GMV 与 roiAnalysis 对齐（客单×单量） */
@@ -2860,7 +2969,7 @@ export function alignOpsPlanGoalsToRoi(
       metric: `${r.channel}核销GMV`,
       target: `≥ ¥${gmv.toLocaleString('zh-CN')}（客单约¥${aov} × 约 ${orders} 单）`,
       rationale:
-        `按投入 ¥${r.investYuan.toLocaleString('zh-CN')}、行业GMV投产中位与毛利盈亏线（≥投入÷毛利率×1.2）取高测算；` +
+        `按投入 ¥${r.investYuan.toLocaleString('zh-CN')} 与本地生活核销合理区间测算；` +
         `禁止目标核销GMV低于投放预算导致商家亏损。毛利ROI≈${r.roi}。`,
       gmvYuan: gmv,
       orders,

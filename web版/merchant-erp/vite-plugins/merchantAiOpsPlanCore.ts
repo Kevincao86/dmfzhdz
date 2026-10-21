@@ -2,12 +2,17 @@
  * AI 运营方案：菜单/毛利/预算/多平台 → 六块结构化 JSON
  */
 import {
+  alignOpsPlanGoalsToRoi,
+  allocateYuanByWeight,
+  applyPreferredWriteoffGmv,
   buildAiOpsRoiLookupForPrompt,
   enrichAiOpsPlanPostProcess,
   ensureSimplePlanDetailDepth,
   isAiOpsPlanResultUsable,
   normalizeAiOpsPlanResult,
+  reasonableWriteoffMultiple,
   type AiOpsPlanEdition,
+  type AiOpsPlanEnrichOpts,
   type AiOpsPlanResult,
 } from '../src/lib/aiOpsPlanTypes.js'
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
@@ -89,6 +94,69 @@ function extractJsonObject(text: string): Record<string, unknown> {
     return repaired
   }
   throw new Error('模型未返回有效 JSON（可能输出过长被截断）')
+}
+
+/** 方案生成后，用豆包按本地生活平台性质复核周期核销额。失败则保留公式中位。 */
+async function refineWriteoffGmvWithDoubao(
+  env: Record<string, string>,
+  plan: AiOpsPlanResult,
+  opts: AiOpsPlanEnrichOpts,
+): Promise<AiOpsPlanResult> {
+  const rows = plan.marketingBudget.roiAnalysis || []
+  if (!rows.length) return plan
+  const lines = rows
+    .map((row) => {
+      const band = reasonableWriteoffMultiple(row.channel)
+      const low = Math.round(row.investYuan * band.low)
+      const high = Math.round(row.investYuan * band.high)
+      return `- ${row.channel}：投入 ${row.investYuan} 元，合理核销区间 ${low}～${high} 元（${band.low}～${band.high} 倍），当前公式 ${row.expectedGmvYuan} 元`
+    })
+    .join('\n')
+  const marginLine = opts.margins
+    ? `已配置毛利：抖音 ${opts.margins.douyin ?? '未填'}%，美团 ${opts.margins.meituan ?? '未填'}%，小红书 ${opts.margins.xhs ?? '未填'}%。`
+    : ''
+  const system = '你是本地生活到店核销测算助手。只输出一个 JSON 对象，不要 Markdown，不要改投入。'
+  const user =
+    `类目：${opts.industryPath || '本地生活'}。周期：${opts.periodStart || ''}～${opts.periodEnd || ''}。` +
+    `总投入已锁定为 ${plan.marketingBudget.totalBudget} 元，等于商家填写的预算。${marginLine}\n` +
+    `各渠道：\n${lines}\n` +
+    `请判断每个渠道在整个活动周期内的合理券面核销额（不是每天，也不是广告消耗回报）。` +
+    `3 万投入只核销约 11 万，不符合抖音/小红书本地生活达人、直播、本地推的平台性质。` +
+    `数字必须落在上面给出的区间内，并按类目、客单、渠道转化给出更贴近真实核销的位置。\n` +
+    `{"rows":[{"channel":"与上面渠道名完全一致","expectedGmvYuan":整数,"reason":"不超过40字"}]}`
+  try {
+    const { merchantAgentChatFromMessages } = await import('./merchantAiUpstream.js')
+    const chat = merchantAgentChatFromMessages(
+      env,
+      'doubao',
+      undefined,
+      system,
+      user,
+    )
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('doubao_writeoff_timeout')), 28_000)
+    })
+    const { text } = await Promise.race([chat, timeout])
+    const obj = extractJsonObject(text)
+    const rawRows = Array.isArray(obj.rows) ? obj.rows : []
+    const preferred = rawRows
+      .map((item) => {
+        const row = item as { channel?: unknown; expectedGmvYuan?: unknown }
+        const channel = String(row.channel || '').trim()
+        const expectedGmvYuan = Math.round(Number(row.expectedGmvYuan) || 0)
+        return { channel, expectedGmvYuan }
+      })
+      .filter((row) => row.channel && row.expectedGmvYuan > 0)
+    if (!preferred.length) return plan
+    const patched = applyPreferredWriteoffGmv(plan, preferred, opts)
+    return alignOpsPlanGoalsToRoi(patched, opts)
+  } catch (err) {
+    console.warn(
+      '[meoo-ai-ops-plan] doubao writeoff refine skipped',
+      err instanceof Error ? err.message : err,
+    )
+    return plan
+  }
 }
 
 /** 按起始下标旋转厂商顺序，便于重试时换一家先试 */
@@ -273,14 +341,14 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监。�
 
 硬性要求：
 1. 只基于用户提供的菜单价目/已上架套餐/毛利/类目/竞品/预算/平台/门店范围；无菜单时用「已上架套餐」清单组品，勿编造菜名。多门店时方案须覆盖所选门店（或注明分店差异）。
-2. marketingBudget.channels 合计≈totalBudget（误差≤5%）；须含 roiSummary + roiAnalysis（≥3 行，含投入/预计GMV/订单/ROI/回本天数）。
+2. marketingBudget.totalBudget 必须等于用户填写的预算，禁止改成别的数；channels 合计必须等于该预算；须含 roiSummary + roiAnalysis（含投入/预计GMV/订单/ROI/回本天数）。
 3. 【达人写死】talentBudget 必须基于用户消息中的「灵祺星选达人库」段：先按门店城市取同城；无同城则已注入全国本地生活行情。必须读清并写明：头部（销售等级5级及以上 / V5·V5+）人数与样本、腰尾部（3–4级 / V3·V4）人数与样本；budgetLines 至少覆盖「短视频达人（头部/腰部/尾部分行）」「短视频本地推」「直播达人」「直播投流」；tier 与库分层对齐；人数/单价禁止脱离库数据；无同城时 note 注明「按全国本地生活达人行情」；subtotalYuan=人数×单价+投流；talentRows≥6。
 4. calendar.milestones 日期落在周期内，≥12 条；除必选 kind（collab_confirm→live_go）外，另给 other：确认货盘、造话题#、预热物料、直播彩排、数据战报等；video_publish/live_* 带 HH:mm。缺项服务端会补全。
 5. platformStrategy 仅用户勾选平台；examples 须像爆款钩子文案；detail≤120字且含 POI/挂链或投流之一。
 6. 组品 3～5 个，优先真实菜单名或已上架套餐名；sellingPoint 写清券面/让利卖点。
 7. phases/weeklyActions 用日/周；hourlySchedule 仅 live；无直播可 []。
 8. phases≥3、goals≥3；每个 phase 的 detailItems≥4 且尽量覆盖阶段内每一天（dateRange 用 YYYY-MM-DD～YYYY-MM-DD）；howTo 含步骤与验收（≤80字）。不足时服务端按日补全。
-9. 【ROI】禁止「假设转化率」；按平台行业中位核销转化写 note；expectedGmvYuan=周期总GMV=客单×单量，且 ≥ max(投入×投产中位, 投入÷毛利率×1.2)；roi=毛利ROI。
+9. 【ROI】禁止「假设转化率」；expectedGmvYuan 是活动周期合计核销额（不是每天）。本地生活达人/直播/本地推的核销额按平台性质估：短视频达人约投入的 5～9 倍、直播约 6～12 倍、本地推约 4～8 倍、小红书约 3.5～6 倍，且高于投入÷毛利率×1.2。禁止把 3 万投入估成只有约 11 万核销。roi=毛利ROI，毛利用用户已配置的各平台毛利，禁止把多档毛利平均成一个数。
 10. Detail/howTo/rationale 各段≤120字；输出必须是完整可解析 JSON，控制总长，禁止截断。`
 
 /** 简易版：detailFlow.actions 必须是 {label, detail}，detail 写满具体内容（非工作流空壳） */
@@ -1007,25 +1075,49 @@ export async function runAiOpsPlanCore(
       }
     }
 
-    if (!plan.marketingBudget.totalBudget) {
+    if (budgetYuan > 0) {
+      const channels = plan.marketingBudget.channels || []
+      const sum = channels.reduce((s, row) => s + (Number(row.amountYuan) || 0), 0)
+      const scaled =
+        sum > 0 && Math.abs(sum - budgetYuan) > 1
+          ? allocateYuanByWeight(
+              budgetYuan,
+              channels.map((row) => Number(row.amountYuan) || 0),
+            )
+          : null
       plan = {
         ...plan,
-        marketingBudget: { ...plan.marketingBudget, totalBudget: budgetYuan },
+        marketingBudget: {
+          ...plan.marketingBudget,
+          totalBudget: budgetYuan,
+          channels: scaled
+            ? channels.map((row, index) => ({ ...row, amountYuan: scaled[index] ?? 0 }))
+            : channels,
+        },
       }
     }
 
+    const enrichOpts = {
+      industryPath: body.industryPath,
+      margins: body.margins,
+      periodStart,
+      periodEnd,
+      platforms,
+    }
     try {
-      plan = enrichAiOpsPlanPostProcess(plan, {
-        industryPath: body.industryPath,
-        margins: body.margins,
-        periodStart,
-        periodEnd,
-        platforms,
-      })
+      plan = enrichAiOpsPlanPostProcess(plan, enrichOpts)
     } catch (postErr) {
       console.error(
         '[meoo-ai-ops-plan] enrichAiOpsPlanPostProcess failed',
         postErr instanceof Error ? postErr.message : postErr,
+      )
+    }
+    try {
+      plan = await refineWriteoffGmvWithDoubao(aiEnv, plan, enrichOpts)
+    } catch (refineErr) {
+      console.warn(
+        '[meoo-ai-ops-plan] refineWriteoffGmvWithDoubao failed',
+        refineErr instanceof Error ? refineErr.message : refineErr,
       )
     }
 
