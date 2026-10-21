@@ -634,8 +634,7 @@ export async function accountPayloadWithMemberExtras(
       acc = { ...acc, active_role: 'pr' }
     }
     const talentMembership = resolveTalentMembershipForAccount(data, acc, linkedMember)
-    const talentWorkbench =
-      acc.active_role === 'talent' || acc.active_role === 'shoot' || acc.active_role === 'edit'
+    const talentWorkbench = acc.active_role === 'talent'
     if (member || talentWorkbench) {
       extras = {
         lingqiShootTeamId: member?.lingqiShootTeamId || null,
