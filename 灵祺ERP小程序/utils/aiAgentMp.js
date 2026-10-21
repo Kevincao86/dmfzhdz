@@ -123,6 +123,44 @@ function refersToPriorImage(text) {
   return false
 }
 
+function quotedSourceText(userText, history) {
+  const ids = []
+  const re = /\[引用(?:我|助手)\s+#([A-Za-z0-9-]+)/g
+  let hit
+  const raw = String(userText || '')
+  while ((hit = re.exec(raw))) ids.push(hit[1] || '')
+  const chunks = []
+  const list = Array.isArray(history) ? history : []
+  ids.forEach((shortId) => {
+    if (!shortId) return
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const msg = list[i]
+      const id = String((msg && msg.id) || '')
+      if (id !== shortId && id.indexOf(shortId) !== 0) continue
+      const body = String((msg && msg.content) || '').trim()
+      if (body && chunks.indexOf(body) < 0) chunks.push(body)
+      break
+    }
+  })
+  return chunks.join('\n').slice(0, 12000)
+}
+
+function quotedMessageImageUrl(userLine, history) {
+  const matched = String(userLine || '').match(/\[引用(?:我|助手)\s+#([A-Za-z0-9-]+)/)
+  if (!matched) return ''
+  const shortId = matched[1]
+  const list = Array.isArray(history) ? history : []
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    const msg = list[i]
+    const id = String((msg && msg.id) || '')
+    if (id !== shortId && id.indexOf(shortId) !== 0) continue
+    const urls = msg && msg.imageUrls
+    if (!Array.isArray(urls) || !urls.length) return ''
+    return String(urls[urls.length - 1] || '').trim()
+  }
+  return ''
+}
+
 function lastHistoryImageUrl(history) {
   const list = Array.isArray(history) ? history : []
   for (let i = list.length - 1; i >= 0; i -= 1) {
@@ -725,7 +763,8 @@ async function postAiChatRequest(opts) {
         .map((m) => String((m && m.content) || ''))
         .filter(Boolean)
         .join('\n')
-      talentRoster = await feat.buildTalentChatRoster(opts.userLine, prior, intelText)
+      const quotedFull = quotedSourceText(opts.userLine, opts.history)
+      talentRoster = await feat.buildTalentChatRoster(opts.userLine, prior, intelText, quotedFull)
     }
   } catch (_) {
     talentRoster = null
@@ -858,7 +897,7 @@ async function sendAgentTurn(opts) {
         ? '请结合附图说明你的需求。'
         : '')
 
-  const priorImage = lastHistoryImageUrl(history)
+  const priorImage = quotedMessageImageUrl(line, history) || lastHistoryImageUrl(history)
   const editPrior = refersToPriorImage(line) || detectImageEditIntent(line, imageDataUrls.length > 0)
   const hasImageContext = imageDataUrls.length > 0 || (editPrior && Boolean(priorImage))
   const imagePickerKey = resolveImagePickerKey(pickerKey, modelOptions, line, hasImageContext)

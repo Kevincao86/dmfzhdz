@@ -628,15 +628,15 @@ function tableTalentHeadcount(text) {
   return 0
 }
 
-function planHeadcountFromTexts(userText, priorText) {
-  const blobs = [String(userText || ''), String(priorText || '')]
+function planHeadcountFromTexts(userText, priorText, quotedFull) {
+  const blobs = [String(quotedFull || ''), String(userText || ''), String(priorText || '')]
   for (let i = 0; i < blobs.length; i += 1) {
     const fromTable = tableTalentHeadcount(blobs[i])
     if (fromTable > 0) return fromTable
   }
   for (let i = 0; i < blobs.length; i += 1) {
     const flat = blobs[i].replace(/,/g, '')
-    const invited = flat.match(/(?:邀请|招募|安排|共|合计|总共|需要)\s*(\d{1,2})\s*位/)
+    const invited = flat.match(/(?:邀请|招募|安排|共|合计|总共|需要|方案要)\s*(\d{1,2})\s*位/)
     const plain = flat.match(/(\d{1,2})\s*位\s*(?:达人|探店)/)
     const n = Number((invited && invited[1]) || (plain && plain[1]) || 0)
     if (n >= 1 && n <= 20) return n
@@ -706,9 +706,9 @@ function talentRosterNote(headcount, libraryCount, publicCount) {
   return `${asked}星选库已按门店类目配满 ${libraryCount} 位。`
 }
 
-async function buildTalentChatRoster(userText, priorText, intelText) {
+async function buildTalentChatRoster(userText, priorText, intelText, quotedFull) {
   if (!isTalentRecommendAsk(userText)) return null
-  const named = cityAskedForTalents(userText)
+  const named = cityAskedForTalents(userText) || cityAskedForTalents(quotedFull)
   const planCity = cityAskedForTalents(priorText)
   let city = named || planCity
   if (!city) city = intelField(intelText, '门店所在城市')
@@ -716,7 +716,7 @@ async function buildTalentChatRoster(userText, priorText, intelText) {
   const industry = industryRaw && industryRaw.indexOf('绑定接口未返回') < 0 ? industryRaw : ''
   const storeName = intelField(intelText, '当前门店')
   const talentType = industry || '本地生活到店'
-  const headcount = planHeadcountFromTexts(userText, priorText)
+  const headcount = planHeadcountFromTexts(userText, priorText, quotedFull)
   const library = await requestTalentRecommend({
     city,
     platform: '抖音',

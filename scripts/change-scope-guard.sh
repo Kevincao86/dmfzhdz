@@ -848,6 +848,7 @@ aiAgentMp
 aiAgentExecutionMp
 pages/ai-agent/ai-agent
 pages/ai-ops-plan/ai-ops-plan
+agentComposerMp
 AiAgentContext.tsx
 change-scope-guard
 PAT

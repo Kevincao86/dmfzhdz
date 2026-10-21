@@ -43,6 +43,7 @@ Page({
     showSendBtn: false,
     voiceMode: false,
     showPlusPanel: false,
+    pendingQuote: null,
     plusActions: composer.PLUS_ACTIONS,
     keyboardHeight: 0,
   },
@@ -201,7 +202,32 @@ Page({
       showSendBtn: false,
       voiceMode: false,
       showPlusPanel: false,
+      pendingQuote: null,
     })
+  },
+
+  onQuoteMessage(e) {
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
+    const msg = (this.data.messages || []).find((m) => m && m.id === id)
+    if (!msg || (msg.role !== 'user' && msg.role !== 'assistant')) return
+    const text = String(msg.content || '').trim()
+    const hasImg = Array.isArray(msg.imageUrls) && msg.imageUrls.some((u) => String(u || '').trim())
+    let excerpt = text.slice(0, 500)
+    if (!excerpt) excerpt = hasImg ? '［附图，无文字］' : '（空消息）'
+    else if (hasImg) excerpt = `［附图］ ${excerpt}`.slice(0, 500)
+    this.setData({
+      pendingQuote: {
+        quotedMessageId: msg.id,
+        role: msg.role,
+        excerpt,
+        who: msg.role === 'user' ? '我' : '助手',
+      },
+      showSendBtn: true,
+    })
+  },
+
+  onClearQuote() {
+    this.setData({ pendingQuote: null }, () => composer.syncShowSendBtn(this))
   },
 
   onToggleShortcuts() {
@@ -219,7 +245,7 @@ Page({
     if (this.data.sending || this.data.recordingVoice) return
     const line = String(this.data.input || '').trim()
     const attachments = this.data.attachments || []
-    if (!line && !attachments.length) return
+    if (!line && !attachments.length && !this.data.pendingQuote) return
     void this.sendLine(line, attachments)
   },
 
@@ -446,13 +472,20 @@ Page({
         preview: a.preview || a.dataUrl,
         name: a.name,
       }))
-    const text =
+    const pq = this.data.pendingQuote
+    let text =
       [String(line || '').trim(), fileNote].filter(Boolean).join('\n') ||
       (atts.some((a) => a.kind === 'video')
         ? '请结合附带的视频说明你的需求。'
         : atts.length
           ? '请结合附图说明你的需求。'
           : '')
+    if (!text && !pq) return
+    if (pq) {
+      const shortId = String(pq.quotedMessageId || '')
+      const quotedBlock = `[引用${pq.who || '助手'} #${shortId}]\n> ${String(pq.excerpt || '').split('\n').join('\n> ')}\n\n`
+      text = quotedBlock + text
+    }
     const history = this.data.messages.filter((m) => m.role === 'user' || m.role === 'assistant')
     const userMsg = {
       id: `u-${Date.now()}`,
@@ -478,6 +511,7 @@ Page({
       showSendBtn: false,
       showPlusPanel: false,
       voiceMode: false,
+      pendingQuote: null,
     })
     try {
       await sessionSync.syncFromCloud({ force: true })

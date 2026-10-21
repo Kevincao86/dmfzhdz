@@ -174,7 +174,8 @@ function chooseFile() {
 function syncShowSendBtn(page) {
   const input = String((page.data && page.data.input) || '').trim()
   const attachments = (page.data && page.data.attachments) || []
-  page.setData({ showSendBtn: input.length > 0 || attachments.length > 0 })
+  const quoted = !!(page.data && page.data.pendingQuote)
+  page.setData({ showSendBtn: input.length > 0 || attachments.length > 0 || quoted })
 }
 
 function authorizeRecord() {

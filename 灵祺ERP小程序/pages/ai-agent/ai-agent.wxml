@@ -292,6 +292,12 @@
           <view class="btn-primary" data-id="{{item.id}}" bindtap="onConfirmPreview">确认执行</view>
         </view>
         <text wx:if="{{item.previewStatus === 'done'}}" class="preview-done">已确认</text>
+        <view
+          wx:if="{{item.role === 'user' || item.role === 'assistant'}}"
+          class="quote-btn"
+          data-id="{{item.id}}"
+          catchtap="onQuoteMessage"
+        >引用此条</view>
       </view>
       <view wx:if="{{item.role === 'user'}}" class="ava ava-me">我</view>
     </view>
@@ -303,6 +309,13 @@
     </view>
   </scroll-view>
   <view class="wx-composer">
+    <view wx:if="{{pendingQuote}}" class="quote-chip">
+      <view class="quote-chip-main">
+        <text class="quote-chip-t">引用对话</text>
+        <text class="quote-chip-b">{{pendingQuote.who}}：{{pendingQuote.excerpt}}</text>
+      </view>
+      <text class="quote-chip-x" bindtap="onClearQuote">移除</text>
+    </view>
     <scroll-view wx:if="{{attachments.length}}" class="attach-row" scroll-x enhanced show-scrollbar="{{false}}">
       <view class="attach-chip" wx:for="{{attachments}}" wx:key="id">
         <image wx:if="{{item.preview}}" class="attach-thumb" src="{{item.preview}}" mode="aspectFill" />
