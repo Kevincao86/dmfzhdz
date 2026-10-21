@@ -2371,6 +2371,7 @@ PAT
       cat <<'PAT'
 mpRegistryProfileGet.ts
 mpAccountAuth.ts
+mpMembershipQuota.ts
 灵祺达人撮合小程序/utils/registryProfileSync.js
 灵祺达人履约管理后台/src/lib/registryProfileSync.ts
 change-scope-guard

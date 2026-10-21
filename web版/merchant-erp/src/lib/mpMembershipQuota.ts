@@ -18,7 +18,11 @@ import {
 import type { MpPointsUsageKind } from './mpPointsEconomics.js'
 import { isMpPointsAddonGenerationKind, mpPointsCostForUsage } from './mpPointsEconomics.js'
 import type { RegistryMpPrUser, RegistryMpTalentMember, RegistrySnapshot } from './opsRegistryTypes.js'
-import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
+import {
+  findRegistryMemberForAccount,
+  findRegistryPrForAccount,
+  resolveTalentMembershipForAccount,
+} from './mpRegistryProfileGet.js'
 import { currentGiftMonthKey } from './mpAiPointsBuckets.js'
 
 type TierCell = boolean | number | string
@@ -219,10 +223,22 @@ export function talentEvalMonthlyLimit(
   opts?: { roleHint?: MpLibraryRole | null },
 ): { limit: number; paid: boolean } {
   const role = resolvePointsLibraryRole(data, account, opts)
-  const subject =
-    role === 'pr' ? findRegistryPrForAccount(data, account) : findRegistryMemberForAccount(data, account)
-  const record = buildMembershipAccessRecord(role, subject)
-  const tier = resolveEffectiveMembershipTier(record.mpMembershipPlan, record.mpMembershipExpiresAt)
+  let plan: string | null | undefined
+  let expiresAt: string | null | undefined
+  if (role === 'pr') {
+    const pr = findRegistryPrForAccount(data, account)
+    plan = pr?.mpMembershipPlan
+    expiresAt = pr?.mpMembershipExpiresAt
+  } else {
+    const picked = resolveTalentMembershipForAccount(
+      data,
+      account,
+      findRegistryMemberForAccount(data, account),
+    )
+    plan = picked.plan
+    expiresAt = picked.expiresAt
+  }
+  const tier = resolveEffectiveMembershipTier(plan, expiresAt)
   const paid = tier !== 'basic'
   return { limit: paid ? 15 : 1, paid }
 }
