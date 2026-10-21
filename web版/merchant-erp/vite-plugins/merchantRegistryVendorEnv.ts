@@ -269,6 +269,10 @@ export function applyAiVendorRoutesToMerchantEnv(out: MerchantAiEnv, rawRoutes: 
     for (const name of ROUTE_ENV_NAMES[vendor.id] ?? []) {
       setFromRegistry(out, name, keys[0], vendor.id)
     }
+    if (vendor.id === 'doubao') {
+      const assistantKey = route.lines[1]?.apiKey.trim() ?? ''
+      if (assistantKey) out.MERCHANT_AI_DOUBAO_ASSISTANT_KEY = assistantKey
+    }
   }
   if (Object.keys(packed).length > 0) {
     out.MERCHANT_AI_VENDOR_ROUTES = JSON.stringify(packed)

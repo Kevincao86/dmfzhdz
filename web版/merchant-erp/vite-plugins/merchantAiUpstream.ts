@@ -3622,14 +3622,21 @@ function extractResponsesOutputText(data: Record<string, unknown>): string {
   const output = data.output
   if (!Array.isArray(output)) return ''
   const parts: string[] = []
+  const takeText = (block: unknown, onlyOutput: boolean) => {
+    if (!block || typeof block !== 'object') return
+    const row = block as Record<string, unknown>
+    if (onlyOutput && row.type !== 'output_text' && row.type !== 'text') return
+    const text = row.text
+    if (typeof text === 'string' && text.trim()) parts.push(text.trim())
+  }
   for (const item of output) {
     if (!item || typeof item !== 'object') continue
-    const content = (item as Record<string, unknown>).content
-    if (!Array.isArray(content)) continue
-    for (const block of content) {
-      if (!block || typeof block !== 'object') continue
-      const text = (block as Record<string, unknown>).text
-      if (typeof text === 'string' && text.trim()) parts.push(text.trim())
+    const rec = item as Record<string, unknown>
+    if (Array.isArray(rec.content)) {
+      for (const block of rec.content) takeText(block, false)
+    }
+    if (Array.isArray(rec.blocks)) {
+      for (const block of rec.blocks) takeText(block, true)
     }
   }
   return parts.join('\n').trim()
@@ -3693,6 +3700,62 @@ function upstreamErrorMessage(data: Record<string, unknown>, status: number): st
     (typeof data.message === 'string' && data.message) ||
     `HTTP ${status}`
   )
+}
+
+const DOUBAO_ASSISTANT_MODEL = 'doubao-seed-2-1-pro-260915'
+
+function doubaoAssistantCity(user: string): string {
+  const city = ((user.match(/城市：([^\n]+)/) || [])[1] || '').replace(/市$/u, '').trim()
+  if (!city || city.length > 8 || /[｜|]/.test(city)) return ''
+  return city
+}
+
+/** 火山备选线路开通的豆包助手：Responses + doubao_app.ai_search，和豆包 App 同源检索。 */
+async function postDoubaoAssistantSearch(
+  apiKey: string,
+  env: MerchantAiEnv,
+  system: string,
+  user: string,
+): Promise<string> {
+  const city = doubaoAssistantCity(user)
+  const prompt = [system.trim(), user.trim()].filter(Boolean).join('\n\n').slice(0, 8000)
+  const res = await fetch(`${doubaoArkApiV3Root(env)}/responses`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'ark-beta-doubao-app': 'true',
+    },
+    body: JSON.stringify({
+      model: DOUBAO_ASSISTANT_MODEL,
+      stream: false,
+      tools: [
+        {
+          type: 'doubao_app',
+          feature: {
+            ai_search: {
+              type: 'enabled',
+              role_description: '你是本地生活经营助手，只根据这次检索结果回答',
+            },
+          },
+          ...(city
+            ? { user_location: { type: 'approximate', country: '中国', city } }
+            : {}),
+        },
+      ],
+      input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }] }],
+    }),
+    signal: AbortSignal.timeout(45_000),
+  })
+  const data = await readJson(res)
+  if (!res.ok) throw new Error(`${upstreamErrorMessage(data, res.status)} (HTTP ${res.status})`)
+  const text = extractResponsesOutputText(data)
+  if (!text) throw new Error('豆包助手未返回正文')
+  const cited = new Set<string>()
+  collectCitedProfileUrls(data, cited)
+  const excerpts: string[] = []
+  collectCitedExcerpts(data, excerpts)
+  return appendCitedExcerpts(appendCitedProfiles(text, cited), excerpts)
 }
 
 async function postDoubaoResponsesSearch(
@@ -3845,13 +3908,27 @@ async function doubaoFunctionWebSearch(
   return appendCitedExcerpts(appendCitedProfiles(text, cited), excerpts)
 }
 
-/** 豆包联网：先走方舟联网插件；账号未开通时改为对话里调用 web_search 工具 */
+/** 豆包联网：先走已开通的豆包助手；未开通再走方舟联网插件，最后才用公开网页检索。 */
 export async function callDoubaoWebSearch(
   apiKey: string,
   env: MerchantAiEnv,
   system: string,
   user: string,
 ): Promise<{ text: string; modelUsed: string }> {
+  const assistantKey = String(env.MERCHANT_AI_DOUBAO_ASSISTANT_KEY ?? '').trim()
+  const assistantKeys = [assistantKey, apiKey, ...readRouteKeysFromEnv(env, 'doubao')].filter(
+    (key, index, all) => Boolean(key) && all.indexOf(key) === index,
+  )
+  for (let i = 0; i < assistantKeys.length; i++) {
+    try {
+      const text = await postDoubaoAssistantSearch(assistantKeys[i]!, env, system, user)
+      if (text.trim()) return { text, modelUsed: DOUBAO_ASSISTANT_MODEL }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      if (i < assistantKeys.length - 1 && isAiRouteHopMessage(message)) continue
+      break
+    }
+  }
   const models = [
     ...new Set(
       [doubaoChatModelId(env), 'doubao-seed-2-0-lite-260215', 'doubao-seed-2-0-lite-260428'].filter((id) =>
