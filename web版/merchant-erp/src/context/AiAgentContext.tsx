@@ -623,7 +623,36 @@ function quotedSourceText(userText: string, msgs: { id: string; content?: string
   return chunks.join('\n').slice(0, 12000)
 }
 
+/** 方案表「总计 17 人」或 S/B/C 各档人数。避免只按模型随手写的三个人推荐。 */
+function tableTalentHeadcount(text: string): number {
+  const lines = String(text || '').split(/\n/)
+  let total = 0
+  let tierSum = 0
+  for (const line of lines) {
+    const totalM = line.match(/(?:总计|合计|总共|一共)[^0-9]{0,16}(\d{1,2})\s*[人位]/)
+    if (totalM) {
+      const n = Number(totalM[1])
+      if (n >= 1 && n <= TALENT_HEADCOUNT_CAP) total = n
+      continue
+    }
+    if (/备用|投流|本地推/.test(line)) continue
+    if (!/(?:S级|A级|B级|C级|大V|腰部|素人|KOC|头部)/.test(line)) continue
+    const nM = line.match(/(\d{1,2})\s*人/)
+    if (!nM) continue
+    const n = Number(nM[1])
+    if (n >= 1 && n <= TALENT_HEADCOUNT_CAP) tierSum += n
+  }
+  if (total >= 1) return total
+  if (tierSum >= 1 && tierSum <= TALENT_HEADCOUNT_CAP) return tierSum
+  return 0
+}
+
 function talentHeadcountFromDialogue(userText: string, priorText: string, quotedFull = ''): number {
+  for (const blob of [quotedFull, userText, priorText]) {
+    if (!blob) continue
+    const fromTable = tableTalentHeadcount(blob)
+    if (fromTable > 0) return fromTable
+  }
   for (const blob of [quotedFull, userText, priorText]) {
     if (!blob) continue
     const named = explicitTalentHeadcount(blob)

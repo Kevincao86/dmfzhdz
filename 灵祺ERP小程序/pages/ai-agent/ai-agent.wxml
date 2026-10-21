@@ -64,6 +64,23 @@
           bindtap="onPreviewBubbleImage"
           data-url="{{img}}"
         />
+        <view wx:if="{{item.talentRoster && item.talentRoster.cards.length}}" class="recruit-card">
+          <text class="plan-name">推荐 {{item.talentRoster.cards.length}} 位达人</text>
+          <view wx:for="{{item.talentRoster.cards}}" wx:for-item="card" wx:key="seatId" class="shoot-box">
+            <view class="talent-card-row">
+              <view wx:if="{{!card.empty}}" class="talent-avatar">
+                <image wx:if="{{card.avatarUrl}}" class="talent-avatar-img" src="{{card.avatarUrl}}" mode="aspectFill" />
+                <text wx:else>{{card.avatarInitial}}</text>
+              </view>
+              <view class="talent-card-text">
+                <text class="plan-desc">{{card.line}}</text>
+                <text wx:if="{{card.profileLink}}" class="talent-home" data-link="{{card.profileLink}}" catchtap="onCopyTalentProfile">{{card.profileLabel}}</text>
+                <text wx:if="{{card.reason}}" class="plan-desc">{{card.reason}}</text>
+              </view>
+            </view>
+            <view wx:if="{{!card.empty}}" class="btn-ghost" data-id="{{item.id}}" data-talent="{{card.talentId}}" data-name="{{card.nickname}}" bindtap="onRosterReplace">替换</view>
+          </view>
+        </view>
         <view wx:if="{{item.preview && item.preview.taskType === 'create_product' && item.preview.productPlans.length}}" class="plan-list">
           <view wx:for="{{item.preview.productPlans}}" wx:for-item="plan" wx:key="slotKey" class="plan-card">
             <text class="plan-name">{{plan.productName || plan.slotLabel}}</text>

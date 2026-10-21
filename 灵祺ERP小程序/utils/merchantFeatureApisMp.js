@@ -370,6 +370,8 @@ function decorateTalentCards(cards, seats) {
     const empty = !!c.empty || !c.talentId
     const platform = String(c.platform || seat.platform || '抖音')
     const profileLink = empty ? '' : httpsUrl(c.profileLink)
+    const fansBit = followerBit(c)
+    const tagBit = (Array.isArray(c.tags) ? c.tags : []).slice(0, 2).filter(Boolean).join(' / ')
     return {
       seatId: String(c.seatId || ''),
       talentId: String(c.talentId || ''),
@@ -388,14 +390,19 @@ function decorateTalentCards(cards, seats) {
       avatarUrl: empty ? '' : httpsUrl(c.avatarUrl),
       avatarInitial: (nickname || '达').slice(0, 1),
       profileLink,
-      profileLabel: profileLink ? talentProfileLabel(platform, profileLink) : '',
+      profileLabel: profileLink
+        ? /\/search\//.test(profileLink)
+          ? '去抖音搜这位达人'
+          : talentProfileLabel(platform, profileLink)
+        : '',
       line: empty
         ? `${c.tierLabel || '这一档'} · 库内暂无下一位`
         : [
             nickname || '达人',
             c.city || '',
             platform,
-            `${Number(c.followers) || 0}粉`,
+            fansBit,
+            tagBit,
             c.quoteYuan != null && c.quoteYuan !== '' ? `¥${c.quoteYuan}` : '',
           ]
             .filter(Boolean)
@@ -567,8 +574,185 @@ function cityMentionedInText(text) {
 
 function isTalentRecommendAsk(text) {
   const x = intentText(text)
-  if (!/达人/.test(x)) return false
-  return /推荐|找|匹配|名单|有哪些|介绍/.test(x)
+  if (/达人/.test(x) && /推荐|找|匹配|名单|有哪些|介绍/.test(x)) return true
+  return /^(?:请)?(?:帮我|给我|为我)?推荐(?:一下|达人|人选|名单)?[。！!]?$/.test(x)
+}
+
+function followerBit(card) {
+  const n = Number(card && card.followers) || 0
+  if (n <= 0) return ''
+  if (card.source === 'public' && !card.followersVerified) return ''
+  if (card.source === 'public' && n >= 10000) {
+    const wan = n / 10000
+    const text = wan >= 100 ? String(Math.round(wan)) : String(Math.round(wan * 10) / 10)
+    return `粉丝${text}万`
+  }
+  if (card.source === 'public') return `粉丝${Math.round(n)}`
+  return `${Math.round(n)}粉`
+}
+
+/** 与网页 talentHeadcountFromDialogue 同一顺序：方案表总计优先。 */
+function tableTalentHeadcount(text) {
+  const lines = String(text || '').split(/\n/)
+  let total = 0
+  let tierSum = 0
+  lines.forEach((line) => {
+    const totalM = line.match(/(?:总计|合计|总共|一共)[^0-9]{0,16}(\d{1,2})\s*[人位]/)
+    if (totalM) {
+      const n = Number(totalM[1])
+      if (n >= 1 && n <= 20) total = n
+      return
+    }
+    if (/备用|投流|本地推/.test(line)) return
+    if (!/(?:S级|A级|B级|C级|大V|腰部|素人|KOC|头部)/.test(line)) return
+    const nM = line.match(/(\d{1,2})\s*人/)
+    if (!nM) return
+    const n = Number(nM[1])
+    if (n >= 1 && n <= 20) tierSum += n
+  })
+  if (total >= 1) return total
+  if (tierSum >= 1 && tierSum <= 20) return tierSum
+  return 0
+}
+
+function planHeadcountFromTexts(userText, priorText) {
+  const blobs = [String(userText || ''), String(priorText || '')]
+  for (let i = 0; i < blobs.length; i += 1) {
+    const fromTable = tableTalentHeadcount(blobs[i])
+    if (fromTable > 0) return fromTable
+  }
+  for (let i = 0; i < blobs.length; i += 1) {
+    const flat = blobs[i].replace(/,/g, '')
+    const invited = flat.match(/(?:邀请|招募|安排|共|合计|总共|需要)\s*(\d{1,2})\s*位/)
+    const plain = flat.match(/(\d{1,2})\s*位\s*(?:达人|探店)/)
+    const n = Number((invited && invited[1]) || (plain && plain[1]) || 0)
+    if (n >= 1 && n <= 20) return n
+  }
+  return 5
+}
+
+function douyinSearchLink(nickname) {
+  return `https://www.douyin.com/search/${encodeURIComponent(`${String(nickname || '').trim()} 达人`)}`
+}
+
+function cardFromPublicSeed(seed, seatId, talentType) {
+  const ready = !!(seed && seed.profileReady && seed.profileLink && !/\/search\//.test(String(seed.profileLink)))
+  const followers = ready && Number(seed.followers) > 0 ? Math.round(Number(seed.followers)) : 0
+  const profileLink = ready ? String(seed.profileLink) : douyinSearchLink(seed && seed.nickname)
+  return {
+    seatId,
+    talentId: `public:${seed.nickname}`,
+    nickname: String(seed.nickname || '').trim(),
+    city: String(seed.city || ''),
+    platform: '抖音',
+    followers,
+    followersVerified: followers > 0,
+    level: '',
+    quoteYuan: null,
+    tags: Array.isArray(seed.tags) ? seed.tags.slice(0, 3) : [],
+    avatarUrl: ready ? String(seed.avatarUrl || '') : '',
+    profileLink,
+    profileVerified: ready,
+    tierLabel: '公网',
+    unitBudgetYuan: 0,
+    talentType: seed.direction || talentType || '',
+    source: 'public',
+    exploreVerified: true,
+    reason: seed.direction ? `公网 · ${seed.direction}` : '公网补位',
+    empty: false,
+  }
+}
+
+async function fetchPublicExploreSeeds(city, industry, gap, skipNames) {
+  const need = Math.max(0, Math.min(20, Number(gap) || 0))
+  const region = String(city || '').trim()
+  if (!region || need < 1) return []
+  try {
+    const r = await postJson(
+      '/api/meoo-ops-novice-kol-allocation',
+      {
+        mode: 'talent_public_fill',
+        city: region,
+        industry: industry || '本地生活',
+        gap: need,
+        skipNames: (skipNames || []).filter(Boolean).slice(0, 40),
+      },
+      170000,
+    )
+    if (!r || r.ok === false) return []
+    return Array.isArray(r.seeds) ? r.seeds : []
+  } catch (_) {
+    return []
+  }
+}
+
+function talentRosterNote(headcount, libraryCount, publicCount) {
+  const asked = `方案要 ${headcount} 位。`
+  if (publicCount > 0) return `${asked}星选库接近要求的有 ${libraryCount} 位，公网补了 ${publicCount} 位。`
+  if (libraryCount < headcount) return `${asked}星选库接近要求的有 ${libraryCount} 位。公网这次没有补到更多同城达人。`
+  return `${asked}星选库已按门店类目配满 ${libraryCount} 位。`
+}
+
+async function buildTalentChatRoster(userText, priorText, intelText) {
+  if (!isTalentRecommendAsk(userText)) return null
+  const named = cityAskedForTalents(userText)
+  const planCity = cityAskedForTalents(priorText)
+  let city = named || planCity
+  if (!city) city = intelField(intelText, '门店所在城市')
+  const industryRaw = intelField(intelText, '经营类目').replace(/（.*$/, '').trim()
+  const industry = industryRaw && industryRaw.indexOf('绑定接口未返回') < 0 ? industryRaw : ''
+  const storeName = intelField(intelText, '当前门店')
+  const talentType = industry || '本地生活到店'
+  const headcount = planHeadcountFromTexts(userText, priorText)
+  const library = await requestTalentRecommend({
+    city,
+    platform: '抖音',
+    talentType,
+    budgetYuan: 5000,
+    headcount,
+    seats: [],
+    excludedIds: [],
+    skipPublic: true,
+  })
+  const cards = (library && library.cards) || []
+  const needles = requirementNeedles(industry)
+  const sameCity = cards.filter((c) => !c.empty && String(c.nickname || '').trim() && cardMatchesCity(c, city))
+  const matched = sameCity.filter((c) => cardMatchesStore(c, needles))
+  const picked = matched.slice(0, headcount)
+  const gap = Math.max(0, headcount - picked.length)
+  const seeds = await fetchPublicExploreSeeds(
+    city,
+    talentType,
+    gap,
+    picked.map((c) => c.nickname).filter(Boolean),
+  )
+  const publicCards = seeds
+    .filter((seed) => seed && String(seed.nickname || '').trim())
+    .slice(0, gap)
+    .map((seed, index) => cardFromPublicSeed(seed, `public-${index + 1}`, talentType))
+  const all = picked.concat(publicCards)
+  if (!all.length) return null
+  return {
+    cards: decorateTalentCards(all, []).map((card, index) =>
+      Object.assign({}, card, { seatId: card.seatId || `seat-${index + 1}` }),
+    ),
+    city: city || '',
+    talentType,
+    storeName: storeName || '',
+    note: talentRosterNote(headcount, picked.length, publicCards.length),
+    headcount,
+  }
+}
+
+async function replaceTalentChatCard(roster, nickname) {
+  const current = (roster && roster.cards) || []
+  const skipNames = current.map((c) => String(c.nickname || '').trim()).filter(Boolean)
+  if (nickname) skipNames.push(String(nickname).trim())
+  const seeds = await fetchPublicExploreSeeds(roster.city, roster.talentType, 1, skipNames)
+  const seed = seeds.find((item) => item && String(item.nickname || '').trim() && skipNames.indexOf(String(item.nickname).trim()) < 0)
+  if (!seed) return null
+  const decorated = decorateTalentCards([cardFromPublicSeed(seed, `public-replace-${Date.now()}`, roster.talentType)], [])
+  return decorated[0] || null
 }
 
 function intelField(intel, label) {
@@ -1005,6 +1189,8 @@ module.exports = {
   requestTalentRecommend,
   seatsForTalentReplace,
   buildTalentRecommendChatBlock,
+  buildTalentChatRoster,
+  replaceTalentChatCard,
   cityAskedForTalents,
   cityMentionedInText,
   isTalentRecommendAsk,

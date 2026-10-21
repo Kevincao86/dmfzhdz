@@ -718,9 +718,30 @@ async function postAiChatRequest(opts) {
       intelText = ''
     }
   }
+  let talentRoster = null
   try {
-    const block = await feat.buildTalentRecommendChatBlock(opts.userLine, intelText)
-    if (block) intelText = intelText ? `${intelText}\n\n${block}` : block
+    if (feat.isTalentRecommendAsk && feat.isTalentRecommendAsk(opts.userLine)) {
+      const prior = (opts.history || [])
+        .map((m) => String((m && m.content) || ''))
+        .filter(Boolean)
+        .join('\n')
+      talentRoster = await feat.buildTalentChatRoster(opts.userLine, prior, intelText)
+    }
+  } catch (_) {
+    talentRoster = null
+  }
+  try {
+    if (talentRoster) {
+      const block = [
+        '【达人推荐 · 本次】',
+        `区域：${talentRoster.city || '已绑定门店'}。门店：${talentRoster.storeName || '未命名'}。方案要求：${talentRoster.talentType}。${talentRoster.note}`,
+        '名单已经用卡片展示，含头像、主页和替换。正文只写一两句说明，不要罗列达人，不要贴主页或头像链接。',
+      ].join('\n')
+      intelText = intelText ? `${intelText}\n\n${block}` : block
+    } else {
+      const block = await feat.buildTalentRecommendChatBlock(opts.userLine, intelText)
+      if (block) intelText = intelText ? `${intelText}\n\n${block}` : block
+    }
   } catch (_) {
     if (feat.isTalentRecommendAsk && feat.isTalentRecommendAsk(opts.userLine)) {
       intelText += '\n\n【达人推荐 · 本次】两路名单都没取到。请说明稍后重试，禁止整段拒答，禁止让用户自己去站外找人。'
@@ -747,6 +768,7 @@ async function postAiChatRequest(opts) {
     content: String(data.content || ''),
     provider: data.provider,
     model: data.model,
+    talentRoster,
   }
 }
 
@@ -889,6 +911,7 @@ async function sendAgentTurn(opts) {
       id: `a-${Date.now()}`,
       role: 'assistant',
       content: chatRes.content,
+      talentRoster: chatRes.talentRoster || undefined,
     },
     rawAssistantContent: chatRes.content,
   }
@@ -1027,7 +1050,11 @@ async function processAgentTurn(opts, executionState) {
     display += exec.buildPlanExecutionConsultation(types)
   }
 
-  turn.assistantMsg.content = display || '（无文本回复）'
+  const roster = turn.assistantMsg.talentRoster
+  turn.assistantMsg.content =
+    roster && roster.cards && roster.cards.length
+      ? roster.note || '已按方案人数给出达人卡片。'
+      : display || '（无文本回复）'
   delete turn.rawAssistantContent
   return {
     userMsg: turn.userMsg,
