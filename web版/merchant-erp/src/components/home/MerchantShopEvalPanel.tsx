@@ -1194,21 +1194,6 @@ export default function MerchantShopEvalPanel() {
           </div>
         ) : null}
 
-        {gains ? (
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-[#eef4ff] px-4 py-4 text-left">
-              <p className="text-xs tracking-wide text-slate-500">预计提升曝光</p>
-              <p className="shop-eval-gain mt-1 text-3xl font-extrabold text-[#1d4ed8]">▲ +{shownExposure}%</p>
-            </div>
-            <div className="rounded-2xl bg-[#fff4e8] px-4 py-4 text-left">
-              <p className="text-xs tracking-wide text-slate-500">预计提升核销额</p>
-              <p className="shop-eval-gain mt-1 text-3xl font-extrabold text-[#c2410c]">▲ +{formatVerifyYuan(shownVerify)}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">完成评估后，这里显示预计提升的曝光和核销额</div>
-        )}
-
         {score ? (
           <div className="mt-4 rounded-2xl border border-orange-100 bg-[#fff7ed] p-4 text-left">
             <p className="text-sm font-extrabold text-[#c2410c]">竞争对手分析</p>
@@ -1231,6 +1216,21 @@ export default function MerchantShopEvalPanel() {
             ) : null}
           </div>
         ) : null}
+
+        {gains ? (
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-[#eef4ff] px-4 py-4 text-left">
+              <p className="text-xs tracking-wide text-slate-500">预计提升曝光</p>
+              <p className="shop-eval-gain mt-1 text-3xl font-extrabold text-[#1d4ed8]">▲ +{shownExposure}%</p>
+            </div>
+            <div className="rounded-2xl bg-[#fff4e8] px-4 py-4 text-left">
+              <p className="text-xs tracking-wide text-slate-500">预计提升核销额</p>
+              <p className="shop-eval-gain mt-1 text-3xl font-extrabold text-[#c2410c]">▲ +{formatVerifyYuan(shownVerify)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">完成评估后，这里显示预计提升的曝光和核销额</div>
+        )}
 
         <button
           type="button"
