@@ -542,6 +542,174 @@ async function enrichCombosFromProductPlan(
   }
 }
 
+function opsPlanBrandCore(name: string) {
+  return name
+    .replace(/[（(][^）)]*[）)]/g, '')
+    .replace(/(南湖店|旗舰店|总店|分店)$/u, '')
+    .replace(/店$/u, '')
+    .replace(/[·•\s]/g, '')
+    .trim()
+}
+
+function opsPlanSearchTarget(storeName: string, storeNames: string[]) {
+  const out: string[] = []
+  const push = (raw: string) => {
+    const name = raw.trim()
+    if (name.length < 2 || /^全部门店/.test(name) || out.includes(name)) return
+    out.push(name)
+  }
+  for (const name of storeNames) push(name)
+  for (const name of storeName.split(/[,，、\n]/)) push(name)
+  if (!out.length) return null
+  const core = opsPlanBrandCore(out[0]!) || out[0]!
+  const name = out.length <= 2 ? out.join('、') : core
+  return { name, core, count: out.length }
+}
+
+function keepOpsPlanNoteLine(line: string) {
+  if (line.length < 6) return false
+  if (/\d+\s*元|套餐|评价|探店|团购|人均|已售|月售|点评/.test(line)) return true
+  return !/暂未检索|未检索到|没有找到|无法查询|无公开/.test(line)
+}
+
+function pushOpsPlanNote(lines: string[], raw: string) {
+  const clean = raw.replace(/^\d+[.、]\s*/, '').trim()
+  if (!keepOpsPlanNoteLine(clean) || lines.includes(clean)) return
+  lines.push(clean)
+}
+
+async function pullSogouTitles(query: string, core: string, peer: boolean) {
+  const q = query.replace(/\s+/g, ' ').trim()
+  if (q.length < 2) return [] as string[]
+  try {
+    const res = await fetch(`https://www.sogou.com/web?query=${encodeURIComponent(q)}`, {
+      headers: {
+        Accept: 'text/html',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return [] as string[]
+    const html = await res.text()
+    const titles: string[] = []
+    for (const block of html.matchAll(/<h3 class="vr-title[\s\S]*?<\/h3>/gi)) {
+      const title = String(block[0] || '')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+      if (title.length < 8 || title.length > 140) continue
+      if (/汉语词语|近义词|反义词|造句|百度百科|安全验证|搜狗搜索/.test(title)) continue
+      if (!peer && core.length >= 2 && !title.includes(core)) continue
+      const line = peer ? `同城同品类：${title}` : title
+      if (!titles.includes(line)) titles.push(line)
+      if (titles.length >= 6) break
+    }
+    return titles
+  } catch {
+    return [] as string[]
+  }
+}
+
+async function opsPlanSogouTitles(name: string, core: string, city: string, category: string) {
+  const brandQueries = [
+    `${name} ${city} 团购`,
+    `${name} 抖音 探店`,
+    `${core} ${city} 美团 套餐`,
+    `${core} ${city} 评价`,
+  ]
+  const titles: string[] = []
+  for (const batch of await Promise.all(brandQueries.map((query) => pullSogouTitles(query, core, false)))) {
+    for (const title of batch) {
+      if (!titles.includes(title)) titles.push(title)
+    }
+  }
+  if (titles.length >= 4 || !category.trim()) return titles.slice(0, 16)
+  const peerQueries = [`${category} ${city} 团购 套餐`, `${category} ${city} 点评 人均`]
+  for (const batch of await Promise.all(peerQueries.map((query) => pullSogouTitles(query, core, true)))) {
+    for (const title of batch) {
+      if (!titles.includes(title)) titles.push(title)
+      if (titles.length >= 16) break
+    }
+  }
+  return titles.slice(0, 16)
+}
+
+/** 与门店评估相同：搜狗标题 + 方舟联网两轮。多家门店收成品牌检索。整段最多 40 秒，超时仍继续写方案。 */
+async function searchOpsPlanPublicNotes(
+  env: Record<string, string>,
+  input: { storeName: string; storeNames: string[]; city: string; category: string },
+): Promise<string> {
+  const target = opsPlanSearchTarget(input.storeName, input.storeNames)
+  if (!target) return ''
+  const key = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
+  const lines: string[] = []
+  const rounds = [
+    {
+      system: [
+        '你在用方舟联网检索这个品牌。每条一行，最多 12 行。',
+        '要写套餐名、价格、已售或月售、评价说法、探店或短视频。数字按检索原文写。',
+        '店名里的「24时」不要当成全天营业。其他分店的电话不要安到被点名的这一家。',
+      ].join(''),
+      user: `品牌：${target.name}\n城市：${input.city || ''}\n地址：\n分类：${input.category || ''}\n同城同名：${target.count}家\n请检索团购、美团、大众点评、抖音探店和评价。`,
+    },
+    {
+      system: [
+        '上一轮材料还不够。继续检索品牌简称、抖音团购、美团、大众点评，以及同城同品类的套餐价格和评价。',
+        '每条开头标明「本店」或「同城同品类」。最多 12 行。有价格和评价就写上。',
+      ].join(''),
+      user: `品牌简称：${target.core}\n城市：${input.city || ''}\n分类：${input.category || ''}\n请把能对上这个品牌的套餐、评价、探店，以及同城同品类可对照的价格带都写出来。`,
+    },
+  ]
+  const work = (async () => {
+    const titlesP = opsPlanSogouTitles(target.name, target.core, input.city, input.category)
+    if (key) {
+      try {
+        const { callDoubaoWebSearch } = await import('./merchantAiUpstream.js')
+        for (const round of rounds) {
+          if (lines.length >= 8) break
+          try {
+            const hit = await callDoubaoWebSearch(key, env, round.system, round.user)
+            for (const line of String(hit.text || '').split('\n')) {
+              pushOpsPlanNote(lines, line)
+              if (lines.length >= 16) break
+            }
+          } catch (err) {
+            console.warn(
+              '[meoo-ai-ops-plan] public store search hop',
+              err instanceof Error ? err.message.slice(0, 160) : err,
+            )
+          }
+        }
+      } catch (err) {
+        console.warn(
+          '[meoo-ai-ops-plan] public store search failed',
+          err instanceof Error ? err.message.slice(0, 160) : err,
+        )
+      }
+    }
+    for (const title of await titlesP) {
+      pushOpsPlanNote(lines, title)
+      if (lines.length >= 16) break
+    }
+    return lines.map((line, index) => `${index + 1}. ${line}`).join('\n')
+  })()
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(lines.map((line, index) => `${index + 1}. ${line}`).join('\n')), 40_000)
+    void work.then(
+      (text) => {
+        clearTimeout(timer)
+        resolve(text)
+      },
+      () => {
+        clearTimeout(timer)
+        resolve('')
+      },
+    )
+  })
+}
+
 export async function runAiOpsPlanCore(
   bodyRaw: string,
   authHeader: string | undefined,
@@ -605,6 +773,12 @@ export async function runAiOpsPlanCore(
     ? body.storeNames.map((x) => String(x).trim()).filter(Boolean).slice(0, 80)
     : []
   const storeScope = body.storeScope === 'selected' ? 'selected' : body.storeScope === 'all' ? 'all' : undefined
+  const publicNotes = await searchOpsPlanPublicNotes(aiEnv, {
+    storeName: String(body.storeName || ''),
+    storeNames,
+    city: String(body.city || ''),
+    category: String(body.industryPath || ''),
+  })
   const storeLine = (() => {
     if (storeScope === 'all') {
       return storeNames.length
@@ -636,6 +810,9 @@ export async function runAiOpsPlanCore(
           : `菜单价目参考：\n${body.menuSummary}`
         : '菜单价目：未提供（按类目常规套餐结构写，勿捏造具体菜名）',
       body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
+      publicNotes
+        ? `公网检索（与门店评估相同；套餐名、价格、已售、评价按原文使用，检索里没有的不要编造）：\n${publicNotes}`
+        : '',
       body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
       '请按简易版 schema 输出完整 JSON；steps≤5、platforms≤4、combos≤4、checklist≤8。',
     ]
@@ -795,6 +972,9 @@ export async function runAiOpsPlanCore(
         : `菜单价目参考：\n${body.menuSummary}`
       : '菜单价目：未提供（请按类目与平台常规套餐结构规划，勿捏造具体菜名）',
     body.competitorSummary ? `竞品摘要：\n${body.competitorSummary}` : '',
+    publicNotes
+      ? `公网检索（与门店评估相同；套餐名、价格、已售、评价按原文使用，检索里没有的不要编造）：\n${publicNotes}`
+      : '',
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
     talentLibraryBlock,
     buildAiOpsRoiLookupForPrompt(platforms, body.industryPath),

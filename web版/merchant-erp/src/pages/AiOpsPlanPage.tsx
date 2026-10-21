@@ -2482,19 +2482,25 @@ export default function AiOpsPlanPage() {
   }, [partner, cat1, cat2, catTree, scopeId])
 
   const resolveSelectedStoreNames = useCallback((): string[] => {
+    const typed = storeSearch.trim()
+    const includeTyped = (names: string[]) => {
+      if (typed.length < 2 || names.some((name) => name === typed || name.includes(typed))) return names
+      if (storeCatalog.length && selectedStoreIds.length) return names
+      return [typed, ...names]
+    }
     if (storeScope === 'all' && storeCatalog.length) {
       return storeCatalog.map((s) => s.name).filter(Boolean)
     }
     if (selectedStoreIds.length) {
       const map = new Map(storeCatalog.map((s) => [s.id, s.name]))
-      return selectedStoreIds.map((id) => map.get(id) || id).filter(Boolean)
+      return includeTyped(selectedStoreIds.map((id) => map.get(id) || id).filter(Boolean))
     }
     const manual = manualStoreNames
       .split(/[,，、\n]/)
       .map((x) => x.trim())
       .filter(Boolean)
-    return manual
-  }, [storeScope, storeCatalog, selectedStoreIds, manualStoreNames])
+    return includeTyped(manual)
+  }, [storeScope, storeCatalog, selectedStoreIds, manualStoreNames, storeSearch])
 
   /** AI 抓取门店地址 → 城市；达人方案须按此城读达人库 */
   const resolveSelectedStoreCity = useCallback((): string => {
@@ -2684,9 +2690,13 @@ export default function AiOpsPlanPage() {
     try {
       updateAiGenerationJob(jobId, { progress: '正在准备参数…' })
       const input = await buildInput()
+      const searchingPublic = resolveSelectedStoreNames().length > 0 || Boolean(editIntel.storeName.trim())
       updateAiGenerationJob(jobId, {
-        progress:
-          planEdition === 'simple' ? '正在生成简易方案（约 30～60 秒）…' : '正在生成（约 1～2 分钟）…',
+        progress: searchingPublic
+          ? '正在公网检索门店资料并生成方案…'
+          : planEdition === 'simple'
+            ? '正在生成简易方案（约 30～60 秒）…'
+            : '正在生成（约 1～2 分钟）…',
       })
       const r = await generateAiOpsPlan(input)
       if (!r.ok) {
@@ -3007,7 +3017,7 @@ export default function AiOpsPlanPage() {
                   <input
                     value={storeSearch}
                     onChange={(e) => setStoreSearch(e.target.value)}
-                    placeholder="搜索门店名 / 地址 / 城市"
+                    placeholder={storeCatalog.length ? '搜索门店名 / 地址 / 城市' : '输入品牌或门店名称'}
                     className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pl-8 pr-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
                 </div>
@@ -3057,8 +3067,7 @@ export default function AiOpsPlanPage() {
                   />
                 )}
                 <p className="text-[11px] text-gray-500">
-                  已选 {selectedStoreIds.length || manualStoreNames.split(/[,，、\n]/).filter((x) => x.trim()).length}{' '}
-                  家
+                  已选 {resolveSelectedStoreNames().length} 家。生成时按门店评估的方式公网检索套餐、评价和探店。
                 </p>
               </div>
             ) : (
@@ -3464,9 +3473,11 @@ export default function AiOpsPlanPage() {
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {loading
-              ? planEdition === 'simple'
-                ? '正在生成简易方案（约 30～60 秒）…'
-                : '正在生成（约 1～2 分钟）…'
+              ? resolveSelectedStoreNames().length > 0 || editIntel.storeName.trim()
+                ? '正在公网检索门店资料并生成方案…'
+                : planEdition === 'simple'
+                  ? '正在生成简易方案（约 30～60 秒）…'
+                  : '正在生成（约 1～2 分钟）…'
               : `生成${planEdition === 'simple' ? '简易' : '标准'}方案（${MP_POINTS_OPS_PLAN_PER_USE} 积分）`}
           </button>
 
