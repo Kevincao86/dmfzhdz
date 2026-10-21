@@ -2706,6 +2706,27 @@ export function allocateYuanByWeight(total: number, weights: number[]): number[]
   return floors
 }
 
+/** 商品毛利页的内置占位：没手改过时就是这三档。手改过的抖音毛利不要再和占位值平均。 */
+const STORE_MARGIN_PLACEHOLDER = { douyin: 38, meituan: 35, xhs: 32 } as const
+
+function marginsFollowExplicitDouyin(
+  margins: AiOpsPlatformMargins | null | undefined,
+): AiOpsPlatformMargins | null {
+  if (!margins) return null
+  const douyin = Math.round(Number(margins.douyin) || 0)
+  const meituan = Math.round(Number(margins.meituan) || 0)
+  const xhs = Math.round(Number(margins.xhs) || 0)
+  if (!(douyin > 0) || douyin === STORE_MARGIN_PLACEHOLDER.douyin) {
+    return { douyin, meituan, xhs }
+  }
+  return {
+    douyin,
+    meituan:
+      meituan <= 0 || meituan === STORE_MARGIN_PLACEHOLDER.meituan ? douyin : meituan,
+    xhs: xhs <= 0 || xhs === STORE_MARGIN_PLACEHOLDER.xhs ? douyin : xhs,
+  }
+}
+
 /** 用「勾选平台 × 商家类目」查询转化率区间；GMV=周期合计；ROI/回本按各渠道已配置毛利重算 */
 export function ensureMarketingRoiFallback(
   plan: AiOpsPlanResult,
@@ -2718,7 +2739,7 @@ export function ensureMarketingRoiFallback(
   },
 ): AiOpsPlanResult {
   const industryPath = opts?.industryPath?.trim() || undefined
-  const margins = opts?.margins || null
+  const margins = marginsFollowExplicitDouyin(opts?.margins)
   const periodDays = aiOpsPeriodDays(opts?.periodStart, opts?.periodEnd)
   let roiAnalysis = [...(plan.marketingBudget.roiAnalysis || [])]
 
