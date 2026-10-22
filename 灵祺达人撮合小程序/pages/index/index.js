@@ -90,7 +90,7 @@ function homeEntriesForIdentity(identity) {
   if (identity === 'pr') {
     return {
       homeEntries: [
-        homeEntry('publish', 'entry-publish.jpg', '发招募', '发布新商单'),
+        homeEntry('talentCheck', 'entry-talent-check.jpg', '达人查验', '核对公开数据'),
         homeEntry('apps', 'entry-orders.jpg', '我的发单', '查看报名情况'),
         ...shared,
       ],
@@ -491,6 +491,15 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     const key = e.currentTarget.dataset.key
     if (key === 'publish') {
       wx.switchTab({ url: '/pages/publish/publish' })
+      return
+    }
+    if (key === 'talentCheck') {
+      const checkUrl = '/pages/subpack-pr/mine-pr-talent-check/mine-pr-talent-check'
+      if (!auth.isLoggedIn()) {
+        require('../../utils/mpGuestRoutes.js').redirectToLogin(checkUrl)
+        return
+      }
+      wx.navigateTo({ url: checkUrl })
       return
     }
     if (key === 'eval') {
