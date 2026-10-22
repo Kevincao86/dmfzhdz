@@ -6,6 +6,14 @@ import './TalentAccountCheckPage.css'
 
 type SheetRow = { douyinId: string; nickname: string; state: '' | 'ok' | 'fail'; note: string }
 
+const PLATFORMS = [
+  { id: 'douyin', label: '抖音', logo: '/platforms/douyin.png', open: true },
+  { id: 'xhs', label: '小红书', logo: '/platforms/xiaohongshu.png', open: false },
+  { id: 'kuaishou', label: '快手', logo: '/platforms/kuaishou-local.png', open: false },
+  { id: 'dianping', label: '大众点评', logo: '/platforms/dianping.png', open: false },
+  { id: 'channels', label: '视频号', logo: '/platforms/wechat.png', open: false },
+] as const
+
 function promptUpgrade(navigate: (path: string) => void, message?: string) {
   const go = window.confirm(message || '本月免费查验已用完，下月恢复。升级会员后按积分查验，不限次数。')
   if (go) navigate('/profile/membership')
@@ -21,6 +29,10 @@ function handleGate(navigate: (path: string) => void, data: TalentCheckStatus) {
     if (go) navigate('/profile/points-recharge')
     return
   }
+  if (data.error === 'platform_closed') {
+    window.alert(data.message || '该平台尚未开放，目前只能查验抖音')
+    return
+  }
   window.alert(data.message || '暂时查不了')
 }
 
@@ -34,6 +46,7 @@ export default function TalentAccountCheckPage() {
   const [member, setMember] = useState(false)
   const [freeRemaining, setFreeRemaining] = useState(1)
   const [pointsPerCheck, setPointsPerCheck] = useState(5)
+  const [pointsBalance, setPointsBalance] = useState(0)
   const [hint, setHint] = useState('正在读取查验额度…')
   const [view, setView] = useState<TalentCheckView | null>(null)
   const [rows, setRows] = useState<SheetRow[]>([])
@@ -42,6 +55,7 @@ export default function TalentAccountCheckPage() {
     setMember(!!data.member)
     setFreeRemaining(Number(data.freeRemaining) || 0)
     setPointsPerCheck(Number(data.pointsPerCheck) || 5)
+    setPointsBalance(Number(data.pointsBalance) || 0)
     if (data.hint) setHint(data.hint)
   }
 
@@ -58,11 +72,14 @@ export default function TalentAccountCheckPage() {
       .catch((err: unknown) => setHint(err instanceof Error ? err.message : '额度读取失败'))
   }, [navigate, pr])
 
-  const singleLabel = !member
-    ? freeRemaining > 0
-      ? '本月免费查验 1 次'
-      : '升级会员后查验'
-    : `开始查验 · ${pointsPerCheck} 积分`
+  const singleLabel = busy ? '查验中…' : !member ? (freeRemaining > 0 ? '免费查验' : '去升级') : '开始查验'
+
+  function onPlatform(id: string) {
+    const item = PLATFORMS.find((row) => row.id === id)
+    if (!item?.open) {
+      window.alert(`${item?.label || '该平台'}尚未开放，目前只能查验抖音`)
+    }
+  }
 
   async function onCheck() {
     const text = query.trim()
@@ -73,7 +90,7 @@ export default function TalentAccountCheckPage() {
     }
     setBusy(true)
     try {
-      const data = await postTalentAccountCheck({ mode: 'check', query: text })
+      const data = await postTalentAccountCheck({ mode: 'check', query: text, platform: 'douyin' })
       if (!data.ok) {
         handleGate(navigate, data)
         return
@@ -106,8 +123,8 @@ export default function TalentAccountCheckPage() {
     try {
       const name = file.name.toLowerCase()
       const body = name.endsWith('.csv')
-        ? { mode: 'parse_sheet', csvText: await file.text() }
-        : { mode: 'parse_sheet', fileBase64: await fileToBase64(file) }
+        ? { mode: 'parse_sheet', platform: 'douyin', csvText: await file.text() }
+        : { mode: 'parse_sheet', platform: 'douyin', fileBase64: await fileToBase64(file) }
       const data = await postTalentAccountCheck(body)
       if (!data.ok) {
         handleGate(navigate, data)
@@ -130,7 +147,7 @@ export default function TalentAccountCheckPage() {
     }
     setBusy(true)
     try {
-      const quote = await postTalentAccountCheck({ mode: 'quote', queries: rows.map((row) => row.douyinId) })
+      const quote = await postTalentAccountCheck({ mode: 'quote', platform: 'douyin', queries: rows.map((row) => row.douyinId) })
       if (!quote.ok) {
         handleGate(navigate, quote)
         return
@@ -146,7 +163,7 @@ export default function TalentAccountCheckPage() {
         next[i] = { ...next[i]!, note: '查验中', state: '' }
         setRows(next.slice())
         try {
-          const data = await postTalentAccountCheck({ mode: 'check', query: next[i]!.douyinId })
+          const data = await postTalentAccountCheck({ mode: 'check', platform: 'douyin', query: next[i]!.douyinId })
           if (!data.ok) next[i] = { ...next[i]!, note: data.message || '未查到', state: 'fail' }
           else {
             next[i] = { ...next[i]!, note: data.view?.cached ? '24小时内已查过' : data.view?.nickname || '已查验', state: 'ok' }
@@ -164,20 +181,39 @@ export default function TalentAccountCheckPage() {
     }
   }
 
+  const douyinLogo = PLATFORMS[0].logo
+  const recent = (view?.recent || []).filter(Boolean)
+
   return (
     <div className="talent-check">
-      <div className="talent-check-strip">
+      <div className="talent-check-head">
         <div className="talent-check-title">达人查验</div>
-        <div className="talent-check-sub">{hint}</div>
+        <div className="talent-check-pills">
+          <span className="talent-check-pill">{member ? `会员 · 余额 ${pointsBalance}` : '免费版'}</span>
+          <span className="talent-check-pill">{member ? `${pointsPerCheck}积分/次` : freeRemaining > 0 ? '本月剩 1 次' : '本月已用完'}</span>
+        </div>
       </div>
+      {!pr ? <p className="talent-check-note">{hint}</p> : null}
       {pr ? (
         <>
+          <div className="talent-check-platforms">
+            {PLATFORMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`talent-check-platform${item.open ? ' on' : ' off'}`}
+                onClick={() => onPlatform(item.id)}
+              >
+                <img src={item.logo} alt="" />
+                <span>
+                  <b>{item.label}</b>
+                  {item.open ? null : <small>未开放</small>}
+                </span>
+              </button>
+            ))}
+          </div>
           <div className="talent-check-tabs">
-            <button
-              type="button"
-              className={tab === 'single' ? 'on' : ''}
-              onClick={() => setTab('single')}
-            >
+            <button type="button" className={tab === 'single' ? 'on' : ''} onClick={() => setTab('single')}>
               单个查验
             </button>
             <button
@@ -196,44 +232,78 @@ export default function TalentAccountCheckPage() {
           </div>
           {tab === 'single' ? (
             <>
-              <div className="talent-check-card">
-                <input
-                  className="talent-check-field"
-                  placeholder="抖音号、分享口令或主页链接"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <button type="button" className="talent-check-btn" disabled={busy} onClick={() => void onCheck()}>
-                  {busy ? '查验中…' : singleLabel}
+              <div className="talent-check-search">
+                <label className="talent-check-field">
+                  <img src={douyinLogo} alt="" />
+                  <input
+                    placeholder="抖音号、口令或主页链接"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </label>
+                <button type="button" className="talent-check-go" disabled={busy} onClick={() => void onCheck()}>
+                  {singleLabel}
                 </button>
-                <div className="talent-check-chips">
-                  <span>公开主页</span>
-                  <span>口令解析</span>
-                  <span>豆包只读公开内容</span>
-                </div>
+              </div>
+              <div className="talent-check-chips">
+                <span>公开主页</span>
+                <span>口令解析</span>
+                <span>豆包只读公开内容</span>
               </div>
               {view ? (
-                <div className="talent-check-card">
-                  {view.rows.map((row) => (
-                    <div className="talent-check-row" key={row.label}>
-                      <b>{row.label}</b>
+                <div className="talent-check-result">
+                  <div className="talent-check-who">
+                    <div className="talent-check-id">
+                      {view.avatarUrl ? (
+                        <img className="avatar" src={view.avatarUrl} alt="" />
+                      ) : (
+                        <span className="talent-check-fallback">{(view.nickname || '达').slice(0, 1)}</span>
+                      )}
                       <div>
-                        {row.value}
-                        <em>{row.source}</em>
+                        <strong>{view.nickname || '未公开'}</strong>
+                        <div className="talent-check-account">
+                          <img src={douyinLogo} alt="" />
+                          {view.account || '未公开'}
+                        </div>
+                        <span className="talent-check-tag">公开主页</span>
                       </div>
                     </div>
-                  ))}
+                    <div className="talent-check-metrics">
+                      <div>
+                        <div className="talent-check-metric-top"><small>粉丝</small><span className="talent-check-tag">公开主页</span></div>
+                        <p>{view.followersText || '未公开'}</p>
+                      </div>
+                      <div>
+                        <div className="talent-check-metric-top"><small>签名</small><span className="talent-check-tag">公开主页</span></div>
+                        <p>{view.signature || '未公开'}</p>
+                      </div>
+                      <div>
+                        <div className="talent-check-metric-top"><small>内容方向</small><span className="talent-check-tag">豆包检索</span></div>
+                        <p>{view.direction || '未写到'}</p>
+                      </div>
+                      <div>
+                        <div className="talent-check-metric-top"><small>近期内容</small><span className="talent-check-tag">豆包检索</span></div>
+                        <p>{recent.length ? recent.join('  ') : '未写到'}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="talent-check-summary">{view.summary}</div>
                   <div className="talent-check-clock">
                     核对于 {view.checkedAtLabel || ''} · 不读后台成交
                     {view.cached ? ' · 24小时内已查过，未再扣积分' : ''}
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="talent-check-guides">
+                  <div><b>公开主页</b><span>昵称、抖音号、粉丝和签名，用解析到的数字。</span></div>
+                  <div><b>豆包检索</b><span>内容方向和近期公开标题。</span></div>
+                  <div><b>不读后台成交</b><span>不写播放量、成交额和联系方式。</span></div>
+                </div>
+              )}
             </>
           ) : (
-            <>
-              <div className="talent-check-card">
-                <div className="talent-check-note">第一列填抖音号，第二列昵称可以空着。支持 xlsx、csv，一次最多 30 个。免费版每月 1 次，不能批量查验。</div>
+            <div className="talent-check-batch">
+              <div className="talent-check-batch-row">
                 <input
                   ref={fileRef}
                   className="talent-check-file"
@@ -245,27 +315,25 @@ export default function TalentAccountCheckPage() {
                     if (file) void onFile(file)
                   }}
                 />
-                <button type="button" className="talent-check-btn" disabled={busy} onClick={() => fileRef.current?.click()}>
+                <button type="button" className="talent-check-go" disabled={busy} onClick={() => fileRef.current?.click()}>
                   上传表格
                 </button>
                 <button type="button" className="talent-check-ghost" onClick={downloadTemplate}>
                   下载模板
                 </button>
               </div>
-              {rows.length ? (
-                <div className="talent-check-card">
-                  <div className="talent-check-note">已读入 {rows.length} 个号</div>
-                  {rows.map((row) => (
-                    <div className={`talent-check-line ${row.state}`} key={row.douyinId}>
-                      {row.nickname || row.douyinId} · {row.note}
-                    </div>
-                  ))}
-                  <button type="button" className="talent-check-btn" disabled={busy} onClick={() => void onBatch()}>
-                    {busy ? '查验中…' : '开始批量查验'}
-                  </button>
+              <div className="talent-check-note">第一列填抖音号，第二列昵称可以空着。支持 xlsx、csv，一次最多 30 个。目前只能批量查验抖音。</div>
+              {rows.map((row) => (
+                <div className={`talent-check-line ${row.state}`} key={`${row.douyinId}-${row.note}`}>
+                  {row.nickname || row.douyinId} · {row.note}
                 </div>
+              ))}
+              {rows.length ? (
+                <button type="button" className="talent-check-go" disabled={busy} onClick={() => void onBatch()} style={{ marginTop: 12 }}>
+                  {busy ? '查验中…' : '开始批量查验'}
+                </button>
               ) : null}
-            </>
+            </div>
           )}
         </>
       ) : null}

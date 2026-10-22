@@ -9,6 +9,7 @@ export type TalentCheckView = {
   account: string
   followersText: string
   signature: string
+  avatarUrl?: string
   direction: string
   recent: string[]
   summary: string

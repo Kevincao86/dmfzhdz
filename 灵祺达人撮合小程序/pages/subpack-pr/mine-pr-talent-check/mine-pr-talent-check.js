@@ -16,6 +16,13 @@ Page({
     member: false,
     freeRemaining: 1,
     pointsBalance: 0,
+    platforms: [
+      { id: 'douyin', label: '抖音', logo: '/images/platforms/douyin.png', open: true },
+      { id: 'xhs', label: '小红书', logo: '/images/platforms/xiaohongshu.png', open: false },
+      { id: 'kuaishou', label: '快手', logo: '/images/platforms/kuaishou-local.png', open: false },
+      { id: 'dianping', label: '大众点评', logo: '/images/platforms/dianping.png', open: false },
+      { id: 'channels', label: '视频号', logo: '/images/platforms/wechat.png', open: false },
+    ],
     pointsPerCheck: 5,
     hint: '正在读取查验额度…',
     singleLabel: '开始查验',
@@ -44,8 +51,8 @@ Page({
     const member = !!data.member
     const freeRemaining = Number(data.freeRemaining) || 0
     const points = Number(data.pointsPerCheck) || 5
-    let singleLabel = `开始查验 · ${points} 积分`
-    if (!member) singleLabel = freeRemaining > 0 ? '本月免费查验 1 次' : '升级会员后查验'
+    let singleLabel = '开始查验'
+    if (!member) singleLabel = freeRemaining > 0 ? '免费查验' : '去升级'
     this.setData({
       member,
       freeRemaining,
@@ -54,6 +61,13 @@ Page({
       hint: data.hint || '',
       singleLabel,
     })
+  },
+
+  onPlatform(e) {
+    const id = e.currentTarget.dataset.id
+    const item = (this.data.platforms || []).find((row) => row.id === id)
+    if (!item || item.open) return
+    wx.showToast({ title: `${item.label}尚未开放`, icon: 'none' })
   },
 
   onTab(e) {
@@ -83,7 +97,9 @@ Page({
         this.handleGate(data)
         return
       }
-      this.setData({ view: data.view || null })
+      const view = data.view || null
+      if (view) view.recentText = (view.recent || []).join('  ')
+      this.setData({ view })
       if (data.view && !data.view.cached) {
         wx.showToast({ title: data.view.charged ? `已扣 ${data.view.charged} 积分` : '已使用本月免费次数', icon: 'none' })
       }

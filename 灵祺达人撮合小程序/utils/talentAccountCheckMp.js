@@ -23,15 +23,15 @@ function status() {
 }
 
 function parseSheet(payload) {
-  return post(Object.assign({ mode: 'parse_sheet' }, payload))
+  return post(Object.assign({ mode: 'parse_sheet', platform: 'douyin' }, payload))
 }
 
 function quote(queries) {
-  return post({ mode: 'quote', queries })
+  return post({ mode: 'quote', platform: 'douyin', queries })
 }
 
 function check(query) {
-  return post({ mode: 'check', query })
+  return post({ mode: 'check', platform: 'douyin', query })
 }
 
 module.exports = { post, status, parseSheet, quote, check }

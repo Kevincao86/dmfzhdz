@@ -1,7 +1,21 @@
 <view class="page">
-  <view class="strip">
-    <view class="strip-title">达人查验</view>
-    <view class="strip-sub">{{hint}}</view>
+  <view class="head">
+    <view class="title">达人查验</view>
+    <view class="pills">
+      <text class="pill">{{member ? '会员 · 余额 ' + pointsBalance : '免费版'}}</text>
+      <text class="pill">{{member ? pointsPerCheck + '积分/次' : (freeRemaining > 0 ? '本月剩 1 次' : '本月已用完')}}</text>
+    </view>
+  </view>
+  <view class="hint" wx:if="{{hint}}">{{hint}}</view>
+
+  <view class="platforms">
+    <view class="platform {{item.open ? 'on' : 'off'}}" wx:for="{{platforms}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlatform">
+      <image src="{{item.logo}}" mode="aspectFill" />
+      <view>
+        <view class="pname">{{item.label}}</view>
+        <view class="pclosed" wx:if="{{!item.open}}">未开放</view>
+      </view>
+    </view>
   </view>
 
   <view class="tabs">
@@ -10,34 +24,52 @@
   </view>
 
   <block wx:if="{{tab === 'single'}}">
-    <view class="card">
-      <input class="field" placeholder="抖音号、分享口令或主页链接" value="{{query}}" bindinput="onQuery" />
-      <button class="btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onCheck">{{singleLabel}}</button>
-      <view class="chips">
-        <text class="chip">公开主页</text>
-        <text class="chip">口令解析</text>
-        <text class="chip">豆包只读公开内容</text>
+    <view class="search">
+      <view class="field">
+        <image src="/images/platforms/douyin.png" mode="aspectFill" />
+        <input placeholder="抖音号、口令或主页链接" value="{{query}}" bindinput="onQuery" />
       </view>
+      <button class="go" loading="{{busy}}" disabled="{{busy}}" bindtap="onCheck">{{singleLabel}}</button>
     </view>
-    <view class="card" wx:if="{{view}}">
-      <view class="row" wx:for="{{view.rows}}" wx:key="label">
-        <text class="row-label">{{item.label}}</text>
-        <view class="row-value">{{item.value}}<text class="tag">{{item.source}}</text></view>
+    <view class="chips">
+      <text class="chip">公开主页</text>
+      <text class="chip">口令解析</text>
+      <text class="chip">豆包只读公开内容</text>
+    </view>
+
+    <view class="result" wx:if="{{view}}">
+      <view class="who">
+        <image class="avatar" wx:if="{{view.avatarUrl}}" src="{{view.avatarUrl}}" mode="aspectFill" />
+        <view class="fallback" wx:else>{{view.nickname[0] || '达'}}</view>
+        <view>
+          <view class="nick">{{view.nickname || '未公开'}}</view>
+          <view class="account"><image src="/images/platforms/douyin.png" mode="aspectFill" />{{view.account || '未公开'}}</view>
+          <text class="tag">公开主页</text>
+        </view>
       </view>
-      <view class="clock" wx:if="{{view.checkedAtLabel}}">核对于 {{view.checkedAtLabel}} · 不读后台成交{{view.cached ? ' · 24小时内已查过，未再扣积分' : ''}}</view>
+      <view class="metrics">
+        <view class="metric"><view class="ml"><text>粉丝</text><text class="tag">公开主页</text></view><view class="mv">{{view.followersText || '未公开'}}</view></view>
+        <view class="metric"><view class="ml"><text>签名</text><text class="tag">公开主页</text></view><view class="mv">{{view.signature || '未公开'}}</view></view>
+        <view class="metric"><view class="ml"><text>内容方向</text><text class="tag">豆包检索</text></view><view class="mv">{{view.direction || '未写到'}}</view></view>
+        <view class="metric"><view class="ml"><text>近期内容</text><text class="tag">豆包检索</text></view><view class="mv">{{view.recentText || '未写到'}}</view></view>
+      </view>
+      <view class="summary">{{view.summary}}</view>
+      <view class="clock">核对于 {{view.checkedAtLabel}} · 不读后台成交{{view.cached ? ' · 24小时内已查过，未再扣积分' : ''}}</view>
+    </view>
+    <view class="guides" wx:else>
+      <view class="guide"><view class="gb">公开主页</view><view class="gs">昵称、抖音号、粉丝和签名。</view></view>
+      <view class="guide"><view class="gb">豆包检索</view><view class="gs">内容方向和近期公开标题。</view></view>
+      <view class="guide"><view class="gb">不读后台成交</view><view class="gs">不写播放量、成交额和联系方式。</view></view>
     </view>
   </block>
 
   <block wx:else>
-    <view class="card">
-      <view class="note">第一列填抖音号，第二列昵称可以空着。一次最多 30 个。免费版每月 1 次，不能批量查验。</view>
-      <button class="btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onPickSheet">上传表格</button>
+    <view class="batch">
+      <button class="go" loading="{{busy}}" disabled="{{busy}}" bindtap="onPickSheet">上传表格</button>
       <button class="ghost" bindtap="onCopyHeader">复制表头</button>
-    </view>
-    <view class="card" wx:if="{{rows.length}}">
-      <view class="note">已读入 {{rows.length}} 个号</view>
-      <view class="sheet-row {{item.state}}" wx:for="{{rows}}" wx:key="douyinId">{{item.nickname || item.douyinId}} · {{item.note || '待查验'}}</view>
-      <button class="btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onBatch">开始批量查验</button>
+      <view class="hint">第一列填抖音号。目前只能批量查验抖音，一次最多 30 个。</view>
+      <view class="line {{item.state}}" wx:for="{{rows}}" wx:key="douyinId">{{item.nickname || item.douyinId}} · {{item.note}}</view>
+      <button class="go" wx:if="{{rows.length}}" loading="{{busy}}" disabled="{{busy}}" bindtap="onBatch">开始批量查验</button>
     </view>
   </block>
 </view>

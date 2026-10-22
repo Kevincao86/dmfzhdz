@@ -25,6 +25,7 @@ export type TalentCheckView = {
   account: string
   followersText: string
   signature: string
+  avatarUrl: string
   direction: string
   recent: string[]
   summary: string
@@ -155,6 +156,7 @@ function buildView(input: {
   account: string
   followers: number
   signature: string
+  avatarUrl: string
   direction: string
   recent: string[]
   summary: string
@@ -177,6 +179,7 @@ function buildView(input: {
     account: input.account,
     followersText: followersText(input.followers),
     signature: input.signature,
+    avatarUrl: input.avatarUrl,
     direction: input.direction,
     recent: input.recent,
     summary: input.summary,
@@ -291,6 +294,12 @@ export async function runTalentAccountCheck(opts: {
   const freeUsed = readFreeUsed(accountId)
   const freeRemaining = member ? 0 : Math.max(0, 1 - freeUsed)
   const mode = String(opts.body.mode || 'status').trim()
+  const platform = String(opts.body.platform || 'douyin').trim().toLowerCase()
+  if (mode !== 'status' && platform && platform !== 'douyin') {
+    const names: Record<string, string> = { xhs: '小红书', kuaishou: '快手', dianping: '大众点评', channels: '视频号' }
+    const name = names[platform] || '该平台'
+    return { status: 200, body: { ok: false, error: 'platform_closed', message: `${name}尚未开放，目前只能查验抖音` } }
+  }
 
   if (mode === 'status') {
     return {
@@ -406,6 +415,7 @@ export async function runTalentAccountCheck(opts: {
     account: parsed.platformAccount,
     followers: parsed.followers,
     signature: String(parsed.signature || ''),
+    avatarUrl: String(parsed.avatarUrl || ''),
     direction: analysis.direction,
     recent: analysis.recent,
     summary: analysis.summary,
