@@ -12,6 +12,7 @@ import {
   hydrateShopEval,
   platformShopEvalMeta,
   readSavedShopEval,
+  rememberShopEvalRival,
   resolveShopEvalFromStores,
   SHOP_EVAL_PLATFORMS,
   shopEvalGainTargets,
@@ -496,7 +497,8 @@ export default function MerchantShopEvalPanel() {
     setRivalLoading(true)
     void loadShopEvalRival(input).then((view) => {
       if (cancel) return
-      setRival(view)
+      const saved = rememberShopEvalRival(input, storage, view)
+      setRival(saved || view)
       setRivalLoading(false)
     })
     return () => {

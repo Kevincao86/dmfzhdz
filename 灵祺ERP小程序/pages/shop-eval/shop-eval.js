@@ -56,7 +56,8 @@ function showRival(page, input, advice) {
   loadShopEvalRival(input)
     .then((view) => {
       if (token !== page._rivalToken) return
-      page.setData(rivalState({ competitor: view }))
+      const saved = evalApi.rememberShopEvalRival ? evalApi.rememberShopEvalRival(input, storage, view) : null
+      page.setData(rivalState({ competitor: saved || view }))
     })
     .catch(() => {
       if (token !== page._rivalToken) return

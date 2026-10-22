@@ -952,12 +952,43 @@ function readCachedRival(raw) {
   })
 }
 
+function usableRival(raw) {
+  const view = readCachedRival(raw)
+  if (!view || !view.competitors || !view.competitors.length) return null
+  return view
+}
+
+function cachedRivalOf(cached) {
+  if (!cached || typeof cached !== 'object') return null
+  const adviceRaw = cached.advice
+  if (adviceRaw && typeof adviceRaw === 'object') {
+    const fromAdvice = usableRival(adviceRaw.competitor)
+    if (fromAdvice) return fromAdvice
+  }
+  return usableRival(cached.rival)
+}
+
+function rememberShopEvalRival(raw, storage, rival) {
+  const view = usableRival(rival)
+  if (!view) return null
+  const { row } = normalizeInput(raw)
+  const loaded = loadCache(storage, row)
+  if (!loaded.data) return null
+  const prevAdvice = loaded.data.advice && typeof loaded.data.advice === 'object' ? loaded.data.advice : null
+  const patch = { rival: view, savedAt: new Date().toISOString() }
+  if (prevAdvice) patch.advice = Object.assign({}, prevAdvice, { competitor: view })
+  writeCache(storage, loaded.key, patch)
+  void publishShopEval(storage, loaded.key, slotId(row))
+  return view
+}
+
 function savedFromCache(cached) {
   if (!cached || cached.sourcesSearch !== 'store-search-v8') return null
   const blocks = publicEvalIndicators(scopeFromCached(cached))
   const indicators = mapIndicators(cached.indicators, blocks)
   if (indicators.length !== blocks.length) return null
   const adviceRaw = cached.advice
+  const competitor = cachedRivalOf(cached)
   let advice = null
   if (adviceRaw && typeof adviceRaw === 'object' && Array.isArray(adviceRaw.sections)) {
     const sections = alignAdviceSections(
@@ -965,9 +996,15 @@ function savedFromCache(cached) {
       indicators.map((item) => item.name),
     )
     if (sections.length === indicators.length) {
-      const competitor = readCachedRival(adviceRaw.competitor)
       advice = { lift: clampLift(adviceRaw.lift), sections }
       if (competitor) advice.competitor = competitor
+    }
+  }
+  if (!advice && competitor) {
+    advice = {
+      lift: clampLift(adviceRaw && typeof adviceRaw === 'object' ? adviceRaw.lift : 0),
+      sections: [],
+      competitor,
     }
   }
   const rawProfile = cached.profile && typeof cached.profile === 'object' ? cached.profile : null
@@ -1819,6 +1856,10 @@ async function adviseShop(raw, score, opts) {
   } catch (e) {
     competitor = null
   }
+  if (!usableRival(competitor)) {
+    const kept = cachedRivalOf(loaded.data)
+    if (kept) competitor = kept
+  }
   const names = score.indicators.map((item) => item.name)
   const listed = score.indicators.map((item) => item.name + ' ' + item.score + '/' + item.weight).join('、')
   const lines = score.indicators.map((item) => `${item.name} ${item.score}/${item.weight}：${item.comment}`).join('\n')
@@ -1854,8 +1895,11 @@ async function adviseShop(raw, score, opts) {
     lift: clampLift(parsed && parsed.lift),
     sections,
   }
-  if (competitor) advice.competitor = competitor
-  writeCache(opts.storage, key, { advice, savedAt: new Date().toISOString() })
+  const keep = usableRival(competitor)
+  if (keep) advice.competitor = keep
+  const patch = { advice, savedAt: new Date().toISOString() }
+  if (keep) patch.rival = keep
+  writeCache(opts.storage, key, patch)
   void publishShopEval(opts.storage, key, slotId(row))
   return Object.assign({}, advice, { fromModel: Boolean(parsed) })
 }
@@ -1902,6 +1946,7 @@ module.exports = {
   hydrateShopEval,
   evaluateShop,
   adviseShop,
+  rememberShopEvalRival,
   shopEvalRivalView,
   describeShopBackend,
   publicEvalIndicators,
