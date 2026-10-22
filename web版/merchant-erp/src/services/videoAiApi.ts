@@ -961,8 +961,7 @@ export async function burnSpokenSubtitles(opts: {
   }
   const srt = buildSrtContent(lines, Math.max(4, Number(opts.durationSec) || 8))
   if (!srt.trim()) return opts.video
-  return postProcessVideoOnServer({
-    video: opts.video,
+  return postProcessVideoOnServer(opts.video, {
     srtContent: srt,
     subtitleStyle: styleId,
     timeoutMs: 180_000,
