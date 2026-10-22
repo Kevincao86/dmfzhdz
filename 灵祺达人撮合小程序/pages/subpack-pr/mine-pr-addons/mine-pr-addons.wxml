@@ -27,7 +27,7 @@
         hover-class="addon-card--hover"
       >
         <view class="addon-card__icon-wrap">
-          <text class="addon-card__glyph">{{item.glyph}}</text>
+          <image class="addon-card__icon" src="{{item.iconSrc}}" mode="aspectFill" />
         </view>
         <view class="addon-card__body">
           <text class="addon-card__title">{{item.title}}</text>
