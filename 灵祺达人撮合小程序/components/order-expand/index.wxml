@@ -20,6 +20,7 @@
               <button class="order-expand-share-menu__item" open-type="share" data-cover="poster" hover-class="none" bindtap="onShareMenuClose">海报封面</button>
             </block>
             <block wx:else>
+              <button class="order-expand-share-menu__item order-expand-share-menu__item--primary" open-type="share" hover-class="none" bindtap="onShareMenuClose">分享小程序卡片</button>
               <view class="order-expand-share-menu__item" bindtap="onShareWechat">
                 <image class="order-expand-share-menu__icon" src="/components/recruit-share-dock/icons/dock-wechat.jpg" mode="aspectFill" />
                 <text>微信好友</text>

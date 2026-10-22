@@ -8,7 +8,9 @@
         <button class="cover-pick-btn" open-type="share" data-cover="poster" hover-class="none" bindtap="onCoverPicked">海报封面</button>
       </view>
     </view>
-    <view wx:else class="dock-row">
+    <block wx:else>
+      <button class="dock-direct" open-type="share" hover-class="none" bindtap="onDirectCard">分享小程序卡片</button>
+      <view class="dock-row">
       <view class="dock-cell" bindtap="onWechat">
         <image class="dock-icon-img" src="/components/recruit-share-dock/icons/dock-wechat.jpg" mode="aspectFill" />
         <text class="dock-label">微信好友</text>
@@ -29,7 +31,8 @@
         <image class="dock-icon-img" src="/components/recruit-share-dock/icons/dock-link.jpg" mode="aspectFill" />
         <text class="dock-label">链接分享</text>
       </view>
-    </view>
+      </view>
+    </block>
     <view class="dock-cancel" bindtap="onCancel">{{coverPick ? '返回' : '取消'}}</view>
   </view>
 </view>

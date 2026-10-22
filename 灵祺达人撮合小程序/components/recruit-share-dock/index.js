@@ -24,6 +24,10 @@ Component({
       }
       this.onClose()
     },
+    onDirectCard() {
+      this.setData({ coverPick: false })
+      this.triggerEvent('close')
+    },
     onWechat() {
       this.setData({ coverPick: true })
     },

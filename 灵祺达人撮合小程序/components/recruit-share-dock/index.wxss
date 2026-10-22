@@ -23,6 +23,20 @@
   margin-bottom: 20rpx;
   padding: 0 24rpx;
 }
+.dock-direct {
+  display: block;
+  margin: 0 24rpx 20rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 16rpx;
+  background: #07c160;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+.dock-direct::after {
+  border: none;
+}
 .dock-row {
   display: flex;
   justify-content: space-around;

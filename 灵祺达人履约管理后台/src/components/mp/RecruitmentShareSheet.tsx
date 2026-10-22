@@ -408,7 +408,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
             className="rounded-xl bg-[#07c160] px-2 py-2.5 text-sm font-medium text-white disabled:opacity-50"
             onClick={() => void onWechatShare('chat')}
           >
-            {wxBusy === 'chat' ? '正在打开微信…' : '发送给微信好友或群'}
+            {wxBusy === 'chat' ? '正在打开微信…' : '分享小程序卡片'}
           </button>
           <button
             type="button"
@@ -420,7 +420,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
           </button>
         </div>
         <p className="mt-2 text-[11px] text-slate-500">
-          {wxHint || '电脑需已登录并解锁微信。手机请用下方小程序码或短链。'}
+          {wxHint || '分享小程序卡片会发到微信好友或群，对方点开就是这张招募。电脑需已登录并解锁微信。'}
         </p>
 
         <div className="mt-4 flex gap-1 border-b border-[var(--shell-border)]">
