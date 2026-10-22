@@ -74,7 +74,7 @@ function readCache(accountId: string, douyinKey: string): TalentCheckView | null
     const parsed = JSON.parse(fs.readFileSync(cacheFile(accountId, douyinKey), 'utf8')) as CacheFile
     if (!parsed || typeof parsed.at !== 'number' || !parsed.view) return null
     if (Date.now() - parsed.at > CACHE_MS) return null
-    return { ...parsed.view, cached: true, charged: 0 }
+    return presentSales({ ...parsed.view, cached: true, charged: 0 })
   } catch {
     return null
   }
@@ -127,22 +127,77 @@ function checkedClock(iso: string) {
 
 const SALES_UNKNOWN = '公开信息不足，暂不估算'
 
+function wanOf(n: number, unit: string | undefined): number {
+  if (unit === '千') return n / 10
+  if (unit === '元') return n / 10000
+  if (unit === '万') return n
+  if (n >= 10000) return n / 10000
+  return n
+}
+
+function salesCenterWan(text: string): number | null {
+  const range = text.match(/([0-9]+(?:\.[0-9]+)?)\s*(万|千|元)?\s*[–—\-~到至]\s*([0-9]+(?:\.[0-9]+)?)\s*(万|千|元)?/)
+  if (range) {
+    const unit = range[4] || range[2] || ''
+    const a = wanOf(Number(range[1]), range[2] || unit)
+    const b = wanOf(Number(range[3]), range[4] || range[2] || unit)
+    if (a > 0 && b > 0) return (a + b) / 2
+  }
+  const one = text.match(/([0-9]+(?:\.[0-9]+)?)\s*(万|千|元)/)
+  if (one) {
+    const value = wanOf(Number(one[1]), one[2])
+    if (value > 0) return value
+  }
+  const yuan = text.match(/([0-9][0-9,]{3,})/)
+  if (yuan) {
+    const n = Number(yuan[1]!.replace(/,/g, ''))
+    if (n >= 10000) return n / 10000
+  }
+  return null
+}
+
+function formatSalesBand(centerWan: number): string {
+  const lo = centerWan * 0.95
+  const hi = centerWan * 1.05
+  const snap = (value: number, mode: 'up' | 'down', digits: number) => {
+    const factor = 10 ** digits
+    const scaled = value * factor
+    const n = mode === 'up' ? Math.ceil(scaled - 1e-9) : Math.floor(scaled + 1e-9)
+    return n / factor
+  }
+  const textOf = (n: number) => {
+    if (Number.isInteger(n)) return String(n)
+    const one = Math.round(n * 10) / 10
+    if (Math.abs(one - n) < 1e-9) return one.toFixed(1).replace(/\.0$/, '')
+    return n.toFixed(2).replace(/0$/, '')
+  }
+  let digits = centerWan >= 20 ? 0 : 1
+  let loShown = snap(lo, 'up', digits)
+  let hiShown = snap(hi, 'down', digits)
+  if (!(loShown < hiShown)) {
+    digits = 2
+    loShown = snap(lo, 'up', digits)
+    hiShown = snap(hi, 'down', digits)
+  }
+  if (!(loShown < hiShown)) return `约 ${textOf(Math.round(centerWan * 100) / 100)}万`
+  return `约 ${textOf(loShown)}万–${textOf(hiShown)}万`
+}
+
 export function cleanSales30d(raw: unknown): string {
   const text = String(raw || '').replace(/\s+/g, ' ').trim()
   if (!text) return SALES_UNKNOWN
-  const yuan = text.match(/^约?\s*([0-9][0-9,]{3,})\s*元?$/)
-  if (yuan) {
-    const n = Number(yuan[1]!.replace(/,/g, ''))
-    if (Number.isFinite(n) && n >= 10000) {
-      const wan = n / 10000
-      const lo = Math.max(1, Math.round(wan * 0.7))
-      const hi = Math.max(lo + 1, Math.round(wan * 1.4))
-      return `约 ${lo}万–${hi}万`
-    }
-  }
-  if (/[约万千]/.test(text)) return text.slice(0, 32)
   if (/不足|无法|看不出|没有带货|暂不/.test(text)) return SALES_UNKNOWN
-  return text.slice(0, 32)
+  const center = salesCenterWan(text)
+  if (center == null || !Number.isFinite(center) || center <= 0) return SALES_UNKNOWN
+  return formatSalesBand(center)
+}
+
+function presentSales(view: TalentCheckView): TalentCheckView {
+  const sales30d = cleanSales30d(view.sales30d)
+  const rows = (view.rows || []).map((row) =>
+    row.label === '近30天带货金额' ? { ...row, value: sales30d, source: '' } : row,
+  )
+  return { ...view, sales30d, rows }
 }
 
 export function readAnalysisJson(text: string): { summary: string; direction: string; recent: string[]; sales30d: string } | null {
@@ -196,7 +251,7 @@ function buildView(input: {
     { label: '签名', value: input.signature || '未公开', source: '公开主页' },
   ]
   if (input.direction) rows.push({ label: '内容方向', value: input.direction, source: '抖音官方数据检索' })
-  rows.push({ label: '近30天带货金额', value: sales30d, source: '豆包估算' })
+  rows.push({ label: '近30天带货金额', value: sales30d, source: '' })
   if (input.recent.length) rows.push({ label: '近期内容', value: input.recent.join('、'), source: '抖音官方数据检索' })
   rows.push({ label: '说明', value: input.summary, source: '抖音官方数据检索' })
   return {
@@ -264,9 +319,9 @@ async function askDoubao(nickname: string, account: string, followersLabel: stri
   const system = [
     '你是豆包助手。只根据这次联网检索到的公开主页回答。',
     '不要编造粉丝数、播放量、手机号或微信。粉丝数以用户消息里给出的公开资料为准，不要改写。',
-    '近30天带货金额只做区间估算，不要写成官方精确成交，不要写成精确到元的数字。',
+    '近30天带货金额只写一个中位估算，用「约 N万」。不要自己写宽区间，不要写成官方精确成交，不要写成精确到元的数字。',
     '只输出一个 JSON 对象，不要 Markdown。',
-    '键：summary（40到90字，写这个账号公开内容在做什么）、direction（8个字以内的内容方向）、recent（最多3条公开作品标题，没有就空数组）、sales30d（近30天带货金额区间，必须带「约」，例如「约 3万–8万」。按公开内容、粉丝量和带货痕迹估算；看不出带货就写「公开信息不足，暂不估算」）。',
+    '键：summary（40到90字，写这个账号公开内容在做什么）、direction（8个字以内的内容方向）、recent（最多3条公开作品标题，没有就空数组）、sales30d（近30天带货金额中位数，必须带「约」和「万」，例如「约 20万」。按公开内容、粉丝量和带货痕迹估算；看不出带货就写「公开信息不足，暂不估算」）。',
   ].join('')
   const user = [
     `抖音号：${account || '未公开'}`,
@@ -282,7 +337,7 @@ async function askDoubao(nickname: string, account: string, followersLabel: stri
 function withSales(view: TalentCheckView, sales30d: string): TalentCheckView {
   const rows = (view.rows || []).filter((row) => row.label !== '近30天带货金额')
   const at = rows.findIndex((row) => row.label === '内容方向')
-  rows.splice(at >= 0 ? at + 1 : rows.length, 0, { label: '近30天带货金额', value: sales30d, source: '豆包估算' })
+  rows.splice(at >= 0 ? at + 1 : rows.length, 0, { label: '近30天带货金额', value: sales30d, source: '' })
   return { ...view, sales30d, rows, cached: true, charged: 0 }
 }
 
