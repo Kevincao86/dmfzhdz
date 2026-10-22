@@ -11,10 +11,11 @@
 .platform.off { opacity: 0.72; }
 .pname { font-size: 24rpx; font-weight: 600; }
 .pclosed { font-size: 18rpx; color: #9a8b76; }
-.tabs { display: inline-flex; background: #efe8dc; border-radius: 14rpx; padding: 4rpx; margin-top: 20rpx; }
+.finder { display: flex; flex-direction: column; align-items: center; }
+.tabs { display: flex; background: #efe8dc; border-radius: 14rpx; padding: 4rpx; margin-top: 20rpx; }
 .tab { font-size: 24rpx; color: #7a6a55; padding: 10rpx 22rpx; border-radius: 12rpx; }
 .tab.on { background: #fffdf8; color: #2c2416; font-weight: 650; }
-.search { display: flex; align-items: center; gap: 12rpx; margin-top: 16rpx; }
+.search { display: flex; align-items: center; gap: 12rpx; width: 100%; margin-top: 16rpx; box-sizing: border-box; }
 .field { flex: 1; display: flex; align-items: center; gap: 10rpx; height: 72rpx; background: #fffdf8; border: 1px solid #2c2416; border-radius: 14rpx; padding: 0 16rpx; }
 .field image { width: 36rpx; height: 36rpx; border-radius: 8rpx; }
 .field input { flex: 1; font-size: 26rpx; }
@@ -22,7 +23,7 @@
 .search .go { width: 168rpx; flex: none; }
 button::after { border: none; }
 .ghost { height: 72rpx; line-height: 72rpx; margin: 16rpx 0 0; background: transparent; color: #3d3228; border: 1px solid #d9cfc0; border-radius: 14rpx; font-size: 26rpx; }
-.chips { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 14rpx; }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10rpx; width: 100%; margin-top: 14rpx; }
 .chip, .tag { font-size: 20rpx; color: #7a6a55; background: #f3ece2; border-radius: 999rpx; padding: 4rpx 12rpx; }
 .guides { margin-top: 20rpx; }
 .guide { background: #fffdf8; border-radius: 16rpx; padding: 16rpx 18rpx; margin-bottom: 12rpx; }

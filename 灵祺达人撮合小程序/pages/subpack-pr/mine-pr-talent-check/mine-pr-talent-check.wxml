@@ -18,25 +18,28 @@
     </view>
   </view>
 
-  <view class="tabs">
-    <view class="tab {{tab === 'single' ? 'on' : ''}}" data-tab="single" bindtap="onTab">单个查验</view>
-    <view class="tab {{tab === 'batch' ? 'on' : ''}}" data-tab="batch" bindtap="onTab">批量查验</view>
+  <view class="finder">
+    <view class="tabs">
+      <view class="tab {{tab === 'single' ? 'on' : ''}}" data-tab="single" bindtap="onTab">单个查验</view>
+      <view class="tab {{tab === 'batch' ? 'on' : ''}}" data-tab="batch" bindtap="onTab">批量查验</view>
+    </view>
+    <block wx:if="{{tab === 'single'}}">
+      <view class="search">
+        <view class="field">
+          <image src="/images/platforms/douyin.png" mode="aspectFill" />
+          <input placeholder="抖音号、口令或主页链接" value="{{query}}" bindinput="onQuery" />
+        </view>
+        <button class="go" loading="{{busy}}" disabled="{{busy}}" bindtap="onCheck">{{singleLabel}}</button>
+      </view>
+      <view class="chips">
+        <text class="chip">公开主页</text>
+        <text class="chip">口令解析</text>
+        <text class="chip">抖音官方数据检索</text>
+      </view>
+    </block>
   </view>
 
   <block wx:if="{{tab === 'single'}}">
-    <view class="search">
-      <view class="field">
-        <image src="/images/platforms/douyin.png" mode="aspectFill" />
-        <input placeholder="抖音号、口令或主页链接" value="{{query}}" bindinput="onQuery" />
-      </view>
-      <button class="go" loading="{{busy}}" disabled="{{busy}}" bindtap="onCheck">{{singleLabel}}</button>
-    </view>
-    <view class="chips">
-      <text class="chip">公开主页</text>
-      <text class="chip">口令解析</text>
-      <text class="chip">抖音官方数据检索</text>
-    </view>
-
     <view class="result" wx:if="{{view}}">
       <view class="who">
         <image class="avatar" wx:if="{{view.avatarUrl}}" src="{{view.avatarUrl}}" mode="aspectFill" />
