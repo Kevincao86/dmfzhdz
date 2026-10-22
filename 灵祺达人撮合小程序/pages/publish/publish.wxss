@@ -315,18 +315,18 @@
 .pub-target-main {
   flex: 1;
   min-height: 0;
-  padding: 12rpx 28rpx calc(24rpx + 116rpx + env(safe-area-inset-bottom));
+  padding: 8rpx 16rpx calc(24rpx + 116rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
 .pub-target-title {
   display: block;
   text-align: center;
-  font-size: 44rpx;
+  font-size: 48rpx;
   font-weight: 800;
   color: #1e1b4b;
   line-height: 1.25;
-  margin-top: 16rpx;
+  margin-top: 12rpx;
 }
 
 .pub-target-sub {
@@ -347,15 +347,17 @@
 .pub-mode-card--icon {
   display: flex;
   align-items: center;
-  gap: 20rpx;
-  padding: 28rpx 72rpx 28rpx 24rpx;
+  gap: 24rpx;
+  min-height: 148rpx;
+  padding: 36rpx 72rpx 36rpx 28rpx;
+  box-sizing: border-box;
 }
 
 .pub-mode-icon {
   flex-shrink: 0;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 16rpx;
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -592,7 +594,7 @@
 }
 
 .pub-mode-card--icon .pub-mode-name {
-  font-size: 34rpx;
+  font-size: 36rpx;
 }
 
 .pub-mode-card--icon .pub-mode-sub {
@@ -642,10 +644,10 @@
 
 .pub-mode-card {
   position: relative;
-  margin-bottom: 16rpx;
-  padding: 28rpx 72rpx 28rpx 28rpx;
+  margin-bottom: 20rpx;
+  padding: 36rpx 72rpx 36rpx 28rpx;
   background: rgba(255, 255, 255, 0.96);
-  border-radius: 20rpx;
+  border-radius: 24rpx;
   border: 1rpx solid rgba(199, 210, 254, 0.5);
   box-shadow: 0 10rpx 36rpx rgba(79, 70, 229, 0.1);
 }
@@ -676,7 +678,7 @@
   flex: 1;
   height: 0;
   min-height: 0;
-  padding: 8rpx 28rpx 24rpx;
+  padding: 8rpx 16rpx 24rpx;
   box-sizing: border-box;
 }
 
@@ -716,9 +718,9 @@
 .tpl-title {
   display: block;
   text-align: center;
-  margin-top: 4rpx;
-  font-size: 32rpx;
-  font-weight: 700;
+  margin-top: 8rpx;
+  font-size: 44rpx;
+  font-weight: 800;
   color: #1e1b4b;
   line-height: 1.3;
 }
