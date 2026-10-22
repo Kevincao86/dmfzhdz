@@ -161,6 +161,8 @@ Page({
     imitateDurationSec: 8,
     imitateNote: '',
     imitateShots: [],
+    subtitleTypes: addonApi.SUBTITLE_TYPES,
+    subtitleIdx: 1,
     imitateAvatars: IMITATE_AVATARS,
     imitateVoices: IMITATE_VOICES,
     characterMode: 'preset',
@@ -430,6 +432,9 @@ Page({
             : '消耗提醒：分享链接按镜头生成 80 积分/秒，最低 400 积分。'
           : pointsHints.bannerText('shortvideo', Number(this.data.durationSec) || 15),
     })
+  },
+  onImitateSubtitle(e) {
+    this.setData({ subtitleIdx: Number(e.detail.value) || 0 })
   },
   onImitateSource(e) {
     const next = e.currentTarget.dataset.source === 'video' ? 'video' : 'share'
@@ -800,6 +805,22 @@ Page({
         const videoPure = await media.downloadUrlBase64(done.videoUrl)
         resultUrl = await addonApi.postMuxAudioFile(videoPure, audioBase64)
       }
+      let burnNote = ''
+      try {
+        const types = this.data.subtitleTypes || []
+        const style = types[this.data.subtitleIdx] || types[0]
+        const speech = (this.data.imitateShots || []).map((row) => row.speech).filter(Boolean).join('\n')
+        const srt = style && style.id !== 'none' ? addonApi.spokenSubtitleSrt(speech, durationSec) : ''
+        if (srt) {
+          this.setData({ progress: '正在按所选字幕烧录…' })
+          const pure = /^https?:\/\//i.test(resultUrl) && resultUrl.indexOf(wx.env.USER_DATA_PATH) < 0
+            ? await media.downloadUrlBase64(resultUrl)
+            : wx.getFileSystemManager().readFileSync(resultUrl, 'base64')
+          resultUrl = await addonApi.postBurnSubtitleFile(pure, srt, style.id)
+        }
+      } catch (burnErr) {
+        burnNote = `字幕未烧上，已保留原片：${String(burnErr.message || burnErr).slice(0, 40)}`
+      }
       const probedBill = await videoInfoDuration(done.videoUrl)
       const billedSec = probedBill > 0.4 ? probedBill : durationSec
       const charge = await mpPointsSpend.spendAddonPoints('imitate', {
@@ -809,7 +830,7 @@ Page({
         note: `${hasVideo ? 'motion_imitate' : 'storyboard'}:${start.taskId || ''}`,
       })
       const charged = charge && charge.pointsCharged > 0 ? `生成完成 · 消耗 ${charge.pointsCharged} 积分` : '生成完成'
-      this.setData({ resultUrl, progress: charged })
+      this.setData({ resultUrl, progress: burnNote ? `${burnNote} ${charged}` : charged })
     } catch (e) {
       this.setData({ err: String(e.message || e).slice(0, 100) })
     } finally {

@@ -49,6 +49,8 @@ function initialData() {
     bgmClips: [],
     bgmVolume: 0.35,
     bgmVolumeLabel: 35,
+    subtitleTypes: videoAi.SUBTITLE_TYPES,
+    subtitleIdx: 1,
   }
 }
 
@@ -218,6 +220,9 @@ const pageMethods = {
       resultUrl: '',
     })
     if (typeof this.refreshPointsHints === 'function') this.refreshPointsHints()
+  },
+  onImitateSubtitle(e) {
+    this.setData({ subtitleIdx: Number(e.detail.value) || 0 })
   },
   onImitateSource(e) {
     const next = e.currentTarget.dataset.source === 'video' ? 'video' : 'share'
@@ -581,6 +586,22 @@ const pageMethods = {
         const videoPure = await downloadUrlBase64(done.videoUrl)
         resultUrl = await videoAi.postMuxAudioFile(videoPure, audioBase64)
       }
+      let burnNote = ''
+      try {
+        const types = this.data.subtitleTypes || []
+        const style = types[this.data.subtitleIdx] || types[0]
+        const speech = (this.data.imitateShots || []).map((row) => row.speech).filter(Boolean).join('\n')
+        const srt = style && style.id !== 'none' ? videoAi.spokenSubtitleSrt(speech, durationSec) : ''
+        if (srt) {
+          this.setData({ progress: '正在按所选字幕烧录…' })
+          const pure = /^https?:\/\//i.test(resultUrl) && resultUrl.indexOf(wx.env.USER_DATA_PATH) < 0
+            ? await downloadUrlBase64(resultUrl)
+            : wx.getFileSystemManager().readFileSync(resultUrl, 'base64')
+          resultUrl = await videoAi.postBurnSubtitleFile(pure, srt, style.id)
+        }
+      } catch (burnErr) {
+        burnNote = `字幕未烧上，已保留原片：${String(burnErr.message || burnErr).slice(0, 40)}`
+      }
       const probedBill = await videoInfoDuration(done.videoUrl)
       const billedSec = probedBill > 0.4 ? probedBill : durationSec
       const charge = await erpPoints.spendAddonPoints({
@@ -595,7 +616,7 @@ const pageMethods = {
       this.setData({
         resultUrl,
         progress: '',
-        hint: charged,
+        hint: burnNote ? `${burnNote} ${charged}` : charged,
         pointsBalance: charge && charge.balance != null ? charge.balance : this.data.pointsBalance,
       })
     } catch (e) {

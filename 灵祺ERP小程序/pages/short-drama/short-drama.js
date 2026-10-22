@@ -217,6 +217,8 @@ Page({
       })),
     ),
     durationIdx: 0,
+    subtitleTypes: videoAi.SUBTITLE_TYPES,
+    subtitleIdx: 1,
     durationSec: 0,
     durationHint: '先选时长。故事会按这个时长来写：8～15 秒一个钩子，30 秒起按时间轴写满。',
     rateLabel: economics.formatMpPointsRateLabel('shortvideo'),
@@ -898,6 +900,25 @@ Page({
     this.setData({ refPaths: [], refDataUrls: [] })
   },
 
+  onSubtitle(e) {
+    this.setData({ subtitleIdx: Number(e.detail.value) || 0 })
+  },
+
+  async burnDramaSubtitles(videoUrl, durationSec) {
+    const types = this.data.subtitleTypes || []
+    const style = types[this.data.subtitleIdx] || types[0]
+    if (!videoUrl || !style || style.id === 'none') return videoUrl
+    const srt = videoAi.spokenSubtitleSrt(
+      [this.data.dialogue, this.data.story].filter(Boolean).join('\n'),
+      durationSec,
+    )
+    if (!srt) return videoUrl
+    this.setData({ progress: '正在按所选字幕烧录…' })
+    const file = await downloadVideoToUserFile(videoUrl)
+    const b64 = wx.getFileSystemManager().readFileSync(file, 'base64')
+    return videoAi.postBurnSubtitleFile(b64, srt, style.id)
+  },
+
   onDuration(e) {
     const idx = Number(e.detail.value) || 0
     const opt = this.data.durationOptions[idx] || { sec: 0, hint: '' }
@@ -1141,7 +1162,14 @@ Page({
       if (plan.length <= 1) {
         const done = await this.runDramaClip(prompt, total, images0)
         if (done.ok && done.videoUrl) {
-          this.setData({ resultUrl: done.videoUrl, hint: '成片已出，可保存到相册。', progress: '' })
+          let url = done.videoUrl
+          let hint = '成片已出，可保存到相册。'
+          try {
+            url = await this.burnDramaSubtitles(url, total)
+          } catch (e) {
+            hint = `字幕未烧上，已保留原片：${String(e.message || e).slice(0, 40)}`
+          }
+          this.setData({ resultUrl: url, hint, progress: '' })
           await this.charge(done.taskId || `drama-${Date.now()}`, total)
         } else if (!this.shouldCancel()) {
           this.setData({ err: done.message || '生成未完成' })
@@ -1203,9 +1231,15 @@ Page({
           return
         }
       }
+      let longHint = `长片已拼接完成（${segmentUrls.length} 段）。`
+      try {
+        finalUrl = await this.burnDramaSubtitles(finalUrl, total)
+      } catch (e) {
+        longHint = `字幕未烧上，已保留原片：${String(e.message || e).slice(0, 40)}`
+      }
       this.setData({
         resultUrl: finalUrl,
-        hint: `长片已拼接完成（${segmentUrls.length} 段）。`,
+        hint: longHint,
         progress: '',
       })
       await this.charge(`drama-long-${Date.now()}`, total)

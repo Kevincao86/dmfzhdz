@@ -628,6 +628,13 @@ volcOmniHumanClient
 volcMotionImitateClient
 merchantVideoAiGateway
 videoAiApi
+ShortVideoImitateStudio
+videoAiMp.js
+shortvideoImitateMp.js
+shortvideo-ai.wxml
+mpAddonMerchantApi.js
+mine-pr-addon-shortvideo.js
+mine-pr-addon-shortvideo.wxml
 aiImageDelivery
 meoo-ai-agent-image
 shortDramaCatalogMp

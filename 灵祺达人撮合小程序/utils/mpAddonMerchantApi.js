@@ -246,6 +246,83 @@ async function postXiaoyunque(body) {
   })
 }
 
+const SUBTITLE_TYPES = [
+  { id: 'none', label: '无字幕' },
+  { id: 'bottom-safe', label: '底部安全区白字（推荐）' },
+  { id: 'bottom-white', label: '底部白字黑边' },
+  { id: 'bottom-white-large', label: '底部大白字' },
+  { id: 'bottom-yellow', label: '底部黄字' },
+  { id: 'bottom-pink', label: '底部粉字（种草）' },
+  { id: 'bottom-green', label: '底部绿字（促销）' },
+  { id: 'center-white', label: '居中白字' },
+  { id: 'top-minimal', label: '顶部简约' },
+  { id: 'top-news', label: '顶部新闻条' },
+  { id: 'cinematic', label: '电影感小字' },
+]
+
+function spokenSubtitleSrt(text, durationSec) {
+  const raw = String(text || '').replace(/\r/g, '').trim()
+  if (raw.length < 2) return ''
+  const parts = raw.split(/[。！？!?；;\n]+/).map((s) => s.trim()).filter((s) => s.length >= 2)
+  const lines = []
+  ;(parts.length ? parts : [raw]).forEach((part) => {
+    for (let i = 0; i < part.length && lines.length < 24; i += 14) {
+      const piece = part.slice(i, i + 14).trim()
+      if (piece.length >= 2) lines.push(piece)
+    }
+  })
+  if (!lines.length) return ''
+  const total = Math.max(4, Number(durationSec) || 8)
+  const weights = lines.map((line) => Math.max(2, line.length))
+  const sum = weights.reduce((a, b) => a + b, 0) || 1
+  let cursor = 0
+  const pad = (n, w) => String(n).padStart(w, '0')
+  const ts = (sec) => {
+    const s = Math.max(0, sec)
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const ss = Math.floor(s % 60)
+    const ms = Math.floor((s - Math.floor(s)) * 1000)
+    return `${pad(h, 2)}:${pad(m, 2)}:${pad(ss, 2)},${pad(ms, 3)}`
+  }
+  return lines
+    .map((line, i) => {
+      const start = cursor
+      const end = i === lines.length - 1 ? total : Math.min(total, cursor + Math.max(1.1, (weights[i] / sum) * total))
+      cursor = end
+      return `${i + 1}\n${ts(start)} --> ${ts(end)}\n${line}\n`
+    })
+    .join('\n')
+}
+
+function postBurnSubtitleFile(videoBase64, srtContent, subtitleStyle) {
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: ecs.url('/api/meoo-merchant-ai-video-post-process'),
+      method: 'POST',
+      timeout: 180000,
+      responseType: 'arraybuffer',
+      header: Object.assign({ 'Content-Type': 'application/json' }, mpAuthHeaders()),
+      data: { videoBase64, srtContent, subtitleStyle },
+      success(res) {
+        const code = Number(res.statusCode) || 0
+        if (code < 200 || code >= 300 || !res.data) {
+          reject(new Error('字幕烧录失败'))
+          return
+        }
+        const filePath = `${wx.env.USER_DATA_PATH}/sub-${Date.now()}.mp4`
+        wx.getFileSystemManager().writeFile({
+          filePath,
+          data: res.data,
+          success: () => resolve(filePath),
+          fail: (e) => reject(new Error((e && e.errMsg) || '保存成片失败')),
+        })
+      },
+      fail: (e) => reject(new Error((e && e.errMsg) || '字幕烧录请求失败')),
+    })
+  })
+}
+
 function postMuxAudioFile(videoBase64, audioBase64) {
   return new Promise((resolve, reject) => {
     wx.request({
@@ -406,6 +483,9 @@ module.exports = {
   postMotionImitate,
   postXiaoyunque,
   postMuxAudioFile,
+  SUBTITLE_TYPES,
+  spokenSubtitleSrt,
+  postBurnSubtitleFile,
   postShortVideoWithFailover,
   pollVideoTask,
   fetchSeedanceStatus,

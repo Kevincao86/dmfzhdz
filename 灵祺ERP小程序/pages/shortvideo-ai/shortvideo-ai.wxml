@@ -141,6 +141,11 @@
       </block>
       <view wx:if="{{err || hint}}" class="sv-alert {{err ? 'err' : 'hint'}}">{{err || hint}}</view>
       <text class="sv-cabin-tip" wx:if="{{progress}}">{{progress}}</text>
+      <text class="sv-label">字幕</text>
+      <picker mode="selector" range="{{subtitleTypes}}" range-key="label" value="{{subtitleIdx}}" bindchange="onImitateSubtitle">
+        <view class="sv-pick">{{subtitleTypes[subtitleIdx].label}}</view>
+      </picker>
+      <text class="sv-cabin-tip">选好类型后，成片会按口播把这种字幕烧进去。</text>
       <button class="sv-btn-cyan" loading="{{busy}}" disabled="{{busy}}" bindtap="onImitateGenerate">开始模仿</button>
       <video wx:if="{{resultUrl}}" class="sv-video" src="{{resultUrl}}" controls />
       <button wx:if="{{resultUrl}}" class="sv-btn-outline" bindtap="saveResultAlbum">保存到相册</button>

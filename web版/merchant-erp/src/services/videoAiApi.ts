@@ -13,6 +13,7 @@ import {
   parseVideoDurationFromFlags,
   replaceVideoDurationInFlags,
 } from '../lib/videoModelDuration'
+import { buildSrtContent, splitSubtitleLines } from '../lib/digitalHumanSubtitle'
 import { appendAspectToVideoPrompt } from '../lib/shortVideoRenderFlags'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../lib/merchantApiAuth'
@@ -932,6 +933,40 @@ export async function postProcessVideoOnServer(
     return blob
   }
   throw new Error('云端成片后处理失败：视频 AI 接口未部署或不可达')
+}
+
+/** 口播/对白按所选字幕样式烧进成片。无字幕或没有可上屏的句子时原片返回。 */
+export async function burnSpokenSubtitles(opts: {
+  video: Blob
+  text: string
+  durationSec: number
+  styleId: string
+}): Promise<Blob> {
+  const styleId = String(opts.styleId || '').trim()
+  if (!styleId || styleId === 'none') return opts.video
+  const raw = String(opts.text || '').replace(/\r/g, '').trim()
+  if (raw.length < 2) return opts.video
+  const parts = raw
+    .split(/[。！？!?；;\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2)
+  const lines: string[] = []
+  for (const part of parts.length ? parts : [raw]) {
+    for (const line of splitSubtitleLines(part, 14)) {
+      const piece = line.trim()
+      if (piece.length >= 2) lines.push(piece)
+      if (lines.length >= 24) break
+    }
+    if (lines.length >= 24) break
+  }
+  const srt = buildSrtContent(lines, Math.max(4, Number(opts.durationSec) || 8))
+  if (!srt.trim()) return opts.video
+  return postProcessVideoOnServer({
+    video: opts.video,
+    srtContent: srt,
+    subtitleStyle: styleId,
+    timeoutMs: 180_000,
+  })
 }
 
 function payloadLooksLikeNonVideo(buf: ArrayBuffer): boolean {

@@ -76,6 +76,7 @@ import {
   isTransientCloudPollError,
   loadPendingCloudVideoJob,
   pollPendingCloudVideoJob,
+  burnSpokenSubtitles,
   postVideoLastFrameFromUrl,
   runXiaoyunqueVideoJob,
   stripVideoVendorNamesFromUserText,
@@ -2671,6 +2672,7 @@ export default function ShortDramaPage({
   const [conflict, setConflict] = useState('')
   const [dialogue, setDialogue] = useState('')
   const [durationSec, setDurationSec] = useState(0)
+  const [subtitleStyle, setSubtitleStyle] = useState('bottom-safe')
   const [resolution, setResolution] = useState<SeedanceQualityId>('720p')
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
@@ -3892,6 +3894,22 @@ export default function ShortDramaPage({
     } catch (e) {
       if (!sourceUrl) throw e
     }
+    if (blob && subtitleStyle && subtitleStyle !== 'none') {
+      setProgress('正在按所选字幕烧录…')
+      try {
+        const burned = await burnSpokenSubtitles({
+          video: blob,
+          text: [dialogue, story].filter(Boolean).join('\n'),
+          durationSec: opts.durationSec,
+          styleId: subtitleStyle,
+        })
+        if (burned.size > 1024) blob = burned
+      } catch (burnErr) {
+        setHint(
+          `字幕未烧上，已保留原片：${burnErr instanceof Error ? burnErr.message : '烧录失败'}`,
+        )
+      }
+    }
     const previewUrl = blob ? URL.createObjectURL(blob) : sourceUrl!
     if (blob) {
       if (!(await dramaBlobHasAudio(blob))) {
@@ -4258,7 +4276,23 @@ export default function ShortDramaPage({
         return
       }
       setProgress('正在拉取试镜…')
-      const blob = await downloadVideoUrlAsBlob(r.videoUrl, { maxAttempts: 3 })
+      let blob = await downloadVideoUrlAsBlob(r.videoUrl, { maxAttempts: 3 })
+      if (subtitleStyle && subtitleStyle !== 'none') {
+        setProgress('正在按所选字幕烧录…')
+        try {
+          const burned = await burnSpokenSubtitles({
+            video: blob,
+            text: [dialogue, story].filter(Boolean).join('\n'),
+            durationSec: PREVIEW_SEC,
+            styleId: subtitleStyle,
+          })
+          if (burned.size > 1024) blob = burned
+        } catch (burnErr) {
+          setHint(
+            `字幕未烧上，已保留原片：${burnErr instanceof Error ? burnErr.message : '烧录失败'}`,
+          )
+        }
+      }
       if (!(await dramaBlobHasAudio(blob))) {
         throw new Error('试镜没有声音（对白/环境声）。已丢弃无声结果，请再试有声短剧。')
       }
@@ -4682,6 +4716,31 @@ export default function ShortDramaPage({
                   </div>
                 ) : null}
               </div>
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-800">字幕</span>
+                <select
+                  className={fieldCls}
+                  disabled={busy}
+                  value={subtitleStyle}
+                  onChange={(e) => setSubtitleStyle(e.target.value)}
+                >
+                  <option value="none">无字幕</option>
+                  <option value="bottom-safe">底部安全区白字（推荐）</option>
+                  <option value="bottom-white">底部白字黑边</option>
+                  <option value="bottom-white-large">底部大白字</option>
+                  <option value="bottom-yellow">底部黄字</option>
+                  <option value="bottom-pink">底部粉字（种草）</option>
+                  <option value="bottom-green">底部绿字（促销）</option>
+                  <option value="center-white">居中白字</option>
+                  <option value="top-minimal">顶部简约</option>
+                  <option value="top-news">顶部新闻条</option>
+                  <option value="cinematic">电影感小字</option>
+                </select>
+                <span className="text-[11px] leading-snug text-slate-500">
+                  选好类型后，成片会按对白把这种字幕烧进去。
+                </span>
+              </label>
 
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium text-slate-800">成片时长</span>

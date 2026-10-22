@@ -19,6 +19,7 @@ import {
 } from '../lib/mpPointsEconomics'
 import { runDhMotionImitateJob } from '../lib/dhOmniHumanVideoApi'
 import {
+  burnSpokenSubtitles,
   downloadVideoUrlAsBlob,
   formatVideoAiUserError,
   muxVideoAudioOnServer,
@@ -318,6 +319,7 @@ export default function ShortVideoImitateStudio() {
   const [bgmClips, setBgmClips] = useState<BgmClip[]>([])
   const [bgmVolume, setBgmVolume] = useState(0.35)
   const [busy, setBusy] = useState(false)
+  const [subtitleStyle, setSubtitleStyle] = useState('bottom-safe')
   const [progress, setProgress] = useState('')
   const [err, setErr] = useState('')
   const [resultUrl, setResultUrl] = useState('')
@@ -605,6 +607,25 @@ export default function ShortVideoImitateStudio() {
     return videoBlob
   }
 
+  async function withSpokenBurn(videoBlob: Blob, sec: number): Promise<Blob> {
+    if (!subtitleStyle || subtitleStyle === 'none') return videoBlob
+    const text = shots.map((s) => s.speech).filter(Boolean).join('\n')
+    if (text.trim().length < 2) return videoBlob
+    setProgress('正在按所选字幕烧录…')
+    try {
+      const burned = await burnSpokenSubtitles({
+        video: videoBlob,
+        text,
+        durationSec: sec,
+        styleId: subtitleStyle,
+      })
+      return burned.size > 1024 ? burned : videoBlob
+    } catch (burnErr) {
+      setErr(`字幕未烧上，已保留原片：${burnErr instanceof Error ? burnErr.message : '烧录失败'}`)
+      return videoBlob
+    }
+  }
+
   async function onGenerate() {
     setErr('')
     setResultUrl('')
@@ -640,17 +661,21 @@ export default function ShortVideoImitateStudio() {
         const needsMix = voiceMode !== 'keep' || (bgmMode === 'custom' && bgmClips.length > 0)
         let billedSec = est
         if (!needsMix) {
-          setResultUrl(job.videoUrl)
           try {
-            const videoBlob = await downloadVideoUrlAsBlob(job.videoUrl, { maxAttempts: 2 })
+            let videoBlob = await downloadVideoUrlAsBlob(job.videoUrl, { maxAttempts: 2 })
             billedSec = (await probeVideoDurationSec(videoBlob).catch(() => 0)) || est
+            videoBlob = await withSpokenBurn(videoBlob, billedSec)
+            setResultUrl(URL.createObjectURL(videoBlob))
           } catch {
             billedSec = est
+            setResultUrl(job.videoUrl)
           }
         } else {
-          const videoBlob = await downloadVideoUrlAsBlob(job.videoUrl, { maxAttempts: 3 })
+          let videoBlob = await downloadVideoUrlAsBlob(job.videoUrl, { maxAttempts: 3 })
           billedSec = (await probeVideoDurationSec(videoBlob).catch(() => 0)) || est
-          setResultUrl(URL.createObjectURL(await mixOnto(videoBlob, billedSec)))
+          videoBlob = await mixOnto(videoBlob, billedSec)
+          videoBlob = await withSpokenBurn(videoBlob, billedSec)
+          setResultUrl(URL.createObjectURL(videoBlob))
         }
         await billImitate(billedSec, false)
       } catch (e) {
@@ -708,6 +733,7 @@ export default function ShortVideoImitateStudio() {
       let videoBlob = await fetch(job.videoUrl).then((r) => r.blob())
       const videoSec = (await probeVideoDurationSec(videoBlob).catch(() => 0)) || est
       videoBlob = await mixOnto(videoBlob, videoSec)
+      videoBlob = await withSpokenBurn(videoBlob, videoSec)
       const url = URL.createObjectURL(videoBlob)
       setResultUrl(url)
       await billImitate(videoSec, true)
@@ -1048,6 +1074,28 @@ export default function ShortVideoImitateStudio() {
           ) : null}
         </div>
       </div>
+      <label className="block text-xs font-medium text-slate-700">
+        字幕
+        <select
+          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
+          disabled={busy}
+          value={subtitleStyle}
+          onChange={(e) => setSubtitleStyle(e.target.value)}
+        >
+          <option value="none">无字幕</option>
+          <option value="bottom-safe">底部安全区白字（推荐）</option>
+          <option value="bottom-white">底部白字黑边</option>
+          <option value="bottom-white-large">底部大白字</option>
+          <option value="bottom-yellow">底部黄字</option>
+          <option value="bottom-pink">底部粉字（种草）</option>
+          <option value="bottom-green">底部绿字（促销）</option>
+          <option value="center-white">居中白字</option>
+          <option value="top-minimal">顶部简约</option>
+          <option value="top-news">顶部新闻条</option>
+          <option value="cinematic">电影感小字</option>
+        </select>
+      </label>
+      <p className="text-[11px] leading-snug text-slate-500">选好类型后，成片会按口播把这种字幕烧进去。</p>
       {err ? <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{err}</p> : null}
       {progress ? <p className="text-xs text-cyan-800">{progress}</p> : null}
       <button
