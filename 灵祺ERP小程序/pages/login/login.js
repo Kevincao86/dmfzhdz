@@ -20,29 +20,30 @@ function isWxPrivacyBlock(detail) {
   return errno === 104 || /privacy|needAuthorization/i.test(errMsg)
 }
 
-function wxPhoneAuthFailHint(detail) {
+function wxPhoneAuthFailHint(detail, actionLabel) {
+  const action = actionLabel || '手机号快捷登录'
   const errMsg = String((detail && detail.errMsg) || '')
   let platform = ''
   try {
     platform = String((wx.getSystemInfoSync() || {}).platform || '')
   } catch (_) {}
   if (isWxPrivacyUndeclared(detail)) {
-    return '请先在微信公众平台的用户隐私保护指引里填写「手机号」用途，保存后再登录'
+    return '请先在公众平台的用户隐私保护指引里填写「手机号」用途，保存后再登录'
   }
   if (platform === 'devtools') {
-    return '开发者工具读不到真实手机号，请用「预览」扫到手机上再点快捷登录'
+    return '开发者工具读不到真实手机号，请用「预览」扫到手机上再点' + action
   }
   if (/deny|cancel|拒绝/i.test(errMsg)) {
-    return '需要在微信弹窗里允许使用绑定的手机号'
+    return '请在弹窗里允许使用绑定的手机号'
   }
-  return '未能读取微信手机号，请再点一次「微信一键登录」'
+  return '未能读取手机号，请再点一次「' + action + '」'
 }
 
 const LANDING_WAYS = [
   { id: 'pwd', mark: '账号', label: '密码登录', sub: '登录名与密码进入工作台' },
   { id: 'sms', mark: '快捷', label: '验证码', sub: '手机号短信验证码登录' },
   { id: 'reg', mark: '入驻', label: '注册', sub: '新开商家账号，免费起步' },
-  { id: 'wx', mark: '手机', label: '快捷登录', sub: '微信授权手机号，进入工作台' },
+  { id: 'wx', mark: '手机', label: '快捷登录', sub: '手机号快捷登录，进入工作台' },
 ]
 
 const MODE_HINT = {
@@ -518,7 +519,7 @@ Page({
       return
     }
     if (!phoneCode) {
-      this.setData({ err: '未能读取微信手机号，请再点一次「微信一键登录」' })
+      this.setData({ err: '未能读取手机号，请再点一次「手机号快捷登录」' })
       return
     }
     void this._doWxLogin(phoneCode, this.data.confirmRebind === true)
@@ -534,11 +535,11 @@ Page({
         this.setData({ wxPrivacyPending: true, err: '' })
         return
       }
-      this.setData({ err: wxPhoneAuthFailHint(detail).replace('微信一键登录', '微信一键注册') })
+      this.setData({ err: wxPhoneAuthFailHint(detail, '手机号快捷注册') })
       return
     }
     if (!phoneCode) {
-      this.setData({ err: '未能读取微信手机号，请再点一次「微信一键注册」' })
+      this.setData({ err: '未能读取手机号，请再点一次「手机号快捷注册」' })
       return
     }
     void this._doWxRegister(phoneCode)
@@ -547,12 +548,12 @@ Page({
   async _doWxRegister(phoneCode) {
     if (this.data.busy || this.data.wxBusy) return
     if (!tenantAuthApi.apiRoot()) {
-      this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用微信注册' })
+      this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用快捷注册' })
       return
     }
     const phoneAuthCode = String(phoneCode || '').trim()
     if (!phoneAuthCode) {
-      this.setData({ err: '请先授权微信绑定的手机号' })
+      this.setData({ err: '请先完成手机号快捷注册' })
       return
     }
     this.setData({ wxBusy: true, err: '', infoHint: '' })
@@ -587,7 +588,7 @@ Page({
   _askWxRebind(message) {
     wx.showModal({
       title: '进入该手机号商家',
-      content: message || '这个微信绑在另一家商家上。确认后将改绑到刚授权的手机号，并进入该商家。原来那家仍可用密码或短信登录。',
+      content: message || '这个账号绑在另一家商家上。确认后将改绑到刚验证的手机号，并进入该商家。原来那家仍可用密码或短信登录。',
       confirmText: '进入这家',
       cancelText: '取消',
       success: (res) => {
@@ -597,7 +598,7 @@ Page({
         }
         this.setData({
           confirmRebind: true,
-          err: '请再点一次登录按钮，授权手机号后进入该商家',
+          err: '请再点一次「手机号快捷登录」，验证手机号后进入该商家',
         })
       },
     })
@@ -611,7 +612,7 @@ Page({
     }
     const phoneAuthCode = String(phoneCode || '').trim()
     if (!phoneAuthCode) {
-      this.setData({ err: '请先授权微信绑定的手机号' })
+      this.setData({ err: '请先完成手机号快捷登录' })
       return
     }
     this.setData({ wxBusy: true, err: '', infoHint: '' })

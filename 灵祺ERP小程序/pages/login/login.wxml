@@ -70,7 +70,7 @@
         disabled="{{busy || wxBusy}}"
         bindtap="onWxLogin"
       >
-        <text>微信一键注册</text>
+        <text>手机号快捷注册</text>
       </button>
       <button
         wx:elif="{{wxPrivacyPending}}"
@@ -91,7 +91,7 @@
         open-type="getPhoneNumber"
         bindgetphonenumber="onGetPhoneNumberRegister"
       >
-        <text>微信一键注册</text>
+        <text>手机号快捷注册</text>
       </button>
       <text class="guest-browse-hint">或填写资料注册</text>
       <view class="field-v2">
@@ -137,7 +137,7 @@
       disabled="{{busy || wxBusy}}"
       bindtap="onWxLogin"
     >
-      <text>微信一键登录</text>
+      <text>手机号快捷登录</text>
     </button>
     <button
       wx:elif="{{wxPrivacyPending}}"
@@ -158,7 +158,7 @@
       open-type="getPhoneNumber"
       bindgetphonenumber="onGetPhoneNumber"
     >
-      <text>{{confirmRebind ? '进入该商家' : '微信一键登录'}}</text>
+      <text>{{confirmRebind ? '进入该商家' : '手机号快捷登录'}}</text>
     </button>
     <button class="btn-v2 login-cancel" disabled="{{busy || wxBusy}}" bindtap="onLeaveLogin">返回，暂不登录</button>
   </view>
