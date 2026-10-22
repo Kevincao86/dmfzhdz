@@ -16,6 +16,8 @@ export const DR_LANDING_LEGACY_OSS_BASE =
   'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/dr-landing'
 
 export const WEB_STATIC_ASSET_VER = '20260702b'
+/** 商家首页首屏成片单独换缓存，避免一年 immutable 仍播旧片 */
+const MERCHANT_HERO_LOOP_VER = '20261022a'
 
 export type WebStaticApp = 'dr' | 'merchant'
 
@@ -33,7 +35,8 @@ function ossObjectKey(app: WebStaticApp, localPath: string): string {
 export function webStaticOssUrl(app: WebStaticApp, localPath: string): string {
   const key = ossObjectKey(app, localPath)
   if (!key || key === `${app}/`) return ''
-  return `${WEB_STATIC_OSS_BASE}/${key}?v=${WEB_STATIC_ASSET_VER}`
+  const ver = key === 'merchant/landing-merchant/hero-loop.mp4' ? MERCHANT_HERO_LOOP_VER : WEB_STATIC_ASSET_VER
+  return `${WEB_STATIC_OSS_BASE}/${key}?v=${ver}`
 }
 
 export function drLandingLegacyOssUrl(localPath: string): string {
