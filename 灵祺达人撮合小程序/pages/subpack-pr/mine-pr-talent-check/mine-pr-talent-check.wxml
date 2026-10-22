@@ -1,0 +1,43 @@
+<view class="page">
+  <view class="strip">
+    <view class="strip-title">达人查验</view>
+    <view class="strip-sub">{{hint}}</view>
+  </view>
+
+  <view class="tabs">
+    <view class="tab {{tab === 'single' ? 'on' : ''}}" data-tab="single" bindtap="onTab">单个查验</view>
+    <view class="tab {{tab === 'batch' ? 'on' : ''}}" data-tab="batch" bindtap="onTab">批量查验</view>
+  </view>
+
+  <block wx:if="{{tab === 'single'}}">
+    <view class="card">
+      <input class="field" placeholder="抖音号、分享口令或主页链接" value="{{query}}" bindinput="onQuery" />
+      <button class="btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onCheck">{{singleLabel}}</button>
+      <view class="chips">
+        <text class="chip">公开主页</text>
+        <text class="chip">口令解析</text>
+        <text class="chip">豆包只读公开内容</text>
+      </view>
+    </view>
+    <view class="card" wx:if="{{view}}">
+      <view class="row" wx:for="{{view.rows}}" wx:key="label">
+        <text class="row-label">{{item.label}}</text>
+        <view class="row-value">{{item.value}}<text class="tag">{{item.source}}</text></view>
+      </view>
+      <view class="clock" wx:if="{{view.checkedAtLabel}}">核对于 {{view.checkedAtLabel}} · 不读后台成交{{view.cached ? ' · 24小时内已查过，未再扣积分' : ''}}</view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="card">
+      <view class="note">第一列填抖音号，第二列昵称可以空着。一次最多 30 个。免费版每月 1 次，不能批量查验。</view>
+      <button class="btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onPickSheet">上传表格</button>
+      <button class="ghost" bindtap="onCopyHeader">复制表头</button>
+    </view>
+    <view class="card" wx:if="{{rows.length}}">
+      <view class="note">已读入 {{rows.length}} 个号</view>
+      <view class="sheet-row {{item.state}}" wx:for="{{rows}}" wx:key="douyinId">{{item.nickname || item.douyinId}} · {{item.note || '待查验'}}</view>
+      <button class="btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onBatch">开始批量查验</button>
+    </view>
+  </block>
+</view>

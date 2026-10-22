@@ -219,7 +219,7 @@ const BIZ_GROUP_DEFS = [
   {
     id: 'tools',
     title: 'AI 创作',
-    keys: ['briefGen', 'aiReview', 'addonsHub', 'myCourses', 'analytics'],
+    keys: ['talentCheck', 'briefGen', 'aiReview', 'addonsHub', 'myCourses', 'analytics'],
   },
   { id: 'help', title: '帮助服务', keys: ['manual', 'support'] },
 ]
@@ -346,6 +346,7 @@ function buildPrMenus() {
     { key: 'talentWatchlist', label: '黑灰名单', sub: '团队共享 · 避免重复踩坑', icon: 'list' },
     { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
     { key: 'funnel', label: '招募漏斗', sub: '曝光→报名→入选→发布转化', icon: 'chart' },
+    { key: 'talentCheck', label: '达人查验', sub: '免费每月 1 次，会员 5 积分/次', icon: 'list' },
     { key: 'analytics', label: 'AI 数据洞察', sub: '发单与转化概况', icon: 'chart' },
     { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
   ])
@@ -377,6 +378,7 @@ const MENU_URLS = {
   myOrders: '/pages/subpack-mine/mine-my-orders/mine-my-orders',
   pointsRecharge: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge',
   wallet: '/pages/subpack-mine/mine-wallet/mine-wallet',
+  talentCheck: '/pages/subpack-pr/mine-pr-talent-check/mine-pr-talent-check',
   briefGen: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
   aiReview: '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
   addonsHub: '/pages/subpack-pr/mine-pr-addons/mine-pr-addons',

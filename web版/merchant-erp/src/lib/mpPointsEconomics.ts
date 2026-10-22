@@ -115,6 +115,9 @@ export const MP_POINTS_TALENT_EVAL_PER_USE = 0
 /** 达人账号分析提升：5 积分/次 */
 export const MP_POINTS_TALENT_ADVICE_PER_USE = 5
 
+/** PR 达人查验：5 积分/次。先扣套餐积分桶，再扣充值积分桶。 */
+export const MP_POINTS_TALENT_CHECK_PER_USE = 5
+
 /** 门店分析提升：5 积分/次；一次整改方案≈¥0.05 */
 export const MP_POINTS_SHOP_EVAL_ADVICE_PER_USE = 5
 
@@ -192,6 +195,7 @@ export type MpPointsUsageKind =
   | 'review_ai'
   | 'talent_eval'
   | 'talent_advice'
+  | 'talent_check'
   | 'shop_eval_advice'
 
 export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
@@ -216,6 +220,7 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   review_ai: '评价回复 AI',
   talent_eval: '达人账号评估',
   talent_advice: '达人账号分析整改',
+  talent_check: '达人查验',
   shop_eval_advice: '门店分析提升',
 }
 
@@ -278,6 +283,7 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'review_ai' ||
     k === 'talent_eval' ||
     k === 'talent_advice' ||
+    k === 'talent_check' ||
     k === 'shop_eval_advice'
   ) {
     return k
@@ -305,6 +311,7 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motion
   if (kind === 'ad_ai') return `${MP_POINTS_AD_AI_PER_USE} 积分/次`
   if (kind === 'talent_eval') return '免费每月 1 次，会员每月 15 次'
   if (kind === 'talent_advice') return `${MP_POINTS_TALENT_ADVICE_PER_USE} 积分/次`
+  if (kind === 'talent_check') return `${MP_POINTS_TALENT_CHECK_PER_USE} 积分/次`
   if (kind === 'shop_eval_advice') return `${MP_POINTS_SHOP_EVAL_ADVICE_PER_USE} 积分/次`
   if (kind === 'review_ai') {
     return `${MP_POINTS_REVIEW_AI_PER_USE} 积分/${MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE} 条`
@@ -381,6 +388,7 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: MpPointsCos
   if (kind === 'ad_ai') return MP_POINTS_AD_AI_PER_USE
   if (kind === 'talent_eval') return MP_POINTS_TALENT_EVAL_PER_USE
   if (kind === 'talent_advice') return MP_POINTS_TALENT_ADVICE_PER_USE
+  if (kind === 'talent_check') return MP_POINTS_TALENT_CHECK_PER_USE
   if (kind === 'shop_eval_advice') return MP_POINTS_SHOP_EVAL_ADVICE_PER_USE
   if (kind === 'review_ai') return MP_POINTS_REVIEW_AI_PER_USE
   return MP_POINTS_ARTICLE_PER_USE

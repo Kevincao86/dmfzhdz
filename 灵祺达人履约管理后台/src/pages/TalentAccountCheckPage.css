@@ -1,0 +1,23 @@
+.talent-check { color: #2c2416; }
+.talent-check-strip,
+.talent-check-card { background: #fffdf8; border-radius: 16px; padding: 18px 20px; margin-bottom: 16px; }
+.talent-check-title { font-size: 20px; font-weight: 650; }
+.talent-check-sub { margin-top: 6px; color: #7a6a55; font-size: 13px; line-height: 1.55; }
+.talent-check-tabs { display: flex; background: #efe8dc; border-radius: 12px; padding: 4px; margin-bottom: 16px; }
+.talent-check-tabs button { flex: 1; border: 0; background: transparent; color: #7a6a55; border-radius: 10px; padding: 10px 0; cursor: pointer; }
+.talent-check-tabs button.on { background: #fffdf8; color: #2c2416; font-weight: 650; }
+.talent-check-field { width: 100%; box-sizing: border-box; border: 0; background: #f7f3ec; border-radius: 12px; padding: 14px; font-size: 15px; color: #2c2416; }
+.talent-check-btn { margin-top: 14px; width: 100%; border: 0; background: #3d3228; color: #f7f3ec; border-radius: 12px; padding: 12px 0; font-size: 15px; cursor: pointer; }
+.talent-check-btn:disabled { opacity: 0.55; cursor: default; }
+.talent-check-ghost { margin-top: 10px; width: 100%; background: transparent; color: #3d3228; border: 1px solid #d9cfc0; border-radius: 12px; padding: 10px 0; cursor: pointer; }
+.talent-check-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.talent-check-chips span { font-size: 12px; color: #7a6a55; background: #f3ece2; border-radius: 999px; padding: 4px 10px; }
+.talent-check-row { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid #f0e8dc; }
+.talent-check-row b { width: 72px; flex-shrink: 0; font-weight: 500; color: #7a6a55; }
+.talent-check-row em { margin-left: 8px; font-style: normal; font-size: 12px; color: #8a5a2b; background: #f6ead8; border-radius: 6px; padding: 1px 6px; }
+.talent-check-clock { margin-top: 8px; font-size: 12px; color: #9a8b76; }
+.talent-check-note { color: #7a6a55; font-size: 13px; line-height: 1.6; }
+.talent-check-line { padding: 8px 0; border-top: 1px solid #f0e8dc; font-size: 13px; }
+.talent-check-line.ok { color: #3d5a3a; }
+.talent-check-line.fail { color: #9a4030; }
+.talent-check-file { display: none; }

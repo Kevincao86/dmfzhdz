@@ -107,6 +107,7 @@ list_scopes() {
   studio_scene_review   商家小程序视觉工坊玩法二级选项；达人/星选视频审核按团购带货与品宣打卡等场景分规则
   video_rule_links      达人小程序与星选短视频审核增加平台官方规则链接页
   talent_local_life_eval 达人小程序与星选：抖音本地生活信息评估（豆包预估分、下月带货等级、整改）
+  talent_account_check   PR 达人查验：公开主页 + 豆包，免费每月 1 次，会员 5 积分/次
   merchant_shop_eval     商家 ERP 总览 + 商家小程序：门店多维评估与提升方案
   calendar_phone_remind  星选与达人小程序：商单日历设置提醒，并写入手机日历
   mine_subscribe_icon    达人小程序：我的页订阅通知图标去掉黑色边
@@ -1886,6 +1887,21 @@ web版/merchant-erp/src/lib/mpCalendarReminderCore.ts
 灵祺达人撮合小程序/app.json
 tabBarConfig
 custom-tab-bar
+change-scope-guard
+PAT
+      ;;
+    talent_account_check)
+      cat <<'PAT'
+talentAccountCheck
+mine-pr-talent-check
+TalentAccountCheckPage
+meoo-ops-mp-auth.ts
+mpPointsEconomics
+opsRegistryTypes.ts
+灵祺达人撮合小程序/pages/mine/mine.js
+灵祺达人撮合小程序/app.json
+灵祺达人履约管理后台/src/App.tsx
+shellNavConfig
 change-scope-guard
 PAT
       ;;

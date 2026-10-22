@@ -1935,6 +1935,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'talent_account_check') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess?.account?.id) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session', message: '请先登录' })
+        return
+      }
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const { runTalentAccountCheck } = await import('../src/lib/talentAccountCheckCore.js')
+      const out = await runTalentAccountCheck({
+        supabaseUrl,
+        serviceRole,
+        token,
+        account,
+        body: body as Record<string, unknown>,
+      })
+      sendJson(res, out.status, out.body)
+      return
+    }
+
     if (action === 'client_state_get' || action === 'client_state_sync') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
@@ -2013,6 +2033,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'points_douyin_poll',
         'mp_ai_points_afford',
         'mp_ai_points_spend',
+        'talent_account_check',
         'mp_brief_gen_records_list',
         'mp_brief_gen_record_save',
         'mp_compliance_review_records_list',

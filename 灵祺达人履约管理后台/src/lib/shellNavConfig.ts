@@ -12,6 +12,7 @@ import {
   Receipt,
   CalendarDays,
   GraduationCap,
+  Search,
 } from 'lucide-react'
 import type { MpAccount, MpAccountRole } from './mpSession'
 import { shouldShowAddonsNav } from './addonAccess'
@@ -46,6 +47,7 @@ export function navItemsForRole(role: MpAccountRole, account?: MpAccount | null)
       { to: '/form-relay', label: '转发工具', icon: Share2 },
       { to: '/templates', label: '我的模版', icon: Layers },
       { to: '/training', label: '培训课程', icon: GraduationCap },
+      { to: '/talent-check', label: '达人查验', icon: Search },
       ...common,
     ]
   }
@@ -104,6 +106,7 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
     '/profile/membership': '会员中心',
     '/profile/talent': '达人资料',
     '/profile/local-life-eval': '达人账号分析',
+    '/talent-check': '达人查验',
     '/profile/pr': 'PR 资料',
     '/profile/supplier': '团队资料',
     '/profile/ai-review/script-rules': '平台文稿审核规则',
