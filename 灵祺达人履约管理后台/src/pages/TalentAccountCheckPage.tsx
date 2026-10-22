@@ -289,15 +289,15 @@ export default function TalentAccountCheckPage() {
                   </div>
                   <div className="talent-check-summary">{view.summary}</div>
                   <div className="talent-check-clock">
-                    核对于 {view.checkedAtLabel || ''} · 不读后台成交
+                    核对于 {view.checkedAtLabel || ''} · 核验限于公开信息
                     {view.cached ? ' · 24小时内已查过，未再扣积分' : ''}
                   </div>
                 </div>
               ) : (
                 <div className="talent-check-guides">
-                  <div><b>公开主页</b><span>昵称、抖音号、粉丝和签名，用解析到的数字。</span></div>
-                  <div><b>豆包检索</b><span>内容方向和近期公开标题。</span></div>
-                  <div><b>不读后台成交</b><span>不写播放量、成交额和联系方式。</span></div>
+                  <div><b>公开主页</b><span>昵称、抖音号、粉丝与签名，以该账号公开主页为准，数字不改写。</span></div>
+                  <div><b>豆包检索</b><span>内容方向与近期作品标题，依据豆包对公开作品的检索。</span></div>
+                  <div><b>核验口径</b><span>本次只核公开信息，不含后台成交、播放量与联系方式。</span></div>
                 </div>
               )}
             </>

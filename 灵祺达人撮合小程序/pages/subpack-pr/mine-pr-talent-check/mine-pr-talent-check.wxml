@@ -54,12 +54,12 @@
         <view class="metric"><view class="ml"><text>近期内容</text><text class="tag">豆包检索</text></view><view class="mv">{{view.recentText || '未写到'}}</view></view>
       </view>
       <view class="summary">{{view.summary}}</view>
-      <view class="clock">核对于 {{view.checkedAtLabel}} · 不读后台成交{{view.cached ? ' · 24小时内已查过，未再扣积分' : ''}}</view>
+      <view class="clock">核对于 {{view.checkedAtLabel}} · 核验限于公开信息{{view.cached ? ' · 24小时内已查过，未再扣积分' : ''}}</view>
     </view>
     <view class="guides" wx:else>
-      <view class="guide"><view class="gb">公开主页</view><view class="gs">昵称、抖音号、粉丝和签名。</view></view>
-      <view class="guide"><view class="gb">豆包检索</view><view class="gs">内容方向和近期公开标题。</view></view>
-      <view class="guide"><view class="gb">不读后台成交</view><view class="gs">不写播放量、成交额和联系方式。</view></view>
+      <view class="guide"><view class="gb">公开主页</view><view class="gs">昵称、抖音号、粉丝与签名，以该账号公开主页为准，数字不改写。</view></view>
+      <view class="guide"><view class="gb">豆包检索</view><view class="gs">内容方向与近期作品标题，依据豆包对公开作品的检索。</view></view>
+      <view class="guide"><view class="gb">核验口径</view><view class="gs">本次只核公开信息，不含后台成交、播放量与联系方式。</view></view>
     </view>
   </block>
 
