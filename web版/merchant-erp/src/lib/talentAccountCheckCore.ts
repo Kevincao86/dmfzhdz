@@ -30,6 +30,8 @@ export type TalentCheckView = {
   recent: string[]
   summary: string
   sales30d: string
+  /** 解读已按 PR 派单口径写过。旧缓存没有这段时会补写一次，不重复扣积分。 */
+  readingReady?: boolean
   checkedAt: string
   checkedAtLabel: string
   cached: boolean
@@ -222,7 +224,7 @@ export function readAnalysisJson(text: string): { summary: string; direction: st
     const recent = Array.isArray(j.recent)
       ? j.recent.map((item) => String(item || '').trim()).filter((item) => item.length >= 2).slice(0, 3)
       : []
-    return { summary: summary.slice(0, 180), direction, recent, sales30d: cleanSales30d(j.sales30d) }
+    return { summary: summary.slice(0, 420), direction, recent, sales30d: cleanSales30d(j.sales30d) }
   } catch {
     return null
   }
@@ -264,6 +266,7 @@ function buildView(input: {
     recent: input.recent,
     summary: input.summary,
     sales30d,
+    readingReady: String(input.summary || '').trim().length >= 120,
     checkedAt: input.checkedAt,
     checkedAtLabel: checkedClock(input.checkedAt),
     cached: input.cached,
@@ -317,18 +320,20 @@ async function askDoubao(nickname: string, account: string, followersLabel: stri
   const key = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
   if (!key) throw new Error('豆包暂不可用，请稍后再试')
   const system = [
-    '你是豆包助手。只根据这次联网检索到的公开主页回答。',
-    '不要编造粉丝数、播放量、手机号或微信。粉丝数以用户消息里给出的公开资料为准，不要改写。',
+    '你是本地生活 PR 的选号助手。只根据这次联网检索到的公开主页回答。',
+    '不要编造粉丝数、播放量、报价、GMV、手机号或微信。粉丝数以用户消息里给出的公开资料为准，不要改写。看不出的就写看不出。',
     '近30天带货金额只写一个中位估算，用「约 N万」。不要自己写宽区间，不要写成官方精确成交，不要写成精确到元的数字。',
+    'summary 是给 PR 派单用的解读，180到320字，写成完整的几句话，不要只写一句账号介绍。',
+    'summary 必须覆盖三件事：这个号的内容调性和观众是谁；适合合作的商家品类和内容形式（探店、团购、口播，按公开内容判断，不适合就写不适合）；派单时 brief 要写清什么、要避开什么。',
     '只输出一个 JSON 对象，不要 Markdown。',
-    '键：summary（40到90字，写这个账号公开内容在做什么）、direction（8个字以内的内容方向）、recent（最多3条公开作品标题，没有就空数组）、sales30d（近30天带货金额中位数，必须带「约」和「万」，例如「约 20万」。按公开内容、粉丝量和带货痕迹估算；看不出带货就写「公开信息不足，暂不估算」）。',
+    '键：summary（180到320字的 PR 派单解读）、direction（8个字以内的内容方向）、recent（最多3条公开作品标题，没有就空数组）、sales30d（近30天带货金额中位数，必须带「约」和「万」，例如「约 20万」。按公开内容、粉丝量和带货痕迹估算；看不出带货就写「公开信息不足，暂不估算」）。',
   ].join('')
   const user = [
     `抖音号：${account || '未公开'}`,
     `昵称：${nickname || '未公开'}`,
     `粉丝：${followersLabel || '未公开'}`,
     `签名：${signature || '未公开'}`,
-    '请联网检索这一个抖音账号的公开主页和近期内容，并估算近30天带货金额区间。',
+    '请联网检索这一个抖音账号的公开主页和近期内容。先估算近30天带货金额中位数，再站在 PR 派单角度写解读：适合什么商家、用什么内容形式、brief 要避开什么。',
   ].join('\n')
   const hit = await callDoubaoWebSearch(key, env, system, user)
   return readAnalysisJson(hit.text)
@@ -351,6 +356,47 @@ async function ensureSales(accountId: string, keys: string[], view: TalentCheckV
   }
   if (!analysis) return view
   const next = withSales(view, analysis.sales30d || SALES_UNKNOWN)
+  for (const key of Array.from(new Set(keys.filter(Boolean)))) writeCache(accountId, key, next)
+  return next
+}
+
+function withReading(
+  view: TalentCheckView,
+  analysis: { summary: string; direction: string; recent: string[]; sales30d: string },
+): TalentCheckView {
+  const sales30d = cleanSales30d(analysis.sales30d || view.sales30d)
+  const direction = analysis.direction || view.direction
+  const recent = analysis.recent.length ? analysis.recent : view.recent
+  const rows = (view.rows || []).map((row) => {
+    if (row.label === '说明') return { ...row, value: analysis.summary }
+    if (row.label === '内容方向' && direction) return { ...row, value: direction }
+    if (row.label === '近期内容' && recent.length) return { ...row, value: recent.join('、') }
+    if (row.label === '近30天带货金额') return { ...row, value: sales30d, source: '' }
+    return row
+  })
+  return presentSales({
+    ...view,
+    summary: analysis.summary,
+    direction,
+    recent,
+    sales30d,
+    rows,
+    readingReady: true,
+    cached: true,
+    charged: 0,
+  })
+}
+
+async function ensureReading(accountId: string, keys: string[], view: TalentCheckView): Promise<TalentCheckView> {
+  if (view.readingReady || String(view.summary || '').trim().length >= 120) return view
+  let analysis: { summary: string; direction: string; recent: string[]; sales30d: string } | null = null
+  try {
+    analysis = await askDoubao(view.nickname, view.account, view.followersText || '未公开', view.signature || '')
+  } catch {
+    return view
+  }
+  if (!analysis || String(analysis.summary || '').trim().length < 40) return view
+  const next = withReading(view, analysis)
   for (const key of Array.from(new Set(keys.filter(Boolean)))) writeCache(accountId, key, next)
   return next
 }
@@ -474,7 +520,8 @@ export async function runTalentAccountCheck(opts: {
   const inputKey = normDouyinKey(query)
   const cachedFirst = findCached(accountId, [inputKey])
   if (cachedFirst) {
-    const view = await ensureSales(accountId, [inputKey, normDouyinKey(cachedFirst.account)], cachedFirst)
+    const withSalesView = await ensureSales(accountId, [inputKey, normDouyinKey(cachedFirst.account)], cachedFirst)
+    const view = await ensureReading(accountId, [inputKey, normDouyinKey(cachedFirst.account)], withSalesView)
     return { status: 200, body: { ok: true, view, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
   }
   if (!member && freeRemaining <= 0) return { status: 200, body: upgradeBody() }
@@ -498,7 +545,8 @@ export async function runTalentAccountCheck(opts: {
   const accountKey = normDouyinKey(parsed.platformAccount)
   const cachedParsed = findCached(accountId, [accountKey, inputKey])
   if (cachedParsed) {
-    const view = await ensureSales(accountId, [accountKey, inputKey], cachedParsed)
+    const withSalesView = await ensureSales(accountId, [accountKey, inputKey], cachedParsed)
+    const view = await ensureReading(accountId, [accountKey, inputKey], withSalesView)
     return { status: 200, body: { ok: true, view, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
   }
 
