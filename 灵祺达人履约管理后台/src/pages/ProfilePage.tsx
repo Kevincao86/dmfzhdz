@@ -12,6 +12,7 @@ import {
   Heart,
   LayoutTemplate,
   LineChart,
+  Search,
   Share2,
   ShieldCheck,
   Sparkles,
@@ -59,6 +60,7 @@ function menuGlyph(to: string): MenuGlyph {
   if (to.startsWith('/profile/talent') || to.startsWith('/profile/pr') || to.startsWith('/profile/supplier')) {
     return UserRound
   }
+  if (to.includes('talent-check')) return Search
   if (to.includes('local-life-eval')) return Sparkles
   if (to.includes('favorites')) return Heart
   if (to.includes('talent-credit')) return ShieldCheck
@@ -270,6 +272,16 @@ export default function ProfilePage() {
       hot: true,
       group: 'deal',
     },
+    ...(isPr
+      ? [
+          {
+            to: '/talent-check',
+            label: '达人查验',
+            desc: '免费每月 1 次，会员 5 积分/次',
+            group: 'tools' as const,
+          },
+        ]
+      : []),
     {
       to: '/profile/ai-review',
       label: 'AI 视频审核',
