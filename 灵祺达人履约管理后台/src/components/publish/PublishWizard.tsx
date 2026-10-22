@@ -1448,10 +1448,23 @@ export default function PublishWizard() {
                     className={`text-sm px-3 py-1.5 rounded-lg border ${
                       form.groupQrImage ? 'border-green-500 text-green-700' : ''
                     }`}
-                    onClick={() => groupQrInputRef.current?.click()}
+                    onClick={() =>
+                      form.groupQrImage
+                        ? window.open(form.groupQrImage, '_blank')
+                        : groupQrInputRef.current?.click()
+                    }
                   >
-                    {groupQrUploading ? '上传中…' : form.groupQrImage ? '已上传群码' : '选择群二维码图片'}
+                    {groupQrUploading ? '上传中…' : form.groupQrImage ? '查看大图' : '选择群二维码图片'}
                   </button>
+                  {form.groupQrImage ? (
+                    <button
+                      type="button"
+                      className="text-sm px-3 py-1.5 rounded-lg border"
+                      onClick={() => groupQrInputRef.current?.click()}
+                    >
+                      修改
+                    </button>
+                  ) : null}
                   {form.groupQrImage ? (
                     <button
                       type="button"
@@ -1523,10 +1536,23 @@ export default function PublishWizard() {
                     className={`text-sm px-3 py-1.5 rounded-lg border ${
                       form.groupQrImage ? 'border-green-500 text-green-700' : ''
                     }`}
-                    onClick={() => groupQrInputRef.current?.click()}
+                    onClick={() =>
+                      form.groupQrImage
+                        ? window.open(form.groupQrImage, '_blank')
+                        : groupQrInputRef.current?.click()
+                    }
                   >
-                    {groupQrUploading ? '上传中…' : form.groupQrImage ? '已上传群码' : '选择群二维码图片'}
+                    {groupQrUploading ? '上传中…' : form.groupQrImage ? '查看大图' : '选择群二维码图片'}
                   </button>
+                  {form.groupQrImage ? (
+                    <button
+                      type="button"
+                      className="text-sm px-3 py-1.5 rounded-lg border"
+                      onClick={() => groupQrInputRef.current?.click()}
+                    >
+                      修改
+                    </button>
+                  ) : null}
                   {form.groupQrImage ? (
                     <button
                       type="button"

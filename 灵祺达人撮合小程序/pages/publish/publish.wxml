@@ -188,7 +188,7 @@
       </view>
       <scroll-view scroll-y class="tpl-scroll" enhanced show-scrollbar="{{false}}">
         <text class="tpl-title">选择招募模版</text>
-        <text class="tpl-sub">系统模版沿用现有表单，自定义可勾选字段并新增</text>
+        <text class="tpl-sub">{{step === 'tplCustom' ? '先勾选要保留的系统项。表单里没有的内容，点底部「新增字段」，再选文字、图片或视频。' : '系统模版沿用现有表单。自定义模版可以勾选字段，并自己新增。'}}</text>
         <view class="pub-mode-list pub-mode-list--target" wx:if="{{step === 'tpl'}}">
           <view class="pub-mode-card pub-mode-card--icon" bindtap="onPickSystemTemplate">
             <view class="pub-mode-copy">
@@ -219,9 +219,7 @@
         </block>
       </scroll-view>
       <view class="tpl-dock" wx:if="{{step === 'tplCustom'}}">
-        <view class="tpl-dock__add" data-format="text" bindtap="onPromptCustomField">文字</view>
-        <view class="tpl-dock__add" data-format="image" bindtap="onPromptCustomField">图片</view>
-        <view class="tpl-dock__add" data-format="video" bindtap="onPromptCustomField">视频</view>
+        <view class="tpl-dock__add" bindtap="onAddCustomFieldMenu">新增字段</view>
         <view class="tpl-dock__go" bindtap="onCustomTemplateDone">开始填写</view>
       </view>
     </view>
@@ -236,13 +234,8 @@
       <view class="pub-target-top pub-form-top" style="{{formHeadStyle}}">
         <view class="pub-target-nav">
           <text class="pub-target-back" bindtap="onBackToMode">‹</text>
-          <view class="pub-target-brand">灵祺星选</view>
         </view>
         <template is="pubStepBarV2" data="{{step: step}}" />
-      </view>
-      <view class="pub-form-title-bar">
-        <text class="pub-target-title pub-form-title-bar__title">{{isEditMode ? '编辑招募' : (isTargetedRecruit ? '填写定向邀约' : '填写招募信息')}}</text>
-        <text class="pub-form-mode-chip">{{isTargetedRecruit ? '定向邀约' : recruitModeLabel}}</text>
       </view>
       <scroll-view
         class="pub-form-scroll"
@@ -739,9 +732,13 @@
             <text class="pub-cover-hint">闭环：从发布到视频审核，均走平台</text>
             <view class="pub-field" wx:if="{{form.fulfillmentLoop === 'open'}}">
               <text class="pub-label">上传群二维码 *</text>
-              <view class="pub-cover-actions">
-                <button class="pub-cover-btn" loading="{{groupQrUploading}}" bindtap="onUploadOpenLoopGroupQr">{{form.groupQrImage ? '已上传群码' : '选择图片'}}</button>
-                <button wx:if="{{form.groupQrImage}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onClearOpenLoopGroupQr">清除</button>
+              <view class="pub-cover-actions" wx:if="{{!form.groupQrImage}}">
+                <button class="pub-cover-btn pub-cover-btn--on" loading="{{groupQrUploading}}" bindtap="onUploadOpenLoopGroupQr">上传群二维码</button>
+              </view>
+              <view class="pub-cover-actions" wx:else>
+                <button class="pub-cover-btn pub-cover-btn--on" bindtap="onPreviewOpenLoopGroupQr">查看大图</button>
+                <button class="pub-cover-btn" loading="{{groupQrUploading}}" bindtap="onUploadOpenLoopGroupQr">修改</button>
+                <button class="pub-cover-btn pub-cover-btn--ghost" bindtap="onClearOpenLoopGroupQr">清除</button>
               </view>
               <image wx:if="{{form.groupQrImage}}" class="pub-cover-preview" src="{{form.groupQrImage}}" mode="aspectFit" bindtap="onPreviewOpenLoopGroupQr" />
             </view>
@@ -763,9 +760,13 @@
             <text class="pub-cover-hint">{{recruitMode === 'edit_ice' ? '剪辑师确认认领后可见群码，并批量回传成片链接。' : 'AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。'}}</text>
             <view class="pub-field" wx:if="{{recruitMode === 'edit_ice' && form.iceVerifyMode !== 'pr'}}">
               <text class="pub-label">上传剪辑师群二维码 *</text>
-              <view class="pub-cover-actions">
-                <button class="pub-cover-btn" loading="{{editGroupQrUploading}}" bindtap="onUploadEditGroupQr">{{form.editGroupQrImage ? '已上传群码' : '选择图片'}}</button>
-                <button wx:if="{{form.editGroupQrImage}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onClearEditGroupQr">清除</button>
+              <view class="pub-cover-actions" wx:if="{{!form.editGroupQrImage}}">
+                <button class="pub-cover-btn pub-cover-btn--on" loading="{{editGroupQrUploading}}" bindtap="onUploadEditGroupQr">上传群二维码</button>
+              </view>
+              <view class="pub-cover-actions" wx:else>
+                <button class="pub-cover-btn pub-cover-btn--on" bindtap="onPreviewEditGroupQr">查看大图</button>
+                <button class="pub-cover-btn" loading="{{editGroupQrUploading}}" bindtap="onUploadEditGroupQr">修改</button>
+                <button class="pub-cover-btn pub-cover-btn--ghost" bindtap="onClearEditGroupQr">清除</button>
               </view>
               <image wx:if="{{form.editGroupQrImage}}" class="pub-cover-preview" src="{{form.editGroupQrImage}}" mode="aspectFit" bindtap="onPreviewEditGroupQr" />
             </view>

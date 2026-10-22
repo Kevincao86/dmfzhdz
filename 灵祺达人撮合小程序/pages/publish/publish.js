@@ -1289,6 +1289,15 @@ Page({
     this.setData({ publishTemplateMode: 'custom', step: 'tplCustom' })
     this.syncTabBarOverlay()
   },
+  onAddCustomFieldMenu() {
+    wx.showActionSheet({
+      itemList: ['新增文字', '新增图片', '新增视频'],
+      success: (res) => {
+        const format = res.tapIndex === 1 ? 'image' : res.tapIndex === 2 ? 'video' : 'text'
+        this.onPromptCustomField({ currentTarget: { dataset: { format } } })
+      },
+    })
+  },
   onBackFromTemplate() {
     this.setData({ step: this.data.step === 'tplCustom' ? 'tpl' : 'mode' })
     this.syncTabBarOverlay()

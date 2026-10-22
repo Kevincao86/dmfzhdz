@@ -151,14 +151,25 @@
 }
 
 .pub-screen--form .pub-form-body {
+  padding-left: 16rpx;
+  padding-right: 16rpx;
   padding-bottom: calc(24rpx + 116rpx + env(safe-area-inset-bottom));
 }
 
 .pub-screen--form .pub-form-card {
-  margin: 0 28rpx 16rpx;
+  margin: 0 0 16rpx;
+  padding: 8rpx 20rpx 12rpx;
   border-radius: 20rpx;
   box-shadow: var(--lq-shadow-soft);
   border: 1rpx solid var(--lq-chip-on-border);
+}
+
+.pub-screen--form .pub-form-card .pub-field {
+  padding: 20rpx 4rpx;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
 }
 
 .pub-target-top {
@@ -689,14 +700,17 @@
 }
 
 .tpl-dock__add {
-  color: #5b2dcc;
-  background: #fff;
-  border: 1rpx solid rgba(91, 45, 204, 0.28);
+  flex: 1.4;
+  color: #fff;
+  background: #5b2dcc;
+  border: none;
 }
 
 .tpl-dock__go {
-  color: #fff;
-  background: #5b2dcc;
+  flex: 1;
+  color: #5b2dcc;
+  background: #fff;
+  border: 1rpx solid rgba(91, 45, 204, 0.35);
 }
 
 .tpl-title {
