@@ -270,11 +270,11 @@ export default function TalentAccountCheckPage() {
                     </div>
                     <div className="talent-check-metrics">
                       <div>
-                        <div className="talent-check-metric-top"><small>粉丝</small><span className="talent-check-tag">公开主页</span></div>
+                        <div className="talent-check-metric-top"><small>粉丝</small></div>
                         <p>{view.followersText || '未公开'}</p>
                       </div>
                       <div>
-                        <div className="talent-check-metric-top"><small>签名</small><span className="talent-check-tag">公开主页</span></div>
+                        <div className="talent-check-metric-top"><small>签名</small></div>
                         <p>{view.signature || '未公开'}</p>
                       </div>
                       <div>
@@ -287,7 +287,10 @@ export default function TalentAccountCheckPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="talent-check-summary">{view.summary}</div>
+                  <div className="talent-check-read">
+                    <b>豆包AI助手解读</b>
+                    <div className="talent-check-summary">{view.summary}</div>
+                  </div>
                   <div className="talent-check-clock">
                     核对于 {view.checkedAtLabel || ''} · 核验限于达人公开数据
                     {view.cached ? ' · 24小时内已查过，未再扣积分' : ''}

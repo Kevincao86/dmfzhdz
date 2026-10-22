@@ -48,12 +48,15 @@
         </view>
       </view>
       <view class="metrics">
-        <view class="metric"><view class="ml"><text>粉丝</text><text class="tag">公开主页</text></view><view class="mv">{{view.followersText || '未公开'}}</view></view>
-        <view class="metric"><view class="ml"><text>签名</text><text class="tag">公开主页</text></view><view class="mv">{{view.signature || '未公开'}}</view></view>
+        <view class="metric"><view class="ml"><text>粉丝</text></view><view class="mv">{{view.followersText || '未公开'}}</view></view>
+        <view class="metric"><view class="ml"><text>签名</text></view><view class="mv">{{view.signature || '未公开'}}</view></view>
         <view class="metric"><view class="ml"><text>内容方向</text><text class="tag">抖音官方数据检索</text></view><view class="mv">{{view.direction || '未写到'}}</view></view>
         <view class="metric"><view class="ml"><text>近期内容</text><text class="tag">抖音官方数据检索</text></view><view class="mv">{{view.recentText || '未写到'}}</view></view>
       </view>
-      <view class="summary">{{view.summary}}</view>
+      <view class="read">
+        <view class="read-title">豆包AI助手解读</view>
+        <view class="summary">{{view.summary}}</view>
+      </view>
       <view class="clock">核对于 {{view.checkedAtLabel}} · 核验限于达人公开数据{{view.cached ? ' · 24小时内已查过，未再扣积分' : ''}}</view>
     </view>
     <view class="guides" wx:else>
