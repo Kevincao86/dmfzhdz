@@ -44,9 +44,9 @@ const ENTRIES = [
   },
   {
     id: 'analysis',
-    title: '店铺分析',
+    title: '竞争对手分析',
     imageUrl: '/images/home/entry-analysis.jpg',
-    url: '/pages/store-analysis/store-analysis',
+    url: '/pages/competitors/competitors',
     tab: false,
   },
   {
