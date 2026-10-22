@@ -10,17 +10,17 @@
 .talent-check-platform small { display: block; font-size: 11px; color: #9a8b76; font-weight: 400; }
 .talent-check-platform.on { border-color: #2c2416; box-shadow: 0 0 0 1px #2c2416; }
 .talent-check-platform.off { opacity: 0.72; }
-.talent-check-tabs { display: inline-flex; gap: 4px; margin-top: 14px; background: #efe8dc; border-radius: 10px; padding: 3px; }
+.talent-check-tabs { display: flex; width: fit-content; gap: 4px; margin: 14px auto 0; background: #efe8dc; border-radius: 10px; padding: 3px; }
 .talent-check-tabs button { border: 0; background: transparent; color: #7a6a55; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 13px; }
 .talent-check-tabs button.on { background: #fffdf8; color: #2c2416; font-weight: 650; }
-.talent-check-search { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.talent-check-search { display: flex; align-items: center; gap: 10px; width: min(680px, 100%); margin: 12px auto 0; }
 .talent-check-field { flex: 1; display: flex; align-items: center; gap: 8px; height: 40px; background: #fffdf8; border: 1px solid #2c2416; border-radius: 10px; padding: 0 12px; }
 .talent-check-field img { width: 22px; height: 22px; border-radius: 6px; }
 .talent-check-field input { flex: 1; border: 0; outline: none; background: transparent; font-size: 14px; color: #2c2416; min-width: 0; }
 .talent-check-field input:focus { outline: none; }
 .talent-check-go { height: 40px; border: 0; background: #3d3228; color: #f7f3ec; border-radius: 10px; padding: 0 18px; cursor: pointer; font-size: 14px; white-space: nowrap; }
 .talent-check-go:disabled { opacity: 0.55; cursor: default; }
-.talent-check-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.talent-check-chips { display: flex; flex-wrap: wrap; gap: 8px; width: min(680px, 100%); margin: 10px auto 0; }
 .talent-check-chips span, .talent-check-tag { font-size: 12px; color: #7a6a55; background: #f3ece2; border-radius: 999px; padding: 3px 8px; }
 .talent-check-guides { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
 .talent-check-guides div { background: #fffdf8; border: 1px solid #f0e8dc; border-radius: 12px; padding: 12px 14px; }
