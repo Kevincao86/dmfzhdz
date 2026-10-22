@@ -86,6 +86,70 @@ function writeCache(accountId: string, douyinKey: string, view: TalentCheckView)
   const file = cacheFile(accountId, douyinKey)
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(file, JSON.stringify({ at: Date.now(), view }))
+  rememberCheck(accountId, view)
+}
+
+const HISTORY_LIMIT = 30
+
+function historyFile(accountId: string) {
+  return path.join(process.cwd(), 'data', 'talent-check-history', `${safeKey(accountId)}.json`)
+}
+
+function readHistoryFile(accountId: string): TalentCheckView[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(historyFile(accountId), 'utf8')) as { records?: TalentCheckView[] }
+    return Array.isArray(parsed.records) ? parsed.records : []
+  } catch {
+    return []
+  }
+}
+
+function writeHistoryFile(accountId: string, records: TalentCheckView[]) {
+  const file = historyFile(accountId)
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, JSON.stringify({ records: records.slice(0, HISTORY_LIMIT) }))
+}
+
+function recordKey(view: TalentCheckView) {
+  return normDouyinKey(view.account)
+}
+
+function rememberCheck(accountId: string, view: TalentCheckView) {
+  const key = recordKey(view)
+  if (!key) return
+  const kept = readHistoryFile(accountId).filter((row) => recordKey(row) !== key)
+  writeHistoryFile(accountId, [presentSales({ ...view, cached: false }), ...kept])
+}
+
+function listHistory(accountId: string): TalentCheckView[] {
+  const saved = readHistoryFile(accountId)
+  const seen = new Set(saved.map(recordKey).filter(Boolean))
+  const dir = path.join(process.cwd(), 'data', 'talent-check-cache')
+  const prefix = `${safeKey(accountId)}__`
+  let names: string[] = []
+  try {
+    names = fs.readdirSync(dir).filter((name) => name.startsWith(prefix) && name.endsWith('.json'))
+  } catch {
+    names = []
+  }
+  const extra: TalentCheckView[] = []
+  for (const name of names) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')) as CacheFile
+      const view = parsed?.view
+      const key = view ? recordKey(view) : ''
+      if (!view || !key || seen.has(key)) continue
+      seen.add(key)
+      extra.push(presentSales({ ...view, cached: false }))
+    } catch {
+      /* 跳过坏缓存 */
+    }
+  }
+  const records = [...saved, ...extra]
+    .sort((a, b) => String(b.checkedAt || '').localeCompare(String(a.checkedAt || '')))
+    .slice(0, HISTORY_LIMIT)
+  if (extra.length) writeHistoryFile(accountId, records)
+  return records
 }
 
 function deleteCache(accountId: string, douyinKey: string) {
@@ -447,6 +511,10 @@ export async function runTalentAccountCheck(opts: {
     const names: Record<string, string> = { xhs: '小红书', kuaishou: '快手', dianping: '大众点评', channels: '视频号' }
     const name = names[platform] || '该平台'
     return { status: 200, body: { ok: false, error: 'platform_closed', message: `${name}尚未开放，目前只能查验抖音` } }
+  }
+
+  if (mode === 'history') {
+    return { status: 200, body: { ok: true, records: listHistory(accountId) } }
   }
 
   if (mode === 'status') {

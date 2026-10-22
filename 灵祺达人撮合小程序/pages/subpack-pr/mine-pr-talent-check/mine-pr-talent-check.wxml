@@ -82,4 +82,18 @@
       <button class="go" wx:if="{{rows.length}}" loading="{{busy}}" disabled="{{busy}}" bindtap="onBatch">开始批量查验</button>
     </view>
   </block>
+
+  <view class="history">
+    <view class="history-title">查验记录</view>
+    <view class="history-empty" wx:if="{{!records.length}}">还没有查验记录。查完一个号后会留在这里，点开不重复扣积分。</view>
+    <view class="history-item" wx:for="{{records}}" wx:key="account" data-index="{{index}}" bindtap="openRecord">
+      <image class="history-avatar" wx:if="{{item.avatarUrl}}" src="{{item.avatarUrl}}" mode="aspectFill" />
+      <view class="history-fallback" wx:else>{{item.nickname[0] || '达'}}</view>
+      <view class="history-main">
+        <view class="history-name">{{item.nickname || '未公开'}}</view>
+        <view class="history-meta">{{item.account || '未公开'}} · 粉丝 {{item.followersText || '未公开'}} · {{item.sales30d || '暂不估算'}}</view>
+      </view>
+      <view class="history-time">{{item.checkedAtLabel}}</view>
+    </view>
+  </view>
 </view>

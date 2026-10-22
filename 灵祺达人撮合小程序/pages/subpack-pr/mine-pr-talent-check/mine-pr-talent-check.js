@@ -28,10 +28,30 @@ Page({
     singleLabel: '开始查验',
     view: null,
     rows: [],
+    records: [],
   },
 
   onShow() {
     this.loadStatus()
+    this.loadHistory()
+  },
+
+  async loadHistory() {
+    try {
+      const data = await api.history()
+      if (data && data.ok) this.setData({ records: data.records || [] })
+    } catch (err) {
+      /* 记录读不到时不挡查验 */
+    }
+  },
+
+  openRecord(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const record = (this.data.records || [])[index]
+    if (!record) return
+    const view = Object.assign({}, record, { cached: false })
+    view.recentText = (view.recent || []).join('  ')
+    this.setData({ tab: 'single', query: record.account || '', view })
   },
 
   async loadStatus() {
@@ -100,6 +120,7 @@ Page({
       const view = data.view || null
       if (view) view.recentText = (view.recent || []).join('  ')
       this.setData({ view })
+      this.loadHistory()
       if (data.view && !data.view.cached) {
         wx.showToast({ title: data.view.charged ? `已扣 ${data.view.charged} 积分` : '已使用本月免费次数', icon: 'none' })
       }
@@ -197,6 +218,7 @@ Page({
         }
         this.setData({ rows })
       }
+      this.loadHistory()
     } catch (err) {
       wx.showToast({ title: messageOf(err, '批量查验失败'), icon: 'none' })
     } finally {

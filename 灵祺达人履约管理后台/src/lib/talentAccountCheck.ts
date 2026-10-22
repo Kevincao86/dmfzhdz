@@ -32,6 +32,7 @@ export type TalentCheckStatus = {
   pointsBalance?: number
   hint?: string
   view?: TalentCheckView
+  records?: TalentCheckView[]
   rows?: { douyinId: string; nickname: string }[]
   truncated?: boolean
   count?: number

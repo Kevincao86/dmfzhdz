@@ -50,6 +50,7 @@ export default function TalentAccountCheckPage() {
   const [hint, setHint] = useState('正在读取查验额度…')
   const [view, setView] = useState<TalentCheckView | null>(null)
   const [rows, setRows] = useState<SheetRow[]>([])
+  const [records, setRecords] = useState<TalentCheckView[]>([])
 
   function applyStatus(data: TalentCheckStatus) {
     setMember(!!data.member)
@@ -70,7 +71,26 @@ export default function TalentAccountCheckPage() {
         else applyStatus(data)
       })
       .catch((err: unknown) => setHint(err instanceof Error ? err.message : '额度读取失败'))
+    void postTalentAccountCheck({ mode: 'history' })
+      .then((data) => {
+        if (data.ok) setRecords(data.records || [])
+      })
+      .catch(() => {})
   }, [navigate, pr])
+
+  function reloadHistory() {
+    void postTalentAccountCheck({ mode: 'history' })
+      .then((data) => {
+        if (data.ok) setRecords(data.records || [])
+      })
+      .catch(() => {})
+  }
+
+  function openRecord(record: TalentCheckView) {
+    setTab('single')
+    setQuery(record.account || '')
+    setView({ ...record, cached: false, recent: record.recent || [] })
+  }
 
   const singleLabel = busy ? '查验中…' : !member ? (freeRemaining > 0 ? '免费查验' : '去升级') : '开始查验'
 
@@ -97,6 +117,7 @@ export default function TalentAccountCheckPage() {
       }
       setView(data.view || null)
       applyStatus(data)
+      reloadHistory()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : '查验失败')
     } finally {
@@ -174,6 +195,7 @@ export default function TalentAccountCheckPage() {
         }
         setRows(next.slice())
       }
+      reloadHistory()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : '批量查验失败')
     } finally {
@@ -342,6 +364,36 @@ export default function TalentAccountCheckPage() {
               ) : null}
             </div>
           )}
+          <section className="talent-check-history">
+            <h3>查验记录</h3>
+            {records.length ? (
+              <div className="talent-check-history-list">
+                {records.map((record) => (
+                  <button
+                    type="button"
+                    className="talent-check-history-item"
+                    key={`${record.account}-${record.checkedAt}`}
+                    onClick={() => openRecord(record)}
+                  >
+                    {record.avatarUrl ? (
+                      <img src={record.avatarUrl} alt="" />
+                    ) : (
+                      <span className="talent-check-history-fallback">{(record.nickname || '达').slice(0, 1)}</span>
+                    )}
+                    <span>
+                      <b>{record.nickname || '未公开'}</b>
+                      <small>
+                        {record.account || '未公开'} · 粉丝 {record.followersText || '未公开'} · {record.sales30d || '暂不估算'}
+                      </small>
+                    </span>
+                    <time>{record.checkedAtLabel || ''}</time>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="talent-check-history-empty">还没有查验记录。查完一个号后会留在这里，点开不重复扣积分。</p>
+            )}
+          </section>
         </>
       ) : null}
     </div>

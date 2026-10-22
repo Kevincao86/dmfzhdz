@@ -34,4 +34,8 @@ function check(query) {
   return post({ mode: 'check', platform: 'douyin', query })
 }
 
-module.exports = { post, status, parseSheet, quote, check }
+function history() {
+  return post({ mode: 'history' })
+}
+
+module.exports = { post, status, parseSheet, quote, check, history }
