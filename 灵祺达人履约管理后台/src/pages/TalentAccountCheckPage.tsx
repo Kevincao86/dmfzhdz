@@ -248,7 +248,7 @@ export default function TalentAccountCheckPage() {
               <div className="talent-check-chips">
                 <span>公开主页</span>
                 <span>口令解析</span>
-                <span>豆包只读公开内容</span>
+                <span>抖音官方数据检索</span>
               </div>
               {view ? (
                 <div className="talent-check-result">
@@ -278,26 +278,26 @@ export default function TalentAccountCheckPage() {
                         <p>{view.signature || '未公开'}</p>
                       </div>
                       <div>
-                        <div className="talent-check-metric-top"><small>内容方向</small><span className="talent-check-tag">豆包检索</span></div>
+                        <div className="talent-check-metric-top"><small>内容方向</small><span className="talent-check-tag">抖音官方数据检索</span></div>
                         <p>{view.direction || '未写到'}</p>
                       </div>
                       <div>
-                        <div className="talent-check-metric-top"><small>近期内容</small><span className="talent-check-tag">豆包检索</span></div>
+                        <div className="talent-check-metric-top"><small>近期内容</small><span className="talent-check-tag">抖音官方数据检索</span></div>
                         <p>{recent.length ? recent.join('  ') : '未写到'}</p>
                       </div>
                     </div>
                   </div>
                   <div className="talent-check-summary">{view.summary}</div>
                   <div className="talent-check-clock">
-                    核对于 {view.checkedAtLabel || ''} · 核验限于公开信息
+                    核对于 {view.checkedAtLabel || ''} · 核验限于达人公开数据
                     {view.cached ? ' · 24小时内已查过，未再扣积分' : ''}
                   </div>
                 </div>
               ) : (
                 <div className="talent-check-guides">
-                  <div><b>公开主页</b><span>昵称、抖音号、粉丝与签名，以该账号公开主页为准，数字不改写。</span></div>
-                  <div><b>豆包检索</b><span>内容方向与近期作品标题，依据豆包对公开作品的检索。</span></div>
-                  <div><b>核验口径</b><span>本次只核公开信息，不含后台成交、播放量与联系方式。</span></div>
+                  <div><b>公开主页</b><span>昵称、抖音号、粉丝与签名，以该账号公开主页为准。</span></div>
+                  <div><b>抖音官方数据检索</b><span>内容方向与近期作品标题，依据抖音官方数据检索。</span></div>
+                  <div><b>核验口径</b><span>本次只核验达人公开数据，并由官方助手进行达人数据分析和评估。</span></div>
                 </div>
               )}
             </>

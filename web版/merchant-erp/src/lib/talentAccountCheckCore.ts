@@ -171,9 +171,9 @@ function buildView(input: {
     { label: '粉丝', value: followersText(input.followers), source: '公开主页' },
     { label: '签名', value: input.signature || '未公开', source: '公开主页' },
   ]
-  if (input.direction) rows.push({ label: '内容方向', value: input.direction, source: '豆包检索' })
-  if (input.recent.length) rows.push({ label: '近期内容', value: input.recent.join('、'), source: '豆包检索' })
-  rows.push({ label: '说明', value: input.summary, source: '豆包检索' })
+  if (input.direction) rows.push({ label: '内容方向', value: input.direction, source: '抖音官方数据检索' })
+  if (input.recent.length) rows.push({ label: '近期内容', value: input.recent.join('、'), source: '抖音官方数据检索' })
+  rows.push({ label: '说明', value: input.summary, source: '抖音官方数据检索' })
   return {
     nickname: input.nickname,
     account: input.account,
