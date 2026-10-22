@@ -39,6 +39,7 @@ button::after { border: none; }
 .metric { width: 50%; box-sizing: border-box; padding: 10rpx 8rpx 10rpx 0; }
 .ml { display: flex; align-items: center; justify-content: space-between; font-size: 20rpx; color: #9a8b76; }
 .mv { margin-top: 4rpx; font-size: 28rpx; font-weight: 650; }
+.sales { margin-top: 18rpx; }
 .read { margin-top: 16rpx; padding-top: 16rpx; border-top: 1px solid #f0e8dc; }
 .read-title { font-size: 26rpx; font-weight: 650; margin-bottom: 8rpx; }
 .summary { font-size: 26rpx; line-height: 1.7; color: #2c2416; }

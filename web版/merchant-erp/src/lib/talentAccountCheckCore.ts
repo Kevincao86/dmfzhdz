@@ -29,6 +29,7 @@ export type TalentCheckView = {
   direction: string
   recent: string[]
   summary: string
+  sales30d: string
   checkedAt: string
   checkedAtLabel: string
   cached: boolean
@@ -124,7 +125,27 @@ function checkedClock(iso: string) {
   return parts
 }
 
-export function readAnalysisJson(text: string): { summary: string; direction: string; recent: string[] } | null {
+const SALES_UNKNOWN = '公开信息不足，暂不估算'
+
+export function cleanSales30d(raw: unknown): string {
+  const text = String(raw || '').replace(/\s+/g, ' ').trim()
+  if (!text) return SALES_UNKNOWN
+  const yuan = text.match(/^约?\s*([0-9][0-9,]{3,})\s*元?$/)
+  if (yuan) {
+    const n = Number(yuan[1]!.replace(/,/g, ''))
+    if (Number.isFinite(n) && n >= 10000) {
+      const wan = n / 10000
+      const lo = Math.max(1, Math.round(wan * 0.7))
+      const hi = Math.max(lo + 1, Math.round(wan * 1.4))
+      return `约 ${lo}万–${hi}万`
+    }
+  }
+  if (/[约万千]/.test(text)) return text.slice(0, 32)
+  if (/不足|无法|看不出|没有带货|暂不/.test(text)) return SALES_UNKNOWN
+  return text.slice(0, 32)
+}
+
+export function readAnalysisJson(text: string): { summary: string; direction: string; recent: string[]; sales30d: string } | null {
   const raw = String(text || '')
     .trim()
     .replace(/^```(?:json)?/i, '')
@@ -138,6 +159,7 @@ export function readAnalysisJson(text: string): { summary: string; direction: st
       summary?: unknown
       direction?: unknown
       recent?: unknown
+      sales30d?: unknown
     }
     const summary = String(j.summary || '').trim()
     if (summary.length < 20) return null
@@ -145,7 +167,7 @@ export function readAnalysisJson(text: string): { summary: string; direction: st
     const recent = Array.isArray(j.recent)
       ? j.recent.map((item) => String(item || '').trim()).filter((item) => item.length >= 2).slice(0, 3)
       : []
-    return { summary: summary.slice(0, 180), direction, recent }
+    return { summary: summary.slice(0, 180), direction, recent, sales30d: cleanSales30d(j.sales30d) }
   } catch {
     return null
   }
@@ -160,11 +182,13 @@ function buildView(input: {
   direction: string
   recent: string[]
   summary: string
+  sales30d: string
   checkedAt: string
   cached: boolean
   charged: number
   balance: number | null
 }): TalentCheckView {
+  const sales30d = input.sales30d || SALES_UNKNOWN
   const rows: CheckRow[] = [
     { label: '昵称', value: input.nickname || '未公开', source: '公开主页' },
     { label: '抖音号', value: input.account || '未公开', source: '公开主页' },
@@ -172,6 +196,7 @@ function buildView(input: {
     { label: '签名', value: input.signature || '未公开', source: '公开主页' },
   ]
   if (input.direction) rows.push({ label: '内容方向', value: input.direction, source: '抖音官方数据检索' })
+  rows.push({ label: '近30天带货金额', value: sales30d, source: '豆包估算' })
   if (input.recent.length) rows.push({ label: '近期内容', value: input.recent.join('、'), source: '抖音官方数据检索' })
   rows.push({ label: '说明', value: input.summary, source: '抖音官方数据检索' })
   return {
@@ -183,6 +208,7 @@ function buildView(input: {
     direction: input.direction,
     recent: input.recent,
     summary: input.summary,
+    sales30d,
     checkedAt: input.checkedAt,
     checkedAtLabel: checkedClock(input.checkedAt),
     cached: input.cached,
@@ -229,7 +255,7 @@ async function sheetRowsFromBody(body: Record<string, unknown>) {
   return parseCheckSheet(lines.join('\n'))
 }
 
-async function askDoubao(nickname: string, account: string, followers: number, signature: string) {
+async function askDoubao(nickname: string, account: string, followersLabel: string, signature: string) {
   const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('../../vite-plugins/merchantRegistryVendorEnv.js')
   const { callDoubaoWebSearch } = await import('../../vite-plugins/merchantAiUpstream.js')
   const env = await mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), process.env as Record<string, string>)
@@ -237,20 +263,41 @@ async function askDoubao(nickname: string, account: string, followers: number, s
   if (!key) throw new Error('豆包暂不可用，请稍后再试')
   const system = [
     '你是豆包助手。只根据这次联网检索到的公开主页回答。',
-    '不要编造粉丝数、播放量、成交额、手机号或微信。',
-    '粉丝数以用户消息里给出的公开资料为准，不要改写。',
+    '不要编造粉丝数、播放量、手机号或微信。粉丝数以用户消息里给出的公开资料为准，不要改写。',
+    '近30天带货金额只做区间估算，不要写成官方精确成交，不要写成精确到元的数字。',
     '只输出一个 JSON 对象，不要 Markdown。',
-    '键：summary（40到90字，写这个账号公开内容在做什么）、direction（8个字以内的内容方向）、recent（最多3条公开作品标题，没有就空数组）。',
+    '键：summary（40到90字，写这个账号公开内容在做什么）、direction（8个字以内的内容方向）、recent（最多3条公开作品标题，没有就空数组）、sales30d（近30天带货金额区间，必须带「约」，例如「约 3万–8万」。按公开内容、粉丝量和带货痕迹估算；看不出带货就写「公开信息不足，暂不估算」）。',
   ].join('')
   const user = [
     `抖音号：${account || '未公开'}`,
     `昵称：${nickname || '未公开'}`,
-    `粉丝：${followers > 0 ? followersText(followers) : '未公开'}`,
+    `粉丝：${followersLabel || '未公开'}`,
     `签名：${signature || '未公开'}`,
-    '请联网检索这一个抖音账号的公开主页和近期内容。',
+    '请联网检索这一个抖音账号的公开主页和近期内容，并估算近30天带货金额区间。',
   ].join('\n')
   const hit = await callDoubaoWebSearch(key, env, system, user)
   return readAnalysisJson(hit.text)
+}
+
+function withSales(view: TalentCheckView, sales30d: string): TalentCheckView {
+  const rows = (view.rows || []).filter((row) => row.label !== '近30天带货金额')
+  const at = rows.findIndex((row) => row.label === '内容方向')
+  rows.splice(at >= 0 ? at + 1 : rows.length, 0, { label: '近30天带货金额', value: sales30d, source: '豆包估算' })
+  return { ...view, sales30d, rows, cached: true, charged: 0 }
+}
+
+async function ensureSales(accountId: string, keys: string[], view: TalentCheckView): Promise<TalentCheckView> {
+  if (String(view.sales30d || '').trim()) return view
+  let analysis: { sales30d: string } | null = null
+  try {
+    analysis = await askDoubao(view.nickname, view.account, view.followersText || '未公开', view.signature || '')
+  } catch {
+    return view
+  }
+  if (!analysis) return view
+  const next = withSales(view, analysis.sales30d || SALES_UNKNOWN)
+  for (const key of Array.from(new Set(keys.filter(Boolean)))) writeCache(accountId, key, next)
+  return next
 }
 
 function upgradeBody() {
@@ -372,7 +419,8 @@ export async function runTalentAccountCheck(opts: {
   const inputKey = normDouyinKey(query)
   const cachedFirst = findCached(accountId, [inputKey])
   if (cachedFirst) {
-    return { status: 200, body: { ok: true, view: cachedFirst, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
+    const view = await ensureSales(accountId, [inputKey, normDouyinKey(cachedFirst.account)], cachedFirst)
+    return { status: 200, body: { ok: true, view, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
   }
   if (!member && freeRemaining <= 0) return { status: 200, body: upgradeBody() }
   if (member && balance < TALENT_CHECK_POINTS) {
@@ -395,12 +443,18 @@ export async function runTalentAccountCheck(opts: {
   const accountKey = normDouyinKey(parsed.platformAccount)
   const cachedParsed = findCached(accountId, [accountKey, inputKey])
   if (cachedParsed) {
-    return { status: 200, body: { ok: true, view: cachedParsed, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
+    const view = await ensureSales(accountId, [accountKey, inputKey], cachedParsed)
+    return { status: 200, body: { ok: true, view, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
   }
 
-  let analysis: { summary: string; direction: string; recent: string[] } | null = null
+  let analysis: { summary: string; direction: string; recent: string[]; sales30d: string } | null = null
   try {
-    analysis = await askDoubao(parsed.platformNickname, parsed.platformAccount, parsed.followers, String(parsed.signature || ''))
+    analysis = await askDoubao(
+      parsed.platformNickname,
+      parsed.platformAccount,
+      parsed.followers > 0 ? followersText(parsed.followers) : '未公开',
+      String(parsed.signature || ''),
+    )
   } catch (e) {
     const message = e instanceof Error ? e.message : '豆包分析失败'
     return { status: 200, body: { ok: false, error: 'analysis_failed', message } }
@@ -419,6 +473,7 @@ export async function runTalentAccountCheck(opts: {
     direction: analysis.direction,
     recent: analysis.recent,
     summary: analysis.summary,
+    sales30d: analysis.sales30d,
     checkedAt,
     cached: false,
     charged: member ? TALENT_CHECK_POINTS : 0,

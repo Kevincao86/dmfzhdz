@@ -38,6 +38,7 @@
 .talent-check-metrics small { display: block; color: #9a8b76; font-size: 12px; }
 .talent-check-metrics p { margin: 2px 0 0; font-size: 16px; font-weight: 650; }
 .talent-check-metric-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.talent-check-sales { margin-top: 14px; }
 .talent-check-read { margin-top: 14px; padding-top: 12px; border-top: 1px solid #f0e8dc; }
 .talent-check-read b { display: block; margin-bottom: 6px; font-size: 13px; }
 .talent-check-summary { font-size: 14px; line-height: 1.7; color: #2c2416; }

@@ -280,6 +280,10 @@ export default function TalentAccountCheckPage() {
                       <div>
                         <div className="talent-check-metric-top"><small>内容方向</small><span className="talent-check-tag">抖音官方数据检索</span></div>
                         <p>{view.direction || '未写到'}</p>
+                        <div className="talent-check-sales">
+                          <div className="talent-check-metric-top"><small>近30天带货金额</small><span className="talent-check-tag">豆包估算</span></div>
+                          <p>{view.sales30d || '公开信息不足，暂不估算'}</p>
+                        </div>
                       </div>
                       <div>
                         <div className="talent-check-metric-top"><small>近期内容</small><span className="talent-check-tag">抖音官方数据检索</span></div>

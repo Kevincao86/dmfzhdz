@@ -50,7 +50,14 @@
       <view class="metrics">
         <view class="metric"><view class="ml"><text>粉丝</text></view><view class="mv">{{view.followersText || '未公开'}}</view></view>
         <view class="metric"><view class="ml"><text>签名</text></view><view class="mv">{{view.signature || '未公开'}}</view></view>
-        <view class="metric"><view class="ml"><text>内容方向</text><text class="tag">抖音官方数据检索</text></view><view class="mv">{{view.direction || '未写到'}}</view></view>
+        <view class="metric">
+          <view class="ml"><text>内容方向</text><text class="tag">抖音官方数据检索</text></view>
+          <view class="mv">{{view.direction || '未写到'}}</view>
+          <view class="sales">
+            <view class="ml"><text>近30天带货金额</text><text class="tag">豆包估算</text></view>
+            <view class="mv">{{view.sales30d || '公开信息不足，暂不估算'}}</view>
+          </view>
+        </view>
         <view class="metric"><view class="ml"><text>近期内容</text><text class="tag">抖音官方数据检索</text></view><view class="mv">{{view.recentText || '未写到'}}</view></view>
       </view>
       <view class="read">

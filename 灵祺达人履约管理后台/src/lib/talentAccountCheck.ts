@@ -13,6 +13,7 @@ export type TalentCheckView = {
   direction: string
   recent: string[]
   summary: string
+  sales30d?: string
   checkedAt: string
   checkedAtLabel: string
   cached: boolean
