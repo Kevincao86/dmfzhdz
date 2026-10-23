@@ -34,6 +34,13 @@ Page({
   },
 
   onShow() {
+    try {
+      wx.setNavigationBarColor({
+        frontColor: '#000000',
+        backgroundColor: '#f7f3ec',
+        animation: { duration: 0, timingFunc: 'linear' },
+      })
+    } catch (_) {}
     this.loadStatus()
     this.loadHistory()
   },

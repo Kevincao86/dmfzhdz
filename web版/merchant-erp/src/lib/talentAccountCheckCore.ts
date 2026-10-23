@@ -537,7 +537,7 @@ export async function runTalentAccountCheck(opts: {
         xhsPointsPerCheck: MP_POINTS_XHS_CHECK_PER_USE,
         pointsBalance: balance,
         hint: member
-          ? `会员不限次数。每次成功查验 ${TALENT_CHECK_POINTS} 积分，先扣套餐积分，再扣充值积分。`
+          ? '会员不限次数。查验失败不扣除积分，先扣套餐积分，再扣充值积分。'
           : freeRemaining > 0
             ? '免费版本月还可成功查验 1 次。'
             : '本月免费次数已用完，下月恢复。升级会员后按积分查验。',

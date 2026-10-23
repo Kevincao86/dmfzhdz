@@ -103,8 +103,8 @@ function viewModel() {
   return {
     lqAccentClass: dark ? 'lq-accent-on lq-accent-dark' : 'lq-accent-on',
     lqPageStyle: styleOf(p),
-    lqPageBg: p.t50,
-    lqNavBg: p.nav,
+      lqPageBg: p.t50,
+      lqNavBg: p.t50,
     accentId: id,
     /* 安卓原生 input 不吃 wxss 的 color，更不能写 -webkit-text-fill-color，否则字被抹掉。 */
     lqInputStyle: dark ? 'color:#f4f4f5;' : '',
@@ -138,8 +138,8 @@ function pin(page) {
     const p = pack(view.accentId)
     try {
       wx.setNavigationBarColor({
-        frontColor: '#ffffff',
-        backgroundColor: p.nav,
+        frontColor: p.mode === 'dark' ? '#ffffff' : '#000000',
+        backgroundColor: p.t50,
         animation: { duration: 0, timingFunc: 'linear' },
       })
     } catch (_) {}
@@ -147,7 +147,7 @@ function pin(page) {
       if (typeof wx.setBackgroundColor === 'function') {
         wx.setBackgroundColor({
           backgroundColor: p.t50,
-          backgroundColorTop: p.nav,
+          backgroundColorTop: p.t50,
           backgroundColorBottom: p.t50,
         })
       }

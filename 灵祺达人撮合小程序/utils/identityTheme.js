@@ -55,14 +55,12 @@ let lastChromeId = ''
 
 function applyChrome(id, opts) {
   const nid = normalize(id)
-  if (lastChromeId === nid && !(opts && opts.force)) return
   lastChromeId = nid
-  const t = pack(nid)
   const animate = opts && opts.animate === true
   try {
     wx.setNavigationBarColor({
-      frontColor: '#ffffff',
-      backgroundColor: t.navBar,
+      frontColor: '#000000',
+      backgroundColor: '#f7f3ec',
       animation: animate
         ? { duration: 220, timingFunc: 'easeInOut' }
         : { duration: 0, timingFunc: 'linear' },
@@ -71,9 +69,9 @@ function applyChrome(id, opts) {
   try {
     if (typeof wx.setBackgroundColor === 'function') {
       wx.setBackgroundColor({
-        backgroundColor: t.bg,
-        backgroundColorTop: t.navBar,
-        backgroundColorBottom: t.bg,
+        backgroundColor: '#f7f3ec',
+        backgroundColorTop: '#f7f3ec',
+        backgroundColorBottom: '#f7f3ec',
       })
     }
   } catch (_) {}
@@ -85,7 +83,7 @@ function applyChrome(id, opts) {
   } catch (_) {}
 }
 
-/** Tab 首页/推荐/消息：顶栏与下拉背景随工作台身份（达人蓝 / PR 紫） */
+/** Tab 与子页顶栏跟页面主体同色 */
 function applyTabHomeChrome() {
   applyChrome(userProfile.readIdentity(), { animate: false })
 }

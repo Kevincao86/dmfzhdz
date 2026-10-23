@@ -103,8 +103,8 @@
   ],
   "window": {
     "navigationBarTitleText": "灵祺星选平台",
-    "navigationBarBackgroundColor": "#7c4dff",
-    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#f7f3ec",
+    "navigationBarTextStyle": "black",
     "backgroundColor": "#F7F3EC",
     "backgroundTextStyle": "dark"
   },

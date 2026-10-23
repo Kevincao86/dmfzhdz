@@ -534,10 +534,10 @@ Page({
   },
   syncMineStatusBar(on) {
     const accent = on ? accentTheme.pack(accentTheme.readId()) : null
-    const color = accent ? accent.nav : '#f7f3ec'
+    const color = accent ? accent.t50 : '#f7f3ec'
     try {
       wx.setNavigationBarColor({
-        frontColor: on ? '#ffffff' : '#000000',
+        frontColor: accent && accent.mode === 'dark' ? '#ffffff' : '#000000',
         backgroundColor: color,
         animation: { duration: 0, timingFunc: 'linear' },
       })
