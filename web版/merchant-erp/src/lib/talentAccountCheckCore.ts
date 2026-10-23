@@ -773,28 +773,38 @@ async function rnoteGet(path: string, params: Record<string, string>) {
   return body
 }
 
-function findXhsUser(value: unknown, depth = 0): { userId: string; nickname: string } | null {
-  if (depth > 6 || value == null) return null
+function collectXhsUsers(value: unknown, out: { userId: string; nickname: string; redId: string }[], depth = 0) {
+  if (depth > 6 || value == null) return
   if (Array.isArray(value)) {
-    for (const item of value) {
-      const hit = findXhsUser(item, depth + 1)
-      if (hit) return hit
-    }
-    return null
+    for (const item of value) collectXhsUsers(item, out, depth + 1)
+    return
   }
-  if (typeof value !== 'object') return null
+  if (typeof value !== 'object') return
   const row = value as Record<string, unknown>
-  const userId = String(row.userid || row.user_id || row.userId || '').trim().toLowerCase()
-  if (/^[0-9a-f]{24}$/.test(userId)) {
-    return { userId, nickname: String(row.nickname || row.name || '').trim() }
+  const named = String(row.userid || row.user_id || row.userId || '').trim().toLowerCase()
+  const bare = String(row.id || '').trim().toLowerCase()
+  const userId = /^[0-9a-f]{24}$/.test(named)
+    ? named
+    : /^[0-9a-f]{24}$/.test(bare) && (row.red_id || row.nickname || row.name)
+      ? bare
+      : ''
+  if (userId && !out.some((item) => item.userId === userId)) {
+    out.push({
+      userId,
+      nickname: String(row.nickname || row.name || '').trim(),
+      redId: String(row.red_id || '').trim(),
+    })
   }
   for (const child of Object.values(row)) {
-    if (child && typeof child === 'object') {
-      const hit = findXhsUser(child, depth + 1)
-      if (hit) return hit
-    }
+    if (child && typeof child === 'object') collectXhsUsers(child, out, depth + 1)
   }
-  return null
+}
+
+function pickXhsUser(body: unknown, query: string) {
+  const found: { userId: string; nickname: string; redId: string }[] = []
+  collectXhsUsers(body, found)
+  const want = query.trim()
+  return found.find((item) => item.redId && item.redId === want) || found[0] || null
 }
 
 async function resolveXhsUserId(query: string) {
@@ -815,7 +825,7 @@ async function resolveXhsUserId(query: string) {
     for (const path of ['/api/v2/crawler/note/image', '/api/v2/crawler/note/video']) {
       try {
         const body = await rnoteGet(path, { note_id: noteId })
-        const hit = findXhsUser(body)
+        const hit = pickXhsUser(body, text)
         if (hit) return hit
       } catch (err) {
         const message = err instanceof Error ? err.message : ''
@@ -825,7 +835,7 @@ async function resolveXhsUserId(query: string) {
   }
   const keyword = text.replace(/https?:\/\/\S+/g, '').trim() || text
   const body = await rnoteGet('/api/v2/crawler/search/users', { keyword: keyword.slice(0, 40), page: '1' })
-  const hit = findXhsUser(body)
+  const hit = pickXhsUser(body, keyword)
   if (!hit) throw new Error('没有查到这个小红书账号。请换主页链接或小红书号。')
   return hit
 }
