@@ -1531,6 +1531,7 @@ PAT
     baidu_site_verify)
       cat <<'PAT'
 baidu_verify_codeva-
+web版/merchant-erp/index.html
 ecs-nginx-merchant-cs.conf
 change-scope-guard
 PAT
