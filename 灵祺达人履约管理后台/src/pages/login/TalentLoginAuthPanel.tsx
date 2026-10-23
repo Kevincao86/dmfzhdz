@@ -224,6 +224,7 @@ export default function TalentLoginAuthPanel({
           <LoginAltMethods
             className="mb-5 mt-0"
             showDivider={false}
+            icons={false}
             activeId={tab === 'scan' ? scanChannel : tab === 'sms' || tab === 'email' ? 'sms' : undefined}
             onSelect={(id) => {
               if (!agreed) {

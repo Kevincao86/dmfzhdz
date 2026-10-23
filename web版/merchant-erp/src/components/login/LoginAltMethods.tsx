@@ -16,6 +16,7 @@ type Props = {
   onSelect: (id: LoginAltMethodId) => void
   className?: string
   showDivider?: boolean
+  icons?: boolean
 }
 
 function SmsIcon() {
@@ -96,7 +97,7 @@ function MethodIcon({ id }: { id: LoginAltMethodId }) {
   )
 }
 
-export default function LoginAltMethods({ methods, activeId, onSelect, className, showDivider = true }: Props) {
+export default function LoginAltMethods({ methods, activeId, onSelect, className, showDivider = true, icons = true }: Props) {
   return (
     <div className={cn('mt-6', className)}>
       {showDivider ? (
@@ -129,17 +130,20 @@ export default function LoginAltMethods({ methods, activeId, onSelect, className
             disabled={m.disabled}
             onClick={() => onSelect(m.id)}
             className={cn(
-              'grid w-full grid-cols-[2rem_minmax(0,1fr)] items-center gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition',
+              'w-full items-center rounded-xl border bg-white px-3 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition',
+              icons ? 'grid grid-cols-[2rem_minmax(0,1fr)] gap-2' : 'flex justify-center',
               activeId === m.id
                 ? 'border-cyan-400 ring-2 ring-cyan-500/20'
                 : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50',
               m.disabled && 'cursor-not-allowed opacity-55 hover:bg-white',
             )}
           >
-            <span className="flex h-8 w-8 items-center justify-center">
-              <MethodIcon id={m.id} />
-            </span>
-            <span className="truncate text-center">{m.label}</span>
+            {icons ? (
+              <span className="flex h-8 w-8 items-center justify-center">
+                <MethodIcon id={m.id} />
+              </span>
+            ) : null}
+            <span className={icons ? 'truncate text-center' : 'text-center'}>{m.label}</span>
           </button>
         ))}
       </div>
