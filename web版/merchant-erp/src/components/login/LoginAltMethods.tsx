@@ -17,6 +17,9 @@ type Props = {
   className?: string
   showDivider?: boolean
   icons?: boolean
+  /** footer：登录按钮下方的图标选择，分隔文案为「免注册」 */
+  layout?: 'grid' | 'footer'
+  tone?: 'cyan' | 'ink'
 }
 
 function SmsIcon() {
@@ -97,7 +100,53 @@ function MethodIcon({ id }: { id: LoginAltMethodId }) {
   )
 }
 
-export default function LoginAltMethods({ methods, activeId, onSelect, className, showDivider = true, icons = true }: Props) {
+export default function LoginAltMethods({
+  methods,
+  activeId,
+  onSelect,
+  className,
+  showDivider = true,
+  icons = true,
+  layout = 'grid',
+  tone = 'cyan',
+}: Props) {
+  if (layout === 'footer') {
+    const line = tone === 'ink' ? 'bg-[#e4dcd0]' : 'bg-slate-200'
+    const caption = tone === 'ink' ? 'text-[#8a8175]' : 'text-slate-400'
+    const label = tone === 'ink' ? 'text-[#1a140f]' : 'text-slate-700'
+    const active = tone === 'ink' ? 'ring-2 ring-[#1a140f]' : 'ring-2 ring-cyan-500'
+    return (
+      <div className={cn('mt-6', className)}>
+        <div className="mb-4 flex items-center gap-3">
+          <div className={cn('h-px flex-1', line)} />
+          <span className={cn('text-xs', caption)}>免注册</span>
+          <div className={cn('h-px flex-1', line)} />
+        </div>
+        <div className="flex items-start justify-center gap-14">
+          {methods.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              title={m.hint ?? m.label}
+              disabled={m.disabled}
+              onClick={() => onSelect(m.id)}
+              className={cn(
+                'flex flex-col items-center gap-2 whitespace-nowrap text-xs font-medium',
+                label,
+                m.disabled && 'cursor-not-allowed opacity-55',
+              )}
+            >
+              <span className={cn('rounded-xl p-0.5', activeId === m.id && active)}>
+                <MethodIcon id={m.id} />
+              </span>
+              <span>{m.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={cn('mt-6', className)}>
       {showDivider ? (

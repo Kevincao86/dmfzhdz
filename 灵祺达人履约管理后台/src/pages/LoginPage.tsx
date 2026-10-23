@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [params] = useSearchParams()
   const workIdentity = 'talent' as const
 
-  const [tab, setTab] = useState<LoginTab>('sms')
+  const [tab, setTab] = useState<LoginTab>('password')
   const [loginName, setLoginName] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')

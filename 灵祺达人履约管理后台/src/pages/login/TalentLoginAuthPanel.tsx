@@ -219,46 +219,6 @@ export default function TalentLoginAuthPanel({
 
   return (
     <div className="relative w-full">
-      {!bindOpen ? (
-        <>
-          <LoginAltMethods
-            className="mb-5 mt-0"
-            showDivider={false}
-            icons={false}
-            activeId={tab === 'scan' ? scanChannel : tab === 'sms' || tab === 'email' ? 'sms' : undefined}
-            onSelect={(id) => {
-              if (!agreed) {
-                setAgreeNeed(true)
-                return
-              }
-              setAgreeNeed(false)
-              setLocalErr('')
-              if (id === 'sms' || id === 'email') {
-                onTabChange(id)
-                return
-              }
-              if (id === 'douyin') {
-                setScanChannel('douyin')
-                onTabChange('scan')
-                return
-              }
-              if (id === 'wechat') {
-                setScanChannel('wechat')
-                onTabChange('scan')
-              }
-            }}
-            methods={[
-              { id: 'sms', label: '验证码登录' },
-              { id: 'douyin', label: '抖音登录' },
-              { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
-            ]}
-          />
-          {agreeNeed && !agreed ? (
-            <p className="mb-3 text-center text-xs text-amber-700">{LOGIN_AGREE_REQUIRED}</p>
-          ) : null}
-        </>
-      ) : null}
-
       <div className="mb-5 flex items-center gap-3 rounded-2xl border border-[#e4dcd0] bg-white/80 px-4 py-3">
         <ShieldCheck className="h-5 w-5 shrink-0 text-[#1a140f]" aria-hidden />
         <p className="text-xs leading-relaxed text-[#3d342c]">
@@ -364,6 +324,18 @@ export default function TalentLoginAuthPanel({
               value={password}
               onChange={(e) => onPasswordChange(e.target.value)}
             />
+            <p className="mt-1.5 text-right text-xs">
+              <button
+                type="button"
+                className="font-medium text-[#1a140f] underline-offset-2 hover:underline"
+                onClick={() => {
+                  setLocalErr('')
+                  onTabChange('sms')
+                }}
+              >
+                忘记密码
+              </button>
+            </p>
           </div>
           {typeof rememberPassword === 'boolean' && onRememberPasswordChange ? (
             <RememberPasswordRow
@@ -561,6 +533,41 @@ export default function TalentLoginAuthPanel({
           )}
         </>
       )) : null}
+
+      {!bindOpen && tab !== 'register' ? (
+        <>
+          <LoginAltMethods
+            layout="footer"
+            tone="ink"
+            className="mt-2"
+            activeId={tab === 'scan' ? scanChannel : undefined}
+            onSelect={(id) => {
+              if (!agreed) {
+                setAgreeNeed(true)
+                return
+              }
+              setAgreeNeed(false)
+              setLocalErr('')
+              if (id === 'douyin') {
+                setScanChannel('douyin')
+                onTabChange('scan')
+                return
+              }
+              if (id === 'wechat') {
+                setScanChannel('wechat')
+                onTabChange('scan')
+              }
+            }}
+            methods={[
+              { id: 'wechat', label: '微信登录', hint: '微信扫码登录，免注册' },
+              { id: 'douyin', label: '抖音登录', hint: '抖音扫码登录，免注册' },
+            ]}
+          />
+          {agreeNeed && !agreed ? (
+            <p className="mt-3 text-center text-xs text-amber-700">{LOGIN_AGREE_REQUIRED}</p>
+          ) : null}
+        </>
+      ) : null}
 
       {showDevPreview && onDevPreview ? (
         <button

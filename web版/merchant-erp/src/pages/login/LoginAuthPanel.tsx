@@ -552,47 +552,28 @@ export default function LoginAuthPanel({
           </div>
         </div>
 
-        {mode === 'login' ? (
+        {mode === 'login' && partnerMode ? (
           <LoginAltMethods
             className="mb-5 mt-0"
             showDivider={false}
-            icons={partnerMode}
-            activeId={
-              loginMethod === 'password'
-                ? undefined
-                : !partnerMode && (loginMethod === 'sms' || loginMethod === 'email')
-                  ? 'sms'
-                  : loginMethod
-            }
+            icons
+            activeId={loginMethod === 'password' ? undefined : loginMethod}
             onSelect={(id) => {
               if (id === 'password') return
               if (!agreed) {
                 onErr(LOGIN_AGREE_REQUIRED)
                 return
               }
-              if (!partnerMode && id === 'sms' && (loginMethod === 'sms' || loginMethod === 'email')) {
-                onErr(null)
-                onInfoHint(null)
-                return
-              }
               setLoginMethod(id)
               onErr(null)
               onInfoHint(null)
             }}
-            methods={
-              partnerMode
-                ? [
-                    { id: 'sms', label: '短信验证码' },
-                    { id: 'email', label: '邮箱登录' },
-                    { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
-                    { id: 'douyin', label: '抖音登录' },
-                  ]
-                : [
-                    { id: 'sms', label: '验证码登录' },
-                    { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
-                    { id: 'douyin', label: '抖音登录' },
-                  ]
-            }
+            methods={[
+              { id: 'sms', label: '短信验证码' },
+              { id: 'email', label: '邮箱登录' },
+              { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
+              { id: 'douyin', label: '抖音登录' },
+            ]}
           />
         ) : null}
 
@@ -644,18 +625,17 @@ export default function LoginAuthPanel({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
-                  <p className="mt-1.5 text-xs text-slate-500">
-                    忘记密码？
+                  <p className="mt-1.5 text-right text-xs">
                     <button
                       type="button"
-                      className="ml-1 font-medium text-cyan-700 underline-offset-2 hover:underline"
+                      className="font-medium text-cyan-700 underline-offset-2 hover:underline"
                       onClick={() => {
                         setLoginMethod('sms')
                         onErr(null)
-                        onInfoHint('已切换到手机验证码登录，验证通过即可进入工作台')
+                        onInfoHint(null)
                       }}
                     >
-                      切换手机或邮箱验证码登录
+                      忘记密码
                     </button>
                   </p>
                 </div>
@@ -816,6 +796,26 @@ export default function LoginAuthPanel({
                 )}
               </>
             )}
+            {!partnerMode ? (
+              <LoginAltMethods
+                layout="footer"
+                className="mt-2"
+                activeId={loginMethod === 'wechat' || loginMethod === 'douyin' ? loginMethod : undefined}
+                onSelect={(id) => {
+                  if (!agreed) {
+                    onErr(LOGIN_AGREE_REQUIRED)
+                    return
+                  }
+                  setLoginMethod(id)
+                  onErr(null)
+                  onInfoHint(null)
+                }}
+                methods={[
+                  { id: 'wechat', label: '微信登录', hint: '微信扫码登录，免注册' },
+                  { id: 'douyin', label: '抖音登录', hint: '抖音扫码登录，免注册' },
+                ]}
+              />
+            ) : null}
           </>
         ) : (
           <form className="space-y-3.5" onSubmit={(e) => void submitRegister(e)}>
