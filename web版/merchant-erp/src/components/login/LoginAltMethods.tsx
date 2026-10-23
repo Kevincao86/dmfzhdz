@@ -113,8 +113,7 @@ export default function LoginAltMethods({
   if (layout === 'footer') {
     const line = tone === 'ink' ? 'bg-[#e4dcd0]' : 'bg-slate-200'
     const caption = tone === 'ink' ? 'text-[#8a8175]' : 'text-slate-400'
-    const label = tone === 'ink' ? 'text-[#1a140f]' : 'text-slate-700'
-    const active = tone === 'ink' ? 'ring-2 ring-[#1a140f]' : 'ring-2 ring-cyan-500'
+    const active = tone === 'ink' ? 'ring-1 ring-[#1a140f]' : 'ring-1 ring-cyan-600'
     return (
       <div className={cn('mt-6', className)}>
         <div className="mb-4 flex items-center gap-3">
@@ -122,7 +121,7 @@ export default function LoginAltMethods({
           <span className={cn('text-xs', caption)}>免注册</span>
           <div className={cn('h-px flex-1', line)} />
         </div>
-        <div className="flex items-start justify-center gap-14">
+        <div className="flex items-center justify-center gap-8">
           {methods.map((m) => (
             <button
               key={m.id}
@@ -131,12 +130,16 @@ export default function LoginAltMethods({
               disabled={m.disabled}
               onClick={() => onSelect(m.id)}
               className={cn(
-                'flex flex-col items-center gap-2 whitespace-nowrap text-xs font-medium',
-                label,
+                'inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-[#666]',
                 m.disabled && 'cursor-not-allowed opacity-55',
               )}
             >
-              <span className={cn('rounded-xl p-0.5', activeId === m.id && active)}>
+              <span
+                className={cn(
+                  'inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center overflow-hidden rounded-[4px] [&>img]:h-[18px] [&>img]:w-[18px] [&>svg]:h-[18px] [&>svg]:w-[18px]',
+                  activeId === m.id && active,
+                )}
+              >
                 <MethodIcon id={m.id} />
               </span>
               <span>{m.label}</span>
