@@ -94,6 +94,29 @@ function patchSelectedApplicantIds(mpOrderId, selectedApplicantIds) {
   )
 }
 
+function submitTalentInvoice(mpOrderId, applicantId, url, fileName) {
+  const id = String(mpOrderId || '').trim()
+  const aid = String(applicantId || '').trim()
+  const imageUrl = String(url || '').trim()
+  if (!id || !aid || !/^https:\/\//i.test(imageUrl)) return Promise.reject(new Error('参数无效'))
+  return postJson(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-patch',
+      '/api/ops-sync/mp-recruitment-orders/patch',
+    ],
+    {
+      id,
+      talentInvoice: { applicantId: aid, url: imageUrl, fileName: String(fileName || '').trim() },
+    },
+  ).catch((e) => {
+    const msg = String((e && e.message) || '')
+    if (/invoice_not_required/.test(msg)) throw new Error('这张招募单不需要交票')
+    if (/invoice_limit/.test(msg)) throw new Error('最多提交 3 张发票')
+    if (/applicant_not_found/.test(msg)) throw new Error('还没有你的报名记录')
+    throw e
+  })
+}
+
 function patchGroupQrImage(mpOrderId, groupQrImage) {
   const id = String(mpOrderId || '').trim()
   if (!id) return Promise.reject(new Error('参数无效'))
@@ -131,6 +154,7 @@ module.exports = {
   patchMpRecruitmentOrder,
   patchMpRecruitmentOrderStatus,
   patchSelectedApplicantIds,
+  submitTalentInvoice,
   patchGroupQrImage,
   patchPrWorkflow,
 }

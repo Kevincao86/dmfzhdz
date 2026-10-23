@@ -71,6 +71,8 @@ export type PublishForm = {
   iceVerifyMode: 'ai' | 'pr'
   /** closed=现网反选路径；open=通告式，报名后直接出群码 */
   fulfillmentLoop?: 'open' | 'closed'
+  /** 达人完成该单后是否要交发票 */
+  requireTalentInvoice?: boolean
   /** 云剪 AI 核查 / 开环通告：群二维码 */
   groupQrImage?: string
   /** 剪辑师云剪：剪辑师群二维码（data URL） */
@@ -156,6 +158,7 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
     fulfillmentLoop: 'closed',
+    requireTalentInvoice: false,
     applyFormTemplateId: applySeed.applyFormTemplateId,
     applyFormTemplateName: applySeed.applyFormTemplateName,
     applyFormFields: applySeed.applyFormFields,
@@ -565,6 +568,7 @@ export function buildPublishOrder(
     budgetText: buildCompactBudgetText(form),
     recruitCount,
     fulfillmentLoop: fulfillmentLoop || '',
+    requireTalentInvoice: form.requireTalentInvoice === true,
     region: buildRegionText(form),
     category: mode.category,
     publisherIdentity: 'pr',
@@ -640,6 +644,7 @@ export function buildPublishOrder(
       ...(merchantLocMeta ? { merchantLocation: merchantLocMeta } : {}),
       iceVideoUrl: recruitModeId === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(form),
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
+      requireTalentInvoice: form.requireTalentInvoice === true,
       ...(fulfillmentLoop ? { fulfillmentLoop } : {}),
       ...(isTargetedRecruit
         ? {

@@ -173,6 +173,7 @@ function emptyForm(recruitTarget) {
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
     fulfillmentLoop: 'closed',
+    requireTalentInvoice: false,
     groupQrImage: '',
     editGroupQrImage: '',
     applyFormTemplateId: applySeed.applyFormTemplateId,
@@ -2006,6 +2007,10 @@ Page({
     const val = e.currentTarget.dataset.val === 'open' ? 'open' : 'closed'
     this.setData({ form: { ...this.data.form, fulfillmentLoop: val } })
   },
+  onRequireInvoicePick(e) {
+    const on = String((e.currentTarget.dataset && e.currentTarget.dataset.val) || '') === '1'
+    this.setData({ form: { ...this.data.form, requireTalentInvoice: on } })
+  },
   async onUploadOpenLoopGroupQr() {
     if (this.data.groupQrUploading) return
     this.setData({ groupQrUploading: true })
@@ -2115,6 +2120,7 @@ Page({
       publisherIdentity: 'pr',
       publisherTemplateId: 'publish-wizard-v2',
       coverImage: coverFields.coverImage,
+      requireTalentInvoice: f.requireTalentInvoice === true,
       mpPublishMeta: (() => {
         const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
         const acct = require('../../utils/auth.js').readAccount()
@@ -2172,6 +2178,7 @@ Page({
           ...(merchantLocMeta ? { merchantLocation: merchantLocMeta } : {}),
           iceVideoUrl: mode.id === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(f),
           iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
+          requireTalentInvoice: f.requireTalentInvoice === true,
           ...(xingxuanRecruitLoop.resolvePublishFulfillmentLoop(mode.id, f.fulfillmentLoop)
             ? {
                 fulfillmentLoop: xingxuanRecruitLoop.resolvePublishFulfillmentLoop(

@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { readApplications, markApplicationWithdrawn, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { fetchRegistryAndReconcileApplications } from '../lib/mpSync/applicationsRegistrySync'
 import { flushClientStateSync } from '../lib/mpAccountClientSync'
-import { cancelMpRecruitmentApply, clearMpRegistryCache } from '../lib/mpApi'
+import { cancelMpRecruitmentApply, clearMpRegistryCache, patchMpRecruitmentOrder } from '../lib/mpApi'
+import { uploadContentImage } from '../lib/mpContentUpload'
 import { resolveSignupDeadlineMsFromMp } from '../lib/mpRecruitment/listFilters'
 import { uploadRecruitmentVideoDraft, submitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import {
@@ -95,6 +96,8 @@ type EnrichedApplication = ApplicationLocal & {
   iceActionLabel?: string
   progressId?: string
   progressLabel?: string
+  showSubmitInvoice?: boolean
+  invoiceBtnLabel?: string
   videoStatusLabel?: string
   selectionNotified?: boolean
   displayStatus?: ReturnType<typeof resolveApplicationDisplayStatus>
@@ -123,6 +126,9 @@ function TalentApplicationsPage() {
   const [searchParams] = useSearchParams()
   const [apps, setApps] = useState<EnrichedApplication[]>([])
   const [loading, setLoading] = useState(true)
+  const [invoiceBusyKey, setInvoiceBusyKey] = useState('')
+  const invoiceInputRef = useRef<HTMLInputElement>(null)
+  const invoiceTargetRef = useRef<{ mpOrderId: string; applicantId: string } | null>(null)
   const [uploadingKey, setUploadingKey] = useState('')
   const [submittingKey, setSubmittingKey] = useState('')
   const [aiDetectBusyKey, setAiDetectBusyKey] = useState('')
@@ -199,6 +205,12 @@ function TalentApplicationsPage() {
     const canUploadScript = canTalentUploadRecruitmentScript(mp, me, isIce)
     const canSubmitScript = canTalentSubmitRecruitmentScript(mp, me, isIce)
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
+    const invoiceMeta =
+      mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+        ? (mp.mpPublishMeta as Record<string, unknown>)
+        : {}
+    const requireInvoice = mp.requireTalentInvoice === true || invoiceMeta.requireTalentInvoice === true
+    const invoiceCount = me && Array.isArray(me.talentInvoices) ? me.talentInvoices.length : 0
     const notifiedIds = buildNotifiedApplicantIdSet(reg as MpRegistry, a.mpOrderId, mp)
     const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
     const registryWithdrawn =
@@ -257,10 +269,39 @@ function TalentApplicationsPage() {
       iceActionLabel,
       progressId: progress.id,
       progressLabel: progress.label,
+      showSubmitInvoice: requireInvoice && progress.id === 'completed' && !!applicantId,
+      invoiceBtnLabel: invoiceCount > 0 ? `提交发票（已交${invoiceCount}张）` : '提交发票',
       selectionNotified,
       displayStatus,
       _progressMp: mp,
       _progressMe: me,
+    }
+  }
+
+  async function onInvoiceFile(file: File | undefined) {
+    const target = invoiceTargetRef.current
+    if (!target || !file) return
+    const key = `${target.mpOrderId}-${target.applicantId}`
+    setInvoiceBusyKey(key)
+    try {
+      const url = await uploadContentImage(file)
+      await patchMpRecruitmentOrder({
+        id: target.mpOrderId,
+        talentInvoice: { applicantId: target.applicantId, url, fileName: file.name },
+      })
+      window.alert('发票已提交')
+      await reloadApps()
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : ''
+      const msg = /invoice_not_required/.test(raw)
+        ? '这张招募单不需要交票'
+        : /invoice_limit/.test(raw)
+          ? '最多提交 3 张发票'
+          : raw || '发票上传失败'
+      window.alert(msg)
+    } finally {
+      setInvoiceBusyKey('')
+      if (invoiceInputRef.current) invoiceInputRef.current.value = ''
     }
   }
 
@@ -1020,6 +1061,24 @@ function TalentApplicationsPage() {
                     {confirmLabel}
                   </Link>
                 ) : null}
+                {a.showSubmitInvoice ? (
+                  <button
+                    type="button"
+                    className="xx-app-table__open"
+                    disabled={invoiceBusyKey === `${a.mpOrderId}-${a.applicantId}`}
+                    onClick={() => {
+                      invoiceTargetRef.current = {
+                        mpOrderId: a.mpOrderId,
+                        applicantId: String(a.applicantId || ''),
+                      }
+                      invoiceInputRef.current?.click()
+                    }}
+                  >
+                    {invoiceBusyKey === `${a.mpOrderId}-${a.applicantId}`
+                      ? '上传中…'
+                      : a.invoiceBtnLabel || '提交发票'}
+                  </button>
+                ) : null}
                 {extraAction}
               </td>
             </tr>
@@ -1028,6 +1087,16 @@ function TalentApplicationsPage() {
           </tbody>
         </table>
       </div>
+      <input
+        ref={invoiceInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          void onInvoiceFile(file)
+        }}
+      />
       <TalentUploadedVideoPreviewModal
         url={previewVideoUrl}
         onClose={() => setPreviewVideoUrl('')}

@@ -71,6 +71,7 @@ function formPatchFromMpOrder(mp) {
     iceVerifyMode: String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim() === 'pr' ? 'pr' : 'ai',
     fulfillmentLoop:
       String(mp.fulfillmentLoop || meta.fulfillmentLoop || '').trim() === 'open' ? 'open' : 'closed',
+    requireTalentInvoice: mp.requireTalentInvoice === true || meta.requireTalentInvoice === true,
     groupQrImage: String(mp.groupQrImage || meta.groupQrImage || '').trim(),
     applyFormTemplateId: meta.applyFormTemplateId || '',
     applyFormTemplateName: meta.applyFormTemplateName || '',

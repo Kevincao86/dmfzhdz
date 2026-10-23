@@ -57,6 +57,19 @@
     </view>
   </view>
 
+  <view wx:if="{{!loading && !err && invoiceOn}}" class="card">
+    <view class="pr-app-filters__head">
+      <text class="pr-app-filters__title">达人发票</text>
+      <text wx:if="{{invoiceRows.length}}" class="pr-app-filters__clear" catchtap="onInvoiceImages">导出图片</text>
+      <text wx:if="{{invoiceRows.length}}" class="pr-app-filters__clear" catchtap="onInvoiceZip">下载压缩包</text>
+    </view>
+    <text wx:if="{{!invoiceRows.length}}" class="hint">还没有达人提交发票。</text>
+    <view wx:for="{{invoiceRows}}" wx:key="key" class="pr-app-filters__head">
+      <text>{{item.name}} {{item.fileName}}</text>
+      <text class="pr-app-filters__clear" data-url="{{item.url}}" catchtap="onInvoiceOne">单张下载</text>
+    </view>
+  </view>
+
   <view wx:if="{{loading}}" class="card state-loading">
     <text class="hint">加载报名列表…</text>
   </view>

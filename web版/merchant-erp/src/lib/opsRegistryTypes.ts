@@ -295,6 +295,8 @@ export type RegistryMpRecruitmentApplicant = {
   aiVerifyStatus?: 'pending' | 'passed' | 'failed'
   aiVerifyNote?: string
   completedAt?: string
+  /** 达人完成且招募单要求交票后上传的发票图片（https） */
+  talentInvoices?: { url: string; fileName?: string; uploadedAt: string }[]
   taskStatus?: MpApplicantTaskStatus
   /** 拒绝/超时释放原因 */
   rejectReason?: string
@@ -711,6 +713,8 @@ export type RegistryMpRecruitmentOrder = {
   fulfillmentLoop?: RecruitmentFulfillmentLoop
   /** 报名截止（发招募写入） */
   deadline?: string
+  /** 发单勾选：达人完成后需提交发票 */
+  requireTalentInvoice?: boolean
   /** PR 反选达人 applicant.id 列表 */
   selectedApplicantIds?: string[]
   /** PR 已发送入选通知的 applicant.id 列表（写入 registry，不依赖 hall inbox 切片） */

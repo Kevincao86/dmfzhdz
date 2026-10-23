@@ -1403,6 +1403,21 @@ export default function PublishWizard() {
         </div>
         ) : null}
 
+        <label className="flex items-start gap-2 text-sm text-[var(--shell-text)]">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={form.requireTalentInvoice === true}
+            onChange={(e) => patchForm({ requireTalentInvoice: e.target.checked })}
+          />
+          <span>
+            需要达人交票
+            <span className="mt-1 block text-xs text-[var(--shell-muted)]">
+              勾选后，达人完成该招募单可提交发票，你可在本单查看、单张下载或打包。
+            </span>
+          </span>
+        </label>
+
         {recruitMode !== 'ice' && recruitMode !== 'edit_ice' ? (
           <div>
             <PubLabel>履约方式 *</PubLabel>

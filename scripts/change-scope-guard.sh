@@ -125,6 +125,7 @@ list_scopes() {
   merchant_shop_metrics  商家小程序经营分析与商家 ERP 看板：营收/核销/退款金额与成交券、退款券
   merchant_membership_plans  星选会员权益与商家订阅档位：168 一账号、368 五账号、计量文案
   pr_cash_campaign     营销中心现金红包：星选/商家ERP活动模版，PR 发单入钱包
+  recruit_invoice      招募单可选达人交票：发单勾选，完成后上传，PR 查看并下载
   mp_home_banner_identity 达人小程序首页海报轮播：运营台可选展示身份（达人 / PR / 全部）
   mp_login_identity_close 登录身份：达人库已删除则进 PR；我的信息短信注销账号
   mp_multi_identity    达人/拍摄/剪辑最多3个：管理库有达人时优先显示达人并自动带上已有身份；报名按商单自动用对应身份
@@ -2167,6 +2168,28 @@ PAT
     mp_home_banner_identity)
       cat <<'PAT'
 OpsPlatformDecorPage.tsx
+change-scope-guard
+PAT
+      ;;
+    recruit_invoice)
+      cat <<'PAT'
+opsRegistryTypes.ts
+mpRecruitmentOrderRegistryMutations
+publishOrder.ts
+mpOrderPublishRestore
+PublishWizard.tsx
+OrdersPage.tsx
+PrOrderApplicantsPage.tsx
+talentInvoice.ts
+talentInvoice.js
+pages/publish/publish.js
+pages/publish/publish.wxml
+applicationDisplay.js
+mine-applications.js
+mine-applications.wxml
+mpOrderRegistryOps.js
+mine-pr-order-applicants.js
+mine-pr-order-applicants.wxml
 change-scope-guard
 PAT
       ;;

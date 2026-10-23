@@ -158,6 +158,9 @@ Page({
     savingSelect: false,
     chatEnabled: false,
     chattingId: '',
+    invoiceOn: false,
+    invoiceRows: [],
+    invoiceBusy: '',
     mpOrder: null,
     iceReviewBusyId: '',
     cancelReviewBusyId: '',
@@ -440,6 +443,8 @@ Page({
           err: '未找到该招募单，请下拉刷新',
           applicants: [],
           mpOrder: null,
+          invoiceOn: false,
+          invoiceRows: [],
         })
         return
       }
@@ -476,6 +481,7 @@ Page({
       const applicants = applicantExtras.enrichAndSortApplicants(baseApplicants, reg, mp, mpOrderId)
       const tagFilterOptions = applicantExtras.collectApplicantTagOptions(applicants)
       const salesLevelOptions = applicantExtras.collectSalesLevelOptions(applicants)
+      const talentInvoice = require('../../../utils/talentInvoice.js')
       const isOpenLoop = xingxuanRecruitLoop.isXingxuanOpenLoop(mp)
       this._isOpenLoop = isOpenLoop
       this.setData({
@@ -496,6 +502,8 @@ Page({
         icePendingReview,
         canCompleteIce: mpOrderIce.canPrCompleteIceOrder(mp),
         mpOrder: mp,
+        invoiceOn: talentInvoice.orderRequiresTalentInvoice(mp),
+        invoiceRows: talentInvoice.collectTalentInvoices(mp),
         groupQrImage: mpGroupQr.groupQrFromRegistry(reg, mpOrderId) || mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         showGroupQrPreview: false,
@@ -1529,6 +1537,34 @@ Page({
       wx.showToast({ title: '复邀已发送', icon: 'success' })
     } catch (err) {
       wx.showToast({ title: err.message || '发送失败', icon: 'none' })
+    }
+  },
+  onInvoiceOne(e) {
+    const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '').trim()
+    if (!url) return
+    const talentInvoice = require('../../../utils/talentInvoice.js')
+    const urls = (this.data.invoiceRows || []).map((row) => row.url)
+    talentInvoice.previewInvoice(url, urls)
+  },
+  onInvoiceImages() {
+    const rows = this.data.invoiceRows || []
+    if (!rows.length) return
+    const talentInvoice = require('../../../utils/talentInvoice.js')
+    talentInvoice.previewInvoice(rows[0].url, rows.map((row) => row.url))
+  },
+  async onInvoiceZip() {
+    const rows = this.data.invoiceRows || []
+    if (!rows.length || this.data.invoiceBusy) return
+    this.setData({ invoiceBusy: 'zip' })
+    wx.showLoading({ title: '打包中', mask: true })
+    try {
+      const talentInvoice = require('../../../utils/talentInvoice.js')
+      await talentInvoice.downloadInvoiceZip(rows, `发票-${this.data.mpOrderId || '招募单'}.zip`)
+    } catch (err) {
+      wx.showToast({ title: String((err && err.message) || '请单张打开保存').slice(0, 20), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ invoiceBusy: '' })
     }
   },
   onWatchlistApplicant(e) {

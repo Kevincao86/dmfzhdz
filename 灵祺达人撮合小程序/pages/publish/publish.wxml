@@ -710,6 +710,22 @@
               show-confirm-bar="{{false}}"
             />
           </view>
+          <view class="pub-field">
+            <text class="pub-label">是否需要达人交票</text>
+            <view class="pub-radio-pair">
+              <view
+                class="pub-radio-opt {{form.requireTalentInvoice ? '' : 'pub-radio-opt--on'}}"
+                data-val="0"
+                catchtap="onRequireInvoicePick"
+              >不需要</view>
+              <view
+                class="pub-radio-opt {{form.requireTalentInvoice ? 'pub-radio-opt--on' : ''}}"
+                data-val="1"
+                catchtap="onRequireInvoicePick"
+              >需要达人交票</view>
+            </view>
+            <text class="pub-cover-hint">需要时，达人完成该招募单后可提交发票，你可在本单查看并下载。</text>
+          </view>
           <view class="pub-field" wx:if="{{recruitMode !== 'ice' && recruitMode !== 'edit_ice'}}">
             <text class="pub-label">履约方式 *</text>
             <view class="pub-radio-pair">

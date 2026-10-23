@@ -344,6 +344,9 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const canUploadScript = talentAppStatus.canTalentUploadRecruitmentScript(mp, me, isIce)
   const canSubmitScript = talentAppStatus.canTalentSubmitRecruitmentScript(mp, me, isIce)
   const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me, localApp.mpOrderId)
+  const invoiceMeta = mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const requireInvoice = !!(mp && (mp.requireTalentInvoice === true || invoiceMeta.requireTalentInvoice === true))
+  const invoiceCount = me && Array.isArray(me.talentInvoices) ? me.talentInvoices.length : 0
   const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, localApp.mpOrderId, mp)
   const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
   const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
@@ -407,6 +410,9 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     iceActionLabel,
     progressId: progress.id,
     progressLabel: progress.label,
+    showSubmitInvoice: requireInvoice && progress.id === 'completed' && !!applicantId,
+    invoiceCount,
+    invoiceBtnLabel: invoiceCount > 0 ? `提交发票（已交${invoiceCount}张）` : '提交发票',
     progressMp: mp || null,
     progressMe: me || null,
     selectionNotified,

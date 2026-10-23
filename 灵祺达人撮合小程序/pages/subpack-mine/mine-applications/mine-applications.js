@@ -205,6 +205,35 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       hallLabel: isIce ? '云剪任务' : '招募大厅',
     })
   },
+  onSubmitInvoice(e) {
+    const mpOrderId = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
+    const applicantId = String((e.currentTarget.dataset && e.currentTarget.dataset.applicantId) || '').trim()
+    if (!mpOrderId || !applicantId) return
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      success: async (res) => {
+        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (!path) return
+        wx.showLoading({ title: '上传中', mask: true })
+        try {
+          const imageOss = require('../../../utils/mpImageOssUpload.js')
+          const ops = require('../../../utils/mpOrderRegistryOps.js')
+          const fileName = `invoice-${Date.now()}.jpg`
+          const url = await imageOss.uploadImageFileToOss(path, { purpose: 'invoice', fileName })
+          await ops.submitTalentInvoice(mpOrderId, applicantId, url, fileName)
+          wx.showToast({ title: '发票已提交', icon: 'success' })
+          await this.load()
+        } catch (err) {
+          const msg = String((err && err.message) || '上传失败').replace('封面图', '发票图片')
+          wx.showToast({ title: msg.slice(0, 20), icon: 'none' })
+        } finally {
+          wx.hideLoading()
+        }
+      },
+    })
+  },
   onTabChange(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
     if (!id || id === this.data.filterTab) return

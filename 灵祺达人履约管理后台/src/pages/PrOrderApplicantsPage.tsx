@@ -29,6 +29,13 @@ import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
 import {
+  collectTalentInvoices,
+  downloadInvoiceImages,
+  downloadInvoiceZip,
+  downloadOneInvoice,
+  orderRequiresTalentInvoice,
+} from '../lib/mpSync/talentInvoice'
+import {
   analyzePrOrderTalents,
   readSavedPrTalentFit,
   savePrTalentFit,
@@ -233,6 +240,27 @@ export default function PrOrderApplicantsPage() {
   const [checkedIds, setCheckedIds] = useState<string[]>([])
   const [batchConfirming, setBatchConfirming] = useState(false)
   const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
+  const [invoiceBusy, setInvoiceBusy] = useState('')
+  const talentInvoiceRows = useMemo(() => collectTalentInvoices(mpOrder), [mpOrder])
+  const invoiceRequired = orderRequiresTalentInvoice(mpOrder)
+  const runInvoiceDownload = async (kind: 'one' | 'images' | 'zip', rowKey?: string) => {
+    if (!talentInvoiceRows.length || invoiceBusy) return
+    setInvoiceBusy(kind + (rowKey || ''))
+    try {
+      if (kind === 'one') {
+        const row = talentInvoiceRows.find((r) => r.key === rowKey)
+        if (row) await downloadOneInvoice(row)
+      } else if (kind === 'images') {
+        await downloadInvoiceImages(talentInvoiceRows)
+      } else {
+        await downloadInvoiceZip(talentInvoiceRows, `发票-${String(mpOrder?.id || '招募单')}.zip`)
+      }
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '下载失败，请单张打开保存')
+    } finally {
+      setInvoiceBusy('')
+    }
+  }
   const [profileModalApplicant, setProfileModalApplicant] = useState<EnrichedApplicantRow | null>(null)
   const [isIce, setIsIce] = useState(false)
   const [iceVerifyMode, setIceVerifyMode] = useState<'ai' | 'pr'>('ai')
@@ -1028,6 +1056,61 @@ export default function PrOrderApplicantsPage() {
             </dl>
           </div>
         </header>
+      ) : null}
+
+      {!loading && !err && invoiceRequired ? (
+        <section className="surface-card rounded-xl border p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-[var(--shell-text)]">达人发票</h3>
+            {talentInvoiceRows.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="text-xs px-3 py-1.5 rounded-lg border"
+                  disabled={!!invoiceBusy}
+                  onClick={() => void runInvoiceDownload('images')}
+                >
+                  {invoiceBusy === 'images' ? '导出中…' : '导出图片'}
+                </button>
+                <button
+                  type="button"
+                  className="text-xs px-3 py-1.5 rounded-lg border"
+                  disabled={!!invoiceBusy}
+                  onClick={() => void runInvoiceDownload('zip')}
+                >
+                  {invoiceBusy === 'zip' ? '打包中…' : '下载压缩包'}
+                </button>
+              </div>
+            ) : null}
+          </div>
+          {talentInvoiceRows.length === 0 ? (
+            <p className="text-sm text-[var(--shell-muted)]">还没有达人提交发票。</p>
+          ) : (
+            <ul className="space-y-2">
+              {talentInvoiceRows.map((row) => (
+                <li key={row.key} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span>
+                    {row.name}
+                    <span className="ml-2 text-xs text-[var(--shell-muted)]">{row.fileName}</span>
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <a href={row.url} target="_blank" rel="noreferrer" className="text-violet-600">
+                      查看
+                    </a>
+                    <button
+                      type="button"
+                      className="text-violet-600"
+                      disabled={!!invoiceBusy}
+                      onClick={() => void runInvoiceDownload('one', row.key)}
+                    >
+                      单张下载
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       ) : null}
 
       {!loading && !err && applicants.length > 0 && !detailViewMode ? (

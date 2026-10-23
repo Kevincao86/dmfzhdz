@@ -74,6 +74,7 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     iceVerifyMode: String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim() === 'pr' ? 'pr' : 'ai',
     fulfillmentLoop:
       String(mp.fulfillmentLoop || meta.fulfillmentLoop || '').trim() === 'open' ? 'open' : 'closed',
+    requireTalentInvoice: mp.requireTalentInvoice === true || meta.requireTalentInvoice === true,
     applyFormTemplateId: String(meta.applyFormTemplateId || ''),
     applyFormTemplateName: String(meta.applyFormTemplateName || ''),
     applyFormFields: Array.isArray(meta.applyFormFields)

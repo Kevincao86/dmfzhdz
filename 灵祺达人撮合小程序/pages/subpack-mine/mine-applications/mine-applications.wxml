@@ -443,6 +443,15 @@
             {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? '上传中…' : item.uploadBtnLabel}}
           </button>
         </view>
+        <button
+          wx:if="{{item.showSubmitInvoice}}"
+          class="app-card__btn app-card__btn--upload"
+          plain
+          hover-class="app-card__btn--hover"
+          catchtap="onSubmitInvoice"
+          data-id="{{item.mpOrderId}}"
+          data-applicant-id="{{item.applicantId}}"
+        >{{item.invoiceBtnLabel || '提交发票'}}</button>
         <view class="app-card__foot app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
           <text>查看商单详情</text>
           <text class="app-card__link">›</text>
