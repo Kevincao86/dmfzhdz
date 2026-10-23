@@ -1910,6 +1910,8 @@ opsRegistryTypes.ts
 灵祺达人撮合小程序/pages/
 灵祺达人撮合小程序/utils/identityTheme.js
 灵祺达人撮合小程序/utils/accentTheme.js
+灵祺达人撮合小程序/utils/mineMenuIcons.js
+灵祺达人撮合小程序/images/mine-icons/talent-check.png
 灵祺达人撮合小程序/app.json
 灵祺达人履约管理后台/src/App.tsx
 ProfilePage.tsx

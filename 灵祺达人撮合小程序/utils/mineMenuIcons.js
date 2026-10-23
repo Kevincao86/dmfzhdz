@@ -1,6 +1,6 @@
 /** 「我的」页菜单图标在 OSS，不打进主包。 */
 const MINE_ICON_OSS = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/mine-icons'
-const MINE_ICON_VER = '20261015a'
+const MINE_ICON_VER = '20261023a'
 
 function mineIcon(file) {
   return `${MINE_ICON_OSS}/${file}?v=${MINE_ICON_VER}`
@@ -42,6 +42,7 @@ const MENU_KEY_ICON = {
   addonsHub: mineIcon('addons.png'),
   myCourses: mineIcon('courses.png'),
   analytics: mineIcon('chart.png'),
+  talentCheck: mineIcon('talent-check.png'),
   templates: mineIcon('tpl.png'),
   briefTemplates: mineIcon('brief.png'),
   cooperation: mineIcon('cooperation.png'),

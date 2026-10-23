@@ -278,6 +278,7 @@ export default function ProfilePage() {
             to: '/talent-check',
             label: '达人查验',
             desc: '免费每月 1 次，会员 5 积分/次',
+            hot: true,
             group: 'tools' as const,
           },
         ]

@@ -44,10 +44,10 @@ export function navItemsForRole(role: MpAccountRole, account?: MpAccount | null)
       { to: '/publish', label: '发布招募', icon: Send },
       { to: '/orders', label: '我的发单', icon: FileText },
       { to: '/orders/calendar', label: '商单日历', icon: CalendarDays },
-      { to: '/form-relay', label: '转发工具', icon: Share2 },
+      { to: '/talent-check', label: '达人查验', icon: Search },
       { to: '/templates', label: '我的模版', icon: Layers },
       { to: '/training', label: '培训课程', icon: GraduationCap },
-      { to: '/talent-check', label: '达人查验', icon: Search },
+      { to: '/form-relay', label: '转发工具', icon: Share2 },
       ...common,
     ]
   }

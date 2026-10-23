@@ -86,6 +86,7 @@ const ADDONS_HUB_MENU = {
   label: 'AI 创作工坊',
   sub: 'AI 短视频、数字人、视觉工坊、图片变清晰和云剪',
   icon: 'wallet',
+  hot: true,
 }
 
 const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay', 'cooperation', 'briefTemplates', 'funnel', 'talentWatchlist'])
@@ -346,7 +347,7 @@ function buildPrMenus() {
     { key: 'talentWatchlist', label: '黑灰名单', sub: '团队共享 · 避免重复踩坑', icon: 'list' },
     { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
     { key: 'funnel', label: '招募漏斗', sub: '曝光→报名→入选→发布转化', icon: 'chart' },
-    { key: 'talentCheck', label: '达人查验', sub: '免费每月 1 次，会员 5 积分/次', icon: 'list' },
+    { key: 'talentCheck', label: '达人查验', sub: '免费每月 1 次，会员 5 积分/次', icon: 'list', hot: true },
     { key: 'analytics', label: 'AI 数据洞察', sub: '发单与转化概况', icon: 'chart' },
     { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
   ])
