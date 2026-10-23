@@ -64,7 +64,7 @@
         <view class="metric"><view class="ml"><text>近期内容</text><text class="tag">{{view.platform === 'xhs' ? '公开笔记' : '抖音官方数据检索'}}</text></view><view class="mv">{{view.recentText || '未写到'}}</view></view>
       </view>
       <view class="read">
-        <view class="read-title">豆包AI助手解读</view>
+        <view class="read-title">灵祺AI解读</view>
         <view class="summary">{{view.summary}}</view>
       </view>
       <view class="clock">核对于 {{view.checkedAtLabel}} · 核验限于达人公开数据{{view.cached ? ' · 24小时内已查过，未再扣积分' : ''}}</view>

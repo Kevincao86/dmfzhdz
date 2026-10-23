@@ -345,7 +345,7 @@ export default function TalentAccountCheckPage() {
                     </div>
                   </div>
                   <div className="talent-check-read">
-                    <b>豆包AI助手解读</b>
+                    <b>灵祺AI解读</b>
                     <div className="talent-check-summary">{view.summary}</div>
                   </div>
                   <div className="talent-check-clock">
