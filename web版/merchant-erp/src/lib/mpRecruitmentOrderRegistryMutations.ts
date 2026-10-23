@@ -5,6 +5,7 @@ import type {
   RecruitmentCpsLinkage,
 } from './opsRegistryTypes.js'
 import { filterSelectedIdsToApplicants, pruneApplicantIdRefsOnOrder } from './mpApplicantIdentity.js'
+import { normalizeMarketingCenter, reconcileCashGrantsWithOrders } from './marketingCampaignCore.js'
 
 export type MpRecruitmentPatchBody = {
   id?: string
@@ -174,6 +175,12 @@ export function deleteMpRecruitmentOrdersFromSnapshot(
     const mpId = String(item?.mpOrderId || '').trim()
     return !mpId || !idSet.has(mpId)
   })
+
+  const cash = reconcileCashGrantsWithOrders(
+    normalizeMarketingCenter(data.marketingCenter),
+    data.mpRecruitmentOrders ?? [],
+  )
+  if (cash.removed > 0) data.marketingCenter = cash.center
 
   return { ok: true, deletedIds }
 }

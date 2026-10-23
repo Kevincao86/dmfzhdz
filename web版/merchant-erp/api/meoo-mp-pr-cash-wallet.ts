@@ -15,7 +15,7 @@ import {
   type CashPayoutAccount,
   type CashWithdrawIdentity,
 } from '../src/lib/marketingCampaignCore.js'
-import { readMarketingCenter, withdrawPrCashWallet } from '../src/lib/marketingCampaignStore.js'
+import { reconcileCashRedPackets, withdrawPrCashWallet } from '../src/lib/marketingCampaignStore.js'
 
 const TRAINING_FILE = path.join(process.cwd(), 'data', 'mp-training.json')
 
@@ -139,11 +139,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, error: result.error, message: result.message })
         return
       }
-      const center = await readMarketingCenter()
+      const center = await reconcileCashRedPackets()
       sendJson(res, 200, { ok: true, message: '提现已提交，等待打款', ...walletViewForIdentity(center, holderKey, identity) })
       return
     }
-    const center = await readMarketingCenter()
+    const center = await reconcileCashRedPackets()
     const withdrawLimit = body.allWithdraws === true ? 2000 : 20
     sendJson(res, 200, { ok: true, ...walletViewForIdentity(center, holderKey, identity, { withdrawLimit }) })
   } catch (error) {

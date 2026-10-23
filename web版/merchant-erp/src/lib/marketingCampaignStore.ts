@@ -15,6 +15,7 @@ import {
   type CashPayoutAccount,
   grantCashForOrder,
   isPromoBoardKind,
+  reconcileCashGrantsWithOrders,
   markCashWithdrawPaid,
   markCashWithdrawsPaid,
   normalizeMarketingCenter,
@@ -92,6 +93,67 @@ async function mutateViaIo<T>(fn: Mutation<T>): Promise<T> {
 async function mutateMarketingCenter<T>(fn: Mutation<T>): Promise<T> {
   if (readRegistryPgConnectionString()) return mutateViaPg(fn)
   return mutateViaIo(fn)
+}
+
+type CashOrderRef = { id?: string; title?: string }
+
+function ordersFromRegistry(raw: unknown): CashOrderRef[] | null {
+  if (!Array.isArray(raw)) return null
+  return raw.filter((item) => item && typeof item === 'object') as CashOrderRef[]
+}
+
+/** 按当前招募单重算红包：删掉的单、标题带「测试」的单不再计入。读失败时不改原账。 */
+export async function reconcileCashRedPackets(): Promise<RegistryMarketingCenter> {
+  const apply = (center: RegistryMarketingCenter, orders: CashOrderRef[] | null) => {
+    if (!orders) return { center, write: false as const }
+    const next = reconcileCashGrantsWithOrders(center, orders)
+    return { center: next.center, write: next.removed > 0 }
+  }
+  if (readRegistryPgConnectionString()) {
+    const cs = readRegistryPgConnectionString()
+    if (!cs) return readMarketingCenter()
+    const client = new Client({ connectionString: cs })
+    await client.connect()
+    try {
+      await client.query('BEGIN')
+      const read = await client.query(
+        `SELECT registry->'marketingCenter' AS center, registry->'mpRecruitmentOrders' AS orders
+         FROM ops_registry_snapshot WHERE id = 1 FOR UPDATE`,
+      )
+      const current = normalizeMarketingCenter(read.rows[0]?.center)
+      const next = apply(current, ordersFromRegistry(read.rows[0]?.orders))
+      if (!next.write) {
+        await client.query('ROLLBACK')
+        return current
+      }
+      await client.query(
+        `UPDATE ops_registry_snapshot
+         SET registry = jsonb_set(COALESCE(registry, '{}'::jsonb), '{marketingCenter}', $1::jsonb, true)
+         WHERE id = 1`,
+        [JSON.stringify(next.center)],
+      )
+      await client.query('COMMIT')
+      return next.center
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {})
+      throw error
+    } finally {
+      await client.end()
+    }
+  }
+  const { readMerchantSupabaseAdminEnv } = await import('../../vite-plugins/merchantSupabaseAdminEnv.js')
+  const { createRegistrySnapshotIoFetch } = await import('./registrySnapshotIoFetch.js')
+  const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
+  if (missingParts.length > 0) return normalizeMarketingCenter(null)
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  const file = data as RegistryFile
+  const current = normalizeMarketingCenter(file.marketingCenter)
+  const next = apply(current, ordersFromRegistry(file.mpRecruitmentOrders))
+  if (!next.write) return current
+  file.marketingCenter = next.center
+  await io.save(data)
+  return next.center
 }
 
 export async function readMarketingCenter(): Promise<RegistryMarketingCenter> {
@@ -175,6 +237,7 @@ export async function withdrawPrCashWallet(
   identity: CashWithdrawIdentity = 'pr',
   account?: CashPayoutAccount | null,
 ) {
+  await reconcileCashRedPackets()
   return mutateMarketingCenter((center) => {
     const next = requestCashWithdraw(center, prKey, displayName, identity, account)
     return { center: next.center, result: next, write: next.ok }

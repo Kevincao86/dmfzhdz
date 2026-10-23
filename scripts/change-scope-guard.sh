@@ -2187,6 +2187,7 @@ opsRegistryTypes.ts
 opsRegistryGatewayCore.ts
 ecs-auth-api-server.ts
 meoo-ops-mp-recruitment-orders-append.ts
+mpRecruitmentOrderRegistryMutations
 change-scope-guard
 PAT
       ;;

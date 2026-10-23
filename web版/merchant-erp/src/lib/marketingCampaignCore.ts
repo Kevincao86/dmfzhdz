@@ -101,6 +101,7 @@ export type RegistryMarketingCenter = {
 
 export type PublishOrderForCash = {
   id?: string
+  title?: string
   publisherIdentity?: string
   publisherTemplateId?: string
   fulfillmentLoop?: string
@@ -466,6 +467,11 @@ export function prKeyFromPublishOrder(order: PublishOrderForCash): string {
   return lingqi || registry
 }
 
+/** 招募标题带「测试」的单不进红包，避免试发占用名额。 */
+export function recruitmentTitleExcludedFromCash(title: unknown): boolean {
+  return String(title ?? '').includes('测试')
+}
+
 /** 转发工具代发的原表招募。这种单不进发单红包。 */
 export function isFormRelayPublishOrder(order: PublishOrderForCash): boolean {
   if (text(order.publisherTemplateId, 40) === 'form-relay-v1') return true
@@ -478,6 +484,7 @@ export function isFormRelayPublishOrder(order: PublishOrderForCash): boolean {
 }
 
 export function publishOrderQualifies(order: PublishOrderForCash): boolean {
+  if (recruitmentTitleExcludedFromCash(order.title)) return false
   if (isFormRelayPublishOrder(order)) return false
   const key = prKeyFromPublishOrder(order)
   if (!key || !text(order.id, 80)) return false
@@ -568,6 +575,49 @@ export function grantCashForOrder(center: RegistryMarketingCenter, order: Publis
       amountCents: campaign.amountCents,
       message: `已获得 ¥${yuanFromCents(campaign.amountCents)} 现金红包`,
     },
+  }
+}
+
+/** 已删除的招募单，或标题仍带「测试」的单，从红包笔数和可提现余额里拿掉。 */
+export function reconcileCashGrantsWithOrders(
+  center: RegistryMarketingCenter,
+  orders: Array<{ id?: string; title?: string }>,
+): { center: RegistryMarketingCenter; removed: number } {
+  const byId = new Map<string, string>()
+  for (const order of orders) {
+    const id = text(order?.id, 80)
+    if (id) byId.set(id, String(order?.title ?? ''))
+  }
+  const campaign = campaignBySurface(center, 'xingxuan')
+  const kept: MarketingGrant[] = []
+  const dropped: MarketingGrant[] = []
+  for (const grant of center.grants) {
+    if (grant.campaignId !== campaign.id) {
+      kept.push(grant)
+      continue
+    }
+    const title = byId.get(grant.orderId)
+    const gone = title === undefined
+    if (gone || recruitmentTitleExcludedFromCash(title)) dropped.push(grant)
+    else kept.push(grant)
+  }
+  if (!dropped.length) return { center, removed: 0 }
+  const wallets = center.wallets.map((item) => ({ ...item }))
+  const updatedAt = nowText()
+  for (const grant of dropped) {
+    const idx = wallets.findIndex((item) => item.campaignId === grant.campaignId && item.prKey === grant.prKey)
+    if (idx < 0) continue
+    const wallet = wallets[idx]!
+    wallets[idx] = {
+      ...wallet,
+      availableCents: Math.max(0, wallet.availableCents - grant.amountCents),
+      qualifyingOrders: Math.max(0, wallet.qualifyingOrders - 1),
+      updatedAt,
+    }
+  }
+  return {
+    center: { ...center, grants: kept, wallets, updatedAt },
+    removed: dropped.length,
   }
 }
 
