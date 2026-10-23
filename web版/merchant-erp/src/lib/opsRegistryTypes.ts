@@ -914,6 +914,7 @@ export type RegistryMpAiPointsSpendEntry = {
     | 'talent_eval'
     | 'talent_advice'
     | 'talent_check'
+    | 'talent_check_xhs'
     | 'shop_eval_advice'
   points: number
   balanceAfter: number
