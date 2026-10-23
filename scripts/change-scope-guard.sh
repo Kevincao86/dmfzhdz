@@ -1533,6 +1533,8 @@ PAT
 baidu_verify_codeva-
 web版/merchant-erp/index.html
 ecs-nginx-merchant-cs.conf
+灵祺达人履约管理后台/index.html
+ecs-nginx-talent-fulfillment.conf
 change-scope-guard
 PAT
       ;;
