@@ -25,7 +25,7 @@ Page({
       { id: 'channels', label: '视频号', logo: '/images/platforms/wechat.png', open: false },
     ],
     pointsPerCheck: 5,
-    xhsPointsPerCheck: 8,
+    xhsPointsPerCheck: 22,
     hint: '正在读取查验额度…',
     singleLabel: '开始查验',
     view: null,
@@ -73,7 +73,7 @@ Page({
     const member = !!data.member
     const freeRemaining = Number(data.freeRemaining) || 0
     const points = Number(data.pointsPerCheck) || 5
-    const xhsPoints = Number(data.xhsPointsPerCheck) || 8
+    const xhsPoints = Number(data.xhsPointsPerCheck) || 22
     const balance = Number(data.pointsBalance) || 0
     const onXhs = this.data.platform === 'xhs'
     let singleLabel = '开始查验'
@@ -98,7 +98,7 @@ Page({
       wx.showToast({ title: `${item.label}尚未开放`, icon: 'none' })
       return
     }
-    const xhsPoints = Number(this.data.xhsPointsPerCheck) || 8
+    const xhsPoints = Number(this.data.xhsPointsPerCheck) || 22
     const balance = Number(this.data.pointsBalance) || 0
     let singleLabel = this.data.singleLabel
     if (id === 'xhs') singleLabel = balance >= xhsPoints ? '开始查验' : '去充值'
@@ -127,10 +127,10 @@ Page({
   async onCheck() {
     const query = String(this.data.query || '').trim()
     if (!query || this.data.busy) return
-    if (this.data.platform === 'xhs' && Number(this.data.pointsBalance) < (Number(this.data.xhsPointsPerCheck) || 8)) {
+    if (this.data.platform === 'xhs' && Number(this.data.pointsBalance) < (Number(this.data.xhsPointsPerCheck) || 22)) {
       wx.showModal({
         title: '积分不足',
-        content: `小红书查验需要 ${Number(this.data.xhsPointsPerCheck) || 8} 积分`,
+        content: `小红书查验需要 ${Number(this.data.xhsPointsPerCheck) || 22} 积分`,
         confirmText: '去充值',
         success: (res) => {
           if (res.confirm) wx.navigateTo({ url: RECHARGE })

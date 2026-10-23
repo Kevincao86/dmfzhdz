@@ -46,7 +46,7 @@ export default function TalentAccountCheckPage() {
   const [member, setMember] = useState(false)
   const [freeRemaining, setFreeRemaining] = useState(1)
   const [pointsPerCheck, setPointsPerCheck] = useState(5)
-  const [xhsPointsPerCheck, setXhsPointsPerCheck] = useState(8)
+  const [xhsPointsPerCheck, setXhsPointsPerCheck] = useState(22)
   const [pointsBalance, setPointsBalance] = useState(0)
   const [hint, setHint] = useState('正在读取查验额度…')
   const [view, setView] = useState<TalentCheckView | null>(null)
@@ -58,7 +58,7 @@ export default function TalentAccountCheckPage() {
     setMember(!!data.member)
     setFreeRemaining(Number(data.freeRemaining) || 0)
     setPointsPerCheck(Number(data.pointsPerCheck) || 5)
-    setXhsPointsPerCheck(Number(data.xhsPointsPerCheck) || 8)
+    setXhsPointsPerCheck(Number(data.xhsPointsPerCheck) || 22)
     setPointsBalance(Number(data.pointsBalance) || 0)
     if (data.hint) setHint(data.hint)
   }
@@ -96,7 +96,7 @@ export default function TalentAccountCheckPage() {
     setView({ ...record, cached: false, recent: record.recent || [] })
   }
 
-  const xhsRate = xhsPointsPerCheck || 8
+  const xhsRate = xhsPointsPerCheck || 22
   const singleLabel = busy
     ? '查验中…'
     : platform === 'xhs'

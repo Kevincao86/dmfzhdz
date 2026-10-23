@@ -147,16 +147,19 @@ export const MP_POINT_INTERNAL_COST_YUAN = 0.01
 /** 美元兑人民币。与高级生图「$0.211≈¥1.52」同一汇率。 */
 export const MP_USD_TO_CNY = 7.2
 
-/** 小红书查验单个成本（美元） */
+/** 小红书接口单次请求成本（美元）。一次查验会打多条请求。 */
 export const MP_XHS_CHECK_COST_USD = 0.01
 
+/** 一次小红书查验：搜索用户 + 主页 + 近期笔记 */
+export const MP_XHS_CHECK_CALLS = 3
+
 /**
- * 小红书查验积分。成本 $0.01 × 7.2 = ¥0.072，1 积分覆盖 ¥0.01，向上取整为 8。
- * 充值价 ¥1 = 40 积分，实付 8÷40 = ¥0.20。扣费先走套餐积分，不够再扣充值积分。
+ * 小红书查验积分。3 次 × $0.01 × 7.2 = ¥0.216，1 积分覆盖 ¥0.01，向上取整为 22。
+ * 充值价 ¥1 = 40 积分，实付 22÷40 = ¥0.55。扣费先走套餐积分，不够再扣充值积分。
  */
 export const MP_POINTS_XHS_CHECK_PER_USE = Math.max(
   1,
-  Math.ceil((MP_XHS_CHECK_COST_USD * MP_USD_TO_CNY) / MP_POINT_INTERNAL_COST_YUAN),
+  Math.ceil((MP_XHS_CHECK_COST_USD * MP_XHS_CHECK_CALLS * MP_USD_TO_CNY) / MP_POINT_INTERNAL_COST_YUAN),
 )
 
 /** 模型公开价上浮比例（售价 = 成本 × 1.30） */
