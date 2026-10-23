@@ -12,6 +12,7 @@ import { talentEvalMonthlyLimit } from './mpMembershipQuota.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { readAccountMpAiPointsBalance } from './mpAiPointsSpendCore.js'
 import { spendMpAiPointsForSessionToken } from './mpAiPointsSpendSession.js'
+import { MP_POINTS_XHS_CHECK_PER_USE } from './mpPointsEconomics.js'
 import { runProfileLinkParseCore } from './profileLinkParseCore.js'
 
 export const TALENT_CHECK_POINTS = 5
@@ -533,6 +534,7 @@ export async function runTalentAccountCheck(opts: {
         member,
         freeRemaining,
         pointsPerCheck: TALENT_CHECK_POINTS,
+        xhsPointsPerCheck: MP_POINTS_XHS_CHECK_PER_USE,
         pointsBalance: balance,
         hint: member
           ? `会员不限次数。每次成功查验 ${TALENT_CHECK_POINTS} 积分，先扣套餐积分，再扣充值积分。`
@@ -1061,17 +1063,19 @@ async function runXhsAccountCheck(
   const preset = Array.from(new Set([directId ? `xhs_${directId}` : '', `xhsq_${normDouyinKey(query)}`].filter(Boolean)))
   const cachedFirst = findCached(accountId, preset)
   if (cachedFirst) {
-    return { status: 200, body: { ok: true, view: cachedFirst, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
+    return {
+      status: 200,
+      body: { ok: true, view: cachedFirst, member, freeRemaining, pointsBalance: balance, pointsPerCheck: MP_POINTS_XHS_CHECK_PER_USE },
+    }
   }
-  if (!member && freeRemaining <= 0) return { status: 200, body: upgradeBody() }
-  if (member && balance < TALENT_CHECK_POINTS) {
+  if (balance < MP_POINTS_XHS_CHECK_PER_USE) {
     return {
       status: 200,
       body: {
         ok: false,
         error: 'insufficient_points',
-        message: `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${TALENT_CHECK_POINTS}），请充值积分或升级套餐后再试`,
-        required: TALENT_CHECK_POINTS,
+        message: `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${MP_POINTS_XHS_CHECK_PER_USE}），请充值积分或升级套餐后再试`,
+        required: MP_POINTS_XHS_CHECK_PER_USE,
         balance,
       },
     }
@@ -1086,7 +1090,10 @@ async function runXhsAccountCheck(
   const keys = Array.from(new Set([`xhs_${resolved.userId}`, `xhsq_${normDouyinKey(query)}`, ...preset]))
   const cachedResolved = findCached(accountId, keys)
   if (cachedResolved) {
-    return { status: 200, body: { ok: true, view: cachedResolved, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
+    return {
+      status: 200,
+      body: { ok: true, view: cachedResolved, member, freeRemaining, pointsBalance: balance, pointsPerCheck: MP_POINTS_XHS_CHECK_PER_USE },
+    }
   }
   let facts: XhsFacts
   try {
@@ -1106,18 +1113,10 @@ async function runXhsAccountCheck(
     return { status: 200, body: { ok: false, error: 'analysis_incomplete', message: '豆包这次没有写完分析，未扣积分。请再查一次。' } }
   }
   const checkedAt = new Date().toISOString()
-  const view = buildXhsView(facts, analysis.direction, analysis.summary, checkedAt, member ? TALENT_CHECK_POINTS : 0, null)
-  if (!member) {
-    for (const key of keys) writeCache(accountId, key, view)
-    writeFreeUsed(accountId)
-    return {
-      status: 200,
-      body: { ok: true, view: { ...view, charged: 0 }, member: false, freeRemaining: 0, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS },
-    }
-  }
+  const view = buildXhsView(facts, analysis.direction, analysis.summary, checkedAt, MP_POINTS_XHS_CHECK_PER_USE, null)
   const daySlot = Math.floor(Date.now() / 86400000)
   const spent = await spendMpAiPointsForSessionToken(opts.supabaseUrl, opts.serviceRole, opts.token, {
-    kind: 'talent_check',
+    kind: 'talent_check_xhs',
     idempotencyKey: `talent-check:${accountId}:xhs:${resolved.userId}:${daySlot}`,
     note: `达人查验 小红书 ${facts.nickname || facts.redId}`,
     roleHint: 'pr',
@@ -1129,7 +1128,7 @@ async function runXhsAccountCheck(
         ok: false,
         error: spent.error || 'insufficient_points',
         message: spent.message || '积分不足，请充值积分或升级套餐后再试',
-        required: TALENT_CHECK_POINTS,
+        required: MP_POINTS_XHS_CHECK_PER_USE,
         balance,
       },
     }
@@ -1139,6 +1138,13 @@ async function runXhsAccountCheck(
   for (const key of keys) writeCache(accountId, key, saved)
   return {
     status: 200,
-    body: { ok: true, view: saved, member: true, freeRemaining: 0, pointsBalance: spent.newBalance, pointsPerCheck: TALENT_CHECK_POINTS },
+    body: {
+      ok: true,
+      view: saved,
+      member,
+      freeRemaining,
+      pointsBalance: spent.newBalance,
+      pointsPerCheck: MP_POINTS_XHS_CHECK_PER_USE,
+    },
   }
 }

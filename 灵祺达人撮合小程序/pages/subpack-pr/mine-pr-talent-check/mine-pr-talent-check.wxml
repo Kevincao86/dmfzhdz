@@ -3,7 +3,7 @@
     <view class="title">达人查验</view>
     <view class="pills">
       <text class="pill">{{member ? '会员 · 余额 ' + pointsBalance : '免费版'}}</text>
-      <text class="pill">{{member ? pointsPerCheck + '积分/次' : (freeRemaining > 0 ? '本月剩 1 次' : '本月已用完')}}</text>
+      <text class="pill">{{platform === 'xhs' ? xhsPointsPerCheck + '积分/次' : (member ? pointsPerCheck + '积分/次' : (freeRemaining > 0 ? '本月剩 1 次' : '本月已用完'))}}</text>
     </view>
   </view>
   <view class="hint" wx:if="{{hint}}">{{hint}}</view>

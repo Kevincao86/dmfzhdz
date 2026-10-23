@@ -25,6 +25,7 @@ Page({
       { id: 'channels', label: '视频号', logo: '/images/platforms/wechat.png', open: false },
     ],
     pointsPerCheck: 5,
+    xhsPointsPerCheck: 8,
     hint: '正在读取查验额度…',
     singleLabel: '开始查验',
     view: null,
@@ -72,13 +73,18 @@ Page({
     const member = !!data.member
     const freeRemaining = Number(data.freeRemaining) || 0
     const points = Number(data.pointsPerCheck) || 5
+    const xhsPoints = Number(data.xhsPointsPerCheck) || 8
+    const balance = Number(data.pointsBalance) || 0
+    const onXhs = this.data.platform === 'xhs'
     let singleLabel = '开始查验'
-    if (!member) singleLabel = freeRemaining > 0 ? '免费查验' : '去升级'
+    if (onXhs) singleLabel = balance >= xhsPoints ? '开始查验' : '去充值'
+    else if (!member) singleLabel = freeRemaining > 0 ? '免费查验' : '去升级'
     this.setData({
       member,
       freeRemaining,
-      pointsBalance: Number(data.pointsBalance) || 0,
+      pointsBalance: balance,
       pointsPerCheck: points,
+      xhsPointsPerCheck: xhsPoints,
       hint: data.hint || '',
       singleLabel,
     })
@@ -92,7 +98,13 @@ Page({
       wx.showToast({ title: `${item.label}尚未开放`, icon: 'none' })
       return
     }
-    this.setData({ platform: id, view: null, tab: id === 'xhs' ? 'single' : this.data.tab })
+    const xhsPoints = Number(this.data.xhsPointsPerCheck) || 8
+    const balance = Number(this.data.pointsBalance) || 0
+    let singleLabel = this.data.singleLabel
+    if (id === 'xhs') singleLabel = balance >= xhsPoints ? '开始查验' : '去充值'
+    else if (!this.data.member) singleLabel = this.data.freeRemaining > 0 ? '免费查验' : '去升级'
+    else singleLabel = '开始查验'
+    this.setData({ platform: id, view: null, tab: id === 'xhs' ? 'single' : this.data.tab, singleLabel })
   },
 
   onTab(e) {
@@ -115,7 +127,18 @@ Page({
   async onCheck() {
     const query = String(this.data.query || '').trim()
     if (!query || this.data.busy) return
-    if (!this.data.member && this.data.freeRemaining <= 0) {
+    if (this.data.platform === 'xhs' && Number(this.data.pointsBalance) < (Number(this.data.xhsPointsPerCheck) || 8)) {
+      wx.showModal({
+        title: '积分不足',
+        content: `小红书查验需要 ${Number(this.data.xhsPointsPerCheck) || 8} 积分`,
+        confirmText: '去充值',
+        success: (res) => {
+          if (res.confirm) wx.navigateTo({ url: RECHARGE })
+        },
+      })
+      return
+    }
+    if (this.data.platform !== 'xhs' && !this.data.member && this.data.freeRemaining <= 0) {
       this.promptUpgrade()
       return
     }

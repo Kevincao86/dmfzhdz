@@ -46,6 +46,7 @@ export default function TalentAccountCheckPage() {
   const [member, setMember] = useState(false)
   const [freeRemaining, setFreeRemaining] = useState(1)
   const [pointsPerCheck, setPointsPerCheck] = useState(5)
+  const [xhsPointsPerCheck, setXhsPointsPerCheck] = useState(8)
   const [pointsBalance, setPointsBalance] = useState(0)
   const [hint, setHint] = useState('正在读取查验额度…')
   const [view, setView] = useState<TalentCheckView | null>(null)
@@ -57,6 +58,7 @@ export default function TalentAccountCheckPage() {
     setMember(!!data.member)
     setFreeRemaining(Number(data.freeRemaining) || 0)
     setPointsPerCheck(Number(data.pointsPerCheck) || 5)
+    setXhsPointsPerCheck(Number(data.xhsPointsPerCheck) || 8)
     setPointsBalance(Number(data.pointsBalance) || 0)
     if (data.hint) setHint(data.hint)
   }
@@ -94,7 +96,18 @@ export default function TalentAccountCheckPage() {
     setView({ ...record, cached: false, recent: record.recent || [] })
   }
 
-  const singleLabel = busy ? '查验中…' : !member ? (freeRemaining > 0 ? '免费查验' : '去升级') : '开始查验'
+  const xhsRate = xhsPointsPerCheck || 8
+  const singleLabel = busy
+    ? '查验中…'
+    : platform === 'xhs'
+      ? pointsBalance >= xhsRate
+        ? '开始查验'
+        : '去充值'
+      : !member
+        ? freeRemaining > 0
+          ? '免费查验'
+          : '去升级'
+        : '开始查验'
 
   function onPlatform(id: (typeof PLATFORMS)[number]['id']) {
     const item = PLATFORMS.find((row) => row.id === id)
@@ -110,7 +123,12 @@ export default function TalentAccountCheckPage() {
   async function onCheck() {
     const text = query.trim()
     if (!text || busy) return
-    if (!member && freeRemaining <= 0) {
+    if (platform === 'xhs' && pointsBalance < xhsRate) {
+      const go = window.confirm(`小红书查验需要 ${xhsRate} 积分，当前余额不足。`)
+      if (go) navigate('/profile/points-recharge')
+      return
+    }
+    if (platform !== 'xhs' && !member && freeRemaining <= 0) {
       promptUpgrade(navigate)
       return
     }
@@ -219,7 +237,9 @@ export default function TalentAccountCheckPage() {
         <div className="talent-check-title">达人查验</div>
         <div className="talent-check-pills">
           <span className="talent-check-pill">{member ? `会员 · 余额 ${pointsBalance}` : '免费版'}</span>
-          <span className="talent-check-pill">{member ? `${pointsPerCheck}积分/次` : freeRemaining > 0 ? '本月剩 1 次' : '本月已用完'}</span>
+          <span className="talent-check-pill">
+            {platform === 'xhs' ? `${xhsRate}积分/次` : member ? `${pointsPerCheck}积分/次` : freeRemaining > 0 ? '本月剩 1 次' : '本月已用完'}
+          </span>
         </div>
       </div>
       {!pr ? <p className="talent-check-note">{hint}</p> : null}

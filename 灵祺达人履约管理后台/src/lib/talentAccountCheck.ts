@@ -31,6 +31,7 @@ export type TalentCheckStatus = {
   member?: boolean
   freeRemaining?: number
   pointsPerCheck?: number
+  xhsPointsPerCheck?: number
   pointsBalance?: number
   hint?: string
   view?: TalentCheckView

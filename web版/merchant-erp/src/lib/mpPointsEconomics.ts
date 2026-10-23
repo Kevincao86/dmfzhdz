@@ -144,6 +144,21 @@ export function mpPointsReviewAiBatchSlot(priorSuccessCount: number): number {
 /** 单积分内部 API 成本（元） */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01
 
+/** 美元兑人民币。与高级生图「$0.211≈¥1.52」同一汇率。 */
+export const MP_USD_TO_CNY = 7.2
+
+/** 小红书查验单个成本（美元） */
+export const MP_XHS_CHECK_COST_USD = 0.01
+
+/**
+ * 小红书查验积分。成本 $0.01 × 7.2 = ¥0.072，1 积分覆盖 ¥0.01，向上取整为 8。
+ * 充值价 ¥1 = 40 积分，实付 8÷40 = ¥0.20。扣费先走套餐积分，不够再扣充值积分。
+ */
+export const MP_POINTS_XHS_CHECK_PER_USE = Math.max(
+  1,
+  Math.ceil((MP_XHS_CHECK_COST_USD * MP_USD_TO_CNY) / MP_POINT_INTERNAL_COST_YUAN),
+)
+
 /** 模型公开价上浮比例（售价 = 成本 × 1.30） */
 export const MP_POINTS_MODEL_MARKUP = 1.3
 
@@ -196,6 +211,7 @@ export type MpPointsUsageKind =
   | 'talent_eval'
   | 'talent_advice'
   | 'talent_check'
+  | 'talent_check_xhs'
   | 'shop_eval_advice'
 
 export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
@@ -221,6 +237,7 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   talent_eval: '达人账号评估',
   talent_advice: '达人账号分析整改',
   talent_check: '达人查验',
+  talent_check_xhs: '小红书达人查验',
   shop_eval_advice: '门店分析提升',
 }
 
@@ -284,6 +301,7 @@ export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
     k === 'talent_eval' ||
     k === 'talent_advice' ||
     k === 'talent_check' ||
+    k === 'talent_check_xhs' ||
     k === 'shop_eval_advice'
   ) {
     return k
@@ -312,6 +330,7 @@ export function formatMpPointsRateLabel(kind: MpPointsUsageKind, opts?: { motion
   if (kind === 'talent_eval') return '免费每月 1 次，会员每月 15 次'
   if (kind === 'talent_advice') return `${MP_POINTS_TALENT_ADVICE_PER_USE} 积分/次`
   if (kind === 'talent_check') return `${MP_POINTS_TALENT_CHECK_PER_USE} 积分/次`
+  if (kind === 'talent_check_xhs') return `${MP_POINTS_XHS_CHECK_PER_USE} 积分/次`
   if (kind === 'shop_eval_advice') return `${MP_POINTS_SHOP_EVAL_ADVICE_PER_USE} 积分/次`
   if (kind === 'review_ai') {
     return `${MP_POINTS_REVIEW_AI_PER_USE} 积分/${MP_POINTS_REVIEW_AI_REPLIES_PER_CHARGE} 条`
@@ -389,6 +408,7 @@ export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: MpPointsCos
   if (kind === 'talent_eval') return MP_POINTS_TALENT_EVAL_PER_USE
   if (kind === 'talent_advice') return MP_POINTS_TALENT_ADVICE_PER_USE
   if (kind === 'talent_check') return MP_POINTS_TALENT_CHECK_PER_USE
+  if (kind === 'talent_check_xhs') return MP_POINTS_XHS_CHECK_PER_USE
   if (kind === 'shop_eval_advice') return MP_POINTS_SHOP_EVAL_ADVICE_PER_USE
   if (kind === 'review_ai') return MP_POINTS_REVIEW_AI_PER_USE
   return MP_POINTS_ARTICLE_PER_USE
