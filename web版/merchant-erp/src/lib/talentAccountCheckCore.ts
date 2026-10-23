@@ -982,11 +982,31 @@ async function askXhsDoubao(facts: string) {
     if (!text) throw new Error('豆包这次没有写完分析')
     return text
   }
+  let text = ''
   try {
-    return readAnalysisJson(await post(true))
+    text = await post(true)
   } catch {
-    return readAnalysisJson(await post(false))
+    try {
+      text = await post(false)
+    } catch {
+      text = ''
+    }
   }
+  const parsed = text ? readAnalysisJson(text) : null
+  if (parsed) return parsed
+  const { callDoubaoWebSearch } = await import('../../vite-plugins/merchantAiUpstream.js')
+  try {
+    const hit = await callDoubaoWebSearch(key, env, system, user)
+    const again = readAnalysisJson(hit.text)
+    if (again) return again
+  } catch (err) {
+    const message = err instanceof Error ? err.message : ''
+    if (/endpoint that is currently closed|temporarily unavailable|Request id/i.test(message)) {
+      throw new Error('豆包分析暂时不可用，未扣积分。请稍后再查。')
+    }
+    throw err instanceof Error ? err : new Error('豆包分析失败')
+  }
+  throw new Error('豆包这次没有写完分析，未扣积分。请再查一次。')
 }
 
 function buildXhsView(facts: XhsFacts, direction: string, summary: string, checkedAt: string, charged: number, balance: number | null): TalentCheckView {
