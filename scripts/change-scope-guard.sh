@@ -1534,6 +1534,10 @@ LoginAuthPanel
 ErpScanLoginPanel
 TalentLoginAuthPanel
 LoginLegalFooter
+灵祺达人履约管理后台/src/pages/LoginPage.tsx
+灵祺达人履约管理后台/index.html
+灵祺达人履约管理后台/public/landing/login-visit-40.mp4
+灵祺达人履约管理后台/public/landing/portrait-shop.jpg
 change-scope-guard
 PAT
       ;;

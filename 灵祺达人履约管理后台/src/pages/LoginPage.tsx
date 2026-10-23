@@ -7,21 +7,13 @@ import {
   readRememberedLogin,
   writeRememberedLogin,
 } from '@merchant/lib/rememberLogin'
-import { cn } from '../cn'
 import { formatMpApiErr } from '../lib/mpApiErrors'
 import { passwordLogin } from '../lib/mpApi'
 import type { MpAccount } from '../lib/mpSession'
 import { enterDevPreview } from '../lib/mpSession'
 import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
-import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { workIdentityToAccountRole } from '../lib/mpWorkIdentity'
 import TalentLoginAuthPanel, { type LoginTab } from './login/TalentLoginAuthPanel'
-
-const AUTH_SHELL = cn(
-  'relative w-full max-w-md rounded-[28px] border border-white/80 p-6 sm:p-8',
-  'bg-white/55 shadow-[0_8px_40px_-12px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]',
-  'backdrop-blur-2xl backdrop-saturate-150',
-)
 
 const REMEMBER_SCOPE = 'fulfillment'
 
@@ -30,12 +22,13 @@ export default function LoginPage() {
   const [params] = useSearchParams()
   const workIdentity = 'talent' as const
 
-  const [tab, setTab] = useState<LoginTab>('password')
+  const [tab, setTab] = useState<LoginTab>('sms')
   const [loginName, setLoginName] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const [rememberPassword, setRememberPassword] = useState(() => isRememberLoginEnabled(REMEMBER_SCOPE))
+  const [videoOn, setVideoOn] = useState(true)
 
   useEffect(() => {
     const saved = readRememberedLogin(REMEMBER_SCOPE)
@@ -77,67 +70,72 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className={cn(
-        'relative flex min-h-[100dvh] flex-col items-center justify-center overflow-x-hidden px-4 py-10 text-slate-900',
-        'pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]',
-      )}
-      style={{
-        background: `
-          radial-gradient(ellipse 75% 55% at 12% 18%, rgba(56, 189, 248, 0.14), transparent 55%),
-          radial-gradient(ellipse 65% 50% at 88% 82%, rgba(139, 92, 246, 0.12), transparent 50%),
-          linear-gradient(165deg, #f8fafc 0%, #eef4ff 42%, #faf5ff 100%)
-        `,
-      }}
-    >
-      <header className="absolute left-0 right-0 top-[max(0.75rem,env(safe-area-inset-top))] z-10 px-4 sm:px-8">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
-          <LoginPortalNav linkClassName="text-slate-600 hover:text-slate-900" activeClassName="text-violet-700" />
-          <Link
-            to="/login"
-            className="rounded-full bg-gradient-to-r from-violet-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
-          >
-            登录
-          </Link>
-        </div>
-      </header>
-
-      <div className="mb-6 mt-14 flex items-center gap-3">
-        <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="h-11 w-11 rounded-2xl object-contain shadow-sm" />
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            LingQi · Talent Fulfillment
-          </p>
-          <h1 className="text-lg font-bold text-slate-900">灵祺星选平台</h1>
-        </div>
+    <div className="grid min-h-[100dvh] bg-[#1a100e] text-[#f6f1ea] lg:grid-cols-[minmax(0,1fr)_minmax(440px,600px)]">
+      <div className="relative min-h-[42dvh] overflow-hidden bg-[#120c0a] lg:min-h-[100dvh]">
+        {videoOn ? (
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            src="/landing/login-visit-40.mp4"
+            poster="/landing/portrait-shop.jpg"
+            autoPlay
+            muted
+            loop
+            playsInline
+            onError={() => setVideoOn(false)}
+          />
+        ) : (
+          <img src="/landing/portrait-shop.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
+        )}
       </div>
 
-      <div className={AUTH_SHELL}>
-        <TalentLoginAuthPanel
-          tab={tab}
-          onTabChange={setTab}
-          loginName={loginName}
-          onLoginNameChange={setLoginName}
-          password={password}
-          onPasswordChange={setPassword}
-          err={err}
-          loading={loading}
-          onPasswordLogin={onPasswordLogin}
-          workIdentity={workIdentity}
-          onScanLoginSuccess={onScanLoginSuccess}
-          showDevPreview={import.meta.env.DEV}
-          onDevPreview={onDevPreview}
-          rememberPassword={rememberPassword}
-          onRememberPasswordChange={setRememberPassword}
-          bindPending={params.get('bind') === '1'}
-        />
-        <p className="mt-4 text-center text-sm text-slate-600">
-          还没有账号？{' '}
-          <Link to="/register" className="font-semibold text-violet-600 underline">
-            手机号注册
-          </Link>
+      <div className="flex min-h-[100dvh] flex-col justify-center overflow-auto px-6 py-8 sm:px-10">
+        <div className="mb-8">
+          <LoginPortalNav linkClassName="text-[#f6f1ea]/70 hover:text-white" activeClassName="text-white" />
+        </div>
+        <h1
+          className="m-0 font-medium text-[#f6f1ea]"
+          style={{
+            fontFamily: '"Noto Serif SC", "Songti SC", serif',
+            fontSize: 'clamp(44px, 4.2vw, 68px)',
+            lineHeight: 1.2,
+            letterSpacing: '0.06em',
+            marginBottom: 24,
+          }}
+        >
+          灵祺星选
+        </h1>
+        <p className="mb-9 max-w-[20em] text-base text-[#f7f1e8]" style={{ lineHeight: 1.85 }}>
+          达人探店、商单和审片在同一处。
+          <br />
+          用小程序同一套账号登录。
         </p>
-        <LoginLegalFooter />
+        <div className="w-full rounded-[28px] bg-[#f4efe6] px-6 py-7 text-[#1a140f] shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:px-8">
+          <TalentLoginAuthPanel
+            tab={tab}
+            onTabChange={setTab}
+            loginName={loginName}
+            onLoginNameChange={setLoginName}
+            password={password}
+            onPasswordChange={setPassword}
+            err={err}
+            loading={loading}
+            onPasswordLogin={onPasswordLogin}
+            workIdentity={workIdentity}
+            onScanLoginSuccess={onScanLoginSuccess}
+            showDevPreview={import.meta.env.DEV}
+            onDevPreview={onDevPreview}
+            rememberPassword={rememberPassword}
+            onRememberPasswordChange={setRememberPassword}
+            bindPending={params.get('bind') === '1'}
+          />
+          <p className="mt-4 text-center text-sm text-[#5c5348]">
+            还没有账号？{' '}
+            <Link to="/register" className="font-semibold text-[#1a140f] underline">
+              手机号注册
+            </Link>
+          </p>
+          <LoginLegalFooter />
+        </div>
       </div>
     </div>
   )

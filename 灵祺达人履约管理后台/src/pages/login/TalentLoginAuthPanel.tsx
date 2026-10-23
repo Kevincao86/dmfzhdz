@@ -28,10 +28,10 @@ export type LoginTab = 'password' | 'sms' | 'email' | 'scan' | 'register'
 export type ScanChannel = 'wechat' | 'douyin'
 
 const inputClass =
-  'w-full rounded-xl border border-slate-200/90 bg-white/90 px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-500/15 sm:text-sm'
+  'w-full rounded-xl border border-[#e4dcd0] bg-white px-4 py-3 text-base text-[#1a140f] outline-none placeholder:text-[#a3988c] focus:border-[#1a140f] sm:text-sm'
 
 const primaryBtn =
-  'w-full rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500 py-3.5 text-sm font-semibold text-white shadow-[0_10px_28px_-8px_rgba(99,102,241,0.55)] transition hover:shadow-[0_14px_32px_-8px_rgba(99,102,241,0.6)] disabled:opacity-60'
+  'w-full rounded-xl bg-[#1a140f] py-3.5 text-sm font-semibold text-[#f4efe6] disabled:opacity-60'
 
 type Props = {
   tab: LoginTab
@@ -219,47 +219,12 @@ export default function TalentLoginAuthPanel({
 
   return (
     <div className="relative w-full">
-      <div className="mb-6">
-        <div className="mb-3 inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800">
-          当前版本 · {ROLE_LABEL[workIdentity]}
-        </div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900">欢迎登录</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          与达人招募小程序账号互通 · 支持手机验证码、邮箱、微信、抖音
-        </p>
-        <div className="mt-4 flex gap-6 border-b border-slate-200">
-          <button
-            type="button"
-            className={`pb-2 text-sm font-semibold ${tab === 'register' ? 'text-slate-400' : 'text-slate-900'}`}
-            onClick={() => onTabChange('password')}
-          >
-            登录
-          </button>
-          <button
-            type="button"
-            className={`pb-2 text-sm font-semibold ${tab === 'register' ? 'text-slate-900' : 'text-slate-400'}`}
-            onClick={() => nav('/register')}
-          >
-            注册
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-5 flex items-center gap-3 rounded-2xl border border-violet-100/80 bg-violet-50/50 px-4 py-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
-          <ShieldCheck className="h-5 w-5 text-violet-600" aria-hidden />
-        </div>
-        <p className="text-xs leading-relaxed text-slate-600">
-          手机号与密码在小程序「我的信息」中设置；数据经 HTTPS 加密传输。
-        </p>
-      </div>
-
       {!bindOpen ? (
         <>
           <LoginAltMethods
             className="mb-5 mt-0"
             showDivider={false}
-            activeId={tab === 'scan' ? scanChannel : tab === 'sms' || tab === 'email' ? tab : undefined}
+            activeId={tab === 'scan' ? scanChannel : tab === 'sms' || tab === 'email' ? 'sms' : undefined}
             onSelect={(id) => {
               if (!agreed) {
                 setAgreeNeed(true)
@@ -282,8 +247,7 @@ export default function TalentLoginAuthPanel({
               }
             }}
             methods={[
-              { id: 'sms', label: '短信验证码' },
-              { id: 'email', label: '邮箱登录' },
+              { id: 'sms', label: '验证码登录' },
               { id: 'douyin', label: '抖音登录' },
               { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
             ]}
@@ -294,7 +258,18 @@ export default function TalentLoginAuthPanel({
         </>
       ) : null}
 
-      {info ? <p className="mb-3 rounded-xl bg-violet-50 px-3 py-2 text-sm text-violet-800">{info}</p> : null}
+      <div className="mb-5 flex items-center gap-3 rounded-2xl border border-[#e4dcd0] bg-white/80 px-4 py-3">
+        <ShieldCheck className="h-5 w-5 shrink-0 text-[#1a140f]" aria-hidden />
+        <p className="text-xs leading-relaxed text-[#3d342c]">
+          <span className="font-semibold">安全登录</span>
+          {' · 数据经 HTTPS 加密传输'}
+        </p>
+      </div>
+      <h2 className="mb-4 text-xl font-semibold text-[#1a140f]" style={{ lineHeight: 1.35 }}>
+        欢迎登录
+      </h2>
+
+      {info ? <p className="mb-3 rounded-xl bg-white px-3 py-2 text-sm text-[#3d342c]">{info}</p> : null}
 
       {bindOpen ? (
         <form
@@ -353,7 +328,7 @@ export default function TalentLoginAuthPanel({
       {!bindOpen && (tab === 'sms' || tab === 'email' || tab === 'scan') ? (
         <button
           type="button"
-          className="mb-4 text-sm font-medium text-violet-700 hover:underline"
+          className="mb-4 text-sm font-medium text-[#1a140f] underline"
           onClick={() => onTabChange('password')}
         >
           ← 账号密码登录
@@ -425,11 +400,30 @@ export default function TalentLoginAuthPanel({
             }
           }}
         >
+          <div className="flex gap-4 text-sm">
+            <button type="button" className="font-semibold text-[#1a140f]" onClick={() => onTabChange('sms')}>手机号</button>
+            <span className="text-[#d5cdc2]">|</span>
+            <button type="button" className="text-[#8a8175]" onClick={() => onTabChange('email')}>邮箱</button>
+          </div>
           <input className={inputClass} placeholder="11 位大陆手机号" value={smsPhone} onChange={(e) => setSmsPhone(e.target.value.replace(/\D/g, '').slice(0, 11))} />
           <div className="flex gap-2">
             <input className={inputClass} placeholder="6 位短信验证码" value={smsCode} onChange={(e) => setSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
-            <button type="button" className="shrink-0 rounded-xl border px-3 text-sm" disabled={smsWait > 0} onClick={() => void sendSms()}>{smsWait > 0 ? `${smsWait}s` : '获取验证码'}</button>
+            <button type="button" className="shrink-0 rounded-xl border border-[#e4dcd0] bg-white px-3 text-sm text-[#1a140f]" disabled={smsWait > 0} onClick={() => void sendSms()}>{smsWait > 0 ? `${smsWait}s` : '获取验证码'}</button>
           </div>
+          {typeof rememberPassword === 'boolean' && onRememberPasswordChange ? (
+            <RememberPasswordRow
+              checked={rememberPassword}
+              onChange={onRememberPasswordChange}
+              className="flex items-center gap-2 text-sm text-[#5c5348]"
+            />
+          ) : null}
+          <LoginAltMethodsAgreeRow
+            checked={agreed}
+            onChange={(v) => {
+              setAgreed(v)
+              if (v) setAgreeNeed(false)
+            }}
+          />
           {showErr ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{showErr}</p> : null}
           <button type="submit" disabled={!agreed} className={primaryBtn}>验证码登录</button>
         </form>
@@ -448,11 +442,30 @@ export default function TalentLoginAuthPanel({
             }
           }}
         >
+          <div className="flex gap-4 text-sm">
+            <button type="button" className="text-[#8a8175]" onClick={() => onTabChange('sms')}>手机号</button>
+            <span className="text-[#d5cdc2]">|</span>
+            <button type="button" className="font-semibold text-[#1a140f]" onClick={() => onTabChange('email')}>邮箱</button>
+          </div>
           <input className={inputClass} placeholder="注册时绑定的邮箱" value={mail} onChange={(e) => setMail(e.target.value.trim())} />
           <div className="flex gap-2">
             <input className={inputClass} placeholder="6 位邮箱验证码" value={mailCode} onChange={(e) => setMailCode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
-            <button type="button" className="shrink-0 rounded-xl border px-3 text-sm" disabled={mailWait > 0} onClick={() => void sendMail()}>{mailWait > 0 ? `${mailWait}s` : '获取验证码'}</button>
+            <button type="button" className="shrink-0 rounded-xl border border-[#e4dcd0] bg-white px-3 text-sm text-[#1a140f]" disabled={mailWait > 0} onClick={() => void sendMail()}>{mailWait > 0 ? `${mailWait}s` : '获取验证码'}</button>
           </div>
+          {typeof rememberPassword === 'boolean' && onRememberPasswordChange ? (
+            <RememberPasswordRow
+              checked={rememberPassword}
+              onChange={onRememberPasswordChange}
+              className="flex items-center gap-2 text-sm text-[#5c5348]"
+            />
+          ) : null}
+          <LoginAltMethodsAgreeRow
+            checked={agreed}
+            onChange={(v) => {
+              setAgreed(v)
+              if (v) setAgreeNeed(false)
+            }}
+          />
           {showErr ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{showErr}</p> : null}
           <button type="submit" disabled={!agreed} className={primaryBtn}>验证码登录</button>
         </form>
