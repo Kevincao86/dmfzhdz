@@ -333,7 +333,7 @@ export default function TalentLoginAuthPanel({
                   onTabChange('sms')
                 }}
               >
-                忘记密码
+                忘记密码，用验证码登录
               </button>
             </p>
           </div>

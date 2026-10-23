@@ -635,7 +635,7 @@ export default function LoginAuthPanel({
                         onInfoHint(null)
                       }}
                     >
-                      忘记密码
+                      忘记密码，用验证码登录
                     </button>
                   </p>
                 </div>
