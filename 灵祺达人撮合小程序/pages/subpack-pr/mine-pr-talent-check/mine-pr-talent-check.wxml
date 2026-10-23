@@ -34,7 +34,7 @@
       <view class="chips">
         <text class="chip">公开主页</text>
         <text class="chip">{{platform === 'xhs' ? '笔记互动' : '口令解析'}}</text>
-        <text class="chip">{{platform === 'xhs' ? '豆包联网解读' : '抖音官方数据检索'}}</text>
+        <text class="chip">{{platform === 'xhs' ? '机构专业解读' : '抖音官方数据检索'}}</text>
       </view>
     </block>
   </view>

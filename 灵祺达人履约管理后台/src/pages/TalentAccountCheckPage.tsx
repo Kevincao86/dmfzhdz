@@ -301,7 +301,7 @@ export default function TalentAccountCheckPage() {
               <div className="talent-check-chips">
                 <span>公开主页</span>
                 <span>{xhs ? '笔记互动' : '口令解析'}</span>
-                <span>{xhs ? '豆包联网解读' : '抖音官方数据检索'}</span>
+                <span>{xhs ? '机构专业解读' : '抖音官方数据检索'}</span>
               </div>
               {view ? (
                 <div className="talent-check-result">
