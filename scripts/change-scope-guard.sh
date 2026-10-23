@@ -1530,7 +1530,7 @@ PAT
       ;;
     baidu_site_verify)
       cat <<'PAT'
-baidu_verify_codeva-hJfwJpoeF5.html
+baidu_verify_codeva-
 ecs-nginx-merchant-cs.conf
 change-scope-guard
 PAT
