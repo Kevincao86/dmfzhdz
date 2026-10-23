@@ -555,23 +555,42 @@ export default function LoginAuthPanel({
             className="mb-5 mt-0"
             showDivider={false}
             icons={partnerMode}
-            activeId={loginMethod === 'password' ? undefined : loginMethod}
+            activeId={
+              loginMethod === 'password'
+                ? undefined
+                : !partnerMode && (loginMethod === 'sms' || loginMethod === 'email')
+                  ? 'sms'
+                  : loginMethod
+            }
             onSelect={(id) => {
               if (id === 'password') return
               if (!agreed) {
                 onErr(LOGIN_AGREE_REQUIRED)
                 return
               }
+              if (!partnerMode && id === 'sms' && (loginMethod === 'sms' || loginMethod === 'email')) {
+                onErr(null)
+                onInfoHint(null)
+                return
+              }
               setLoginMethod(id)
               onErr(null)
               onInfoHint(null)
             }}
-            methods={[
-              { id: 'sms', label: '短信验证码' },
-              { id: 'email', label: '邮箱登录' },
-              { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
-              { id: 'douyin', label: '抖音登录' },
-            ]}
+            methods={
+              partnerMode
+                ? [
+                    { id: 'sms', label: '短信验证码' },
+                    { id: 'email', label: '邮箱登录' },
+                    { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
+                    { id: 'douyin', label: '抖音登录' },
+                  ]
+                : [
+                    { id: 'sms', label: '验证码登录' },
+                    { id: 'wechat', label: '微信登录', hint: '微信扫码登录' },
+                    { id: 'douyin', label: '抖音登录' },
+                  ]
+            }
           />
         ) : null}
 
@@ -653,6 +672,17 @@ export default function LoginAuthPanel({
               </form>
             ) : loginMethod === 'sms' ? (
               <form className="space-y-5" onSubmit={(e) => void submitSmsLogin(e)}>
+                {!partnerMode ? (
+                  <div className="flex items-center gap-4 text-sm">
+                    <button type="button" className="font-semibold text-slate-900" onClick={() => setLoginMethod('sms')}>
+                      手机号
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button type="button" className="text-slate-500" onClick={() => setLoginMethod('email')}>
+                      邮箱
+                    </button>
+                  </div>
+                ) : null}
                 <div>
                   <label className={labelClass} htmlFor="meoo-login-phone">
                     手机号
@@ -704,6 +734,17 @@ export default function LoginAuthPanel({
               </form>
             ) : loginMethod === 'email' ? (
               <form className="space-y-5" onSubmit={(e) => void submitEmailLogin(e)}>
+                {!partnerMode ? (
+                  <div className="flex items-center gap-4 text-sm">
+                    <button type="button" className="text-slate-500" onClick={() => setLoginMethod('sms')}>
+                      手机号
+                    </button>
+                    <span className="text-slate-300">|</span>
+                    <button type="button" className="font-semibold text-slate-900" onClick={() => setLoginMethod('email')}>
+                      邮箱
+                    </button>
+                  </div>
+                ) : null}
                 <div>
                   <label className={labelClass} htmlFor="meoo-login-email">
                     邮箱
