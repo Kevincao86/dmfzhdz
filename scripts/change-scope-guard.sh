@@ -1538,6 +1538,10 @@ LoginLegalFooter
 灵祺达人履约管理后台/index.html
 灵祺达人履约管理后台/public/landing/login-visit-40.mp4
 灵祺达人履约管理后台/public/landing/portrait-shop.jpg
+web版/merchant-erp/src/pages/LoginPage.tsx
+web版/merchant-erp/index.html
+web版/merchant-erp/public/landing/merchant-login-40.mp4
+web版/merchant-erp/public/landing/merchant-login-poster.jpg
 change-scope-guard
 PAT
       ;;

@@ -21,6 +21,8 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 're
   const [err, setErr] = useState<string | null>(null)
   const [infoHint, setInfoHint] = useState<string | null>(null)
   const [pendingRef, setPendingRef] = useState<string | null>(null)
+  const [videoOn, setVideoOn] = useState(true)
+  const partner = isPartnerEdition()
 
   useEffect(() => {
     const ref = captureDistributionRefFromSearch(location.search)
@@ -95,6 +97,68 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 're
         <Link to="/" className="text-sm text-cyan-700 hover:underline">
           返回首页
         </Link>
+      </div>
+    )
+  }
+
+  if (!partner) {
+    return (
+      <div className="relative min-h-[100dvh] bg-[#120c0a] text-[#f6f1ea]">
+        {videoOn ? (
+          <video
+            className="fixed inset-0 h-full w-full object-cover"
+            src="/landing/merchant-login-40.mp4"
+            poster="/landing/merchant-login-poster.jpg"
+            autoPlay
+            muted
+            loop
+            playsInline
+            onError={() => setVideoOn(false)}
+          />
+        ) : (
+          <img src="/landing/merchant-login-poster.jpg" alt="" className="fixed inset-0 h-full w-full object-cover" />
+        )}
+        <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(90deg,rgba(18,12,10,0.12)_0%,rgba(18,12,10,0.08)_40%,rgba(18,12,10,0.42)_100%)]" />
+        <div className="relative z-10 flex min-h-[100dvh] flex-col">
+          <header className="px-6 pt-6 sm:px-10">
+            <LoginPortalNav linkClassName="text-white/85 hover:text-white" activeClassName="text-white" />
+          </header>
+          <div className="flex flex-1 items-center justify-end overflow-auto px-4 py-8 sm:px-10 lg:pr-16">
+            <div className="w-full max-w-[560px]">
+              <h1
+                className="m-0 font-medium text-[#f6f1ea] [text-shadow:0_2px_18px_rgba(0,0,0,0.45)]"
+                style={{
+                  fontFamily: '"Noto Serif SC", "Songti SC", serif',
+                  fontSize: 'clamp(44px, 4.2vw, 64px)',
+                  lineHeight: 1.2,
+                  letterSpacing: '0.06em',
+                }}
+              >
+                灵祺
+                <span className="mt-1.5 block text-[0.62em] tracking-[0.08em]" style={{ lineHeight: 1.25 }}>
+                  AI智能ERP
+                </span>
+              </h1>
+              <p className="mb-8 mt-4 max-w-[20em] text-base text-[#f7f1e8] [text-shadow:0_2px_14px_rgba(0,0,0,0.45)]" style={{ lineHeight: 1.85 }}>
+                门店经营、投流和达人合作在同一处。
+                <br />
+                用商家账号登录工作台。
+              </p>
+              <div className="w-full rounded-[28px] border border-white/50 bg-[#f4efe6]/70 px-6 py-7 text-[#1a140f] shadow-[0_24px_70px_rgba(0,0,0,0.28)] backdrop-blur-2xl sm:px-8">
+                <LoginAuthPanel
+                  initialMode={initialMode}
+                  pendingRefCode={pendingRef}
+                  infoHint={infoHint}
+                  err={err}
+                  onInfoHint={setInfoHint}
+                  onErr={setErr}
+                  onLoginSuccess={() => navigate('/home', { replace: true })}
+                />
+                <LoginLegalFooter />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }

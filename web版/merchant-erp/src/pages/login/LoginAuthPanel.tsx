@@ -554,6 +554,7 @@ export default function LoginAuthPanel({
           <LoginAltMethods
             className="mb-5 mt-0"
             showDivider={false}
+            icons={partnerMode}
             activeId={loginMethod === 'password' ? undefined : loginMethod}
             onSelect={(id) => {
               if (id === 'password') return
