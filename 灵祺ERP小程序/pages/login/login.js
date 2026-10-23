@@ -43,7 +43,7 @@ const LANDING_WAYS = [
   { id: 'pwd', mark: '账号', label: '密码登录', sub: '登录名与密码进入工作台' },
   { id: 'sms', mark: '快捷', label: '验证码', sub: '手机号短信验证码登录' },
   { id: 'reg', mark: '入驻', label: '注册', sub: '新开商家账号，免费起步' },
-  { id: 'wx', mark: '手机', label: '快捷登录', sub: '手机号快捷登录，进入工作台' },
+  { id: 'wx', mark: '微信', label: '微信登录', sub: '微信一键登录，进入工作台' },
 ]
 
 const MODE_HINT = {
@@ -503,6 +503,45 @@ Page({
   async onWxLogin() {
     if (this.data.busy || this.data.wxBusy) return
     if (!this._ensureLegalAgreed('wx')) return
+    if (!tenantAuthApi.apiRoot()) {
+      this.setData({ err: '未配置 MERCHANT_API_BASE_URL，无法使用微信一键登录' })
+      return
+    }
+    this.setData({ wxBusy: true, err: '', infoHint: '' })
+    try {
+      const wxSession = await wxAccountMp.fetchWxLoginCode()
+      const r = await tenantAuthApi.loginWithWxCode({
+        code: wxSession.code,
+        stableDevOpenId: wxSession.stableDevOpenId,
+      })
+      if (!r.ok || !r.access_token) {
+        this.setData({ err: r.message || r.detail || '微信一键登录失败' })
+        return
+      }
+      api.persistSession(
+        { access_token: r.access_token, refresh_token: r.refresh_token || '' },
+        r.loginName || '',
+      )
+      if (r.needsPhoneBind) {
+        this.setData({
+          showBindPhone: true,
+          bindAccessToken: r.access_token,
+          bindPhone: '',
+          bindSmsCode: '',
+          bindNeedCode: false,
+          bindMergeToken: '',
+          bindMergeMsg: '',
+          err: '',
+        })
+        return
+      }
+      this._goHome()
+    } catch (e) {
+      const msg = e && e.message ? e.message : '微信一键登录失败'
+      this.setData({ err: msg })
+    } finally {
+      this.setData({ wxBusy: false })
+    }
   },
 
   onGetPhoneNumber(e) {

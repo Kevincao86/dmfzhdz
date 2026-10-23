@@ -128,12 +128,19 @@
   </view>
 
   <view wx:if="{{pickedId === 'wx'}}" class="auth-card-v2 login-auth-card">
-    <text class="mode-hint">使用手机号快捷登录，进入商家工作台。</text>
+    <text class="mode-hint">使用微信一键登录，进入商家工作台。不会先要手机号。</text>
     <text wx:if="{{err}}" class="err-msg">{{err}}</text>
     <button
-      wx:if="{{!legalAgreed}}"
       class="btn-v2 wx-login"
       loading="{{wxBusy}}"
+      disabled="{{busy || wxBusy}}"
+      bindtap="onWxLogin"
+    >
+      <text>微信一键登录</text>
+    </button>
+    <button
+      wx:if="{{!legalAgreed}}"
+      class="btn-v2 login-cancel"
       disabled="{{busy || wxBusy}}"
       bindtap="onWxLogin"
     >
@@ -142,8 +149,7 @@
     <button
       wx:elif="{{wxPrivacyPending}}"
       id="merchant-privacy-agree-btn"
-      class="btn-v2 wx-login"
-      loading="{{wxBusy}}"
+      class="btn-v2 login-cancel"
       disabled="{{busy || wxBusy}}"
       open-type="agreePrivacyAuthorization"
       bindagreeprivacyauthorization="onWxPrivacyAgree"
@@ -152,8 +158,7 @@
     </button>
     <button
       wx:else
-      class="btn-v2 wx-login"
-      loading="{{wxBusy}}"
+      class="btn-v2 login-cancel"
       disabled="{{busy || wxBusy}}"
       open-type="getPhoneNumber"
       bindgetphonenumber="onGetPhoneNumber"
