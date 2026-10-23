@@ -30,6 +30,9 @@ export type TalentCheckView = {
   recent: string[]
   summary: string
   sales30d: string
+  /** 小红书查验才有。抖音记录没有这个字段。 */
+  platform?: 'douyin' | 'xhs'
+  engageText?: string
   /** 解读已按 PR 派单口径写过。旧缓存没有这段时会补写一次，不重复扣积分。 */
   readingReady?: boolean
   checkedAt: string
@@ -411,6 +414,7 @@ function withSales(view: TalentCheckView, sales30d: string): TalentCheckView {
 }
 
 async function ensureSales(accountId: string, keys: string[], view: TalentCheckView): Promise<TalentCheckView> {
+  if (view.platform === 'xhs') return view
   if (String(view.sales30d || '').trim()) return view
   let analysis: { sales30d: string } | null = null
   try {
@@ -452,6 +456,7 @@ function withReading(
 }
 
 async function ensureReading(accountId: string, keys: string[], view: TalentCheckView): Promise<TalentCheckView> {
+  if (view.platform === 'xhs') return view
   if (view.readingReady || String(view.summary || '').trim().length >= 120) return view
   let analysis: { summary: string; direction: string; recent: string[]; sales30d: string } | null = null
   try {
@@ -507,10 +512,13 @@ export async function runTalentAccountCheck(opts: {
   const freeRemaining = member ? 0 : Math.max(0, 1 - freeUsed)
   const mode = String(opts.body.mode || 'status').trim()
   const platform = String(opts.body.platform || 'douyin').trim().toLowerCase()
-  if (mode !== 'status' && platform && platform !== 'douyin') {
-    const names: Record<string, string> = { xhs: '小红书', kuaishou: '快手', dianping: '大众点评', channels: '视频号' }
+  if (mode !== 'status' && mode !== 'history' && platform && platform !== 'douyin' && platform !== 'xhs') {
+    const names: Record<string, string> = { kuaishou: '快手', dianping: '大众点评', channels: '视频号' }
     const name = names[platform] || '该平台'
-    return { status: 200, body: { ok: false, error: 'platform_closed', message: `${name}尚未开放，目前只能查验抖音` } }
+    return { status: 200, body: { ok: false, error: 'platform_closed', message: `${name}尚未开放，目前只能查验抖音和小红书` } }
+  }
+  if (platform === 'xhs' && (mode === 'parse_sheet' || mode === 'quote')) {
+    return { status: 200, body: { ok: false, error: 'platform_closed', message: '小红书目前只支持单个查验' } }
   }
 
   if (mode === 'history') {
@@ -581,6 +589,10 @@ export async function runTalentAccountCheck(opts: {
         pointsPerCheck: TALENT_CHECK_POINTS,
       },
     }
+  }
+
+  if (platform === 'xhs') {
+    return runXhsAccountCheck(opts, { accountId, member, freeRemaining, balance })
   }
 
   const query = String(opts.body.query || '').trim()
@@ -702,5 +714,401 @@ export async function runTalentAccountCheck(opts: {
       pointsBalance: nextBalance,
       pointsPerCheck: TALENT_CHECK_POINTS,
     },
+  }
+}
+
+const XHS_MODEL = 'doubao-seed-1-8-251228'
+
+function rnoteApiKey() {
+  const raw = String(process.env.RNOTE_API_KEY || '').trim()
+  if (!raw) return ''
+  return raw.startsWith('sk-') ? raw : `sk-${raw}`
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+}
+
+function unwrapRnote(body: Record<string, unknown>) {
+  const level1 = asRecord(body.data)
+  const level2 = asRecord(level1.data)
+  return Object.keys(level2).length ? level2 : level1
+}
+
+function firstUrl(text: string) {
+  const matched = text.match(/https?:\/\/[^\s]+/i)
+  return matched ? matched[0].replace(/[)），。]+$/, '') : ''
+}
+
+function xhsUserIdIn(text: string) {
+  const profile = text.match(/\/user\/profile\/([0-9a-f]{24})/i)
+  if (profile) return profile[1]!.toLowerCase()
+  const bare = text.trim().match(/^[0-9a-f]{24}$/i)
+  return bare ? bare[0].toLowerCase() : ''
+}
+
+function xhsNoteIdIn(text: string) {
+  const note = text.match(/\/(?:explore|discovery\/item|item)\/([0-9a-f]{24})/i)
+  return note ? note[1]!.toLowerCase() : ''
+}
+
+async function rnoteGet(path: string, params: Record<string, string>) {
+  const key = rnoteApiKey()
+  if (!key) throw new Error('小红书查验还没配好，请稍后再试')
+  const url = new URL(path, 'https://rnote.dev')
+  for (const [name, value] of Object.entries(params)) {
+    if (value) url.searchParams.set(name, value)
+  }
+  const res = await fetch(url, {
+    headers: { 'X-API-Key': key, accept: 'application/json' },
+    signal: AbortSignal.timeout(25_000),
+  })
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  const detail = String(body.error || body.detail || '')
+  if (res.status === 402 || /余额不足/.test(detail)) {
+    throw new Error('小红书数据接口余额不足，请充值后再查')
+  }
+  if (res.status === 401 || /无效的 API Key/.test(detail)) throw new Error('小红书查验密钥无效')
+  if (!res.ok || body.success === false) throw new Error(detail || '没有查到这个小红书账号')
+  return body
+}
+
+function findXhsUser(value: unknown, depth = 0): { userId: string; nickname: string } | null {
+  if (depth > 6 || value == null) return null
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const hit = findXhsUser(item, depth + 1)
+      if (hit) return hit
+    }
+    return null
+  }
+  if (typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const userId = String(row.userid || row.user_id || row.userId || '').trim().toLowerCase()
+  if (/^[0-9a-f]{24}$/.test(userId)) {
+    return { userId, nickname: String(row.nickname || row.name || '').trim() }
+  }
+  for (const child of Object.values(row)) {
+    if (child && typeof child === 'object') {
+      const hit = findXhsUser(child, depth + 1)
+      if (hit) return hit
+    }
+  }
+  return null
+}
+
+async function resolveXhsUserId(query: string) {
+  let text = query.trim()
+  const url = firstUrl(text)
+  if (url && /xhslink\.com|xhs\.cn/i.test(url)) {
+    try {
+      const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8_000) })
+      if (res.url) text = `${text}\n${res.url}`
+    } catch {
+      /* 短链打不开就继续用原文 */
+    }
+  }
+  const direct = xhsUserIdIn(text)
+  if (direct) return { userId: direct, nickname: '' }
+  const noteId = xhsNoteIdIn(text)
+  if (noteId) {
+    for (const path of ['/api/v2/crawler/note/image', '/api/v2/crawler/note/video']) {
+      try {
+        const body = await rnoteGet(path, { note_id: noteId })
+        const hit = findXhsUser(body)
+        if (hit) return hit
+      } catch (err) {
+        const message = err instanceof Error ? err.message : ''
+        if (/余额不足|密钥无效/.test(message)) throw err
+      }
+    }
+  }
+  const keyword = text.replace(/https?:\/\/\S+/g, '').trim() || text
+  const body = await rnoteGet('/api/v2/crawler/search/users', { keyword: keyword.slice(0, 40), page: '1' })
+  const hit = findXhsUser(body)
+  if (!hit) throw new Error('没有查到这个小红书账号。请换主页链接或小红书号。')
+  return hit
+}
+
+function countOf(value: unknown) {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? n : 0
+}
+
+function avgOf(nums: number[]) {
+  if (!nums.length) return 0
+  return Math.round(nums.reduce((sum, n) => sum + n, 0) / nums.length)
+}
+
+type XhsFacts = {
+  userId: string
+  redId: string
+  nickname: string
+  signature: string
+  avatarUrl: string
+  fans: number
+  liked: number
+  collected: number
+  follows: number
+  notes: number
+  engageText: string
+  recent: string[]
+  brief: string
+}
+
+async function loadXhsFacts(userId: string, nicknameHint: string): Promise<XhsFacts> {
+  const infoBody = await rnoteGet('/api/v2/crawler/user/info', { user_id: userId })
+  const info = unwrapRnote(infoBody)
+  const postedBody = await rnoteGet('/api/v2/crawler/user/posted', { user_id: userId, num: '20' })
+  const posted = unwrapRnote(postedBody)
+  const notes = Array.isArray(posted.notes) ? posted.notes.map(asRecord) : []
+  const titles: string[] = []
+  const likes: number[] = []
+  const collects: number[] = []
+  const lines: string[] = []
+  for (const note of notes) {
+    const title = String(note.display_title || note.title || '').trim()
+    if (title && titles.length < 3) titles.push(title.slice(0, 40))
+    const like = countOf(note.likes)
+    const collect = countOf(note.collected_count)
+    likes.push(like)
+    collects.push(collect)
+    if (lines.length < 8 && title) {
+      lines.push(`${title.slice(0, 40)}｜赞${like}｜藏${collect}｜评${countOf(note.comments_count)}${note.is_goods_note ? '｜商品笔记' : ''}`)
+    }
+  }
+  const likeAvg = avgOf(likes)
+  const collectAvg = avgOf(collects)
+  const engageText = notes.length ? `近期${notes.length}篇，篇均赞${followersText(likeAvg)}，篇均藏${followersText(collectAvg)}` : '近期笔记未公开'
+  const ip = String(info.ip_location || '').trim()
+  const desc = String(info.desc || '').trim()
+  const verify = String(info.red_official_verify_content || '').trim()
+  return {
+    userId,
+    redId: String(info.red_id || '').trim(),
+    nickname: String(info.nickname || nicknameHint || '').trim(),
+    signature: [desc, ip ? `IP ${ip}` : ''].filter(Boolean).join(' · '),
+    avatarUrl: String(info.images || info.imageb || '').trim(),
+    fans: countOf(info.fans),
+    liked: countOf(info.liked),
+    collected: countOf(info.collected),
+    follows: countOf(info.follows),
+    notes: countOf(asRecord(info.note_num_stat).posted || info.ndiscovery),
+    engageText,
+    recent: titles,
+    brief: [
+      `小红书号：${String(info.red_id || '未公开')}`,
+      `昵称：${String(info.nickname || nicknameHint || '未公开')}`,
+      `粉丝：${followersText(countOf(info.fans))}`,
+      `关注：${followersText(countOf(info.follows))}`,
+      `获赞：${followersText(countOf(info.liked))}`,
+      `收藏：${followersText(countOf(info.collected))}`,
+      `笔记数：${followersText(countOf(asRecord(info.note_num_stat).posted || info.ndiscovery))}`,
+      `简介：${desc || '未公开'}`,
+      ip ? `IP属地：${ip}` : '',
+      verify ? `认证：${verify}` : '',
+      engageText,
+      lines.length ? `近期笔记：\n${lines.join('\n')}` : '近期笔记未公开',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  }
+}
+
+function responsesText(data: Record<string, unknown>) {
+  if (typeof data.output_text === 'string' && data.output_text.trim()) return data.output_text.trim()
+  const output = data.output
+  if (!Array.isArray(output)) return ''
+  const parts: string[] = []
+  for (const item of output) {
+    const rec = asRecord(item)
+    const blocks = Array.isArray(rec.content) ? rec.content : []
+    for (const block of blocks) {
+      const text = asRecord(block).text
+      if (typeof text === 'string' && text.trim()) parts.push(text.trim())
+    }
+  }
+  return parts.join('\n').trim()
+}
+
+async function askXhsDoubao(facts: string) {
+  const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('../../vite-plugins/merchantRegistryVendorEnv.js')
+  const env = await mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), process.env as Record<string, string>)
+  const key = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
+  if (!key) throw new Error('豆包暂不可用，请稍后再试')
+  const raw = String(env.MERCHANT_AI_DOUBAO_ARK_BASE || '').trim().replace(/\/$/, '')
+  const root = !raw ? 'https://ark.cn-beijing.volces.com/api/v3' : raw.endsWith('/api/v3') ? raw : `${raw}/api/v3`
+  const system = [
+    '你是本地生活 PR 的小红书选号助手。',
+    '粉丝、获赞、收藏、笔记数、篇均赞藏以用户消息里的公开资料为准，不要改写。联网只用来核对内容调性，对不上就以资料为准。',
+    '不要编造报价、GMV、手机号或微信。小红书公开笔记没有成交金额，sales30d 固定写「公开信息不足，暂不估算」。',
+    'summary 是给 PR 派单用的解读，180到320字，覆盖三件事：内容调性和观众是谁；适合合作的商家品类和内容形式；brief 要写清什么、要避开什么。',
+    '只输出一个 JSON 对象，不要 Markdown。',
+    '键：summary、direction（8个字以内）、recent（最多3条，优先抄资料里的笔记标题）、sales30d。',
+  ].join('')
+  const user = `${facts}\n请联网检索这个小红书账号的公开内容，再按资料里的数字写 PR 派单解读。`
+  const post = async (web: boolean) => {
+    const res = await fetch(`${root}/responses`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: XHS_MODEL,
+        stream: false,
+        ...(web ? { tools: [{ type: 'web_search', max_keyword: 3, limit: 5, sources: ['search_engine'] }] } : {}),
+        thinking: { type: 'disabled' },
+        input: [
+          { role: 'system', content: [{ type: 'input_text', text: system }] },
+          { role: 'user', content: [{ type: 'input_text', text: user }] },
+        ],
+      }),
+      signal: AbortSignal.timeout(60_000),
+    })
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+    if (!res.ok) {
+      const err = asRecord(data.error)
+      throw new Error(String(err.message || `豆包分析失败`))
+    }
+    const text = responsesText(data)
+    if (!text) throw new Error('豆包这次没有写完分析')
+    return text
+  }
+  try {
+    return readAnalysisJson(await post(true))
+  } catch {
+    return readAnalysisJson(await post(false))
+  }
+}
+
+function buildXhsView(facts: XhsFacts, direction: string, summary: string, checkedAt: string, charged: number, balance: number | null): TalentCheckView {
+  const praise = followersText(facts.liked + facts.collected)
+  const rows: CheckRow[] = [
+    { label: '昵称', value: facts.nickname || '未公开', source: '公开主页' },
+    { label: '小红书号', value: facts.redId || '未公开', source: '公开主页' },
+    { label: '粉丝', value: followersText(facts.fans), source: '公开主页' },
+    { label: '简介', value: facts.signature || '未公开', source: '公开主页' },
+    { label: '获赞与收藏', value: praise, source: '公开主页' },
+  ]
+  if (direction) rows.push({ label: '内容方向', value: direction, source: '豆包联网' })
+  rows.push({ label: '近期篇均互动', value: facts.engageText, source: '公开笔记' })
+  if (facts.recent.length) rows.push({ label: '近期内容', value: facts.recent.join('、'), source: '公开笔记' })
+  rows.push({ label: '说明', value: summary, source: '豆包联网' })
+  return {
+    nickname: facts.nickname,
+    account: facts.redId || facts.userId,
+    followersText: followersText(facts.fans),
+    signature: facts.signature,
+    avatarUrl: facts.avatarUrl,
+    direction,
+    recent: facts.recent,
+    summary,
+    sales30d: SALES_UNKNOWN,
+    platform: 'xhs',
+    engageText: facts.engageText,
+    readingReady: summary.trim().length >= 120,
+    checkedAt,
+    checkedAtLabel: checkedClock(checkedAt),
+    cached: false,
+    charged,
+    balance,
+    rows,
+  }
+}
+
+async function runXhsAccountCheck(
+  opts: {
+    supabaseUrl: string
+    serviceRole: string
+    token: string
+    account: MpAccountRow
+    body: Record<string, unknown>
+  },
+  gate: { accountId: string; member: boolean; freeRemaining: number; balance: number },
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const { accountId, member, freeRemaining, balance } = gate
+  const query = String(opts.body.query || '').trim()
+  if (!query) return { status: 200, body: { ok: false, error: 'missing_query', message: '请输入小红书号、主页链接或昵称' } }
+  const directId = xhsUserIdIn(query)
+  const preset = Array.from(new Set([directId ? `xhs_${directId}` : '', `xhsq_${normDouyinKey(query)}`].filter(Boolean)))
+  const cachedFirst = findCached(accountId, preset)
+  if (cachedFirst) {
+    return { status: 200, body: { ok: true, view: cachedFirst, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
+  }
+  if (!member && freeRemaining <= 0) return { status: 200, body: upgradeBody() }
+  if (member && balance < TALENT_CHECK_POINTS) {
+    return {
+      status: 200,
+      body: {
+        ok: false,
+        error: 'insufficient_points',
+        message: `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${TALENT_CHECK_POINTS}），请充值积分或升级套餐后再试`,
+        required: TALENT_CHECK_POINTS,
+        balance,
+      },
+    }
+  }
+  let resolved: { userId: string; nickname: string }
+  try {
+    resolved = await resolveXhsUserId(query)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '没有查到这个小红书账号'
+    return { status: 200, body: { ok: false, error: 'parse_failed', message } }
+  }
+  const keys = Array.from(new Set([`xhs_${resolved.userId}`, `xhsq_${normDouyinKey(query)}`, ...preset]))
+  const cachedResolved = findCached(accountId, keys)
+  if (cachedResolved) {
+    return { status: 200, body: { ok: true, view: cachedResolved, member, freeRemaining, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS } }
+  }
+  let facts: XhsFacts
+  try {
+    facts = await loadXhsFacts(resolved.userId, resolved.nickname)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '没有查到这个小红书账号'
+    return { status: 200, body: { ok: false, error: 'parse_failed', message } }
+  }
+  let analysis: { summary: string; direction: string; recent: string[] } | null = null
+  try {
+    analysis = await askXhsDoubao(facts.brief)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '豆包分析失败'
+    return { status: 200, body: { ok: false, error: 'analysis_failed', message } }
+  }
+  if (!analysis) {
+    return { status: 200, body: { ok: false, error: 'analysis_incomplete', message: '豆包这次没有写完分析，未扣积分。请再查一次。' } }
+  }
+  const checkedAt = new Date().toISOString()
+  const view = buildXhsView(facts, analysis.direction, analysis.summary, checkedAt, member ? TALENT_CHECK_POINTS : 0, null)
+  if (!member) {
+    for (const key of keys) writeCache(accountId, key, view)
+    writeFreeUsed(accountId)
+    return {
+      status: 200,
+      body: { ok: true, view: { ...view, charged: 0 }, member: false, freeRemaining: 0, pointsBalance: balance, pointsPerCheck: TALENT_CHECK_POINTS },
+    }
+  }
+  const daySlot = Math.floor(Date.now() / 86400000)
+  const spent = await spendMpAiPointsForSessionToken(opts.supabaseUrl, opts.serviceRole, opts.token, {
+    kind: 'talent_check',
+    idempotencyKey: `talent-check:${accountId}:xhs:${resolved.userId}:${daySlot}`,
+    note: `达人查验 小红书 ${facts.nickname || facts.redId}`,
+    roleHint: 'pr',
+  })
+  if (!spent.ok) {
+    return {
+      status: 200,
+      body: {
+        ok: false,
+        error: spent.error || 'insufficient_points',
+        message: spent.message || '积分不足，请充值积分或升级套餐后再试',
+        required: TALENT_CHECK_POINTS,
+        balance,
+      },
+    }
+  }
+  const charged = spent.already ? 0 : spent.pointsCharged
+  const saved = { ...view, charged, balance: spent.newBalance }
+  for (const key of keys) writeCache(accountId, key, saved)
+  return {
+    status: 200,
+    body: { ok: true, view: saved, member: true, freeRemaining: 0, pointsBalance: spent.newBalance, pointsPerCheck: TALENT_CHECK_POINTS },
   }
 }

@@ -14,6 +14,8 @@ export type TalentCheckView = {
   recent: string[]
   summary: string
   sales30d?: string
+  platform?: 'douyin' | 'xhs'
+  engageText?: string
   checkedAt: string
   checkedAtLabel: string
   cached: boolean

@@ -9,7 +9,7 @@
   <view class="hint" wx:if="{{hint}}">{{hint}}</view>
 
   <view class="platforms">
-    <view class="platform {{item.open ? 'on' : 'off'}}" wx:for="{{platforms}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlatform">
+    <view class="platform {{item.open ? 'on' : 'off'}} {{platform === item.id ? 'picked' : ''}}" wx:for="{{platforms}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlatform">
       <image src="{{item.logo}}" mode="aspectFill" />
       <view>
         <view class="pname">{{item.label}}</view>
@@ -26,15 +26,15 @@
     <block wx:if="{{tab === 'single'}}">
       <view class="search">
         <view class="field">
-          <image src="/images/platforms/douyin.png" mode="aspectFill" />
-          <input placeholder="抖音号、口令或主页链接" value="{{query}}" bindinput="onQuery" />
+          <image src="{{platform === 'xhs' ? '/images/platforms/xiaohongshu.png' : '/images/platforms/douyin.png'}}" mode="aspectFill" />
+          <input placeholder="{{platform === 'xhs' ? '小红书号、主页链接或昵称' : '抖音号、口令或主页链接'}}" value="{{query}}" bindinput="onQuery" />
         </view>
         <button class="go" loading="{{busy}}" disabled="{{busy}}" bindtap="onCheck">{{singleLabel}}</button>
       </view>
       <view class="chips">
         <text class="chip">公开主页</text>
-        <text class="chip">口令解析</text>
-        <text class="chip">抖音官方数据检索</text>
+        <text class="chip">{{platform === 'xhs' ? '笔记互动' : '口令解析'}}</text>
+        <text class="chip">{{platform === 'xhs' ? '豆包联网解读' : '抖音官方数据检索'}}</text>
       </view>
     </block>
   </view>
@@ -46,7 +46,7 @@
         <view class="fallback" wx:else>{{view.nickname[0] || '达'}}</view>
         <view>
           <view class="nick">{{view.nickname || '未公开'}}</view>
-          <view class="account"><image src="/images/platforms/douyin.png" mode="aspectFill" />{{view.account || '未公开'}}</view>
+          <view class="account"><image src="{{view.platform === 'xhs' ? '/images/platforms/xiaohongshu.png' : '/images/platforms/douyin.png'}}" mode="aspectFill" />{{view.account || '未公开'}}</view>
           <text class="tag">公开主页</text>
         </view>
       </view>
@@ -54,14 +54,14 @@
         <view class="metric"><view class="ml"><text>粉丝</text></view><view class="mv">{{view.followersText || '未公开'}}</view></view>
         <view class="metric"><view class="ml"><text>签名</text></view><view class="mv">{{view.signature || '未公开'}}</view></view>
         <view class="metric">
-          <view class="ml"><text>内容方向</text><text class="tag">抖音官方数据检索</text></view>
+          <view class="ml"><text>内容方向</text><text class="tag">{{view.platform === 'xhs' ? '豆包联网' : '抖音官方数据检索'}}</text></view>
           <view class="mv">{{view.direction || '未写到'}}</view>
           <view class="sales">
-            <view class="ml"><text>近30天带货金额</text></view>
-            <view class="mv">{{view.sales30d || '公开信息不足，暂不估算'}}</view>
+            <view class="ml"><text>{{view.platform === 'xhs' ? '近期篇均互动' : '近30天带货金额'}}</text></view>
+            <view class="mv">{{view.platform === 'xhs' ? (view.engageText || '未公开') : (view.sales30d || '公开信息不足，暂不估算')}}</view>
           </view>
         </view>
-        <view class="metric"><view class="ml"><text>近期内容</text><text class="tag">抖音官方数据检索</text></view><view class="mv">{{view.recentText || '未写到'}}</view></view>
+        <view class="metric"><view class="ml"><text>近期内容</text><text class="tag">{{view.platform === 'xhs' ? '公开笔记' : '抖音官方数据检索'}}</text></view><view class="mv">{{view.recentText || '未写到'}}</view></view>
       </view>
       <view class="read">
         <view class="read-title">豆包AI助手解读</view>
@@ -70,9 +70,9 @@
       <view class="clock">核对于 {{view.checkedAtLabel}} · 核验限于达人公开数据{{view.cached ? ' · 24小时内已查过，未再扣积分' : ''}}</view>
     </view>
     <view class="guides" wx:else>
-      <view class="guide"><view class="gb">公开主页</view><view class="gs">昵称、抖音号、粉丝与签名，以该账号公开主页为准。</view></view>
-      <view class="guide"><view class="gb">抖音官方数据检索</view><view class="gs">内容方向与近期作品标题，依据抖音官方数据检索。</view></view>
-      <view class="guide"><view class="gb">核验口径</view><view class="gs">本次只核验达人公开数据，并由官方助手进行达人数据分析和评估。</view></view>
+      <view class="guide"><view class="gb">公开主页</view><view class="gs">{{platform === 'xhs' ? '昵称、小红书号、粉丝与简介，以该账号公开主页为准。' : '昵称、抖音号、粉丝与签名，以该账号公开主页为准。'}}</view></view>
+      <view class="guide"><view class="gb">{{platform === 'xhs' ? '公开笔记' : '抖音官方数据检索'}}</view><view class="gs">{{platform === 'xhs' ? '近期笔记的赞、藏和篇均互动，按公开笔记计算。' : '内容方向与近期作品标题，依据抖音官方数据检索。'}}</view></view>
+      <view class="guide"><view class="gb">核验口径</view><view class="gs">{{platform === 'xhs' ? '粉丝和互动用公开数据，解读由豆包联网完成，不改这些数字。' : '本次只核验达人公开数据，并由官方助手进行达人数据分析和评估。'}}</view></view>
     </view>
   </block>
 
@@ -94,7 +94,7 @@
       <view class="history-fallback" wx:else>{{item.nickname[0] || '达'}}</view>
       <view class="history-main">
         <view class="history-name">{{item.nickname || '未公开'}}</view>
-        <view class="history-meta">{{item.account || '未公开'}} · 粉丝 {{item.followersText || '未公开'}} · {{item.sales30d || '暂不估算'}}</view>
+        <view class="history-meta">{{item.account || '未公开'}} · 粉丝 {{item.followersText || '未公开'}} · {{item.platform === 'xhs' ? (item.engageText || '篇均未公开') : (item.sales30d || '暂不估算')}}</view>
       </view>
       <view class="history-time">{{item.checkedAtLabel}}</view>
     </view>

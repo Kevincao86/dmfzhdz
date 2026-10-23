@@ -30,8 +30,8 @@ function quote(queries) {
   return post({ mode: 'quote', platform: 'douyin', queries })
 }
 
-function check(query) {
-  return post({ mode: 'check', platform: 'douyin', query })
+function check(query, platform) {
+  return post({ mode: 'check', platform: platform || 'douyin', query })
 }
 
 function history() {

@@ -11,6 +11,7 @@ function messageOf(err, fallback) {
 Page({
   data: {
     tab: 'single',
+    platform: 'douyin',
     query: '',
     busy: false,
     member: false,
@@ -18,7 +19,7 @@ Page({
     pointsBalance: 0,
     platforms: [
       { id: 'douyin', label: '抖音', logo: '/images/platforms/douyin.png', open: true },
-      { id: 'xhs', label: '小红书', logo: '/images/platforms/xiaohongshu.png', open: false },
+      { id: 'xhs', label: '小红书', logo: '/images/platforms/xiaohongshu.png', open: true },
       { id: 'kuaishou', label: '快手', logo: '/images/platforms/kuaishou-local.png', open: false },
       { id: 'dianping', label: '大众点评', logo: '/images/platforms/dianping.png', open: false },
       { id: 'channels', label: '视频号', logo: '/images/platforms/wechat.png', open: false },
@@ -51,7 +52,7 @@ Page({
     if (!record) return
     const view = Object.assign({}, record, { cached: false })
     view.recentText = (view.recent || []).join('  ')
-    this.setData({ tab: 'single', query: record.account || '', view })
+    this.setData({ tab: 'single', platform: record.platform === 'xhs' ? 'xhs' : 'douyin', query: record.account || '', view })
   },
 
   async loadStatus() {
@@ -86,12 +87,20 @@ Page({
   onPlatform(e) {
     const id = e.currentTarget.dataset.id
     const item = (this.data.platforms || []).find((row) => row.id === id)
-    if (!item || item.open) return
-    wx.showToast({ title: `${item.label}尚未开放`, icon: 'none' })
+    if (!item) return
+    if (!item.open) {
+      wx.showToast({ title: `${item.label}尚未开放`, icon: 'none' })
+      return
+    }
+    this.setData({ platform: id, view: null, tab: id === 'xhs' ? 'single' : this.data.tab })
   },
 
   onTab(e) {
     const tab = e.currentTarget.dataset.tab
+    if (tab === 'batch' && this.data.platform === 'xhs') {
+      wx.showToast({ title: '小红书目前只支持单个查验', icon: 'none' })
+      return
+    }
     if (tab === 'batch' && !this.data.member) {
       this.promptUpgrade('免费版每月只能查 1 个号。批量查验需要升级会员。')
       return
@@ -112,7 +121,7 @@ Page({
     }
     this.setData({ busy: true })
     try {
-      const data = await api.check(query)
+      const data = await api.check(query, this.data.platform)
       if (!data || data.ok === false) {
         this.handleGate(data)
         return

@@ -7,7 +7,8 @@
 .platforms { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 24rpx; }
 .platform { display: flex; align-items: center; gap: 10rpx; background: #fffdf8; border: 1px solid #efe6d8; border-radius: 16rpx; padding: 10rpx 14rpx; }
 .platform image { width: 48rpx; height: 48rpx; border-radius: 10rpx; }
-.platform.on { border-color: #2c2416; }
+.platform.on { border-color: #efe6d8; }
+.platform.picked { border-color: #2c2416; background: #fff; }
 .platform.off { opacity: 0.72; }
 .pname { font-size: 24rpx; font-weight: 600; }
 .pclosed { font-size: 18rpx; color: #9a8b76; }

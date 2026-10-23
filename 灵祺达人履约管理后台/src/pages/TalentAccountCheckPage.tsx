@@ -8,7 +8,7 @@ type SheetRow = { douyinId: string; nickname: string; state: '' | 'ok' | 'fail';
 
 const PLATFORMS = [
   { id: 'douyin', label: '抖音', logo: '/platforms/douyin.png', open: true },
-  { id: 'xhs', label: '小红书', logo: '/platforms/xiaohongshu.png', open: false },
+  { id: 'xhs', label: '小红书', logo: '/platforms/xiaohongshu.png', open: true },
   { id: 'kuaishou', label: '快手', logo: '/platforms/kuaishou-local.png', open: false },
   { id: 'dianping', label: '大众点评', logo: '/platforms/dianping.png', open: false },
   { id: 'channels', label: '视频号', logo: '/platforms/wechat.png', open: false },
@@ -51,6 +51,7 @@ export default function TalentAccountCheckPage() {
   const [view, setView] = useState<TalentCheckView | null>(null)
   const [rows, setRows] = useState<SheetRow[]>([])
   const [records, setRecords] = useState<TalentCheckView[]>([])
+  const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]['id']>('douyin')
 
   function applyStatus(data: TalentCheckStatus) {
     setMember(!!data.member)
@@ -88,17 +89,22 @@ export default function TalentAccountCheckPage() {
 
   function openRecord(record: TalentCheckView) {
     setTab('single')
+    setPlatform(record.platform === 'xhs' ? 'xhs' : 'douyin')
     setQuery(record.account || '')
     setView({ ...record, cached: false, recent: record.recent || [] })
   }
 
   const singleLabel = busy ? '查验中…' : !member ? (freeRemaining > 0 ? '免费查验' : '去升级') : '开始查验'
 
-  function onPlatform(id: string) {
+  function onPlatform(id: (typeof PLATFORMS)[number]['id']) {
     const item = PLATFORMS.find((row) => row.id === id)
     if (!item?.open) {
-      window.alert(`${item?.label || '该平台'}尚未开放，目前只能查验抖音`)
+      window.alert(`${item?.label || '该平台'}尚未开放，目前只能查验抖音和小红书`)
+      return
     }
+    setPlatform(id)
+    setView(null)
+    if (id === 'xhs') setTab('single')
   }
 
   async function onCheck() {
@@ -110,7 +116,7 @@ export default function TalentAccountCheckPage() {
     }
     setBusy(true)
     try {
-      const data = await postTalentAccountCheck({ mode: 'check', query: text, platform: 'douyin' })
+      const data = await postTalentAccountCheck({ mode: 'check', query: text, platform })
       if (!data.ok) {
         handleGate(navigate, data)
         return
@@ -203,7 +209,8 @@ export default function TalentAccountCheckPage() {
     }
   }
 
-  const douyinLogo = PLATFORMS[0].logo
+  const active = PLATFORMS.find((item) => item.id === platform) || PLATFORMS[0]
+  const xhs = platform === 'xhs' || view?.platform === 'xhs'
   const recent = (view?.recent || []).filter(Boolean)
 
   return (
@@ -223,7 +230,7 @@ export default function TalentAccountCheckPage() {
               <button
                 key={item.id}
                 type="button"
-                className={`talent-check-platform${item.open ? ' on' : ' off'}`}
+                className={`talent-check-platform${item.open ? ' on' : ' off'}${platform === item.id ? ' picked' : ''}`}
                 onClick={() => onPlatform(item.id)}
               >
                 <img src={item.logo} alt="" />
@@ -242,6 +249,10 @@ export default function TalentAccountCheckPage() {
               type="button"
               className={tab === 'batch' ? 'on' : ''}
               onClick={() => {
+                if (platform === 'xhs') {
+                  window.alert('小红书目前只支持单个查验')
+                  return
+                }
                 if (!member) {
                   promptUpgrade(navigate, '免费版每月只能查 1 个号。批量查验需要升级会员。')
                   return
@@ -256,9 +267,9 @@ export default function TalentAccountCheckPage() {
             <>
               <div className="talent-check-search">
                 <label className="talent-check-field">
-                  <img src={douyinLogo} alt="" />
+                  <img src={active.logo} alt="" />
                   <input
-                    placeholder="抖音号、口令或主页链接"
+                    placeholder={xhs ? '小红书号、主页链接或昵称' : '抖音号、口令或主页链接'}
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
@@ -269,8 +280,8 @@ export default function TalentAccountCheckPage() {
               </div>
               <div className="talent-check-chips">
                 <span>公开主页</span>
-                <span>口令解析</span>
-                <span>抖音官方数据检索</span>
+                <span>{xhs ? '笔记互动' : '口令解析'}</span>
+                <span>{xhs ? '豆包联网解读' : '抖音官方数据检索'}</span>
               </div>
               {view ? (
                 <div className="talent-check-result">
@@ -284,7 +295,7 @@ export default function TalentAccountCheckPage() {
                       <div>
                         <strong>{view.nickname || '未公开'}</strong>
                         <div className="talent-check-account">
-                          <img src={douyinLogo} alt="" />
+                          <img src={view.platform === 'xhs' ? PLATFORMS[1].logo : PLATFORMS[0].logo} alt="" />
                           {view.account || '未公开'}
                         </div>
                         <span className="talent-check-tag">公开主页</span>
@@ -300,15 +311,15 @@ export default function TalentAccountCheckPage() {
                         <p>{view.signature || '未公开'}</p>
                       </div>
                       <div>
-                        <div className="talent-check-metric-top"><small>内容方向</small><span className="talent-check-tag">抖音官方数据检索</span></div>
+                        <div className="talent-check-metric-top"><small>内容方向</small><span className="talent-check-tag">{view.platform === 'xhs' ? '豆包联网' : '抖音官方数据检索'}</span></div>
                         <p>{view.direction || '未写到'}</p>
                         <div className="talent-check-sales">
-                          <div className="talent-check-metric-top"><small>近30天带货金额</small></div>
-                          <p>{view.sales30d || '公开信息不足，暂不估算'}</p>
+                          <div className="talent-check-metric-top"><small>{view.platform === 'xhs' ? '近期篇均互动' : '近30天带货金额'}</small></div>
+                          <p>{view.platform === 'xhs' ? view.engageText || '未公开' : view.sales30d || '公开信息不足，暂不估算'}</p>
                         </div>
                       </div>
                       <div>
-                        <div className="talent-check-metric-top"><small>近期内容</small><span className="talent-check-tag">抖音官方数据检索</span></div>
+                        <div className="talent-check-metric-top"><small>近期内容</small><span className="talent-check-tag">{view.platform === 'xhs' ? '公开笔记' : '抖音官方数据检索'}</span></div>
                         <p>{recent.length ? recent.join('  ') : '未写到'}</p>
                       </div>
                     </div>
@@ -324,9 +335,9 @@ export default function TalentAccountCheckPage() {
                 </div>
               ) : (
                 <div className="talent-check-guides">
-                  <div><b>公开主页</b><span>昵称、抖音号、粉丝与签名，以该账号公开主页为准。</span></div>
-                  <div><b>抖音官方数据检索</b><span>内容方向与近期作品标题，依据抖音官方数据检索。</span></div>
-                  <div><b>核验口径</b><span>本次只核验达人公开数据，并由官方助手进行达人数据分析和评估。</span></div>
+                  <div><b>公开主页</b><span>{xhs ? '昵称、小红书号、粉丝与简介，以该账号公开主页为准。' : '昵称、抖音号、粉丝与签名，以该账号公开主页为准。'}</span></div>
+                  <div><b>{xhs ? '公开笔记' : '抖音官方数据检索'}</b><span>{xhs ? '近期笔记的赞、藏和篇均互动，按公开笔记计算。' : '内容方向与近期作品标题，依据抖音官方数据检索。'}</span></div>
+                  <div><b>核验口径</b><span>{xhs ? '粉丝和互动用公开数据，解读由豆包联网完成，不改这些数字。' : '本次只核验达人公开数据，并由官方助手进行达人数据分析和评估。'}</span></div>
                 </div>
               )}
             </>
@@ -351,7 +362,7 @@ export default function TalentAccountCheckPage() {
                   下载模板
                 </button>
               </div>
-              <div className="talent-check-note">第一列填抖音号，第二列昵称可以空着。支持 xlsx、csv，一次最多 30 个。目前只能批量查验抖音。</div>
+              <div className="talent-check-note">{xhs ? '小红书目前只支持单个查验。' : '第一列填抖音号，第二列昵称可以空着。支持 xlsx、csv，一次最多 30 个。目前只能批量查验抖音。'}</div>
               {rows.map((row) => (
                 <div className={`talent-check-line ${row.state}`} key={`${row.douyinId}-${row.note}`}>
                   {row.nickname || row.douyinId} · {row.note}
@@ -383,7 +394,7 @@ export default function TalentAccountCheckPage() {
                     <span>
                       <b>{record.nickname || '未公开'}</b>
                       <small>
-                        {record.account || '未公开'} · 粉丝 {record.followersText || '未公开'} · {record.sales30d || '暂不估算'}
+                        {record.account || '未公开'} · 粉丝 {record.followersText || '未公开'} · {record.platform === 'xhs' ? record.engageText || '篇均未公开' : record.sales30d || '暂不估算'}
                       </small>
                     </span>
                     <time>{record.checkedAtLabel || ''}</time>
