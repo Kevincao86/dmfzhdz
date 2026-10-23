@@ -98,6 +98,7 @@ list_scopes() {
   mp_share_card_title    达人/商家微信小程序分享卡片：title 不含小程序昵称（微信会自动加「昵称｜」）
   mp_recruit_share_card  达人小程序招募详情分享：海报封面 / 招募封面
   login_alt_methods      商家 ERP + 星选 Web 登录页：下方图标登录方式（不含小程序）
+  baidu_site_verify      商家 cs：百度站长文件验证（根目录 html + HTTP 不跳转）
   xingxuan_hall_ux       星选网页+微信小程序：大厅按身份、身份切换、推荐大厅说明、培训报名
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
   xingxuan_open_loop_done 开环：选达人并通知后商单转入已完成；已完成列表筛开环/闭环
@@ -1524,6 +1525,13 @@ PAT
 灵祺达人撮合小程序/images/share/talent-lift-poster.jpg
 灵祺达人撮合小程序/pages/subpack-core/detail/detail
 灵祺达人撮合小程序/components/launch-splash/
+change-scope-guard
+PAT
+      ;;
+    baidu_site_verify)
+      cat <<'PAT'
+baidu_verify_codeva-hJfwJpoeF5.html
+ecs-nginx-merchant-cs.conf
 change-scope-guard
 PAT
       ;;
