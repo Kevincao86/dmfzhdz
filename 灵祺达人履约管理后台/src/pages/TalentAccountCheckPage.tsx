@@ -331,7 +331,7 @@ export default function TalentAccountCheckPage() {
                         <p>{view.signature || '未公开'}</p>
                       </div>
                       <div>
-                        <div className="talent-check-metric-top"><small>内容方向</small><span className="talent-check-tag">{view.platform === 'xhs' ? '豆包联网' : '抖音官方数据检索'}</span></div>
+                        <div className="talent-check-metric-top"><small>内容方向</small><span className="talent-check-tag">{view.platform === 'xhs' ? '联网分析' : '抖音官方数据检索'}</span></div>
                         <p>{view.direction || '未写到'}</p>
                         <div className="talent-check-sales">
                           <div className="talent-check-metric-top"><small>{view.platform === 'xhs' ? '近期篇均互动' : '近30天带货金额'}</small></div>
