@@ -49,7 +49,7 @@ export default function LandingPage() {
   const onSameEdition = viewEdition === siteEdition
 
   function goAuth() {
-    if (onSameEdition) {
+    if (!isPartnerEdition() || onSameEdition) {
       nav('/login', { replace: false })
       return
     }
@@ -104,11 +104,13 @@ export default function LandingPage() {
 
           <div className="absolute bottom-8 right-6 z-20 w-[min(100%,340px)] sm:right-10 lg:right-14">
             <p className="mb-3 text-right text-xs text-white/60">{m.cta}</p>
-            <EditionLandingToggle
-              siteEdition={siteEdition}
-              viewEdition={viewEdition}
-              onViewEditionChange={setViewEdition}
-            />
+            {isPartnerEdition() ? (
+              <EditionLandingToggle
+                siteEdition={siteEdition}
+                viewEdition={viewEdition}
+                onViewEditionChange={setViewEdition}
+              />
+            ) : null}
             <button
               type="button"
               onClick={goAuth}

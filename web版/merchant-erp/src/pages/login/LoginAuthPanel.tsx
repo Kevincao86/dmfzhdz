@@ -477,10 +477,12 @@ export default function LoginAuthPanel({
 
   return (
     <div className="relative w-full">
-      <div className="absolute right-0 top-0 z-10">
-        <EditionSwitchLink />
-      </div>
-      <div className="mb-6 hidden pr-[7.5rem] lg:block">
+      {partnerMode ? (
+        <div className="absolute right-0 top-0 z-10">
+          <EditionSwitchLink />
+        </div>
+      ) : null}
+      <div className={cn('mb-6 hidden lg:block', partnerMode && 'pr-[7.5rem]')}>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">
           {mode === 'login' ? '欢迎登录' : '欢迎注册'}
         </h2>
@@ -490,7 +492,7 @@ export default function LoginAuthPanel({
             : '填写信息完成注册，即可使用免费版'}
         </p>
       </div>
-      <div className="mb-6 border-b border-white/50 pr-[7.5rem] pt-0.5">
+      <div className={cn('mb-6 border-b border-white/50 pt-0.5', partnerMode && 'pr-[7.5rem]')}>
         <div className="flex gap-8">
           <button
             type="button"
