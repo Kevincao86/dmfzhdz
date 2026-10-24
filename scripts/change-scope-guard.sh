@@ -2481,6 +2481,8 @@ shortDramaCatalogMp
 addonAiComplianceCapabilities
 mine-pr-addon-short-drama.js
 mine-pr-addon-ai-review.js
+beian-ghs.png
+trade-screenshot-example.jpg
 change-scope-guard
 PAT
       ;;
