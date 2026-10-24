@@ -652,6 +652,18 @@
   box-shadow: 0 10rpx 36rpx rgba(79, 70, 229, 0.1);
 }
 
+.pub-loop-picked {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #7c3aed;
+}
+
+.pub-mode-card--on {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 4rpx rgba(124, 58, 237, 0.2);
+}
+
 .pub-mode-card--disabled {
   opacity: 0.78;
   background: rgba(255, 255, 255, 0.9);

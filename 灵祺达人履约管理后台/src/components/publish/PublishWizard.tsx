@@ -158,6 +158,7 @@ export default function PublishWizard() {
   const [customFieldFormat, setCustomFieldFormat] = useState<'text' | 'image' | 'video'>('text')
   const [customFieldDraft, setCustomFieldDraft] = useState('')
   const [recruitChannel, setRecruitChannel] = useState('')
+  const [loopChosen, setLoopChosen] = useState(false)
   const [isTargetedRecruit, setIsTargetedRecruit] = useState(false)
   const [recruitTarget, setRecruitTarget] = useState('')
   const [recruitTargetLabel, setRecruitTargetLabel] = useState('')
@@ -517,6 +518,7 @@ export default function PublishWizard() {
               setDoneId('')
               setStep('channel')
               setRecruitChannel('')
+              setLoopChosen(false)
               setIsTargetedRecruit(false)
               setRecruitTarget('')
               setRecruitTargetLabel('')
@@ -539,9 +541,47 @@ export default function PublishWizard() {
       <div className="page-content-shell page-content-shell--narrow space-y-5">
         <PageHero
           title="发布招募"
-          subtitle="普通招募公开曝光 · 定向邀约点名确认"
+          subtitle="先定履约方式，再选公开招募或定向邀约"
           badge="步骤 1/5"
         />
+        <p className="text-sm text-[var(--shell-muted)] px-1">选择履约方式</p>
+        <div className="grid gap-3">
+          {(
+            [
+              {
+                id: 'closed' as const,
+                label: '闭环',
+                sub: '达人在平台报名。你先定可探店日期和时段，达人只能从这些时间里选。排期确定后直接上传成片，你在平台审核。',
+              },
+              {
+                id: 'open' as const,
+                label: '开环',
+                sub: '按通告发到微信群。你确认达人后发送群二维码，达人进群交付。交片和结算都在群里跟进，平台不排探店、不审视频。发布时需要上传群二维码。',
+              },
+            ]
+          ).map((loop) => {
+            const on = loopChosen && (form.fulfillmentLoop || 'closed') === loop.id
+            return (
+              <button
+                key={loop.id}
+                type="button"
+                className={`choice-card w-full text-left surface-card rounded-xl border p-5 hover-panel ${
+                  on ? 'border-violet-500 ring-2 ring-violet-500/40' : ''
+                }`}
+                onClick={() => {
+                  setLoopChosen(true)
+                  setForm((prev) => ({ ...prev, fulfillmentLoop: loop.id }))
+                }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="font-semibold text-lg text-[var(--shell-text)]">{loop.label}</div>
+                  {on ? <span className="text-xs text-violet-600 shrink-0">已选</span> : null}
+                </div>
+                <div className="text-sm text-[var(--shell-muted)] mt-1.5 leading-relaxed">{loop.sub}</div>
+              </button>
+            )
+          })}
+        </div>
         <p className="text-sm text-[var(--shell-muted)] px-1">选择招募方式</p>
         <div className="grid gap-3 sm:grid-cols-1">
           {RECRUIT_CHANNELS.map((c) => (
@@ -550,6 +590,10 @@ export default function PublishWizard() {
               type="button"
               className="choice-card w-full text-left surface-card rounded-xl border p-5 hover-panel"
               onClick={() => {
+                if (!loopChosen) {
+                  window.alert('请先选择开环或闭环。')
+                  return
+                }
                 if (c.id === 'targeted' && !canUseTargetedRecruit()) {
                   window.alert('当前会员档位不含定向邀约，请升级会员或联系运营开通。')
                   return
@@ -613,7 +657,11 @@ export default function PublishWizard() {
                 }
                 setRecruitTarget(t.id)
                 setRecruitTargetLabel(t.label)
-                setForm(emptyPublishForm(t.id))
+                setForm((prev) => ({
+                  ...emptyPublishForm(t.id),
+                  fulfillmentLoop: prev.fulfillmentLoop,
+                  groupQrImage: prev.groupQrImage,
+                }))
                 setStep('mode')
               }}
             >
@@ -1418,33 +1466,10 @@ export default function PublishWizard() {
           </span>
         </label>
 
-        {recruitMode !== 'ice' && recruitMode !== 'edit_ice' ? (
+        {recruitMode !== 'ice' && recruitMode !== 'edit_ice' && (form.fulfillmentLoop || 'closed') === 'open' ? (
           <div>
-            <PubLabel>履约方式 *</PubLabel>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {(['closed', 'open'] as const).map((loop) => (
-                <button
-                  key={loop}
-                  type="button"
-                  className={`text-sm px-3 py-1.5 rounded-lg border ${
-                    (form.fulfillmentLoop || 'closed') === loop
-                      ? 'border-violet-500 bg-violet-600 text-white'
-                      : 'border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-white/5'
-                  }`}
-                  onClick={() => patchForm({ fulfillmentLoop: loop })}
-                >
-                  {loop === 'open' ? '开环' : '闭环'}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1 text-xs leading-5 text-[var(--shell-muted)]">
-              开环：正常通告方式，发群收集信息
-              <br />
-              闭环：从发布到视频审核，均走平台
-            </p>
-            {(form.fulfillmentLoop || 'closed') === 'open' ? (
               <div className="mt-3">
-                <PubLabel hint="审核通过后，达人在我的报名详情里扫码进群">上传群二维码 *</PubLabel>
+                <PubLabel hint="本单已选开环。审核通过后，达人在我的报名详情里扫码进群">上传群二维码 *</PubLabel>
                 <input
                   ref={groupQrInputRef}
                   type="file"
@@ -1500,7 +1525,6 @@ export default function PublishWizard() {
                   </button>
                 ) : null}
               </div>
-            ) : null}
           </div>
         ) : null}
 

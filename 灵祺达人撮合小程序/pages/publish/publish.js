@@ -290,6 +290,7 @@ Page({
     recruitChannels: mpTargetedRecruit.RECRUIT_CHANNELS,
     inviteHourOptions: mpTargetedRecruit.INVITE_HOUR_OPTIONS,
     recruitChannel: '',
+    loopChosen: false,
     isTargetedRecruit: false,
     recruitModes: RECRUIT_MODES,
     recruitTarget: '',
@@ -1196,10 +1197,10 @@ Page({
         isTargetedRecruit: false,
         recruitModes: modesForTarget(target.id),
         isSupplierPublish: true,
-        form: emptyForm(target.id),
+        form: this.formKeepingLoop(target.id),
         tagGrid: buildTagGrid([]),
       })
-      this.syncSupplierPublishGrids(emptyForm(target.id))
+      this.syncSupplierPublishGrids(this.formKeepingLoop(target.id))
       this.syncDisplayFields()
       this.syncTabBarOverlay()
       return
@@ -1210,15 +1211,35 @@ Page({
       recruitTargetLabel: target.label,
       recruitModes: modesForTarget(target.id),
       isSupplierPublish: false,
-      form: emptyForm(target.id),
+      form: this.formKeepingLoop(target.id),
       tagGrid: buildTagGrid([]),
     })
     this.syncDisplayFields()
     this.syncTabBarOverlay()
   },
+  formKeepingLoop(targetId) {
+    const prev = this.data.form || {}
+    const form = emptyForm(targetId)
+    if (this.data.loopChosen) {
+      form.fulfillmentLoop = prev.fulfillmentLoop === 'open' ? 'open' : 'closed'
+      form.groupQrImage = prev.groupQrImage || ''
+    }
+    return form
+  },
+  onPickFulfillmentLoop(e) {
+    const val = e.currentTarget.dataset.val === 'open' ? 'open' : 'closed'
+    this.setData({
+      loopChosen: true,
+      form: { ...this.data.form, fulfillmentLoop: val },
+    })
+  },
   onSelectChannel(e) {
     const id = e.currentTarget.dataset.id
     if (id !== 'open' && id !== 'targeted') return
+    if (!this.data.loopChosen) {
+      wx.showToast({ title: '请先选择开环或闭环', icon: 'none' })
+      return
+    }
     if (id === 'targeted' && !mpTargetedRecruitAccess.canUseTargetedRecruit()) {
       wx.showModal({
         title: '定向邀约未开通',

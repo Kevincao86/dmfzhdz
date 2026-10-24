@@ -66,8 +66,31 @@
         <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
       <view class="pub-target-main">
-        <text class="pub-target-title">选择招募方式</text>
-        <text class="pub-target-sub">普通招募公开曝光 · 定向邀约点名确认</text>
+        <text class="pub-target-title">选择履约方式</text>
+        <text class="pub-target-sub">先定开环或闭环，再选公开招募或定向邀约</text>
+        <view class="pub-mode-list pub-mode-list--target">
+          <view
+            class="pub-mode-card {{loopChosen && form.fulfillmentLoop !== 'open' ? 'pub-mode-card--on' : ''}}"
+            data-val="closed"
+            bindtap="onPickFulfillmentLoop"
+          >
+            <view class="pub-mode-copy">
+              <text class="pub-mode-name">闭环<text wx:if="{{loopChosen && form.fulfillmentLoop !== 'open'}}" class="pub-loop-picked">已选</text></text>
+              <text class="pub-mode-sub">达人在平台报名。你先定可探店日期和时段，达人只能从这些时间里选。排期确定后直接上传成片，你在平台审核。</text>
+            </view>
+          </view>
+          <view
+            class="pub-mode-card {{loopChosen && form.fulfillmentLoop === 'open' ? 'pub-mode-card--on' : ''}}"
+            data-val="open"
+            bindtap="onPickFulfillmentLoop"
+          >
+            <view class="pub-mode-copy">
+              <text class="pub-mode-name">开环<text wx:if="{{loopChosen && form.fulfillmentLoop === 'open'}}" class="pub-loop-picked">已选</text></text>
+              <text class="pub-mode-sub">按通告发到微信群。你确认达人后发送群二维码，达人进群交付。交片和结算都在群里跟进，平台不排探店、不审视频。发布时需要上传群二维码。</text>
+            </view>
+          </view>
+        </view>
+        <text class="pub-target-title" style="margin-top:28rpx;">选择招募方式</text>
         <view class="pub-mode-list pub-mode-list--target">
           <view
             wx:for="{{recruitChannels}}"
@@ -726,24 +749,10 @@
             </view>
             <text class="pub-cover-hint">需要时，达人完成该招募单后可提交发票，你可在本单查看并下载。</text>
           </view>
-          <view class="pub-field" wx:if="{{recruitMode !== 'ice' && recruitMode !== 'edit_ice'}}">
-            <text class="pub-label">履约方式 *</text>
-            <view class="pub-radio-pair">
-              <view
-                class="pub-radio-opt {{form.fulfillmentLoop !== 'open' ? 'pub-radio-opt--on' : ''}}"
-                data-val="closed"
-                catchtap="onFulfillmentLoopPick"
-              >闭环</view>
-              <view
-                class="pub-radio-opt {{form.fulfillmentLoop === 'open' ? 'pub-radio-opt--on' : ''}}"
-                data-val="open"
-                catchtap="onFulfillmentLoopPick"
-              >开环</view>
-            </view>
-            <text class="pub-cover-hint">开环：正常通告方式，发群收集信息</text>
-            <text class="pub-cover-hint">闭环：从发布到视频审核，均走平台</text>
-            <view class="pub-field" wx:if="{{form.fulfillmentLoop === 'open'}}">
+          <view class="pub-field" wx:if="{{recruitMode !== 'ice' && recruitMode !== 'edit_ice' && form.fulfillmentLoop === 'open'}}">
+            <view class="pub-field">
               <text class="pub-label">上传群二维码 *</text>
+              <text class="pub-cover-hint">本单已选开环。审核通过后，达人在我的报名详情里扫码进群。</text>
               <view class="pub-cover-actions" wx:if="{{!form.groupQrImage}}">
                 <button class="pub-cover-btn pub-cover-btn--on" loading="{{groupQrUploading}}" bindtap="onUploadOpenLoopGroupQr">上传群二维码</button>
               </view>

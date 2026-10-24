@@ -27,6 +27,7 @@ list_scopes() {
   mp_oss_image      达人小程序图片改走备案域名，避免安卓直连 OSS
   closed_loop_talent 闭环报名：排期确定后直接交片，不再单独签到
   visit_slot_roster 闭环排期：PR 先定可探店时段，按日期时段排人并备注、导出、打印
+  publish_loop_first 发布招募第一页选择开环或闭环，表单里不再切换
   recruit_video     探店成片上传
   recruit_share_poster_ai  招募创建成功分享页 AI 海报生图（星选+撮合）
   merchant_recruit_loop  商家 ERP 达人招募引导闭环（不改星选小程序/dr）
@@ -2478,6 +2479,15 @@ mpAccountAuth.ts
 mpMembershipQuota.ts
 灵祺达人撮合小程序/utils/registryProfileSync.js
 灵祺达人履约管理后台/src/lib/registryProfileSync.ts
+change-scope-guard
+PAT
+      ;;
+    publish_loop_first)
+      cat <<'PAT'
+PublishWizard.tsx
+pages/publish/publish.wxml
+pages/publish/publish.js
+pages/publish/publish.wxss
 change-scope-guard
 PAT
       ;;
