@@ -16,6 +16,21 @@ function todayDateKey() {
   return orderCalendar.dateKeyFromMs(Date.now())
 }
 
+const CAL_FRESH_MS = 90 * 1000
+const CAL_POLL_MS = 3 * 60 * 1000
+let calendarMem = null
+
+function calendarCacheKey() {
+  const identity = readIdentity()
+  const acct = auth.readAccount() || {}
+  return `${identity}:${String(acct.registryMemberId || acct.id || acct.phone || '').trim()}`
+}
+
+function readCalendarMem() {
+  if (!calendarMem || calendarMem.key !== calendarCacheKey()) return null
+  return calendarMem
+}
+
 function readIdentity() {
   return userProfile.readIdentity() || 'talent'
 }
@@ -61,6 +76,7 @@ Page({
     todayKey: '',
     upcomingTodos: [],
     activeTodoCount: 0,
+    refreshing: false,
   },
 
   async onLoad() {
@@ -79,7 +95,6 @@ Page({
     })
     await prepareMineSubPage(this)
     syncCalendarChrome(this, identity)
-    this.reload()
   },
 
   async onShow() {
@@ -91,15 +106,73 @@ Page({
       isPr: isPrIdentity(identity),
       pageSub: orderCalendar.calendarSubtitle(identity),
     })
-    this.reload()
+    const cached = readCalendarMem()
+    if (cached) this.paintCalendarSnapshot(cached.snapshot)
+    const age = cached ? Date.now() - cached.at : Infinity
+    if (!cached || age > CAL_FRESH_MS) this.reload({ silent: !!cached })
+    this.startCalendarPoll()
+  },
+
+  onHide() {
+    this.stopCalendarPoll()
+  },
+
+  onUnload() {
+    this.stopCalendarPoll()
+  },
+
+  startCalendarPoll() {
+    this.stopCalendarPoll()
+    this._calTimer = setInterval(() => {
+      this.reload({ silent: true })
+    }, CAL_POLL_MS)
+  },
+
+  stopCalendarPoll() {
+    if (this._calTimer) {
+      clearInterval(this._calTimer)
+      this._calTimer = null
+    }
+  },
+
+  onRefreshTap() {
+    this.reload({ silent: true, force: true })
+  },
+
+  paintCalendarSnapshot(snapshot) {
+    const byDate = (snapshot && snapshot.byDate) || {}
+    const selectedDateKey = this.data.selectedDateKey
+    const grid = this.buildGridCells(this.data.year, this.data.month, byDate)
+    this.setData({
+      loading: false,
+      err: '',
+      isPr: !!snapshot.isPr,
+      byDate,
+      grid,
+      selectedEvents: byDate[selectedDateKey] || [],
+      upcomingTodos: (snapshot.upcomingTodos || []).map((evt) => ({
+        ...evt,
+        selected: evt.dateKey === selectedDateKey,
+      })),
+      activeTodoCount: snapshot.activeTodoCount || 0,
+      navLabel: this.resolveNavLabel(this.data.viewMode, this.data.year, this.data.month),
+    })
   },
 
   resolveNavLabel(viewMode, year, month) {
     return viewMode === 'week' ? '本周' : monthTitle(year, month)
   },
 
-  async reload() {
-    this.setData({ loading: true, err: '' })
+  async reload(opts) {
+    const silent = !!(opts && opts.silent)
+    if (this._calBusy) {
+      this._calPendingForce = true
+      return
+    }
+    const hasView = !!(this.data.grid && this.data.grid.length)
+    if (!silent && !hasView) this.setData({ loading: true, err: '' })
+    this.setData({ refreshing: true })
+    this._calBusy = true
     try {
       const identity = readIdentity()
       const isPr = isPrIdentity(identity)
@@ -127,8 +200,12 @@ Page({
       )
       const activeTodoCount = orderCalendar.countActiveTodos(enriched)
 
+      const snapshot = { isPr, byDate, upcomingTodos, activeTodoCount }
+      calendarMem = { key: calendarCacheKey(), at: Date.now(), snapshot }
       this.setData({
         loading: false,
+        refreshing: false,
+        err: '',
         isPr,
         byDate,
         grid,
@@ -138,10 +215,18 @@ Page({
         navLabel: this.resolveNavLabel(this.data.viewMode, this.data.year, this.data.month),
       })
     } catch (e) {
+      const keep = !!(this.data.grid && this.data.grid.length)
       this.setData({
         loading: false,
-        err: (e && e.message) || '加载失败',
+        refreshing: false,
+        err: keep ? '' : (e && e.message) || '加载失败',
       })
+    } finally {
+      this._calBusy = false
+      if (this._calPendingForce) {
+        this._calPendingForce = false
+        this.reload({ silent: true, force: true })
+      }
     }
   },
 

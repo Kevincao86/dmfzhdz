@@ -18,8 +18,8 @@
     </view>
   </view>
 
-  <view wx:if="{{loading}}" class="cal-state">加载中…</view>
-  <view wx:elif="{{err}}" class="cal-state cal-state--err">{{err}}</view>
+  <view wx:if="{{loading && !grid.length}}" class="cal-state">加载中…</view>
+  <view wx:elif="{{err && !grid.length}}" class="cal-state cal-state--err">{{err}}</view>
 
   <block wx:else>
     <view class="cal-card cal-todo">
@@ -57,6 +57,7 @@
           <view class="cal-mode-btn {{viewMode === 'month' ? 'cal-mode-btn--on' : ''}}" data-mode="month" bindtap="onToggleViewMode">月视图</view>
         </view>
         <view class="cal-chip" bindtap="onBackToday">今天</view>
+        <view class="cal-chip" bindtap="onRefreshTap">{{refreshing ? '刷新中' : '刷新'}}</view>
       </view>
 
       <view class="cal-toolbar cal-toolbar--sub">

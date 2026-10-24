@@ -96,6 +96,24 @@ import {
 } from '../lib/mpRecruitment/orderCalendarCore'
 
 const WEEK_LABELS = ['一', '二', '三', '四', '五', '六', '日']
+const CAL_FRESH_MS = 90 * 1000
+const CAL_POLL_MS = 3 * 60 * 1000
+
+type CalendarCache = {
+  key: string
+  at: number
+  events: OrderCalendarEvent[]
+  reminderIds: string[]
+  labels: MpOrderCustomLabel[]
+}
+
+let calendarCache: CalendarCache | null = null
+
+function calendarCacheKey(isPr: boolean): string {
+  const account = getAccount()
+  const id = String(account?.registryMemberId || account?.accountId || account?.loginName || '').trim()
+  return `${isPr ? 'pr' : getWorkIdentity()}:${id}`
+}
 
 const FEATURE_ITEMS = [
   {
@@ -213,7 +231,10 @@ export default function OrderCalendarPage() {
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   const [selectedDateKey, setSelectedDateKey] = useState('')
   const [events, setEvents] = useState<OrderCalendarEvent[]>([])
+  const eventsLenRef = useRef(0)
+  eventsLenRef.current = events.length
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [err, setErr] = useState('')
   const [pendingRemindEventIds, setPendingRemindEventIds] = useState<Set<string>>(new Set())
   const [remindTarget, setRemindTarget] = useState<OrderCalendarEvent | null>(null)
@@ -269,7 +290,9 @@ export default function OrderCalendarPage() {
 
   const refreshCalendar = useCallback(
     async (opts?: { silent?: boolean }) => {
-      if (!opts?.silent) setLoading(true)
+      const cached = calendarCache && calendarCache.key === calendarCacheKey(isPr) ? calendarCache : null
+      if (!opts?.silent && !cached && eventsLenRef.current === 0) setLoading(true)
+      setRefreshing(true)
       setErr('')
       try {
         const reg = await fetchMpRegistry(
@@ -295,21 +318,50 @@ export default function OrderCalendarPage() {
         } catch {
           manual = []
         }
-        setEvents([...list, ...manual])
-        await refreshReminders()
-        await refreshLabels()
+        const nextEvents = [...list, ...manual]
+        setEvents(nextEvents)
+        const rows = await listCalendarReminders().catch(() => [])
+        const ids = rows
+          .filter((r) => r.status === 'pending')
+          .map((r) => String(r.eventId || '').trim())
+          .filter(Boolean)
+        setPendingRemindEventIds(new Set(ids))
+        const labels = await listOrderCustomLabels().catch(() => [])
+        setOrderLabels(labels)
+        calendarCache = {
+          key: calendarCacheKey(isPr),
+          at: Date.now(),
+          events: nextEvents,
+          reminderIds: ids,
+          labels,
+        }
       } catch (e) {
-        setErr(e instanceof Error ? e.message : '加载失败')
+        if (eventsLenRef.current === 0 && !cached) setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
-        if (!opts?.silent) setLoading(false)
+        setLoading(false)
+        setRefreshing(false)
       }
     },
-    [isPr, refreshReminders, refreshLabels],
+    [isPr],
   )
 
   useEffect(() => {
-    void refreshCalendar()
-  }, [refreshCalendar])
+    const key = calendarCacheKey(isPr)
+    const hit = calendarCache && calendarCache.key === key ? calendarCache : null
+    if (hit) {
+      setEvents(hit.events)
+      setPendingRemindEventIds(new Set(hit.reminderIds))
+      setOrderLabels(hit.labels)
+      setLoading(false)
+      if (Date.now() - hit.at > CAL_FRESH_MS) void refreshCalendar({ silent: true })
+    } else {
+      void refreshCalendar()
+    }
+    const timer = window.setInterval(() => {
+      void refreshCalendar({ silent: true })
+    }, CAL_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [refreshCalendar, isPr])
 
   const byDate = useMemo(() => groupEventsByDate(events), [events])
   const upcomingTodos = useMemo(() => buildUpcomingTodos(events), [events])
@@ -622,12 +674,12 @@ export default function OrderCalendarPage() {
 
         {/* 右侧主内容 */}
         <main className="xx-cal-desk__board">
-          {loading ? (
+          {loading && events.length === 0 ? (
             <div className="flex flex-1 items-center justify-center gap-2 rounded-[20px] border border-violet-100 bg-white py-20 text-sm text-slate-500 shadow-sm">
               <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
               加载商单进度…
             </div>
-          ) : err ? (
+          ) : err && events.length === 0 ? (
             <p className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {err}
             </p>
@@ -766,6 +818,13 @@ export default function OrderCalendarPage() {
                       className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-50"
                     >
                       今天
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void refreshCalendar({ silent: true })}
+                      className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-50"
+                    >
+                      {refreshing ? '刷新中' : '刷新'}
                     </button>
                     <button
                       type="button"

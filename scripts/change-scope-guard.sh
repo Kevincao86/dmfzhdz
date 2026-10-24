@@ -29,6 +29,7 @@ list_scopes() {
   visit_slot_roster 闭环排期：PR 先定可探店时段，按日期时段排人并备注、导出、打印
   publish_loop_first 发布招募第一页选择开环或闭环，表单里不再切换
   visit_photo_checkin 探店拍照签到：不限探店当天，达人拍照后即可签到
+  order_calendar_cache 商单日历：再次进入先用缓存，可手动刷新，过期后后台更新
   publish_link_cta   待回传链接报名页：把回传链接入口做得更明显
   recruit_video     探店成片上传
   recruit_share_poster_ai  招募创建成功分享页 AI 海报生图（星选+撮合）
@@ -1900,6 +1901,14 @@ HomeDashboard.tsx
 灵祺ERP小程序/custom-tab-bar/
 灵祺ERP小程序/pages/ai-agent/ai-agent.js
 灵祺ERP小程序/pages/mine/mine.js
+change-scope-guard
+PAT
+      ;;
+    order_calendar_cache)
+      cat <<'PAT'
+mine-order-calendar.js
+mine-order-calendar.wxml
+OrderCalendarPage.tsx
 change-scope-guard
 PAT
       ;;
