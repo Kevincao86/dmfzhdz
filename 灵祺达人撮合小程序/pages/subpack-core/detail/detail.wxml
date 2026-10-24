@@ -120,7 +120,7 @@
           <button class="btn-secondary visit-action-btn visit-action-btn--half visit-action-btn--ghost" loading="{{visitBusy}}" bindtap="declineVisitAssignment">我有冲突</button>
         </view>
         <view wx:if="{{showCheckInBtn}}" class="visit-action-row">
-          <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" disabled="{{!checkInReady}}" bindtap="visitCheckInTap">{{checkInReady ? '探店签到' : '探店日当天可签到'}}</button>
+          <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="visitCheckInTap">拍照签到</button>
         </view>
         <text wx:if="{{showCheckInBtn && !showEditVisitBtn && canContactPr}}" class="hint" style="display:block;margin-top:12rpx;">排期已确认，如需调整请联系招募方。</text>
         <view wx:if="{{canViewVideo || canSubmitVisitPublishLink || visitPublishUrl}}" class="visit-action-row" style="margin-top:24rpx;">
@@ -510,11 +510,10 @@
     >当前版本不能报名</button>
     <button
       wx:elif="{{applied && showCheckInBtn}}"
-      class="detail-bottom-v2__cta {{checkInReady ? '' : 'detail-bottom-v2__cta--muted'}}"
+      class="detail-bottom-v2__cta"
       loading="{{visitBusy}}"
-      disabled="{{!checkInReady}}"
       bindtap="visitCheckInTap"
-    >{{checkInReady ? '到店签到' : '探店日当天可签到'}}</button>
+    >拍照签到</button>
     <button wx:elif="{{applied}}" class="detail-bottom-v2__cta" bindtap="onShareTap">邀请好友</button>
   </view>
 </view>

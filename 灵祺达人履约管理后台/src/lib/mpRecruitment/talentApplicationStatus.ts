@@ -205,6 +205,21 @@ function parseVisitDayMs(timeStr: string): number {
   return Number.isFinite(t) ? t : 0
 }
 
+function photoCheckInDisplay(
+  applicant: Record<string, unknown> | null,
+): Partial<Pick<ApplicationDisplayStatus, 'showCheckInBtn' | 'checkInReady'>> {
+  if (!applicant) return {}
+  const checkedIn =
+    String(applicant.visitCheckInAt || '').trim() ||
+    String(applicant.visitStatus || '').trim() === 'checked_in'
+  if (checkedIn) return {}
+  const assigned = String(applicant.assignedVisitAt || '').trim()
+  if (!assigned) return {}
+  const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
+  if (assignStatus === 'pending_talent_confirm' || assignStatus === 'declined') return {}
+  return { showCheckInBtn: true, checkInReady: true }
+}
+
 export function isVisitCheckInDay(assignedVisitAt: string, nowMs = Date.now()): boolean {
   const dayMs = parseVisitDayMs(assignedVisitAt)
   if (!dayMs) return false
@@ -254,22 +269,19 @@ function resolveVisitDisplayExtras(
     assignStatus !== 'declined' &&
     assignStatus !== 'pending_talent_confirm'
   ) {
-    const onVisitDay = isVisitCheckInDay(assigned)
     const store = String(applicant.assignedVisitStore || '').trim() || '门店'
     const revised = !!String(applicant.visitScheduleRevisedAt || '').trim()
     const revisedNote = '商单探店时间已变更，请与PR沟通并重新调整探店时间'
     return {
-      label: onVisitDay ? '待签到' : '待探店',
+      label: '待签到',
       showCheckInBtn: true,
-      checkInReady: onVisitDay,
+      checkInReady: true,
       showEditVisitBtn: true,
       editVisitMode: 'effective',
       visitScheduleRevised: revised,
       visitHint: revised
         ? `已确认排期 · ${assigned} · ${store}（${revisedNote}）`
-        : onVisitDay
-          ? `今日探店 · ${assigned} · ${store}`
-          : `已确认排期 · ${assigned} · ${store}（探店日当天可签到）`,
+        : `已确认排期 · ${assigned} · ${store}（到店后可直接拍照签到）`,
     }
   }
   if (!checkedIn) {
@@ -389,8 +401,8 @@ function closedLoopDeliverHint(applicant: Record<string, unknown> | null): strin
   const assigned = String(applicant?.assignedVisitAt || '').trim()
   const store = String(applicant?.assignedVisitStore || '').trim()
   if (!assigned) return '排期已确定，直接上传成片。'
-  if (store) return `探店时间 ${assigned} · ${store}。到店后直接交片，不用单独签到。`
-  return `探店时间 ${assigned}。到店后直接交片，不用单独签到。`
+  if (store) return `探店时间 ${assigned} · ${store}。到店后可直接拍照签到，也可以直接交片。`
+  return `探店时间 ${assigned}。到店后可直接拍照签到，也可以直接交片。`
 }
 
 function canShowConfirmVisitBtn(
@@ -674,6 +686,7 @@ function resolveApplicationDisplayStatusCore(
       tone: 'accepted',
       showConfirmBtn: false,
       visitHint: closedLoopDeliverHint(applicant),
+      ...photoCheckInDisplay(applicant),
     }
   }
 
@@ -684,6 +697,7 @@ function resolveApplicationDisplayStatusCore(
       tone: 'accepted',
       showConfirmBtn: false,
       visitHint: !isIce && isPrScheduleEffective(applicant, mp) ? closedLoopDeliverHint(applicant) : '',
+      ...(!isIce ? photoCheckInDisplay(applicant) : {}),
     }
   }
 
@@ -749,6 +763,7 @@ function resolveApplicationDisplayStatusCore(
         showEditVisitBtn: revised,
         editVisitMode: revised ? 'effective' : undefined,
         visitScheduleRevised: revised,
+        ...photoCheckInDisplay(applicant),
       }
     }
   }

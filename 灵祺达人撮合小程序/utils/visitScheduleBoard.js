@@ -424,7 +424,15 @@ function buildPool(selectedApplicants) {
 function checkInStatusLabel(a) {
   const checkedIn = String((a && a.visitCheckInAt) || '').trim()
   const assigned = String((a && a.assignedVisitAt) || '').trim()
-  if (checkedIn) return { text: `已签到 ${checkedIn}`, tone: 'ok' }
+  if (checkedIn) {
+    const photo = String((a && a.visitCheckInPhoto) || '').trim()
+    const method = String((a && a.visitCheckInMethod) || '').trim()
+    return {
+      text: method === 'photo' ? `已拍照签到 ${checkedIn}` : `已签到 ${checkedIn}`,
+      tone: 'ok',
+      photo,
+    }
+  }
   if (assigned) return { text: '待签到', tone: 'pending' }
   return { text: '未排期', tone: 'none' }
 }

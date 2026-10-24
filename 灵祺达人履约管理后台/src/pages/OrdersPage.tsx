@@ -1076,7 +1076,7 @@ function TalentApplicationsPage() {
             ds.showConfirmVisitBtn
               ? undefined
               : ds.showCheckInBtn
-              ? '到店签到'
+              ? '拍照签到'
               : ds.showAssignConfirmBtn
                 ? '确认排期'
                 : ds.showConfirmBtn

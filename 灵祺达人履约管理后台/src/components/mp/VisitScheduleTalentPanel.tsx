@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { clearMpRegistryCache } from '../../lib/mpApi'
 import {
   buildVisitHmSelectOptions,
@@ -15,6 +15,7 @@ import {
   visitCheckIn,
 } from '../../lib/mpSync/visitScheduleRuntime'
 import type { ApplicationDisplayStatus } from '../../lib/mpRecruitment/talentApplicationStatus'
+import { uploadContentImage } from '../../lib/mpContentUpload'
 import { BtnOutline, BtnPrimary, FormSection } from '../ui/MockupLayouts'
 
 const VISIT_HM_OPTIONS = buildVisitHmSelectOptions()
@@ -42,6 +43,7 @@ export default function VisitScheduleTalentPanel({
   const activePlan = hasLockedPlanDates ? planDates[Math.min(planDateIdx, planDates.length - 1)] : null
   const activeSlots = activePlan?.slots || []
   const [busy, setBusy] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement | null>(null)
   const [err, setErr] = useState('')
   const [visitDate, setVisitDate] = useState(() => resolveDefaultTalentVisitPlanDate(mpOrder))
   const [visitStartTime, setVisitStartTime] = useState('09:00')
@@ -142,14 +144,12 @@ export default function VisitScheduleTalentPanel({
     )
   }
 
-  async function run(action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'checkin') {
+  async function run(action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment') {
     if (!mpOrderId || !applicantId) return
     setBusy(true)
     setErr('')
     try {
-      if (action === 'checkin') {
-        await visitCheckIn(mpOrderId, applicantId)
-      } else if (action === 'decline_assignment') {
+      if (action === 'decline_assignment') {
         const reason = window.prompt('请简要说明档期冲突原因（选填）') || ''
         await confirmVisitSchedule(mpOrderId, applicantId, 'decline_assignment', reason)
       } else if (action === 'accept_selection') {
@@ -178,6 +178,23 @@ export default function VisitScheduleTalentPanel({
       setErr(e instanceof Error ? e.message : '操作失败')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function onPhotoPicked(file: File | undefined) {
+    if (!file || !mpOrderId || !applicantId) return
+    setBusy(true)
+    setErr('')
+    try {
+      const photoUrl = await uploadContentImage(file)
+      await visitCheckIn(mpOrderId, applicantId, 'photo', photoUrl)
+      clearMpRegistryCache()
+      onRefresh()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '拍照签到失败')
+    } finally {
+      setBusy(false)
+      if (photoInputRef.current) photoInputRef.current.value = ''
     }
   }
 
@@ -309,13 +326,17 @@ export default function VisitScheduleTalentPanel({
       ) : null}
       {display.showCheckInBtn ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
-          <p className="text-sm text-emerald-900 font-medium">
-            {display.checkInReady
-              ? '今日为探店日，到店后请点击签到。'
-              : display.visitHint || '探店日当天可签到，签到后进入待传视频。'}
-          </p>
-          <BtnPrimary disabled={busy || !display.checkInReady} onClick={() => void run('checkin')}>
-            {busy ? '签到中…' : display.checkInReady ? '探店签到' : '探店日当天可签到'}
+          <p className="text-sm text-emerald-900 font-medium">到店后直接拍照即可签到，不限探店当天。拍完也可以继续交片。</p>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => void onPhotoPicked(e.target.files?.[0])}
+          />
+          <BtnPrimary disabled={busy} onClick={() => photoInputRef.current?.click()}>
+            {busy ? '签到中…' : '拍照签到'}
           </BtnPrimary>
         </div>
       ) : null}

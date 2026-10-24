@@ -502,6 +502,7 @@ export function talentVisitCheckInOnMp(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
   method = 'manual',
+  photoUrl = '',
 ):
   | { ok: true; mp: RegistryMpRecruitmentOrder; checkInAt: string }
   | { ok: false; error: string; code?: string } {
@@ -519,19 +520,26 @@ export function talentVisitCheckInOnMp(
   if (me.visitAssignmentStatus === 'declined') {
     return { ok: false, error: '您已反馈档期冲突，请联系 PR', code: 'assignment_declined' }
   }
-  if (!isVisitCheckInDay(assigned)) {
-    return { ok: false, error: '仅探店当天可签到', code: 'not_visit_day' }
+  const photo = String(photoUrl || '').trim()
+  if (String(method || '').trim() === 'photo' && !/^https:\/\//i.test(photo)) {
+    return { ok: false, error: '请先拍摄签到照片', code: 'photo_required' }
   }
   if (String(me.visitCheckInAt || '').trim()) {
     return { ok: true, mp, checkInAt: String(me.visitCheckInAt) }
   }
   const now = nowStr()
-  const nextApplicants = patchApplicant(applicants, id, {
+  const patch: Record<string, unknown> = {
     visitCheckInAt: now,
-    visitCheckInMethod: method,
+    visitCheckInMethod: String(method || 'manual').trim() || 'manual',
     visitStatus: 'checked_in',
     groupJoinStatus: 'joined',
-  } as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>)
+  }
+  if (/^https:\/\//i.test(photo)) patch.visitCheckInPhoto = photo
+  const nextApplicants = patchApplicant(
+    applicants,
+    id,
+    patch as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>,
+  )
   return {
     ok: true,
     mp: { ...mp, applicants: nextApplicants, updatedAt: now },

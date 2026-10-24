@@ -198,10 +198,13 @@ function defaultVisitPlanDate() {
   return `${y}-${m}-${day}`
 }
 
-function visitCheckIn(mpOrderId, applicantId, method) {
+function visitCheckIn(mpOrderId, applicantId, method, photoUrl) {
+  const body = { mpOrderId, applicantId, method: method || 'manual' }
+  const photo = String(photoUrl || '').trim()
+  if (photo) body.photoUrl = photo
   return postVisit(
     ['/api/meoo-ops-mp-visit-checkin', '/api/ops-sync/mp-visit-checkin'],
-    { mpOrderId, applicantId, method: method || 'manual' },
+    body,
   )
 }
 

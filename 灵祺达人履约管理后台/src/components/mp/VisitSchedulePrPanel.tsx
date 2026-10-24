@@ -159,12 +159,20 @@ function rowsToNotify(
   })
 }
 
-function checkInStatusLabel(a: Record<string, unknown>): { text: string; tone: 'ok' | 'pending' | 'none' } {
+function checkInStatusLabel(a: Record<string, unknown>): { text: string; tone: 'ok' | 'pending' | 'none'; photo: string } {
   const checkedIn = String(a.visitCheckInAt || '').trim()
   const assigned = String(a.assignedVisitAt || '').trim()
-  if (checkedIn) return { text: `已签到 ${checkedIn}`, tone: 'ok' }
-  if (assigned) return { text: '待签到', tone: 'pending' }
-  return { text: '未排期', tone: 'none' }
+  const photo = String(a.visitCheckInPhoto || '').trim()
+  if (checkedIn) {
+    const method = String(a.visitCheckInMethod || '').trim()
+    return {
+      text: method === 'photo' ? `已拍照签到 ${checkedIn}` : `已签到 ${checkedIn}`,
+      tone: 'ok',
+      photo,
+    }
+  }
+  if (assigned) return { text: '待签到', tone: 'pending', photo: '' }
+  return { text: '未排期', tone: 'none', photo: '' }
 }
 
 export default function VisitSchedulePrPanel({
@@ -632,6 +640,11 @@ export default function VisitSchedulePrPanel({
                         >
                           {status.text}
                         </span>
+                        {status.photo ? (
+                          <a href={status.photo} target="_blank" rel="noreferrer" className="block mt-1">
+                            <img src={status.photo} alt="签到照片" className="h-16 w-16 rounded object-cover" />
+                          </a>
+                        ) : null}
                       </td>
                     </tr>
                   )

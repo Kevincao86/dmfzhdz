@@ -268,10 +268,16 @@ export function defaultVisitPlanDate(): string {
   return `${y}-${m}-${day}`
 }
 
-export async function visitCheckIn(mpOrderId: string, applicantId: string, method = 'manual') {
+export async function visitCheckIn(
+  mpOrderId: string,
+  applicantId: string,
+  method = 'manual',
+  photoUrl = '',
+) {
+  const photo = String(photoUrl || '').trim()
   return postVisit(
     ['/api/meoo-ops-mp-visit-checkin', '/api/ops-sync/mp-visit-checkin'],
-    { mpOrderId, applicantId, method },
+    { mpOrderId, applicantId, method, ...(photo ? { photoUrl: photo } : {}) },
   )
 }
 

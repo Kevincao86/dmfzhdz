@@ -1746,20 +1746,39 @@ Page({
     run()
   },
   async visitCheckInTap() {
-    if (!this.data.visitApplicantId || !this.data.id) return
-    if (!this.data.checkInReady) {
-      wx.showToast({ title: '探店日当天可签到', icon: 'none' })
+    if (!this.data.visitApplicantId || !this.data.id || this.data.visitBusy) return
+    const privacy = require('../../../utils/mpPrivacyAuthorize.js')
+    let picked = null
+    try {
+      picked = await privacy.runChooseMedia(
+        {
+          count: 1,
+          mediaType: ['image'],
+          sourceType: ['camera'],
+          camera: 'back',
+        },
+        { purpose: '探店拍照签到', needCamera: true },
+      )
+    } catch (e) {
+      wx.showToast({ title: String((e && e.message) || '无法打开相机').slice(0, 20), icon: 'none' })
       return
     }
+    const path = picked && picked.tempFiles && picked.tempFiles[0] && picked.tempFiles[0].tempFilePath
+    if (!path) return
     this.setData({ visitBusy: true })
+    wx.showLoading({ title: '签到中', mask: true })
     try {
-      await visitScheduleRuntime.visitCheckIn(this.data.id, this.data.visitApplicantId, 'manual')
+      const imageOss = require('../../../utils/mpImageOssUpload.js')
+      const url = await imageOss.uploadImageFileToOss(path, {
+        purpose: 'image',
+        fileName: `checkin-${Date.now()}.jpg`,
+      })
+      await visitScheduleRuntime.visitCheckIn(this.data.id, this.data.visitApplicantId, 'photo', url)
+      wx.hideLoading()
       wx.showToast({ title: '签到成功', icon: 'success' })
       await this.loadOrder(this.data.id)
-      setTimeout(() => {
-        wx.navigateTo({ url: '/pages/subpack-mine/mine-applications/mine-applications?tab=pending_video' })
-      }, 400)
     } catch (e) {
+      wx.hideLoading()
       wx.showToast({ title: String((e && e.message) || e || '签到失败').slice(0, 24), icon: 'none' })
     } finally {
       this.setData({ visitBusy: false })

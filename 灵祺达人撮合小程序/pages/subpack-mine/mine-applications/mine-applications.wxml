@@ -278,7 +278,7 @@
         catchtap="goDetail"
         data-id="{{item.mpOrderId}}"
       >
-        {{item.checkInReady ? '探店签到' : '查看探店排期'}}
+        拍照签到
       </button>
       <button
         wx:if="{{item.isIce && item.progressId === 'completed'}}"

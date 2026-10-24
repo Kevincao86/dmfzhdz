@@ -28,6 +28,7 @@ list_scopes() {
   closed_loop_talent 闭环报名：排期确定后直接交片，不再单独签到
   visit_slot_roster 闭环排期：PR 先定可探店时段，按日期时段排人并备注、导出、打印
   publish_loop_first 发布招募第一页选择开环或闭环，表单里不再切换
+  visit_photo_checkin 探店拍照签到：不限探店当天，达人拍照后即可签到
   recruit_video     探店成片上传
   recruit_share_poster_ai  招募创建成功分享页 AI 海报生图（星选+撮合）
   merchant_recruit_loop  商家 ERP 达人招募引导闭环（不改星选小程序/dr）
@@ -2488,6 +2489,26 @@ PublishWizard.tsx
 pages/publish/publish.wxml
 pages/publish/publish.js
 pages/publish/publish.wxss
+change-scope-guard
+PAT
+      ;;
+    visit_photo_checkin)
+      cat <<'PAT'
+mpRecruitmentVisitScheduleCore.ts
+meoo-ops-mp-visit-checkin.ts
+talentApplicationStatus.js
+talentApplicationStatus.ts
+visitScheduleRuntime.js
+visitScheduleRuntime.ts
+detail/detail.wxml
+detail/detail.js
+mine-applications.wxml
+VisitScheduleTalentPanel.tsx
+VisitSchedulePrPanel.tsx
+visitScheduleBoard.js
+mine-pr-order-schedule.wxml
+mine-pr-order-schedule.js
+OrdersPage.tsx
 change-scope-guard
 PAT
       ;;

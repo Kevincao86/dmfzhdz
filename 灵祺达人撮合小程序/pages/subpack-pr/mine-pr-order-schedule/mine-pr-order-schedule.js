@@ -308,6 +308,11 @@ Page({
       this.setData({ busy: false })
     }
   },
+  onPreviewCheckInPhoto(e) {
+    const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '').trim()
+    if (!url) return
+    wx.previewImage({ current: url, urls: [url] })
+  },
   onModeManual() {
     this.setData({ mode: 'manual', okMsg: '', errMsg: '' })
   },

@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-ops-mp-visit-checkin — 达人探店当天签到。
+ * POST /api/meoo-ops-mp-visit-checkin — 达人探店拍照签到（不限探店当天）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { mpOrderId?: string; applicantId?: string; method?: string }
+    let body: { mpOrderId?: string; applicantId?: string; method?: string; photoUrl?: string }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
     } catch {
@@ -79,7 +79,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     const cur = data.mpRecruitmentOrders[idx]!
-    const result = talentVisitCheckInOnMp(cur, applicantId, String(body.method || 'manual').trim())
+    const result = talentVisitCheckInOnMp(
+      cur,
+      applicantId,
+      String(body.method || 'manual').trim(),
+      String(body.photoUrl || '').trim(),
+    )
     if (!result.ok) {
       sendOpsJson(res, 409, {
         ok: false,
