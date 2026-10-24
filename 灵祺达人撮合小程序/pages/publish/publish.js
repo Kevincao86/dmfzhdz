@@ -1138,7 +1138,7 @@ Page({
   },
   onBackFromTarget() {
     this.setData({
-      step: 'channel',
+      step: 'recruit',
       recruitTarget: '',
       recruitTargetLabel: '',
       recruitMode: '',
@@ -1230,8 +1230,14 @@ Page({
     const val = e.currentTarget.dataset.val === 'open' ? 'open' : 'closed'
     this.setData({
       loopChosen: true,
+      step: 'recruit',
       form: { ...this.data.form, fulfillmentLoop: val },
     })
+    this.syncTabBarOverlay()
+  },
+  onBackFromRecruit() {
+    this.setData({ step: 'channel' })
+    this.syncTabBarOverlay()
   },
   onSelectChannel(e) {
     const id = e.currentTarget.dataset.id

@@ -135,7 +135,7 @@ export default function PublishWizard() {
   const [search] = useSearchParams()
   const pr = readPrProfile()
 
-  const [step, setStep] = useState<'channel' | 'target' | 'mode' | 'tpl' | 'tplCustom' | 'placeholder' | 'form' | 'done'>('channel')
+  const [step, setStep] = useState<'channel' | 'recruit' | 'target' | 'mode' | 'tpl' | 'tplCustom' | 'placeholder' | 'form' | 'done'>('channel')
   const [publishTemplateMode, setPublishTemplateMode] = useState<'system' | 'custom'>('system')
   const [fieldOn, setFieldOn] = useState<Record<string, boolean>>({
     delivery: true,
@@ -541,7 +541,7 @@ export default function PublishWizard() {
       <div className="page-content-shell page-content-shell--narrow space-y-5">
         <PageHero
           title="发布招募"
-          subtitle="先定履约方式，再选公开招募或定向邀约"
+          subtitle="选定后，再选择普通招募或定向邀约"
           badge="步骤 1/5"
         />
         <p className="text-sm text-[var(--shell-muted)] px-1">选择履约方式</p>
@@ -571,6 +571,7 @@ export default function PublishWizard() {
                 onClick={() => {
                   setLoopChosen(true)
                   setForm((prev) => ({ ...prev, fulfillmentLoop: loop.id }))
+                  setStep('recruit')
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -582,6 +583,22 @@ export default function PublishWizard() {
             )
           })}
         </div>
+      </div>
+    )
+  }
+
+  if (step === 'recruit') {
+    const loopLabel = form.fulfillmentLoop === 'open' ? '开环' : '闭环'
+    return (
+      <div className="page-content-shell page-content-shell--narrow space-y-5">
+        <button type="button" className="text-slate-400 text-sm" onClick={() => setStep('channel')}>
+          ‹ 返回
+        </button>
+        <PageHero
+          title="发布招募"
+          subtitle={`已选${loopLabel}。请选择普通招募或定向邀约`}
+          badge="步骤 1/5"
+        />
         <p className="text-sm text-[var(--shell-muted)] px-1">选择招募方式</p>
         <div className="grid gap-3 sm:grid-cols-1">
           {RECRUIT_CHANNELS.map((c) => (
@@ -590,10 +607,6 @@ export default function PublishWizard() {
               type="button"
               className="choice-card w-full text-left surface-card rounded-xl border p-5 hover-panel"
               onClick={() => {
-                if (!loopChosen) {
-                  window.alert('请先选择开环或闭环。')
-                  return
-                }
                 if (c.id === 'targeted' && !canUseTargetedRecruit()) {
                   window.alert('当前会员档位不含定向邀约，请升级会员或联系运营开通。')
                   return
@@ -626,7 +639,7 @@ export default function PublishWizard() {
   if (step === 'target') {
     return (
       <div className="page-content-shell page-content-shell--narrow space-y-5">
-        <button type="button" className="text-slate-400 text-sm" onClick={() => setStep('channel')}>
+        <button type="button" className="text-slate-400 text-sm" onClick={() => setStep('recruit')}>
           ‹ 返回
         </button>
         <PageHero
