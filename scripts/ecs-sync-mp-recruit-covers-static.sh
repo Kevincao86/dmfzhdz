@@ -38,6 +38,12 @@ if [[ -d "$FESTIVAL_SRC" ]]; then
   sudo cp -f "$FESTIVAL_SRC"/*.jpg "$STATIC_ROOT/festivals/" 2>/dev/null || true
 fi
 
+shopt -s nullglob
+for f in "$MP/images/home"/entry-*.jpg "$MP/images/home"/poster-pr.jpg; do
+  sudo cp -f "$f" "$STATIC_ROOT/home/"
+done
+shopt -u nullglob
+
 for f in hero-talent.png hero-talent-v2-search.png hero-shoot.png hero-edit.png home-banner-clouds.png poster-default.jpg kpi-recruit.jpg kpi-urgent.jpg kpi-today.jpg; do
   if [[ -f "$MP/images/home/$f" ]]; then
     sudo cp -f "$MP/images/home/$f" "$STATIC_ROOT/home/$f"
@@ -116,6 +122,11 @@ for path in \
   "/recruit-covers/posters/style-sunset-v1.png" \
   "/recruit-covers/mine-icons/info.png" \
   "/recruit-covers/home/kpi-recruit.jpg" \
+  "/recruit-covers/home/entry-eval.jpg" \
+  "/recruit-covers/home/entry-apply.jpg" \
+  "/recruit-covers/home/entry-calendar.jpg" \
+  "/recruit-covers/home/entry-ai-review.jpg" \
+  "/recruit-covers/home/poster-pr.jpg" \
   "/recruit-covers/share/talent-lift-poster.jpg" \
   "/recruit-covers/ai-addon-icons/shortvideo.png" \
   "/recruit-covers/web-static/merchant/digital-human/avatars/av-real-1.jpg"; do

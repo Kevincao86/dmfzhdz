@@ -70,11 +70,11 @@ const HOME_CATEGORY_CHIPS = [
 
 const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const homeBannerAssets = require('../../utils/homeBannerAssets.js')
-const recruitCoverOssBase = require('../../utils/recruitCoverOssBase.js')
+const config = require('../../utils/config.js')
 
 function homeEntryUrl(name) {
-  const base = String(recruitCoverOssBase || '').replace(/\/$/, '')
-  return `${base}/home/${name}?v=20261003c`
+  const base = String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')
+  return `${base}/home/${name}?v=20261025a`
 }
 
 function homeEntry(key, file, title, sub) {
