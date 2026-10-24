@@ -310,7 +310,9 @@ function resolveApplicantOnMp(mp, applicantId) {
 }
 
 /** 达人「我的报名」列表行 */
-function enrichTalentApplicationRow(localApp, mp, reg) {
+function enrichTalentApplicationRow(localApp, mp, reg, extra) {
+  const registryLoaded = !!(extra && extra.registryLoaded)
+  const prCancelled = registryLoaded && (!mp || String((mp && mp.status) || '').trim() === 'deleted')
   const merchant = reg ? display.findMerchantOrder(reg, mp?.sourceMerchantOrderId) : null
   const view = mp ? display.enrichMpOrder(mp, merchant) : null
   const platform = deliveryReview.resolveOrderPlatformFromMp(mp, view?.platform || '抖音')
@@ -359,6 +361,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     withdrawnAt,
     localApplicantId: applicantId || undefined,
     settleRemindOn: require('./openLoopSettlement.js').readSettleRemindOn(reg),
+    prCancelled,
   })
   const iceVerifyMode = mp ? getIceVerifyMode(mp) : 'ai'
   let iceActionLabel = ''
@@ -409,8 +412,9 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     orderTypeId: orderType.id,
     orderTypeLabel: orderType.label,
     iceActionLabel,
-    progressId: progress.id,
-    progressLabel: progress.label,
+    prCancelled,
+    progressId: prCancelled ? 'completed' : progress.id,
+    progressLabel: prCancelled ? '已完成' : progress.label,
     showSubmitInvoice: requireInvoice && progress.id === 'completed' && !!applicantId,
     invoiceCount,
     invoiceBtnLabel: invoiceCount > 0 ? `提交发票（已交${invoiceCount}张）` : '提交发票',

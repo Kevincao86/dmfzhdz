@@ -123,6 +123,7 @@ list_scopes() {
   xingxuan_pr_orders_hot 星选与达人小程序：账号绑定标志、招募订单瘦身、专业版一键分析、火热角标
   xingxuan_open_loop_qr 开环群码：招募大厅详情不展示，审核通过后在达人报名详情展示
   talent_signup_deadline_done 达人/剪辑/拍摄：报名截止后的商单在我的报名里自动进入已完成
+  pr_deleted_application PR已删除的商单：达人报名移入已完成并标注PR已取消
   xingxuan_ui_script_rules  星选网页按钮/布局重排；文稿审核（小红书/大众点评）规则页：星选Web+达人/星选小程序
   xingxuan_ui_desk          星选网页按确认的台账样式稿改 UI（仅 CSS/壳层，不改功能）
   ads_studio_review      本地推投流免进设置页、商家小程序 AI 标签对齐星选、审核规则半月刷新
@@ -1641,6 +1642,16 @@ PAT
     talent_signup_deadline_done)
       cat <<'PAT'
 talentApplicationStatus
+change-scope-guard
+PAT
+      ;;
+    pr_deleted_application)
+      cat <<'PAT'
+talentApplicationStatus.js
+talentApplicationStatus.ts
+applicationDisplay.js
+mine-applications.js
+OrdersPage.tsx
 change-scope-guard
 PAT
       ;;

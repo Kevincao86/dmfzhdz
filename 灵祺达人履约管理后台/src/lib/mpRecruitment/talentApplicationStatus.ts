@@ -61,6 +61,8 @@ export type ApplicationDisplayOpts = {
   localApplicantId?: string
   /** 达人已在我的报名打开商单结算提醒 */
   settleRemindOn?: boolean
+  /** PR 已删除这张商单 */
+  prCancelled?: boolean
 }
 
 export const TALENT_APP_PROGRESS_FILTERS: { id: TalentAppProgressId; label: string }[] = [
@@ -632,6 +634,15 @@ function resolveApplicationDisplayStatusCore(
   mpOrderId?: string,
   opts?: ApplicationDisplayOpts,
 ): ApplicationDisplayStatus {
+  if (opts?.prCancelled) {
+    return {
+      tabId: 'completed',
+      label: '已完成（PR已取消）',
+      tone: 'completed',
+      showConfirmBtn: false,
+      showCancelBtn: false,
+    }
+  }
   if (opts?.withdrawnAt) {
     return { tabId: 'cancelled', label: '已取消报名', tone: 'cancelled', showConfirmBtn: false, showCancelBtn: false }
   }

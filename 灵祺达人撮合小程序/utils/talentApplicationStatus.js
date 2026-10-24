@@ -452,6 +452,15 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
 
 function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
   const options = opts || {}
+  if (options.prCancelled) {
+    return {
+      tabId: 'completed',
+      label: '已完成（PR已取消）',
+      tone: 'completed',
+      showConfirmBtn: false,
+      showCancelBtn: false,
+    }
+  }
   if (options.withdrawnAt) {
     return { tabId: 'cancelled', label: '已取消报名', tone: 'cancelled', showConfirmBtn: false, showCancelBtn: false }
   }

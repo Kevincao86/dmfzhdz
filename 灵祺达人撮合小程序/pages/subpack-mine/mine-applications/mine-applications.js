@@ -92,7 +92,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         r.progressMp || null,
         r.progressMe || null,
         r.mpOrderId,
-        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined, settleRemindOn: this.data.settleRemindOn === true },
+        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined, settleRemindOn: this.data.settleRemindOn === true, prCancelled: !!r.prCancelled },
       ),
     )
     return appFilters.filterApplicationRows(byTab, {
@@ -115,7 +115,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         r.progressMp,
         r.progressMe,
         r.mpOrderId,
-        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined, settleRemindOn: this.data.settleRemindOn === true },
+        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined, settleRemindOn: this.data.settleRemindOn === true, prCancelled: !!r.prCancelled },
       )
       return (
         st.tabId === 'pending_video' &&
@@ -284,7 +284,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       const enriched = this.mergeAiStatusToRows(
         local.map((a) => {
           const mp = mpList.find((o) => o && o.id === a.mpOrderId)
-          const row = appDisplay.enrichTalentApplicationRow(a, mp, reg)
+          const row = appDisplay.enrichTalentApplicationRow(a, mp, reg, { registryLoaded: true })
           if (!String(a.withdrawnAt || '').trim() && row.applicantId && row.applicantId !== a.applicantId) {
             applicationsStore.updateApplicationApplicantId(a.mpOrderId, row.applicantId)
           }

@@ -102,6 +102,7 @@ type EnrichedApplication = ApplicationLocal & {
   invoiceBtnLabel?: string
   videoStatusLabel?: string
   selectionNotified?: boolean
+  prCancelled?: boolean
   displayStatus?: ReturnType<typeof resolveApplicationDisplayStatus>
   _progressMp?: Record<string, unknown> | null
   _progressMe?: Record<string, unknown> | null
@@ -158,21 +159,29 @@ function TalentApplicationsPage() {
   const [filterCity, setFilterCity] = useState('全部')
   const [previewVideoUrl, setPreviewVideoUrl] = useState('')
 
-  function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
+  function enrichApplicationRow(
+    a: ApplicationLocal,
+    mp: Record<string, unknown> | undefined,
+    reg: Record<string, unknown>,
+    registryLoaded = false,
+  ) {
+    const prCancelled = registryLoaded && (!mp || String(mp.status || '').trim() === 'deleted')
     const isIceFromId = /^MP-ICE-/i.test(String(a.mpOrderId || ''))
     if (!mp) {
       const withdrawn = !!String(a.withdrawnAt || '').trim()
       const displayStatus = resolveApplicationDisplayStatus(null, null, a.mpOrderId, {
         isIce: isIceFromId,
         withdrawnAt: withdrawn,
+        prCancelled,
       })
       const progress = resolveTalentApplicationProgress(null, null, a.mpOrderId)
       return {
         ...a,
         title: a.title || a.mpOrderId,
         isIce: isIceFromId,
-        progressId: progress.id,
-        progressLabel: progress.label,
+        prCancelled,
+        progressId: prCancelled ? 'completed' : progress.id,
+        progressLabel: prCancelled ? '已完成' : progress.label,
         displayStatus,
         selectionNotified: false,
         _progressMp: null,
@@ -229,6 +238,7 @@ function TalentApplicationsPage() {
         reg as { mpTalentMembers?: Array<Record<string, unknown>> },
         resolveTalentMemberId(),
       ),
+      prCancelled,
     })
     let iceActionLabel = ''
     if (isIce) {
@@ -275,8 +285,9 @@ function TalentApplicationsPage() {
       canSubmitScript,
       isIce,
       iceActionLabel,
-      progressId: progress.id,
-      progressLabel: progress.label,
+      prCancelled,
+      progressId: prCancelled ? 'completed' : progress.id,
+      progressLabel: prCancelled ? '已完成' : progress.label,
       showSubmitInvoice: requireInvoice && progress.id === 'completed' && !!applicantId,
       invoiceBtnLabel: invoiceCount > 0 ? `提交发票（已交${invoiceCount}张）` : '提交发票',
       selectionNotified,
@@ -325,7 +336,7 @@ function TalentApplicationsPage() {
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
       const enriched: EnrichedApplication[] = localAfter.map((a) => {
         const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
-        const row = enrichApplicationRow(a, mp, reg as Record<string, unknown>)
+        const row = enrichApplicationRow(a, mp, reg as Record<string, unknown>, true)
         if (row.applicantId && row.applicantId !== a.applicantId) {
           updateApplicationApplicantId(a.mpOrderId, row.applicantId)
         }
@@ -837,7 +848,7 @@ function TalentApplicationsPage() {
         >[]
         const enriched: EnrichedApplication[] = local.map((a) => {
           const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
-          const row = enrichApplicationRow(a, mp, reg as Record<string, unknown>)
+          const row = enrichApplicationRow(a, mp, reg as Record<string, unknown>, true)
           if (row.applicantId && row.applicantId !== a.applicantId) {
             updateApplicationApplicantId(a.mpOrderId, row.applicantId)
           }
@@ -875,6 +886,7 @@ function TalentApplicationsPage() {
         isIce: a.isIce,
         withdrawnAt: !!String(a.withdrawnAt || '').trim(),
         settleRemindOn,
+        prCancelled: !!a.prCancelled,
       }),
     )
     return filterApplicationRows(byTab, {
@@ -1070,6 +1082,7 @@ function TalentApplicationsPage() {
             selectionNotified: a.selectionNotified,
             isIce: a.isIce,
             settleRemindOn,
+            prCancelled: !!a.prCancelled,
           })
           const href = detailHref(a.mpOrderId)
           const confirmLabel =
