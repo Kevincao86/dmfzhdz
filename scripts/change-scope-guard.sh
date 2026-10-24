@@ -2570,6 +2570,7 @@ PAT
 mpOssDisplayUrl
 灵祺达人撮合小程序/app.js
 detail/detail.wxml
+talent-lift-banner.jpg
 recruitShareCover.js
 recruitShareCard.js
 mpAddonIceApi.js
