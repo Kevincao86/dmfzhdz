@@ -8,7 +8,7 @@ import {
   ChevronRight,
   MessageCircle,
   Handshake,
-  AlertTriangle,
+  CircleCheck,
   UserCheck,
   CalendarDays,
   GraduationCap,
@@ -55,13 +55,18 @@ const DYNAMIC_LINKS: Record<string, string> = {
   待沟通: '/messages',
   待确认合作: '/orders',
   异常单据: '/orders',
+  已完成单据: '/orders',
 }
 
 const DYNAMIC_ICONS = {
   blue: UserCheck,
   green: MessageCircle,
   orange: Handshake,
-  purple: AlertTriangle,
+  purple: CircleCheck,
+}
+
+function platformDynamicLabel(label: string): string {
+  return label === '异常单据' ? '已完成单据' : label
 }
 
 function TrendBarChart({ items }: { items: { label: string; count: number }[] }) {
@@ -638,8 +643,9 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
             <h3 className="dash-dynamics__title">平台动态</h3>
             <div className="dash-dynamics-grid">
               {stats.dynamicCards.map((card) => {
+                const label = platformDynamicLabel(card.label)
                 const Icon = DYNAMIC_ICONS[card.tone]
-                const to = DYNAMIC_LINKS[card.label] || '/orders'
+                const to = DYNAMIC_LINKS[label] || DYNAMIC_LINKS[card.label] || '/orders'
                 return (
                   <Link
                     key={card.label}
@@ -650,7 +656,7 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
                       <Icon size={20} strokeWidth={2} />
                     </div>
                     <div className="dash-dynamic-card__body">
-                      <div className="dash-dynamic-card__label">{card.label}</div>
+                      <div className="dash-dynamic-card__label">{label}</div>
                       <div className="dash-dynamic-card__row">
                         <span className="dash-dynamic-card__value">{card.count}</span>
                         {card.delta !== 0 ? (
