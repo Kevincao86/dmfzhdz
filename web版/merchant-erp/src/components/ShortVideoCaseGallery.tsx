@@ -567,7 +567,7 @@ export function ShortVideoCanvasLocalLifeStrip({
     <section className={cn('w-full space-y-3', className)}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">本地生活 · 画布案例</h3>
+          <h3 className="text-sm font-semibold text-slate-900">画布案例</h3>
           <p className="mt-0.5 text-xs text-slate-500">
             含配音预览 · 点「做同款」自动生成镜头节点与连线路径
           </p>

@@ -226,7 +226,7 @@ export default function ShortVideoAgentCabin({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="输入想法、剧本或门店卖点；输入 / 使用技能，添加主体，和 Agent 一起创作"
+            placeholder="输入想法、剧本或想拍的内容；输入 / 使用技能，添加主体，和 Agent 一起创作"
             className="min-h-[108px] w-full resize-y rounded-2xl border-0 bg-transparent px-3 py-2 text-sm leading-relaxed text-slate-800 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
           />
 

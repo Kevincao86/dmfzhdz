@@ -23,7 +23,7 @@ export const SHORT_VIDEO_STUDIO_MODES: ShortVideoStudioMode[] = [
   {
     id: 'agent',
     label: 'Agent 模式',
-    description: '自然语言 + 探店/活动技能，自动规划分镜出片',
+    description: '自然语言写想法，自动规划分镜出片',
     pane: 'generate',
   },
   {

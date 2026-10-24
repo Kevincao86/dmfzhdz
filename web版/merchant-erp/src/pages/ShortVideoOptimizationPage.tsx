@@ -26,7 +26,7 @@ import ShortVideoImitateStudio from '../components/ShortVideoImitateStudio'
 import type { ShortVideoCaseItem } from '../lib/shortVideoCaseGallery'
 import { SHORT_VIDEO_CASES, alignCanvasRowsToCaseDuration, canvasLocalLifeCases } from '../lib/shortVideoCaseGallery'
 import type { ShortVideoMusicTrack } from '../lib/shortVideoMusicLibrary'
-import { appendLocalLifeShopFill, findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
+import { findShortVideoSkill, type ShortVideoSkillId } from '../lib/shortVideoSkills'
 import {
   findStudioMode,
   type ShortVideoStudioModeId,
@@ -536,7 +536,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
     })
   }, [embedAddonAccess])
   const [mainPane, setMainPane] = useState<MainPane>('generate')
-  const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>('store_visit')
+  const [activeSkillId, setActiveSkillId] = useState<ShortVideoSkillId | null>(null)
   const [studioMode, setStudioMode] = useState<ShortVideoStudioModeId>('agent')
   const [selectedMusicTrackId, setSelectedMusicTrackId] = useState<string | null>(null)
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
@@ -566,10 +566,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
   const motionVideoRef = useRef<HTMLVideoElement>(null)
   const motionVideoInputRef = useRef<HTMLInputElement>(null)
   const motionPhotoInputRef = useRef<HTMLInputElement>(null)
-  const [genPrompt, setGenPrompt] = useState(
-    () => findShortVideoSkill('store_visit')?.promptTemplate ?? '',
-  )
-  const [shopFill, setShopFill] = useState({ storeName: '', offerName: '', price: '' })
+  const [genPrompt, setGenPrompt] = useState('')
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
     // 默认 2 段节拍落在所选单段总时长内（15s → 0–8 / 8–15），避免 2×15=30s
     retimeScriptRowsToTotalSec(defaultScriptRows(2, 5), 15),
@@ -1920,7 +1917,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
       return
     }
 
-    let txt = appendLocalLifeShopFill(genPrompt.trim(), shopFill)
+    let txt = genPrompt.trim()
     // 画布已填可用分镜时，即使未勾选长片也走分段合成，避免闭环断裂
     let workingScriptRows = scriptRows
     const canvasScriptReady = isScriptRowsUsable(workingScriptRows) && workingScriptRows.length >= 2
@@ -2552,7 +2549,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           />
         </div>
         <p className="mx-auto max-w-2xl text-sm leading-relaxed text-slate-600">
-          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 模仿视频 · 音乐配乐 · 案例做同款。探店、套餐、活动用技能出片；店员口播请走数字人。多素材拼接请切「AI混剪」。
+          Skill 技能 · 无限画布 · 短片生成 · 动作模仿 · 模仿视频 · 音乐配乐 · 案例做同款。按你的文案出片；店员口播请走数字人。多素材拼接请切「AI混剪」。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-cyan-800">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -2622,26 +2619,6 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
           >
             {mainPane === 'generate' ? (
               <div className="space-y-4">
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <input
-                    value={shopFill.storeName}
-                    onChange={(e) => setShopFill((s) => ({ ...s, storeName: e.target.value }))}
-                    placeholder="店名"
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
-                  />
-                  <input
-                    value={shopFill.offerName}
-                    onChange={(e) => setShopFill((s) => ({ ...s, offerName: e.target.value }))}
-                    placeholder="招牌 / 套餐"
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
-                  />
-                  <input
-                    value={shopFill.price}
-                    onChange={(e) => setShopFill((s) => ({ ...s, price: e.target.value }))}
-                    placeholder="团购价（勿编）"
-                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
-                  />
-                </div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{VIDEO_ENGINE_LABEL_SEEDANCE}</p>
