@@ -136,6 +136,8 @@ export function patchApplicantVideoSubmit(
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
     const prevCount = Math.max(0, Number(a.videoSubmitCount || 0))
+    const checkedIn = String(a.visitCheckInAt || '').trim()
+    const assigned = String(a.assignedVisitAt || '').trim()
     return {
       ...a,
       videoUrl: url,
@@ -145,6 +147,13 @@ export function patchApplicantVideoSubmit(
       videoSubmitCount: prevCount + 1,
       aiVerifyStatus: 'pending' as const,
       aiVerifyNote: '待 PR 审核',
+      ...(checkedIn || !assigned
+        ? {}
+        : {
+            visitCheckInAt: nowCn(),
+            visitCheckInMethod: 'deliver',
+            visitStatus: 'checked_in' as const,
+          }),
     }
   })
   return { ok: true, mp: { ...mp, applicants, updatedAt: nowCn() } }

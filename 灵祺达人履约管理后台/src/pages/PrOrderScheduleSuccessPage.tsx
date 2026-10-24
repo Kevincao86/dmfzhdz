@@ -23,8 +23,8 @@ export default function PrOrderScheduleSuccessPage() {
         <h2 className="text-lg font-semibold text-emerald-800">探店排期已确认并通知达人</h2>
         <p className="text-sm text-[var(--shell-muted)]">
           {talentCount > 0
-            ? `已向 ${talentCount} 位达人下发探店日期与时段，达人可在小程序「我的报名 → 待探店」查看并签到。`
-            : '达人可在小程序「我的报名 → 待探店」查看排期详情，探店日当天完成签到后进入待传视频。'}
+            ? `已向 ${talentCount} 位达人下发探店日期与时段，达人可在小程序「我的报名」直接上传成片。`
+            : '达人可在小程序「我的报名」查看排期，并直接上传成片，不用单独签到。'}
         </p>
         <div className="flex flex-wrap justify-center gap-2 pt-2">
           <Link

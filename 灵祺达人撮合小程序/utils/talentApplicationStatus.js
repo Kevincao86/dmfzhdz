@@ -226,6 +226,21 @@ function isTalentVisitCheckedIn(mp, applicant) {
   return String((applicant && applicant.visitStatus) || '').trim() === 'checked_in'
 }
 
+/** 闭环：PR 排期生效后即可交片，不再要求探店当天先签到。 */
+function isClosedLoopReadyToDeliver(mp, applicant) {
+  if (isScheduleSkipped(mp)) return true
+  if (isTalentVisitCheckedIn(mp, applicant)) return true
+  return isPrScheduleEffective(applicant, mp)
+}
+
+function closedLoopDeliverHint(applicant) {
+  const assigned = String((applicant && applicant.assignedVisitAt) || '').trim()
+  const store = String((applicant && applicant.assignedVisitStore) || '').trim()
+  if (!assigned) return '排期已确定，直接上传成片。'
+  if (store) return `探店时间 ${assigned} · ${store}。到店后直接交片，不用单独签到。`
+  return `探店时间 ${assigned}。到店后直接交片，不用单独签到。`
+}
+
 function canShowConfirmVisitBtn(mp, applicant) {
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   if (isTalentVisitCheckedIn(mp, applicant)) return false
@@ -243,8 +258,7 @@ function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
   if (isScriptOrder(mp)) return false
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
-  const skipped = isScheduleSkipped(mp)
-  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
+  if (!isClosedLoopReadyToDeliver(mp, applicant)) return false
   const videoStatus = String(applicant.videoStatus || '')
   const videoUrl = String(applicant.videoUrl || '').trim()
   if (videoStatus === 'pending' || videoStatus === 'passed' || videoStatus === 'draft') return false
@@ -256,8 +270,7 @@ function canTalentSubmitRecruitmentVideo(mp, applicant, isIce) {
   if (isScriptOrder(mp)) return false
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
-  const skipped = isScheduleSkipped(mp)
-  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
+  if (!isClosedLoopReadyToDeliver(mp, applicant)) return false
   const videoStatus = String(applicant.videoStatus || '')
   const videoUrl = String(applicant.videoUrl || '').trim()
   if (!videoUrl) return false
@@ -271,8 +284,7 @@ function canTalentReuploadRecruitmentVideo(mp, applicant, isIce) {
 function canTalentUploadRecruitmentScript(mp, applicant, isIce) {
   if (!isScriptOrder(mp) || isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
-  const skipped = isScheduleSkipped(mp)
-  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
+  if (!isClosedLoopReadyToDeliver(mp, applicant)) return false
   const st = String(applicant.scriptStatus || '')
   const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
   if (st === 'pending' || st === 'passed' || st === 'draft') return false
@@ -283,8 +295,7 @@ function canTalentUploadRecruitmentScript(mp, applicant, isIce) {
 function canTalentSubmitRecruitmentScript(mp, applicant, isIce) {
   if (!isScriptOrder(mp) || isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
-  const skipped = isScheduleSkipped(mp)
-  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
+  if (!isClosedLoopReadyToDeliver(mp, applicant)) return false
   const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
   if (!url) return false
   const st = String(applicant.scriptStatus || '')
@@ -340,7 +351,7 @@ function isPendingVideoPhase(mp, applicant, mpOrderId) {
   }
   if (isScriptOrder(mp)) {
     const st = String(applicant.scriptStatus || '')
-    if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+    if (isClosedLoopReadyToDeliver(mp, applicant) && !isApplicantPassed(applicant, false)) {
       if (st === 'passed') return false
       return true
     }
@@ -350,7 +361,7 @@ function isPendingVideoPhase(mp, applicant, mpOrderId) {
     return false
   }
   const videoStatus = String(applicant.videoStatus || '')
-  if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+  if (isClosedLoopReadyToDeliver(mp, applicant) && !isApplicantPassed(applicant, false)) {
     if (videoStatus === 'passed' && !resolveVisitPublishPhase(applicant)) return false
     return true
   }
@@ -476,7 +487,7 @@ function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
     !isIce &&
     applicant &&
     prSelectedEarly &&
-    isTalentVisitCheckedIn(mp, applicant) &&
+    isClosedLoopReadyToDeliver(mp, applicant) &&
     !isApplicantPassed(applicant, false)
   ) {
     return {
@@ -484,11 +495,18 @@ function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
       label: pendingVideoPhaseLabel(mp, applicant),
       tone: 'accepted',
       showConfirmBtn: false,
+      visitHint: closedLoopDeliverHint(applicant),
     }
   }
 
   if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
-    return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }
+    return {
+      tabId: 'pending_video',
+      label: pendingVideoPhaseLabel(mp, applicant),
+      tone: 'accepted',
+      showConfirmBtn: false,
+      visitHint: !isIce && isPrScheduleEffective(applicant, mp) ? closedLoopDeliverHint(applicant) : '',
+    }
   }
 
   if (isIce && applicant) {
@@ -533,31 +551,20 @@ function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
   }
 
   if (!isIce && prSelected && notified && isPrScheduleEffective(applicant, mp)) {
-    if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+    if (!isApplicantPassed(applicant, false)) {
+      const revised = !!String((applicant && applicant.visitScheduleRevisedAt) || '').trim()
       return {
         tabId: 'pending_video',
         label: pendingVideoPhaseLabel(mp, applicant),
         tone: 'accepted',
         showConfirmBtn: false,
+        visitHint: revised
+          ? '商单探店时间已变更，请与 PR 沟通后直接交片。'
+          : closedLoopDeliverHint(applicant),
+        showEditVisitBtn: revised,
+        editVisitMode: revised ? 'effective' : '',
+        visitScheduleRevised: revised,
       }
-    }
-    const visitExtras = resolveVisitDisplayExtras(applicant)
-    if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
-      return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }
-    }
-    return {
-      tabId: 'pending_visit',
-      label: visitExtras.label || '待探店',
-      tone: 'accepted',
-      showConfirmBtn: false,
-      showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
-      showCheckInBtn: visitExtras.showCheckInBtn,
-      checkInReady: visitExtras.checkInReady,
-      showConfirmVisitBtn: canShowConfirmVisitBtn(mp, applicant),
-      showEditVisitBtn: visitExtras.showEditVisitBtn,
-      editVisitMode: visitExtras.editVisitMode,
-      visitHint: visitExtras.visitHint,
-      visitScheduleRevised: visitExtras.visitScheduleRevised,
     }
   }
 

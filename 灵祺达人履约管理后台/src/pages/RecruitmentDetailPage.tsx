@@ -755,7 +755,7 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
                     : [
                         { title: '资料准确', desc: '平台账号、粉丝数须与真实资料一致，便于 PR 筛选。' },
                         { title: '及时沟通', desc: '入选后可通过「沟通」与招募方确认排期与交付要求。' },
-                        { title: '成片上传', desc: '探店完成后在详情页或「我的报名」上传视频等待审核。' },
+                        { title: '成片上传', desc: '排期确定后在「我的报名」直接上传视频，不用单独签到。' },
                       ]
                 }
               />
