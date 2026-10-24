@@ -1,6 +1,6 @@
-/** 数字人预设头像走备案静态站（根域 /digital-human 曾 500）。 */
+/** 数字人预设头像走 OSS。 */
 const AVATAR_CDN =
-  'https://mofangdianai.com/recruit-covers/web-static/merchant/digital-human/avatars'
+  'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/merchant/digital-human/avatars'
 /** 换图后递增，破小程序/CDN 缓存 */
 const AVATAR_ASSET_VERSION = 'dh20260715b'
 

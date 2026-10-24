@@ -1,21 +1,11 @@
 /**
- * modianningbo 这只 OSS 桶当前返回 UserDisable，手机直连也没有图。
- * mp-recruit-covers 下的展示地址改到已备案静态站：
- * https://mofangdianai.com/recruit-covers/…
- * 其它桶、以及群码等非封面前缀保持原样（账号恢复前本来也读不到）。
+ * 展示图走 OSS。这里不再把 mp-recruit-covers 改写到备案静态站。
+ * restoreOssCanonicalUrl 仍把已经落到备案域名的地址还原成 OSS，给云剪用。
  */
 const CDN_ORIGIN = 'https://mofangdianai.com/recruit-covers'
 
-const COVER_OSS_RE =
-  /^https?:\/\/modianningbo\.oss-[a-z0-9-]+\.aliyuncs\.com\/mp-recruit-covers\/([^?#]*)(\?[^#]*)?(#.*)?$/i
-
 function rewriteOssDisplayUrl(raw) {
-  if (typeof raw !== 'string' || raw.indexOf('aliyuncs.com') === -1) return raw
-  const m = raw.trim().match(COVER_OSS_RE)
-  if (!m) return raw
-  const key = String(m[1] || '').replace(/^\/+/, '')
-  if (!key) return raw
-  return `${CDN_ORIGIN}/${key}${m[2] || ''}${m[3] || ''}`
+  return raw
 }
 
 function mapDeep(value, fn) {

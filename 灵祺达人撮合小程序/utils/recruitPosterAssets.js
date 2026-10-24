@@ -88,8 +88,13 @@ function festivalAssetCandidates(filename) {
     seen.add(url)
     out.push(url)
   }
-  add(festivalRootCdn())
-  add(readOssCoverBase())
+  if (config.MP_COVER_PREFER_CDN !== false) {
+    add(festivalRootCdn())
+    add(readOssCoverBase())
+  } else {
+    add(readOssCoverBase())
+    add(festivalRootCdn())
+  }
   return out
 }
 

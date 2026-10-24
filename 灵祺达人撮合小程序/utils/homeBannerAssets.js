@@ -37,9 +37,11 @@ function bannerUrl(fileName) {
   return withCacheBust(`${cdnBase()}/home/${fileName}`)
 }
 
-/** 首页预设海报与数字图标：包内不打包，走备案静态站 */
+/** 首页预设海报与数字图标：包内不打包，走 OSS */
 function ossHomeUrl(fileName) {
-  return bannerUrl(fileName)
+  const oss = ossBase()
+  if (oss) return withCacheBust(`${oss}/home/${fileName}`)
+  return withCacheBust(`${cdnBase()}/home/${fileName}`)
 }
 
 module.exports = {

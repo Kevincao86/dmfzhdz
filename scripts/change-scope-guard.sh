@@ -2575,6 +2575,8 @@ recruitShareCover.js
 recruitShareCard.js
 mpAddonIceApi.js
 homeBannerAssets.js
+pages/index/index.js
+recruitPosterAssets.js
 mineMenuIcons.js
 mpDigitalHumanPresets.js
 addonCards.js

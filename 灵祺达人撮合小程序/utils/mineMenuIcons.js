@@ -1,6 +1,6 @@
-/** 「我的」页菜单图标走备案静态站，不打进主包。 */
-const MINE_ICON_OSS = 'https://mofangdianai.com/recruit-covers/mine-icons'
-const MINE_ICON_VER = '20261025a'
+/** 「我的」页菜单图标在 OSS，不打进主包。 */
+const MINE_ICON_OSS = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/mine-icons'
+const MINE_ICON_VER = '20261023a'
 
 function mineIcon(file) {
   return `${MINE_ICON_OSS}/${file}?v=${MINE_ICON_VER}`

@@ -17,10 +17,10 @@ module.exports = {
   MP_SHARE_COVER_URL: '',
   /** 星选 Web / ECS 静态封面（真机 downloadFile 合法域名，优先于 OSS） */
   RECRUIT_COVER_CDN_BASE: 'https://mofangdianai.com/recruit-covers',
-  /** 分享/身份图仅 CDN（images/share、identity 不打包，主包 <2MB 真机调试） */
-  MP_COVER_PREFER_CDN: true,
-  /** 欢迎页身份 3D 图走备案静态站 /recruit-covers/identity */
-  MP_IDENTITY_ICON_PREFER_OSS: false,
+  /** 封面、首页、身份图走 OSS（images 大图不打包） */
+  MP_COVER_PREFER_CDN: false,
+  /** 欢迎页身份 3D 图走 OSS */
+  MP_IDENTITY_ICON_PREFER_OSS: true,
   /** 商家审核通知分享海报：真机走 CDN 合法域名；OSS 仅备份（upload-mp-recruit-covers-oss.js） */
   MP_MERCHANT_NOTIFY_POSTER_PREFER_OSS: false,
   /** 远程图缓存版本（改图后 bump，避免微信缓存旧 JPEG） */

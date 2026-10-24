@@ -5,12 +5,12 @@
 const posterCore = require('./recruitmentSharePosterCore.js')
 const prRecruitQr = require('./prRecruitQr.js')
 const hallFilters = require('./recruitmentHallFilters.js')
-const config = require('./config.js')
+const ossBase = require('./recruitCoverOssBase.js')
 const ossDisplay = require('./mpOssDisplayUrl.js')
 
 const CARD_W = 750
 const CARD_H = 600
-const BG_OSS = `${String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')}/share/recruit-card-bg.jpg?v=20261025a`
+const BG_OSS = `${String(ossBase || '').replace(/\/$/, '')}/share/recruit-card-bg.jpg?v=20261010c`
 const BG_LOCAL = '/images/share/recruit-card-bg.jpg'
 const SLOGAN = '同城探店 · 速来报名'
 
