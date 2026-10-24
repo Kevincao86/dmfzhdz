@@ -2495,6 +2495,7 @@ mine-pr-order-schedule.js
 detail/detail.wxml
 mpRecruitmentAiCore.ts
 mpRecruitmentVisitScheduleCore.ts
+openLoopSettlement.ts
 change-scope-guard
 PAT
       ;;

@@ -135,7 +135,7 @@ function eventId(mpOrderId: string, applicantId: string, tag: string): string {
 export function resolveOpenLoopCard(
   mp: OrderLike,
   applicant: ApplicantLike,
-  opts?: { selected?: boolean; selectionNotified?: boolean; nowMs?: number },
+  opts?: { selected?: boolean; selectionNotified?: boolean; nowMs?: number; enabled?: boolean },
 ): OpenLoopCard | null {
   if (!isOpenLoopOrder(mp) || !applicant) return null
   if (opts?.enabled !== true) return null
