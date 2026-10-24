@@ -269,23 +269,12 @@ function generateClientRuleSchedule(selectedApplicants, opts) {
     return fb - fa
   })
   const storeName = String(options.storeName || '门店').trim()
-  const mealCount = Math.max(1, Number(options.mealCount) || 1)
-  const tableSize = Math.max(2, Number(options.tableSize) || 4)
-  const shareTable = options.shareTable !== false
-  const usedSlotCounts = {}
   return pool.map((a, i) => {
     const preferred = resolveApplicantVisitPreference(a)
     let time = pickBestVisitSlot(preferred, slots, i)
     if (!time) time = slots[i % slots.length]
-    const slotKey = normalizeSlotCompareKey(time.indexOf(' ') >= 0 ? time.split(/\s+/).slice(1).join(' ') : time)
-    const used = usedSlotCounts[slotKey] || 0
-    usedSlotCounts[slotKey] = used + 1
-    const tableNote = formatScheduleTableNote(shareTable, {
-      tableSize,
-      mealCount,
-      tableIndex: Math.floor(used / Math.max(1, tableSize)),
-      tableCount: Math.min(tableSize, used + 1),
-    })
+    const kept = String((a && a.tableNote) || '').trim()
+    const tableNote = kept && !/拼桌|单独探店|人\/桌|餐食/.test(kept) ? kept : undefined
     return {
       applicantId: String(a.id || ''),
       time,

@@ -3,7 +3,6 @@ import {
   buildVisitTimeRange,
   DEFAULT_VISIT_SLOTS,
   defaultVisitPlanDate,
-  formatScheduleTableNote,
   isValidVisitTimeRange,
   normalizeVisitPlanDateKey,
   parseVisitTimeRange,
@@ -15,7 +14,7 @@ export { normalizeVisitPlanDateKey }
 export type VisitSlotDef = { id: string; start: string; end: string }
 export type VisitDateDef = { id: string; date: string; slots: VisitSlotDef[] }
 
-export type ScheduleTable = { id: string; talentIds: string[] }
+export type ScheduleTable = { id: string; talentIds: string[]; notes?: Record<string, string> }
 export type ScheduleColumn = { dateId: string; slotId: string; tables: ScheduleTable[] }
 
 export type ApplicantLite = {
@@ -203,23 +202,15 @@ export function boardToScheduleRows(
     if (!slotLabel || !visitDate) continue
     const time = formatVisitRowTime(visitDate, slotLabel)
     if (!time) continue
-    col.tables.forEach((table, tIdx) => {
-      const count = table.talentIds.length
+    col.tables.forEach((table) => {
       table.talentIds.forEach((applicantId) => {
-        const tableNote = formatScheduleTableNote(opts.shareTable, {
-          tableSize: opts.tableSize,
-          mealCount: opts.mealCount,
-          tableIndex: tIdx,
-          tableCount: count,
-        })
+        const tableNote = String(table.notes?.[applicantId] || '').trim()
         rows.push({
           applicantId,
           time,
           storeName: opts.storeName,
-          tableNote,
-          tableGroupId: opts.shareTable
-            ? `table-${col.dateId}-${col.slotId}-${table.id}`
-            : `solo-${applicantId}`,
+          tableNote: tableNote || undefined,
+          tableGroupId: `slot-${col.dateId}-${col.slotId}`,
         })
       })
     })
@@ -305,17 +296,20 @@ export function hydrateBoardFromApplicants(applicants: Record<string, unknown>[]
       const label = slotDefLabel(slot)
       const key = `${day.date}|${label}`
       const talentIds = groups.get(key) || []
+      const notes: Record<string, string> = {}
+      for (const id of talentIds) {
+        const raw = String(assigned.find((a) => String(a.id) === id)?.tableNote || '').trim()
+        if (raw && !/拼桌|单独探店|人\/桌|餐食/.test(raw)) notes[id] = raw
+      }
       columns.push({
         dateId: day.id,
         slotId: slot.id,
-        tables: talentIds.length ? [{ id: 't1', talentIds }] : [],
+        tables: [{ id: 't1', talentIds, notes }],
       })
     }
   }
 
-  const shareTable =
-    assigned.some((a) => String(a.tableNote || '').includes('拼桌')) ||
-    [...groups.values()].some((ids) => ids.length > 1)
+  const shareTable = false
   const mealMatch = assigned
     .map((a) => String(a.tableNote || '').match(/餐食\s*(\d+)/))
     .find(Boolean)
@@ -339,7 +333,7 @@ function assignedIds(columns: ScheduleColumn[]): Set<string> {
 }
 
 function tableCapacity(shareTable: boolean, tableSize: number): number {
-  return shareTable ? Math.max(1, tableSize) : 1
+  return shareTable ? Math.max(1, tableSize) : 99
 }
 
 export function countTotalTables(columns: ScheduleColumn[]): number {
@@ -586,11 +580,18 @@ export function applyScheduleRowsToBoard(
     const colIdx = next.findIndex((c) => c.dateId === loc.dateId && c.slotId === loc.slotId)
     if (colIdx < 0) continue
     const col = next[colIdx]!
+    if (!col.tables.length) {
+      col.tables = [{ id: 't1', talentIds: [], notes: {} }]
+    }
 
     let placed = false
     for (const table of col.tables) {
       if (!table.talentIds.includes(applicantId) && table.talentIds.length < cap) {
         table.talentIds = [...table.talentIds, applicantId]
+        const note = String(row.tableNote || '').trim()
+        if (note && !/拼桌|单独探店|人\/桌|餐食/.test(note)) {
+          table.notes = { ...(table.notes || {}), [applicantId]: note }
+        }
         placed = true
         break
       }
@@ -830,13 +831,30 @@ export default function VisitScheduleDragBoard({
     )
   }
 
+  function setTalentNote(dateId: string, slotId: string, tableId: string, talentId: string, note: string) {
+    onColumnsChange(
+      columns.map((col) =>
+        col.dateId === dateId && col.slotId === slotId
+          ? {
+              ...col,
+              tables: col.tables.map((t) =>
+                t.id === tableId
+                  ? { ...t, notes: { ...(t.notes || {}), [talentId]: note } }
+                  : t,
+              ),
+            }
+          : col,
+      ),
+    )
+  }
+
   function dropTalent(dateId: string, slotId: string, tableId: string, talentId: string) {
     if (!talentId) return
     const target = columns.find((c) => c.dateId === dateId && c.slotId === slotId)
     const table = target?.tables.find((t) => t.id === tableId)
     if (!table) return
     if (!table.talentIds.includes(talentId) && table.talentIds.length >= cap) {
-      setDropHint(shareTable ? `该桌已满，最多 ${cap} 人` : '单独探店每格仅可 1 人')
+      setDropHint(shareTable ? `该桌已满，最多 ${cap} 人` : '该时段人数已满')
       return
     }
     setDropHint('')
@@ -973,7 +991,7 @@ export default function VisitScheduleDragBoard({
       </div>
 
       <div>
-        <p className="text-sm font-medium mb-2">待排期达人（拖到下方日期×时段{shareTable ? ' / 桌位' : ''}）</p>
+        <p className="text-sm font-medium mb-2">待排期达人（拖到下方日期和时段，可为每人写备注）</p>
         <div className="flex flex-wrap gap-2 min-h-[52px] p-2 rounded-lg border border-dashed bg-slate-50/80">
           {unassigned.length ? (
             unassigned.map((p) => (
@@ -1066,7 +1084,7 @@ export default function VisitScheduleDragBoard({
                               <p className="text-xs text-[var(--shell-muted)]">
                                 {shareTable
                                   ? `第 ${tIdx + 1} 桌（${table.talentIds.length}/${cap} 人）`
-                                  : `单独探店（${table.talentIds.length}/${cap}）`}
+                                  : `本时段 ${table.talentIds.length} 人`}
                               </p>
                               {shareTable && !table.talentIds.length ? (
                                 <button
@@ -1078,20 +1096,27 @@ export default function VisitScheduleDragBoard({
                                 </button>
                               ) : null}
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-col gap-1.5">
                               {table.talentIds.map((tid) => {
                                 const p = pool.find((x) => x.id === tid)
                                 if (!p) return null
                                 return (
-                                  <TalentChip
-                                    key={tid}
-                                    person={p}
-                                    draggable
-                                    onDragStart={(e) => onDragStart(e, tid)}
-                                    onRemove={() => removeFromBoard(tid)}
-                                    onCommunicate={onCommunicate}
-                                    chatting={chatLoadingId === tid}
-                                  />
+                                  <div key={tid} className="flex flex-wrap items-center gap-1.5">
+                                    <TalentChip
+                                      person={p}
+                                      draggable
+                                      onDragStart={(e) => onDragStart(e, tid)}
+                                      onRemove={() => removeFromBoard(tid)}
+                                      onCommunicate={onCommunicate}
+                                      chatting={chatLoadingId === tid}
+                                    />
+                                    <input
+                                      className="min-w-[140px] flex-1 rounded border px-2 py-1 text-xs"
+                                      placeholder="备注，如和某某组队"
+                                      value={table.notes?.[tid] || ''}
+                                      onChange={(e) => setTalentNote(col.dateId, col.slotId, table.id, tid, e.target.value)}
+                                    />
+                                  </div>
                                 )
                               })}
                               {!table.talentIds.length ? (

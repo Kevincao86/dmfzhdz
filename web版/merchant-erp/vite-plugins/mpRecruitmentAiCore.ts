@@ -500,20 +500,16 @@ export async function runMpRecruitmentAiCore(
       const scheduleTalents = (ctx.talents || []).filter((t) => t && t.id).slice(0, 30)
       const visitSlots = (ctx.visitSlots || []).map((s) => String(s || '').trim()).filter(Boolean)
       const storeName = String(ctx.storeName || '门店').trim() || '门店'
-      const shareTable = ctx.shareTable !== false
-      const mealCount = Math.max(1, Number(ctx.mealCount) || 1)
-      const tableSize = Math.max(2, Number(ctx.tableSize) || 4)
-      const system = `你是本地生活达人探店排期助手。根据招募单信息、可探店时段、拼桌设置与已选达人名单，生成合理探店排期。
+      const system = `你是本地生活达人探店排期助手。把已选达人排进给定的日期和时段，不要按桌、不要拼桌。
 只输出 JSON 数组，不要 Markdown、不要解释。每个元素字段：
 - talentId：达人 id（必须与输入名单 id 一致）
-- time：如 "2026/6/15 17:00-20:00"（须含日期与时段）
+- time：必须从给定 visitSlots 里选一条，如 "2026/6/15 17:00-20:00"
 - talentName：达人昵称（必须与输入名单一致）
 - storeName：门店名
-- tableNote：拼桌/餐食备注（如 "拼桌 4 人/桌 · 餐食 1 份"）
-规则：优先尊重达人 visitTimeSlot；高粉丝量可适当靠前；${shareTable ? `餐饮拼桌每桌约 ${tableSize} 人` : '不拼桌单独探店'}；餐食 ${mealCount} 份；时段从给定 visitSlots 选取并错开日期。`
+- tableNote：达人备注，没有就留空。不要写拼桌、桌号或餐食份数。
+规则：优先把达人排进其 visitTimeSlot 对应的日期和时段；同一时段可以排多名达人；不要拆成桌位。`
       const user = `招募：${String(ctx.title || '').slice(0, 80)} · 类目 ${String(ctx.category || '').slice(0, 40)} · 门店 ${storeName}
 可探店时段：${(visitSlots.length ? visitSlots : ['09:00-12:00', '14:00-17:00', '17:00-20:00']).join('、')}
-拼桌：${shareTable ? '是' : '否'} · 每桌 ${tableSize} 人 · 餐食 ${mealCount} 份
 
 已选达人（须每人一条排期）：${JSON.stringify(
         scheduleTalents.map((t) => ({

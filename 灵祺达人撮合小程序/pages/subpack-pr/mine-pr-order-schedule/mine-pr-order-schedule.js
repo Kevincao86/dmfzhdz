@@ -46,7 +46,9 @@ Page({
     busy: false,
     okMsg: '',
     errMsg: '',
-    shareTable: true,
+    shareTable: false,
+    printOpen: false,
+    printLines: [],
     mealCount: 1,
     tableSize: 4,
     visitDates: [],
@@ -764,7 +766,7 @@ Page({
       this.setData({
         okMsg:
           source === 'ai'
-            ? 'AI 已根据达人意向与桌位设置自动排入下方，可微调后确认生效'
+            ? 'AI 已按日期和时段排入下方，可微调备注后确认生效'
             : '已按达人意向与可用时段自动排入下方，可微调后确认生效',
       })
     } catch (e) {
@@ -772,6 +774,57 @@ Page({
     } finally {
       this.setData({ busy: false })
     }
+  },
+  scheduleLines() {
+    const rows = this.manualRows()
+    const fromBoard = rows.length ? rows : visitBoard.scheduleRowsFromApplicants(this._selected || [], this.data.storeName)
+    const applicants = this._selected || []
+    return fromBoard.map((r, i) => {
+      const a = applicants.find((x) => String(x.id) === String(r.applicantId))
+      return {
+        no: i + 1,
+        name: visitBoard.applicantName(a || { id: r.applicantId }),
+        time: r.time,
+        store: r.storeName || this.data.storeName,
+        note: r.tableNote || '',
+      }
+    })
+  },
+  onTalentNoteInput(e) {
+    const talentId = e.currentTarget.dataset.talentId
+    const dayId = e.currentTarget.dataset.dayId
+    const slotId = e.currentTarget.dataset.slotId
+    const tableId = e.currentTarget.dataset.tableId
+    const note = e.detail.value
+    const columns = (this.data.columns || []).map((col) => {
+      if (col.dateId !== dayId || col.slotId !== slotId) return col
+      return {
+        ...col,
+        tables: (col.tables || []).map((t) =>
+          t.id === tableId ? { ...t, notes: { ...(t.notes || {}), [talentId]: note } } : t,
+        ),
+      }
+    })
+    const boardView = visitBoard.buildBoardView(
+      this.data.visitDates,
+      columns,
+      this.data.pool,
+      false,
+      this.data.tableSize,
+      this.data.mealCount,
+    )
+    this.setData({ columns, boardView, shareTable: false })
+  },
+  onPrintSchedule() {
+    const lines = this.scheduleLines()
+    if (!lines.length) {
+      wx.showToast({ title: '请先填写排期时间', icon: 'none' })
+      return
+    }
+    this.setData({ printOpen: true, printLines: lines })
+  },
+  onClosePrint() {
+    this.setData({ printOpen: false })
   },
   async onExportSchedule() {
     const rows = this.manualRows()
@@ -782,7 +835,7 @@ Page({
     }
     try {
       const applicants = this._selected || []
-      const lines = ['达人', '探店时间', '门店', '桌位备注']
+      const lines = ['达人', '探店时间', '门店', '备注']
       for (const r of fromBoard) {
         const a = applicants.find((x) => String(x.id) === String(r.applicantId))
         lines.push(

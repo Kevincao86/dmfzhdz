@@ -283,14 +283,15 @@ export default function VisitScheduleTalentPanel({
         <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 space-y-3">
           <p className="text-sm text-amber-900">
             {hasLockedPlanDates
-              ? 'PR 已开放可探店日期，请从下列选项中选择并提交探店意向。'
-              : '您已通过 PR 审核，若报名时未填探店时间，请补充日期与时段；已填写则等待 PR 排期确认。'}
+              ? 'PR 已确认可探店时间，请从下列日期和时段中选择。'
+              : '请等待 PR 确认可探店日期和时段，再从中选择。'}
           </p>
-          {planDatePicker()}
-          {!hasLockedPlanDates ? freeFormVisitFields() : null}
-          <BtnPrimary disabled={busy} onClick={() => void run('accept_selection')}>
-            {busy ? '提交中…' : '提交探店意向'}
-          </BtnPrimary>
+          {hasLockedPlanDates ? planDatePicker() : null}
+          {hasLockedPlanDates ? (
+            <BtnPrimary disabled={busy} onClick={() => void run('accept_selection')}>
+              {busy ? '提交中…' : '提交探店时间'}
+            </BtnPrimary>
+          ) : null}
         </div>
       ) : null}
       {display.showAssignConfirmBtn ? (
@@ -332,11 +333,12 @@ export default function VisitScheduleTalentPanel({
                 ? '请根据与 PR 沟通结果，选择新的探店日期与时段并保存。'
                 : '可修改探店日期与时段，保存后将同步至招募方。'}
           </p>
-          {planDatePicker()}
-          {!hasLockedPlanDates ? freeFormVisitFields() : null}
-          <BtnPrimary disabled={busy} onClick={() => void saveVisitEdit()}>
-            {busy ? '保存中…' : display.editVisitMode === 'preference' ? '保存意向修改' : '保存排期修改'}
-          </BtnPrimary>
+          {hasLockedPlanDates ? planDatePicker() : <p className="text-sm text-violet-900">请等待 PR 确认可探店日期和时段。</p>}
+          {hasLockedPlanDates ? (
+            <BtnPrimary disabled={busy} onClick={() => void saveVisitEdit()}>
+              {busy ? '保存中…' : display.editVisitMode === 'preference' ? '保存意向修改' : '保存排期修改'}
+            </BtnPrimary>
+          ) : null}
         </div>
       ) : null}
       {err ? <p className="text-sm text-red-600">{err}</p> : null}

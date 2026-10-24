@@ -125,23 +125,15 @@ function boardToScheduleRows(columns, visitDates, opts) {
     if (!slotLabel || !visitDate) continue
     const time = formatVisitRowTime(visitDate, slotLabel)
     if (!time) continue
-    ;(col.tables || []).forEach((table, tIdx) => {
-      const count = (table.talentIds || []).length
+    ;(col.tables || []).forEach((table) => {
       ;(table.talentIds || []).forEach((applicantId) => {
-        const tableNote = formatScheduleTableNote(opts.shareTable, {
-          tableSize: opts.tableSize,
-          mealCount: opts.mealCount,
-          tableIndex: tIdx,
-          tableCount: count,
-        })
+        const tableNote = String((table.notes && table.notes[applicantId]) || '').trim()
         rows.push({
           applicantId,
           time,
           storeName: opts.storeName,
-          tableNote,
-          tableGroupId: opts.shareTable
-            ? `table-${col.dateId}-${col.slotId}-${table.id}`
-            : `solo-${applicantId}`,
+          tableNote: tableNote || undefined,
+          tableGroupId: `slot-${col.dateId}-${col.slotId}`,
         })
       })
     })
@@ -209,7 +201,7 @@ function hydrateBoardFromApplicants(applicants) {
 
   if (!visitDates.length) {
     const vd = initVisitDates()
-    return { visitDates: vd, columns: initColumns(vd), shareTable: true, mealCount: 1, tableSize: 4 }
+    return { visitDates: vd, columns: initColumns(vd, { shareTable: false }), shareTable: false, mealCount: 1, tableSize: 4 }
   }
 
   const columns = []
@@ -218,17 +210,20 @@ function hydrateBoardFromApplicants(applicants) {
       const label = slotDefLabel(slot)
       const key = `${day.date}|${label}`
       const talentIds = groups.get(key) || []
+      const notes = {}
+      talentIds.forEach((id) => {
+        const raw = String((assigned.find((a) => String(a.id) === id) || {}).tableNote || '').trim()
+        if (raw && !/拼桌|单独探店|人\/桌|餐食/.test(raw)) notes[id] = raw
+      })
       columns.push({
         dateId: day.id,
         slotId: slot.id,
-        tables: talentIds.length ? [{ id: 't1', talentIds }] : [],
+        tables: [{ id: 't1', talentIds, notes }],
       })
     }
   }
 
-  const shareTable =
-    assigned.some((a) => String(a.tableNote || '').includes('拼桌')) ||
-    [...groups.values()].some((ids) => ids.length > 1)
+  const shareTable = false
   const mealMatch = assigned
     .map((a) => String(a.tableNote || '').match(/餐食\s*(\d+)/))
     .find(Boolean)
@@ -391,8 +386,8 @@ function initBoardState(applicants, isReview, mp) {
         : null
     return {
       visitDates: fromPlan,
-      columns: initColumns(fromPlan, { shareTable: !(sm && sm.shareTable === false) }),
-      shareTable: !(sm && sm.shareTable === false),
+      columns: initColumns(fromPlan, { shareTable: false }),
+      shareTable: false,
       mealCount: Math.max(1, Number((sm && sm.mealCount) || 1)),
       tableSize: Math.max(2, Number((sm && sm.tableSize) || 4)),
     }
@@ -400,8 +395,8 @@ function initBoardState(applicants, isReview, mp) {
   const visitDates = initVisitDates()
   return {
     visitDates,
-    columns: initColumns(visitDates, { shareTable: true }),
-    shareTable: true,
+    columns: initColumns(visitDates, { shareTable: false }),
+    shareTable: false,
     mealCount: 1,
     tableSize: 4,
   }
@@ -516,13 +511,14 @@ function buildBoardView(visitDates, columns, pool, shareTable, tableSize, mealCo
         addBtnDisabled,
         tables: tables.map((t, ti) => ({
           tableId: t.id,
-          tableLabel: shareTable ? `第${ti + 1}桌` : '单独探店',
+          tableLabel: shareTable ? `第${ti + 1}桌` : '本时段',
           cap,
           uncapped: !shareTable,
           count: (t.talentIds || []).length,
           talents: (t.talentIds || []).map((tid) => {
             const p = (pool || []).find((x) => x.id === tid)
-            return p || { id: tid, name: tid }
+            const person = p || { id: tid, name: tid }
+            return { ...person, note: (t.notes && t.notes[tid]) || '' }
           }),
         })),
         colKey: `${day.id}:${slot.id}`,
@@ -648,6 +644,10 @@ function applyScheduleRowsToBoard(columns, visitDates, rows, opts) {
       const table = col.tables[ti]
       if ((table.talentIds || []).indexOf(applicantId) < 0 && (table.talentIds || []).length < cap) {
         table.talentIds = [...(table.talentIds || []), applicantId]
+        const note = String(row.tableNote || '').trim()
+        if (note && !/拼桌|单独探店|人\/桌|餐食/.test(note)) {
+          table.notes = Object.assign({}, table.notes || {}, { [applicantId]: note })
+        }
         placed = true
         break
       }

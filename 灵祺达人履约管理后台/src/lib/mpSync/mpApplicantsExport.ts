@@ -17,7 +17,7 @@ const CSV_HEADERS = [
   '省份', '城市', '联系方式', '微信号', '主页链接', '支付宝', '报名时间', '任务状态',
 ]
 
-const SCHEDULE_HEADERS = ['序号', '达人', '平台账号', '达人意向', '确认排期', '门店', '拼桌备注']
+const SCHEDULE_HEADERS = ['序号', '达人', '平台账号', '达人意向', '确认排期', '门店', '备注']
 
 const BORDER_STYLES = `
 <Style ss:ID="cell"><Borders>
@@ -199,6 +199,35 @@ export function visitScheduleToCsv(
   orderTitle?: string,
 ): string {
   return visitScheduleToPrintableHtml(applicants, rows, orderTitle)
+}
+
+export function printVisitSchedule(
+  applicants: Record<string, unknown>[],
+  rows: { applicantId: string; time: string; storeName?: string; tableNote?: string }[],
+  orderTitle?: string,
+) {
+  const list = (rows || []).filter((r) => String(r.time || '').trim())
+  if (!list.length) throw new Error('请先填写排期时间')
+  const byId = new Map((applicants || []).map((a) => [String(a.id), a]))
+  const body = list
+    .map((r, i) => {
+      const a = byId.get(String(r.applicantId)) || {}
+      const name = String(a.platformNickname || a.displayName || a.name || r.applicantId)
+      const cells = [i + 1, name, r.time, r.storeName || '', String(r.tableNote || '').trim()]
+        .map((v) => `<td>${String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`)
+        .join('')
+      return `<tr>${cells}</tr>`
+    })
+    .join('')
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>排期名单</title>
+<style>body{font-family:sans-serif;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%;margin-top:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}th{background:#f3f4f6}</style>
+</head><body><h1>探店排期名单</h1><p>${String(orderTitle || '').replace(/</g, '')}</p>
+<table><thead><tr><th>序号</th><th>达人</th><th>日期时段</th><th>门店</th><th>备注</th></tr></thead><tbody>${body}</tbody></table>
+<script>window.print()<\/script></body></html>`
+  const w = window.open('', '_blank')
+  if (!w) throw new Error('请允许弹出窗口后再打印')
+  w.document.write(html)
+  w.document.close()
 }
 
 export function downloadVisitScheduleCsv(

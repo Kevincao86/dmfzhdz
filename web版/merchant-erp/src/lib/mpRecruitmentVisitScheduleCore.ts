@@ -89,7 +89,7 @@ export function buildVisitScheduleAiContext(
   }
 }
 
-/** 规则智能排期：按粉丝量、报名偏好时段、拼桌参数生成排期 */
+/** 规则智能排期：按达人已选的日期和时段排入，同一时段可多人，不按桌。 */
 export function generateRuleBasedVisitSchedule(
   mp: RegistryMpRecruitmentOrder,
   opts: VisitScheduleAiOpts,
@@ -100,39 +100,32 @@ export function generateRuleBasedVisitSchedule(
     (opts.visitSlots || []).map((s) => String(s || '').trim()).filter(Boolean) ||
     (['09:00-12:00', '14:00-17:00'] as string[])
   const storeName = String(opts.storeName || mp.storeName || '门店').trim() || '门店'
-  const mealCount = Math.max(1, Number(opts.mealCount) || 1)
-  const tableSize = Math.max(2, Number(opts.tableSize) || 4)
-  const shareTable = opts.shareTable !== false
-  const category = String(opts.category || mp.category || '').trim()
   const base = new Date()
   base.setDate(base.getDate() + 1)
-  const rows: VisitScheduleAssignRow[] = []
-  let tableGroup = 0
-  pool.forEach((a, i) => {
+  return pool.map((a, i) => {
     const preferred = String(
       (a as Record<string, unknown>).talentPreferredVisitAt || a.visitTimeSlot || '',
     ).trim()
-    const d = new Date(base)
-    d.setDate(d.getDate() + Math.floor(i / Math.max(1, slots.length)))
-    const slot = slots[i % slots.length]!
-    const datePart = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
-    const time = preferred || `${datePart} ${slot}`
-    let tableNote = shareTable
-      ? `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份`
-      : '单独探店'
-    if (category.includes('餐饮') || category.includes('美食')) {
-      tableNote += shareTable ? ' · 餐饮拼桌' : ' · 餐饮单独'
+    const kept = String((a as Record<string, unknown>).tableNote || '').trim()
+    const tableNote = kept && !/拼桌|单独探店|人\/桌|餐食/.test(kept) ? kept : undefined
+    const hit = slots.find((s) => preferred === s || (preferred && preferred.includes(s)))
+    let time = preferred
+    if (hit && preferred.includes(hit) && /\d{4}/.test(preferred)) time = preferred
+    else if (hit && /\d{4}/.test(hit)) time = hit
+    else {
+      const d = new Date(base)
+      d.setDate(d.getDate() + Math.floor(i / Math.max(1, slots.length)))
+      const slot = hit && !/\d{4}/.test(hit) ? hit : slots[i % slots.length]!
+      time = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${slot}`
     }
-    if (shareTable && i % tableSize === 0) tableGroup += 1
-    rows.push({
+    return {
       applicantId: String(a.id),
       time,
       storeName,
       tableNote,
-      tableGroupId: shareTable ? `table-${tableGroup}` : `solo-${a.id}`,
-    })
+      tableGroupId: `slot-${time}`,
+    }
   })
-  return rows
 }
 
 function patchApplicant(

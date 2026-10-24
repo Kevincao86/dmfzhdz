@@ -19,7 +19,7 @@ import {
   setVisitSchedule,
   type VisitScheduleRow,
 } from '../../lib/mpSync/visitScheduleRuntime'
-import { downloadVisitScheduleCsv } from '../../lib/mpSync/mpApplicantsExport'
+import { downloadVisitScheduleCsv, printVisitSchedule } from '../../lib/mpSync/mpApplicantsExport'
 import {
   canChat,
   ensureSessionWithTalent,
@@ -74,7 +74,7 @@ function initBoardState(
     return {
       visitDates: hydrated.visitDates,
       columns: hydrated.columns,
-      shareTable: hydrated.shareTable,
+      shareTable: false,
       mealCount: hydrated.mealCount,
       tableSize: hydrated.tableSize,
     }
@@ -87,8 +87,8 @@ function initBoardState(
         : undefined
     return {
       visitDates: fromPlan,
-      columns: initColumns(fromPlan, { shareTable: meta?.shareTable !== false }),
-      shareTable: meta?.shareTable !== false,
+      columns: initColumns(fromPlan, { shareTable: false }),
+      shareTable: false,
       mealCount: Math.max(1, Number(meta?.mealCount) || 1),
       tableSize: Math.max(2, Number(meta?.tableSize) || 4),
     }
@@ -96,8 +96,8 @@ function initBoardState(
   const visitDates = initVisitDates()
   return {
     visitDates,
-    columns: initColumns(visitDates, { shareTable: true }),
-    shareTable: true,
+    columns: initColumns(visitDates, { shareTable: false }),
+    shareTable: false,
     mealCount: 1,
     tableSize: 4,
   }
@@ -556,12 +556,25 @@ export default function VisitSchedulePrPanel({
           <p className="text-xs text-[var(--shell-muted)] mt-1">
             {isReview
               ? '待视频审核阶段可调整探店日期、时段与达人安排；保存后将通知变更涉及的达人。'
-              : `手动模式：拖动达人至时段${shareTable ? '与桌位' : ''}；AI 模式：自动生成后可微调。`}
+              : '按日期和时段排入达人，可为每人写备注。AI 按同样规则自动排入，之后可以微调。'}
           </p>
         </div>
         <div className="flex gap-2 text-sm flex-wrap">
           <button type="button" className="px-3 py-1.5 rounded-lg border" onClick={onExportSchedule}>
-            下载排期明细
+            下载 Excel
+          </button>
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded-lg border"
+            onClick={() => {
+              try {
+                printVisitSchedule(selectedApplicants, exportRows(), orderTitle || storeName)
+              } catch (e) {
+                window.alert(e instanceof Error ? e.message : '打印失败')
+              }
+            }}
+          >
+            打印排期名单
           </button>
           {!isReview ? (
             <>
@@ -633,42 +646,13 @@ export default function VisitSchedulePrPanel({
         <span className="text-[var(--shell-muted)]">类目</span>
         <input className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input" value={category} readOnly />
       </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={shareTable} onChange={(e) => setShareTable(e.target.checked)} />
-        餐饮拼桌（多人一桌，可拖入同一桌）
-      </label>
-      {shareTable ? (
-        <div className="grid gap-3 sm:grid-cols-2 text-sm max-w-md pl-6">
-          <label className="block">
-            <span className="text-[var(--shell-muted)]">餐食份数（全排期总桌数）</span>
-            <input
-              type="number"
-              min={1}
-              className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input"
-              value={mealCount}
-              onChange={(e) => setMealCount(Math.max(1, Number(e.target.value) || 1))}
-            />
-          </label>
-          <label className="block">
-            <span className="text-[var(--shell-muted)]">每桌人数</span>
-            <input
-              type="number"
-              min={1}
-              className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input"
-              value={tableSize}
-              onChange={(e) => setTableSize(Math.max(1, Number(e.target.value) || 4))}
-            />
-          </label>
-        </div>
-      ) : null}
-
       <VisitScheduleDragBoard
         visitDates={visitDates}
         onVisitDatesChange={setVisitDates}
         columns={columns}
         onColumnsChange={setColumns}
         pool={pool}
-        shareTable={shareTable}
+        shareTable={false}
         tableSize={tableSize}
         storeName={storeName}
         mealCount={mealCount}
