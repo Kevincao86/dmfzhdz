@@ -19,8 +19,8 @@ module.exports = {
   RECRUIT_COVER_CDN_BASE: 'https://mofangdianai.com/recruit-covers',
   /** 分享/身份图仅 CDN（images/share、identity 不打包，主包 <2MB 真机调试） */
   MP_COVER_PREFER_CDN: true,
-  /** 欢迎页身份 3D 图优先 OSS（CDN /recruit-covers/identity 需 ecs-sync 同步；OSS 见 upload-mp-recruit-covers-oss） */
-  MP_IDENTITY_ICON_PREFER_OSS: true,
+  /** 欢迎页身份 3D 图走备案静态站 /recruit-covers/identity */
+  MP_IDENTITY_ICON_PREFER_OSS: false,
   /** 商家审核通知分享海报：真机走 CDN 合法域名；OSS 仅备份（upload-mp-recruit-covers-oss.js） */
   MP_MERCHANT_NOTIFY_POSTER_PREFER_OSS: false,
   /** 远程图缓存版本（改图后 bump，避免微信缓存旧 JPEG） */

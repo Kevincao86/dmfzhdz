@@ -65,6 +65,9 @@ fi
 if [[ -f "$MP/images/share/talent-lift-poster.jpg" ]]; then
   sudo cp -f "$MP/images/share/talent-lift-poster.jpg" "$STATIC_ROOT/share/talent-lift-poster.jpg"
 fi
+if [[ -f "$MP/images/share/recruit-card-bg.jpg" ]]; then
+  sudo cp -f "$MP/images/share/recruit-card-bg.jpg" "$STATIC_ROOT/share/recruit-card-bg.jpg"
+fi
 AVATAR_SRC="$ROOT/web版/merchant-erp/public/digital-human/avatars"
 if [[ -d "$AVATAR_SRC" ]]; then
   sudo mkdir -p "$STATIC_ROOT/web-static/merchant/digital-human/avatars"
@@ -130,6 +133,7 @@ for path in \
   "/recruit-covers/home/entry-ai-review.jpg" \
   "/recruit-covers/home/poster-pr.jpg" \
   "/recruit-covers/share/talent-lift-poster.jpg" \
+  "/recruit-covers/share/recruit-card-bg.jpg" \
   "/recruit-covers/ai-addon-icons/shortvideo.png" \
   "/recruit-covers/web-static/merchant/digital-human/avatars/av-real-1.jpg"; do
   CODE="$(curl -sS -L -o /dev/null -w '%{http_code}' -H 'Host: mofangdianai.com' "http://127.0.0.1${path}" || echo 000)"

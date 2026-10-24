@@ -1,9 +1,9 @@
 const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
 const upgradeHint = require('../../../utils/mpAddonUpgradeHint.js')
 
-/** 图标在 OSS，不打进分包。与「我的」页菜单图标同一桶。 */
-const AI_ADDON_ICON_OSS = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/ai-addon-icons'
-const AI_ADDON_ICON_VER = '20261022a'
+/** 图标走备案静态站，不打进分包。 */
+const AI_ADDON_ICON_OSS = 'https://mofangdianai.com/recruit-covers/ai-addon-icons'
+const AI_ADDON_ICON_VER = '20261025a'
 
 function addonIcon(file) {
   return `${AI_ADDON_ICON_OSS}/${file}?v=${AI_ADDON_ICON_VER}`

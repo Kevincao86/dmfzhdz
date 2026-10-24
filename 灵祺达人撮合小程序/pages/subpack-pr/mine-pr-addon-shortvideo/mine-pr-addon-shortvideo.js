@@ -14,7 +14,7 @@ const SMART_EFFECT_LABEL = '智能（按内容自动转场）'
 const IMITATE_VIDEO_MAX = 48 * 1024 * 1024
 const IMITATE_VIDEO_MAX_SEC = 60
 const IMITATE_AVATAR_BASE =
-  'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/merchant/digital-human/avatars'
+  'https://mofangdianai.com/recruit-covers/web-static/merchant/digital-human/avatars'
 const IMITATE_AVATARS = [
   { id: 'av-real-7', name: '浩然' },
   { id: 'av-real-8', name: '思琪' },

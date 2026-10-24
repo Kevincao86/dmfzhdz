@@ -2573,6 +2573,12 @@ detail/detail.wxml
 recruitShareCover.js
 recruitShareCard.js
 mpAddonIceApi.js
+homeBannerAssets.js
+mineMenuIcons.js
+mpDigitalHumanPresets.js
+addonCards.js
+mine-pr-addon-shortvideo.js
+config.release.js
 ecs-sync-mp-recruit-covers-static.sh
 change-scope-guard
 PAT

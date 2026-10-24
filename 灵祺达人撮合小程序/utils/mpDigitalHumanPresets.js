@@ -1,6 +1,6 @@
-/** 与商家 ERP merchantStaticUrl 同源 OSS（根域 /digital-human 曾 500，勿再走 mofangdianai.com） */
+/** 数字人预设头像走备案静态站（根域 /digital-human 曾 500）。 */
 const AVATAR_CDN =
-  'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/merchant/digital-human/avatars'
+  'https://mofangdianai.com/recruit-covers/web-static/merchant/digital-human/avatars'
 /** 换图后递增，破小程序/CDN 缓存 */
 const AVATAR_ASSET_VERSION = 'dh20260715b'
 
