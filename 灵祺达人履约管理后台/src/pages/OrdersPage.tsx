@@ -57,6 +57,7 @@ import {
 } from '../lib/mpRecruitment/talentApplicationStatus'
 import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
 import { visitCheckIn } from '../lib/mpSync/visitScheduleRuntime'
+import { submitOpenLoopAction, syncOpenLoopReminder } from '../lib/mpSync/openLoopReminderSync'
 import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
@@ -329,6 +330,11 @@ function TalentApplicationsPage() {
           return st ? { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : r
         }),
       )
+      for (const row of enriched) {
+        const phase = row.displayStatus?.openLoop?.phase
+        if (phase !== 'in_group' && phase !== 'pending') continue
+        void syncOpenLoopReminder(row._progressMp || null, row._progressMe || null, !!row.selectionNotified)
+      }
       maybeSwitchToPendingVideoTab(enriched)
     } catch {
       setApps(local.map((a) => enrichApplicationRow(a, undefined, {})))
@@ -422,6 +428,28 @@ function TalentApplicationsPage() {
       alert(err instanceof Error ? err.message : '取消报名失败')
     } finally {
       setCancelApplyKey('')
+    }
+  }
+
+  async function onOpenLoop(app: EnrichedApplication, action: string) {
+    if (!app.mpOrderId || !app.applicantId) {
+      alert('缺少报名信息')
+      return
+    }
+    if (action === 'dropped' || action === 'settled') {
+      const ok = window.confirm(
+        action === 'dropped'
+          ? '标记没做成？后来交了片还可以再点「我已交片」。'
+          : '确认已经收到款项？标记后停止未结算提醒。',
+      )
+      if (!ok) return
+    }
+    try {
+      await submitOpenLoopAction(app.mpOrderId, app.applicantId, action)
+      clearMpRegistryCache()
+      await reloadApps()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '保存失败')
     }
   }
 
@@ -1019,6 +1047,36 @@ function TalentApplicationsPage() {
                   {cancelApplyKey === `${a.mpOrderId}-${a.applicantId}` ? '取消中…' : '取消报名'}
                 </button>
               ) : null}
+              {ds.openLoop?.showDelivered ? (
+                <button type="button" className="app-order-card__btn app-order-card__btn--primary" onClick={() => void onOpenLoop(a, 'delivered')}>
+                  我已交片
+                </button>
+              ) : null}
+              {ds.openLoop?.showAsk ? (
+                <>
+                  <button type="button" className="app-order-card__btn app-order-card__btn--outline" onClick={() => void onOpenLoop(a, 'still_working')}>
+                    还在做
+                  </button>
+                  <button type="button" className="app-order-card__btn app-order-card__btn--outline" onClick={() => void onOpenLoop(a, 'dropped')}>
+                    没做成
+                  </button>
+                </>
+              ) : null}
+              {ds.openLoop?.showSettled ? (
+                <button type="button" className="app-order-card__btn app-order-card__btn--primary" onClick={() => void onOpenLoop(a, 'settled')}>
+                  已收到
+                </button>
+              ) : null}
+              {ds.openLoop?.showSnooze ? (
+                <button type="button" className="app-order-card__btn app-order-card__btn--outline" onClick={() => void onOpenLoop(a, 'mute')}>
+                  稍后再提醒
+                </button>
+              ) : null}
+              {ds.openLoop?.showGroupQr ? (
+                <Link to={href} className="app-order-card__btn app-order-card__btn--outline no-underline">
+                  查看群码
+                </Link>
+              ) : null}
               {ds.showConfirmVisitBtn ? (
                 <button
                   type="button"
@@ -1050,6 +1108,7 @@ function TalentApplicationsPage() {
               <td>{applied}</td>
               <td>
                 <span className={`app-order-card__status app-order-card__status--${ds.tone}`}>{ds.label}</span>
+                {ds.openLoop?.hint ? <p className="xx-app-table__sub">{ds.openLoop.hint}</p> : null}
                 {a.aiCheckStatusText ? <p className="xx-app-table__sub">{a.aiCheckStatusText}</p> : null}
               </td>
               <td className="xx-app-table__ops">

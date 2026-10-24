@@ -1,6 +1,7 @@
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
 import { buildNotifyWorkflowPatch, mergePrWorkflowIntoOrder } from './mpRecruitmentPrWorkflowCore.js'
 import { seedApplicantScheduleIntentFromApply } from './mpRecruitmentVisitScheduleCore.js'
+import { stampOpenLoopNotifiedAt } from './openLoopSettlement.js'
 
 export type MpTalentInboxEntryInput = {
   talentMemberId: string
@@ -37,7 +38,7 @@ function recordSelectionNotifiedOnOrder(
   set.add(aid)
   const applicants = (cur.applicants ?? []).map((a) => {
     if (!a || String(a.id) !== aid) return a
-    return seedApplicantScheduleIntentFromApply(a, now)
+    return stampOpenLoopNotifiedAt(seedApplicantScheduleIntentFromApply(a, now), cur, now)
   })
   list[idx] = mergePrWorkflowIntoOrder(
     {

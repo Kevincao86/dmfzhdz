@@ -103,6 +103,7 @@ list_scopes() {
   xingxuan_hall_ux       星选网页+微信小程序：大厅按身份、身份切换、推荐大厅说明、培训报名
   xingxuan_open_loop     星选招募开环/闭环（小程序发单+达人报名群码 + 履约 Web 同步；闭环现网路径不改）
   xingxuan_open_loop_done 开环：选达人并通知后商单转入已完成；已完成列表筛开环/闭环
+  open_loop_settle     开环商单：进群后交片确认与未结算提醒（星选+达人小程序，不改闭环）
   merchant_local_ads     商家 ERP：巨量本地推绑定/投流；与千川账户/取数隔离（不含聚光）
   ads_studio_review      本地推投流读云端绑定；商家小程序 AI 短片/工坊/短剧对齐星选；视频与文稿审核半月拉规则
   mp_ads_today           商家小程序投流「今日数据」按上海时区当天账户报表，不再用近7日汇总
@@ -1793,6 +1794,27 @@ lingqi-xingxuan-app/src/api/hall.ts
 灵祺达人撮合小程序/pages/mine/mine
 灵祺达人撮合小程序/pages/recommend/recommend
 灵祺达人撮合小程序/pages/subpack-core/detail/detail
+change-scope-guard
+PAT
+      ;;
+    open_loop_settle)
+      cat <<'PAT'
+openLoopSettlement
+openLoopReminderSync
+灵祺达人撮合小程序/utils/talentApplicationStatus.js
+灵祺达人撮合小程序/utils/applicationDisplay.js
+mine-applications
+灵祺达人撮合小程序/pages/subpack-core/detail/detail.js
+灵祺达人撮合小程序/pages/subpack-core/detail/detail.wxml
+灵祺达人履约管理后台/src/lib/mpRecruitment/talentApplicationStatus.ts
+OrdersPage.tsx
+RecruitmentDetailPage.tsx
+mpCalendarReminderApi.ts
+mpRecruitmentOrderRegistryMutations.ts
+mpTalentInboxMutations.ts
+web版/merchant-erp/src/lib/opsRegistryTypes.ts
+mpSubscribeMessageSend.ts
+mpWechatOfficialAccountSend.ts
 change-scope-guard
 PAT
       ;;

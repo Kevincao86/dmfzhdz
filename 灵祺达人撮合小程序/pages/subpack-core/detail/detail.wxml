@@ -389,6 +389,18 @@
       <text wx:else class="hint" style="display:block;margin-top:16rpx;">群二维码加载中，请下拉刷新</text>
     </view>
 
+    <view class="card" wx:if="{{openLoop}}">
+      <text class="success-title">{{openLoop.label}}</text>
+      <text class="hint" style="display:block;margin-top:8rpx;">{{openLoop.hint}}</text>
+      <view class="app-card__actions" style="margin-top:16rpx;">
+        <button wx:if="{{openLoop.showDelivered}}" class="btn-primary visit-action-btn" data-action="delivered" bindtap="onOpenLoopAction">我已交片</button>
+        <button wx:if="{{openLoop.showAsk}}" class="btn-secondary visit-action-btn" data-action="still_working" bindtap="onOpenLoopAction">还在做</button>
+        <button wx:if="{{openLoop.showAsk}}" class="btn-secondary visit-action-btn" data-action="dropped" bindtap="onOpenLoopAction">没做成</button>
+        <button wx:if="{{openLoop.showSettled}}" class="btn-primary visit-action-btn" data-action="settled" bindtap="onOpenLoopAction">已收到</button>
+        <button wx:if="{{openLoop.showSnooze}}" class="btn-secondary visit-action-btn" data-action="mute" bindtap="onOpenLoopAction">稍后再提醒</button>
+      </view>
+    </view>
+
     <view class="card card--success" wx:if="{{applied && isIce && isEditIce && icePendingConfirm}}">
       <text class="success-title">待确认接收</text>
       <view class="ice-slot-stats">

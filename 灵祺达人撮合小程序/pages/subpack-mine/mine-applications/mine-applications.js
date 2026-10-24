@@ -14,6 +14,7 @@ const deliveryReview = require('../../../utils/deliveryReviewPlatform.js')
 const visitScheduleRuntime = require('../../../utils/visitScheduleRuntime.js')
 const hallFilters = require('../../../utils/recruitmentHallFilters.js')
 const talentFlowSteps = require('../../../utils/talentApplicationFlowSteps.js')
+const openLoopReminderSync = require('../../../utils/openLoopReminderSync.js')
 
 const mpPrivacyPageMixin = require('../../../utils/mpPrivacyPageMixin.js')
 
@@ -288,6 +289,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       )
       const cityOptions = hallFilters.buildCityFilterOptions(enriched)
       const tabPatch = this._maybeSwitchToPendingVideoTab(enriched)
+      openLoopReminderSync.syncRows(enriched)
       this.setData({
         rows: enriched,
         filteredRows: tabPatch ? tabPatch.filteredRows : this.applyFilters(enriched),
@@ -504,6 +506,49 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     this._pendingUploadKind = 'video'
     this._pendingUploadEvent = e
     this._runUploadVideoOnce(() => this._doUploadVideo(e))
+  },
+  onOpenLoopAction(e) {
+    const ds = (e.currentTarget && e.currentTarget.dataset) || {}
+    const action = String(ds.action || '').trim()
+    const { mpOrderId, applicantId } = this._resolveActionRow(ds)
+    if (!mpOrderId || !applicantId || !action) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    const titles = {
+      delivered: '已记下交片，之后会提醒你跟结算',
+      still_working: '14 天后再问一次',
+      dropped: '已标记没做成',
+      settled: '已标记收到款项',
+      mute: '已暂停提醒',
+    }
+    const run = () => {
+      wx.showLoading({ title: '保存中', mask: true })
+      openLoopReminderSync
+        .submitAction(mpOrderId, applicantId, action)
+        .then(() => {
+          wx.hideLoading()
+          const registryCache = require('../../../utils/registryCache.js')
+          registryCache.bust()
+          wx.showToast({ title: titles[action] || '已保存', icon: 'none' })
+          return this.load({ silent: true })
+        })
+        .catch((err) => {
+          wx.hideLoading()
+          wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+        })
+    }
+    if (action === 'dropped' || action === 'settled') {
+      wx.showModal({
+        title: action === 'dropped' ? '标记没做成？' : '确认已经收到款项？',
+        content: action === 'dropped' ? '标记后不再追问交片。如果后来交了片，还可以再点「我已交片」。' : '标记后停止未结算提醒。',
+        success: (res) => {
+          if (res.confirm) run()
+        },
+      })
+      return
+    }
+    run()
   },
   onConfirmVisit(e) {
     const { mpOrderId: id, applicantId, key } = this._resolveActionRow(

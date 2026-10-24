@@ -4,7 +4,7 @@ import { getActiveRole, getToken } from './mpSession'
 
 const PATH = '/api/meoo-ops-mp-calendar-reminder'
 
-export type MpCalendarReminderLeadPreset = 'day8' | 'day_before_20' | 'days2_before'
+export type MpCalendarReminderLeadPreset = 'day8' | 'day_before_20' | 'days2_before' | 'at'
 
 export type MpCalendarReminder = {
   id: string

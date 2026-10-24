@@ -354,6 +354,8 @@ function calendarReminderProjectLabel(eventTitle: string, eventKind?: string): s
   if (eventKind === 'visit') return '探店提醒'
   if (eventKind === 'deadline') return '交片提醒'
   if (eventKind === 'plan_slot') return '可探店提醒'
+  if (eventKind === 'open_loop_checkin') return '开环交片确认'
+  if (eventKind === 'open_loop_settle') return '开环未结算'
   return '日程提醒'
 }
 
@@ -369,12 +371,18 @@ export async function notifyCalendarReminderSubscribe(opts: {
   const openId = String(opts.openId || '').trim()
   if (!openId) return
   const mpOrderId = String(opts.mpOrderId || '').trim()
+  const openLoopKind = opts.eventKind === 'open_loop_checkin' || opts.eventKind === 'open_loop_settle'
+  const page = openLoopKind
+    ? mpOrderId
+      ? `pages/subpack-core/detail/detail?id=${encodeURIComponent(mpOrderId)}&from=apply`
+      : 'pages/subpack-mine/mine-applications/mine-applications'
+    : mpOrderId
+      ? `pages/subpack-mine/mine-order-calendar/mine-order-calendar?mpOrderId=${encodeURIComponent(mpOrderId)}`
+      : 'pages/subpack-mine/mine-order-calendar/mine-order-calendar'
   await sendMpSubscribeMessage({
     openId,
     templateKey: 'calendarReminder',
-    page: mpOrderId
-      ? `pages/subpack-mine/mine-order-calendar/mine-order-calendar?mpOrderId=${encodeURIComponent(mpOrderId)}`
-      : 'pages/subpack-mine/mine-order-calendar/mine-order-calendar',
+    page,
     data: {
       time10: { value: formatCalendarTime10(opts.eventDateKey, opts.eventKind) },
       thing13: { value: clipThing(opts.storeName || '—') },

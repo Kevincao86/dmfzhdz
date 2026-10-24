@@ -1,6 +1,7 @@
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { getIceVerifyMode } = require('./iceOrderStats.js')
 const deliveryReview = require('./deliveryReviewPlatform.js')
+const openLoopSettlement = require('./openLoopSettlement.js')
 
 const TALENT_APPLICATION_TABS = [
   { id: 'registered', label: '已报名' },
@@ -446,6 +447,21 @@ function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
       tone: 'pending',
       showConfirmBtn: false,
       showCancelBtn: false,
+    }
+  }
+
+  const openLoopCard = openLoopSettlement.resolveOpenLoopCard(mp, applicant, {
+    selected: isApplicantPrSelected(mp, applicant),
+    selectionNotified: options.selectionNotified,
+  })
+  if (openLoopCard) {
+    return {
+      tabId: openLoopCard.tabId,
+      label: openLoopCard.label,
+      tone: openLoopCard.tone,
+      showConfirmBtn: false,
+      visitHint: openLoopCard.hint,
+      openLoop: openLoopCard,
     }
   }
 

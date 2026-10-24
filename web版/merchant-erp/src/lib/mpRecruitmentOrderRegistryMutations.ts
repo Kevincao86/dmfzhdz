@@ -6,6 +6,7 @@ import type {
 } from './opsRegistryTypes.js'
 import { filterSelectedIdsToApplicants, pruneApplicantIdRefsOnOrder } from './mpApplicantIdentity.js'
 import { normalizeMarketingCenter, reconcileCashGrantsWithOrders } from './marketingCampaignCore.js'
+import { applyOpenLoopSettleAction } from './openLoopSettlement.js'
 
 export type MpRecruitmentPatchBody = {
   id?: string
@@ -18,6 +19,8 @@ export type MpRecruitmentPatchBody = {
   cpsLinkage?: RecruitmentCpsLinkage
   /** 达人完成招募单后补交一张发票图片 */
   talentInvoice?: { applicantId?: string; url?: string; fileName?: string }
+  /** 开环：达人交片 / 结算自记 */
+  openLoopSettle?: { applicantId?: string; action?: string }
 }
 
 /** 整单 patch 时：客户端未加载 applicants 常会传 []，不得覆盖注册表已有报名 */
@@ -106,12 +109,13 @@ export function patchMpRecruitmentOrderInSnapshot(
   const hasGroupQr = body.groupQrImage !== undefined
   const hasCpsLinkage = body.cpsLinkage !== undefined
   const hasTalentInvoice = body.talentInvoice != null
+  const hasOpenLoopSettle = body.openLoopSettle != null
   const MAX_GROUP_QR_LEN = 120_000
   if (!id) return { ok: false, error: 'invalid_patch', status: 400 }
   if (hasGroupQr && String(body.groupQrImage || '').length > MAX_GROUP_QR_LEN) {
     return { ok: false, error: 'group_qr_too_large', status: 400 }
   }
-  if (!order && !status && !applicants && !selectedApplicantIds && !hasGroupQr && !hasCpsLinkage && !hasTalentInvoice) {
+  if (!order && !status && !applicants && !selectedApplicantIds && !hasGroupQr && !hasCpsLinkage && !hasTalentInvoice && !hasOpenLoopSettle) {
     return { ok: false, error: 'invalid_patch', status: 400 }
   }
   if (
@@ -132,6 +136,17 @@ export function patchMpRecruitmentOrderInSnapshot(
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   if (hasTalentInvoice) {
     return appendTalentInvoiceOnOrder(data, idx, cur, body.talentInvoice, now)
+  }
+  if (hasOpenLoopSettle) {
+    const result = applyOpenLoopSettleAction(
+      cur,
+      String(body.openLoopSettle?.applicantId || ''),
+      String(body.openLoopSettle?.action || ''),
+      new Date(),
+    )
+    if (!result.ok) return { ok: false, error: result.error, status: result.error === 'applicant_not_found' ? 404 : 400 }
+    data.mpRecruitmentOrders[idx] = result.order
+    return { ok: true }
   }
   if (order && order.id === id) {
     const mergedApplicants = resolveApplicantsOnFullOrderPatch(cur.applicants, order.applicants)

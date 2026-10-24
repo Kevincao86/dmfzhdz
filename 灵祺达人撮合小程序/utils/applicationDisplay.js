@@ -428,6 +428,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     showEditVisitBtn: displayStatus.showEditVisitBtn,
     editVisitMode: displayStatus.editVisitMode,
     visitHint: displayStatus.visitHint,
+    openLoop: displayStatus.openLoop || null,
     videoStatusLabel: isScript
       ? scriptStatus
         ? scriptUpload.scriptStatusLabel(scriptStatus) || displayStatus.label

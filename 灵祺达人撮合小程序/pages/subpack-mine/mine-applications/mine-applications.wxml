@@ -160,6 +160,64 @@
     </view>
     <view class="app-card__actions">
       <button
+        wx:if="{{item.openLoop.showDelivered}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="onOpenLoopAction"
+        data-action="delivered"
+        data-id="{{item.mpOrderId}}"
+        data-applicant-id="{{item.applicantId}}"
+      >我已交片</button>
+      <button
+        wx:if="{{item.openLoop.showAsk}}"
+        class="app-card__btn app-card__btn--view"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="onOpenLoopAction"
+        data-action="still_working"
+        data-id="{{item.mpOrderId}}"
+        data-applicant-id="{{item.applicantId}}"
+      >还在做</button>
+      <button
+        wx:if="{{item.openLoop.showAsk}}"
+        class="app-card__btn app-card__btn--view"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="onOpenLoopAction"
+        data-action="dropped"
+        data-id="{{item.mpOrderId}}"
+        data-applicant-id="{{item.applicantId}}"
+      >没做成</button>
+      <button
+        wx:if="{{item.openLoop.showSettled}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="onOpenLoopAction"
+        data-action="settled"
+        data-id="{{item.mpOrderId}}"
+        data-applicant-id="{{item.applicantId}}"
+      >已收到</button>
+      <button
+        wx:if="{{item.openLoop.showSnooze}}"
+        class="app-card__btn app-card__btn--view"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="onOpenLoopAction"
+        data-action="mute"
+        data-id="{{item.mpOrderId}}"
+        data-applicant-id="{{item.applicantId}}"
+      >稍后再提醒</button>
+      <button
+        wx:if="{{item.openLoop.showGroupQr}}"
+        class="app-card__btn app-card__btn--view"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >查看群码</button>
+      <button
         wx:if="{{item.showCancelBtn}}"
         class="app-card__btn app-card__btn--view"
         plain

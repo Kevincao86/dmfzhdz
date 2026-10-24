@@ -295,6 +295,19 @@ export type RegistryMpRecruitmentApplicant = {
   aiVerifyStatus?: 'pending' | 'passed' | 'failed'
   aiVerifyNote?: string
   completedAt?: string
+  /** 开环：PR 通知进群的时间，未结算提醒从这里起算 */
+  selectionNotifiedAt?: string
+  /** 开环：达人确认已在群内交片 */
+  openLoopDeliveredAt?: string
+  /** 开环：pending 待结算 / settled 已收到 / dropped 没做成 */
+  openLoopSettlementStatus?: '' | 'pending' | 'settled' | 'dropped'
+  openLoopSettledAt?: string
+  /** 开环：点「还在做」后，在此时间前不再追问交片 */
+  openLoopSnoozeUntil?: string
+  openLoopRemindMuted?: boolean
+  openLoopCheckinClosed?: boolean
+  openLoopCheckinArmed?: boolean
+  openLoopSettleArmed?: boolean
   /** 达人完成且招募单要求交票后上传的发票图片（https） */
   talentInvoices?: { url: string; fileName?: string; uploadedAt: string }[]
   taskStatus?: MpApplicantTaskStatus

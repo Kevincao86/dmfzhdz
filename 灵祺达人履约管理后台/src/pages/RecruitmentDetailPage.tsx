@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement, cancelMpRecruitmentApply } from '../lib/mpApi'
+import { submitOpenLoopAction, syncOpenLoopReminder } from '../lib/mpSync/openLoopReminderSync'
 import { detailCacheIsCurrent, readHallOrders, readOrderDetail, writeOrderDetail } from '../lib/mpRecruitment/hallOrderCache'
 import { resolveSignupDeadlineMsFromMp } from '../lib/mpRecruitment/listFilters'
 import { getAccount, getActiveRole } from '../lib/mpSession'
@@ -200,6 +201,24 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
           { selectionNotified: visitSelectionNotified, isIce: false },
         )
       : null
+  useEffect(() => {
+    if (role !== 'talent' || !mpRaw || !myApplicant) return
+    const phase = visitDisplay?.openLoop?.phase
+    if (phase !== 'in_group' && phase !== 'pending') return
+    void syncOpenLoopReminder(
+      mpRaw,
+      myApplicant as Record<string, unknown>,
+      visitSelectionNotified,
+    )
+  }, [
+    role,
+    id,
+    visitApplicantId,
+    visitSelectionNotified,
+    visitDisplay?.openLoop?.phase,
+    myApplicant,
+    mpRaw,
+  ])
   const isEditIce = mpRaw ? isEditTeamIceMpOrder(mpRaw) : false
   const isPackIce = mpRaw ? isPackSlotIceOrder(mpRaw) : false
   const iceSlotsFull =
@@ -555,6 +574,29 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
     setTargetedInviteStatusLabel(inviteState.targetedInviteStatusLabel)
   }
 
+  async function onOpenLoopSettle(action: string) {
+    const applicantId = visitApplicantId
+    if (!id || !applicantId) {
+      window.alert('缺少报名信息')
+      return
+    }
+    if (action === 'dropped' || action === 'settled') {
+      const ok = window.confirm(
+        action === 'dropped'
+          ? '标记没做成？后来交了片还可以再点「我已交片」。'
+          : '确认已经收到款项？标记后停止未结算提醒。',
+      )
+      if (!ok) return
+    }
+    try {
+      await submitOpenLoopAction(id, applicantId, action)
+      clearMpRegistryCache()
+      await reloadOrder()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '保存失败')
+    }
+  }
+
   async function onAcceptTargetedInvite() {
     await respondTargetedInviteAction('accept')
   }
@@ -747,6 +789,40 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
                   <p className="text-xs text-amber-800">群二维码加载中，请刷新本页</p>
                 )
               })()}
+            </section>
+          ) : null}
+
+          {role === 'talent' && visitDisplay?.openLoop ? (
+            <section className="surface-card rounded-xl border p-4 space-y-3">
+              <h3 className="font-medium">{visitDisplay.openLoop.label}</h3>
+              <p className="text-sm text-[var(--shell-muted)]">{visitDisplay.openLoop.hint}</p>
+              <div className="flex flex-wrap gap-2">
+                {visitDisplay.openLoop.showDelivered ? (
+                  <button type="button" className="btn-mockup btn-mockup--primary" onClick={() => void onOpenLoopSettle('delivered')}>
+                    我已交片
+                  </button>
+                ) : null}
+                {visitDisplay.openLoop.showAsk ? (
+                  <>
+                    <button type="button" className="btn-mockup" onClick={() => void onOpenLoopSettle('still_working')}>
+                      还在做
+                    </button>
+                    <button type="button" className="btn-mockup" onClick={() => void onOpenLoopSettle('dropped')}>
+                      没做成
+                    </button>
+                  </>
+                ) : null}
+                {visitDisplay.openLoop.showSettled ? (
+                  <button type="button" className="btn-mockup btn-mockup--primary" onClick={() => void onOpenLoopSettle('settled')}>
+                    已收到
+                  </button>
+                ) : null}
+                {visitDisplay.openLoop.showSnooze ? (
+                  <button type="button" className="btn-mockup" onClick={() => void onOpenLoopSettle('mute')}>
+                    稍后再提醒
+                  </button>
+                ) : null}
+              </div>
             </section>
           ) : null}
 

@@ -32,6 +32,7 @@ const subpageNav = require('../../../utils/subpageNav.js')
 const mpTargetedRecruit = require('../../../utils/mpTargetedRecruit.js')
 const mpTargetedRecruitApi = require('../../../utils/mpTargetedRecruitApi.js')
 const participant = require('../../../utils/participant.js')
+const openLoopReminderSync = require('../../../utils/openLoopReminderSync.js')
 
 function isGenericErpTaskLine(line) {
   return /商家通过 ERP 发起招募|达人报名后由商家在 ERP 反选|商家 ERP 普通招募/.test(String(line || ''))
@@ -317,6 +318,8 @@ Page({
     view: null,
     applied: false,
     isOpenLoop: false,
+    openLoop: null,
+    openLoopApplicantId: '',
     fromApply: false,
     applicationApproved: false,
     openLoopGroupQr: '',
@@ -1165,6 +1168,14 @@ Page({
         iceStep3Hint,
         applied: hasApplied,
         isOpenLoop: xingxuanRecruitLoop.isXingxuanOpenLoop(mp),
+        openLoop: (() => {
+          const st = talentAppStatus.resolveApplicationDisplayStatus(mp, gate.applicant, id, {
+            selectionNotified: talentAppStatus.isApplicantSelectionNotified(mp, gate.applicant),
+            isIce,
+          })
+          return st.openLoop || null
+        })(),
+        openLoopApplicantId: gate.applicant ? String(gate.applicant.id || '') : '',
         fromApply: !!this._fromApply,
         applicationApproved: gate.reason === 'approved',
         openLoopGroupQr:
@@ -1217,6 +1228,13 @@ Page({
         targetedInviteBusy: false,
       })
       this.syncSignupState()
+      if (gate.applicant && xingxuanRecruitLoop.isXingxuanOpenLoop(mp)) {
+        void openLoopReminderSync.syncOne(
+          mp,
+          gate.applicant,
+          talentAppStatus.isApplicantSelectionNotified(mp, gate.applicant),
+        )
+      }
       this.startSignupCountdownTimer()
       this.renderPrQrImage()
       if (this._detailViewBumpId !== id) {
@@ -1677,6 +1695,49 @@ Page({
           .finally(() => that.setData({ visitBusy: false }))
       },
     })
+  },
+  onOpenLoopAction(e) {
+    const action = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.action) || '').trim()
+    const mpOrderId = String(this.data.id || '').trim()
+    const applicantId = String(this.data.openLoopApplicantId || '').trim()
+    if (!action || !mpOrderId || !applicantId) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    const titles = {
+      delivered: '已记下交片，之后会提醒你跟结算',
+      still_working: '14 天后再问一次',
+      dropped: '已标记没做成',
+      settled: '已标记收到款项',
+      mute: '已暂停提醒',
+    }
+    const run = () => {
+      wx.showLoading({ title: '保存中', mask: true })
+      openLoopReminderSync
+        .submitAction(mpOrderId, applicantId, action)
+        .then(() => {
+          wx.hideLoading()
+          const registryCache = require('../../../utils/registryCache.js')
+          registryCache.bust()
+          wx.showToast({ title: titles[action] || '已保存', icon: 'none' })
+          return this.loadOrder(mpOrderId)
+        })
+        .catch((err) => {
+          wx.hideLoading()
+          wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+        })
+    }
+    if (action === 'dropped' || action === 'settled') {
+      wx.showModal({
+        title: action === 'dropped' ? '标记没做成？' : '确认已经收到款项？',
+        content: action === 'dropped' ? '标记后不再追问交片。如果后来交了片，还可以再点「我已交片」。' : '标记后停止未结算提醒。',
+        success: (res) => {
+          if (res.confirm) run()
+        },
+      })
+      return
+    }
+    run()
   },
   async visitCheckInTap() {
     if (!this.data.visitApplicantId || !this.data.id) return

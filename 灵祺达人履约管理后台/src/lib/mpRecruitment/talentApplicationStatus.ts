@@ -4,6 +4,7 @@ import { resolveSignupDeadlineMsFromMp } from './listFilters'
 import { resolveCreatedMsFromMpId } from '../mpSync/mpRecruitmentOrderId'
 import { getIceVerifyMode } from './iceOrderStats'
 import { isScriptReviewPlatform } from './deliveryReviewPlatform'
+import { resolveOpenLoopCard, type OpenLoopCard } from '@merchant/lib/openLoopSettlement'
 
 export type TalentAppProgressId = 'all' | 'pr_pending' | 'in_progress' | 'completed'
 
@@ -48,6 +49,7 @@ export type ApplicationDisplayStatus = {
   editVisitMode?: 'preference' | 'effective'
   visitHint?: string
   visitScheduleRevised?: boolean
+  openLoop?: OpenLoopCard
 }
 
 export type ApplicationDisplayOpts = {
@@ -618,6 +620,21 @@ function resolveApplicationDisplayStatusCore(
       tone: 'pending',
       showConfirmBtn: false,
       showCancelBtn: false,
+    }
+  }
+
+  const openLoopCard = resolveOpenLoopCard(mp, applicant, {
+    selected: isApplicantPrSelected(mp, applicant),
+    selectionNotified: opts?.selectionNotified,
+  })
+  if (openLoopCard) {
+    return {
+      tabId: openLoopCard.tabId,
+      label: openLoopCard.label,
+      tone: openLoopCard.tone,
+      showConfirmBtn: false,
+      visitHint: openLoopCard.hint,
+      openLoop: openLoopCard,
     }
   }
 

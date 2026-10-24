@@ -109,6 +109,8 @@ function oaCalendarProjectLabel(eventTitle: string, eventKind?: string): string 
   if (eventKind === 'visit') return '探店提醒'
   if (eventKind === 'deadline') return '交片提醒'
   if (eventKind === 'plan_slot') return '可探店提醒'
+  if (eventKind === 'open_loop_checkin') return '开环交片确认'
+  if (eventKind === 'open_loop_settle') return '开环未结算'
   return '日程提醒'
 }
 
@@ -130,7 +132,10 @@ export async function sendWechatOaCalendarReminderTemplate(opts: {
   if (!templateId) throw new Error('wx_oa_calendar_template_missing')
 
   const mpOrderId = String(opts.mpOrderId || '').trim()
-  const pagePath = 'pages/subpack-mine/mine-order-calendar/mine-order-calendar'
+  const openLoopKind = opts.eventKind === 'open_loop_checkin' || opts.eventKind === 'open_loop_settle'
+  const pagePath = openLoopKind
+    ? 'pages/subpack-mine/mine-applications/mine-applications'
+    : 'pages/subpack-mine/mine-order-calendar/mine-order-calendar'
   const token = await getWechatOfficialAccountAccessToken()
   const mpAppId = mpWechatAppId()
 
@@ -150,9 +155,13 @@ export async function sendWechatOaCalendarReminderTemplate(opts: {
   if (mpAppId) {
     payload.miniprogram = {
       appid: mpAppId,
-      pagepath: mpOrderId
-        ? `pages/detail/detail?id=${encodeURIComponent(mpOrderId)}`
-        : pagePath,
+      pagepath: openLoopKind
+        ? mpOrderId
+          ? `pages/subpack-core/detail/detail?id=${encodeURIComponent(mpOrderId)}&from=apply`
+          : pagePath
+        : mpOrderId
+          ? `pages/detail/detail?id=${encodeURIComponent(mpOrderId)}`
+          : pagePath,
     }
   }
 
