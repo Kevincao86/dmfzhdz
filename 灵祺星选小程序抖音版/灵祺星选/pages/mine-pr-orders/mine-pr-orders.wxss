@@ -17,6 +17,12 @@
   padding-bottom: 24rpx;
 }
 
+.pr-orders-refresh-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8rpx 8rpx 0;
+}
+
 .pr-platform-scroll {
   width: 100%;
   white-space: nowrap;

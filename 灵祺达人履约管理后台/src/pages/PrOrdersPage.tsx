@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, LayoutGrid, List, RotateCcw } from 'lucide-react'
 import { fetchMpRegistry, deleteMpRecruitmentOrder, patchMpRecruitmentOrder, patchPrOrderWorkflow, clearMpRegistryCache } from '../lib/mpApi'
+import { getAccount } from '../lib/mpSession'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter } from '../lib/mpRecruitment/mpOrderStatus'
@@ -103,6 +104,31 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   workflowStage: PrWorkflowStage
 }
 
+const ORDERS_POLL_MS = 60 * 1000
+
+type OrdersCache = { key: string; rows: PrOrderRow[]; sig: string }
+let ordersCache: OrdersCache | null = null
+
+function ordersCacheKey(): string {
+  const account = getAccount()
+  return String(account?.registryPrId || account?.registryMemberId || account?.accountId || '')
+}
+
+function orderListSignature(rows: PrOrderRow[]): string {
+  return rows
+    .map((row) =>
+      [
+        row.mpOrderId,
+        row.applicantCount || 0,
+        row.workflowStage || '',
+        row.pendingReviewCount || 0,
+        row.status || '',
+        row.deletedAt || '',
+      ].join(':'),
+    )
+    .join('|')
+}
+
 function isStoppedOrderRow(row: Pick<PrOrderRow, 'status' | 'statusLabel'>): boolean {
   return row.status === 'closed' || row.statusLabel === '已停止'
 }
@@ -195,8 +221,11 @@ export default function PrOrdersPage() {
   }
 
   const [rows, setRows] = useState<PrOrderRow[]>([])
+  const rowsLenRef = useRef(0)
+  rowsLenRef.current = rows.length
   const [drafts, setDrafts] = useState<PublishWizardDraft[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [err, setErr] = useState('')
   const [togglingId, setTogglingId] = useState('')
   const [deletingId, setDeletingId] = useState('')
@@ -220,7 +249,19 @@ export default function PrOrdersPage() {
     setDrafts(listPublishDrafts())
   }, [])
 
-  async function loadPublished() {
+  function commitRows(next: PrOrderRow[], opts?: { force?: boolean }) {
+    const sig = orderListSignature(next)
+    const key = ordersCacheKey()
+    const prev = ordersCache && ordersCache.key === key ? ordersCache : null
+    const changed = !prev || prev.sig !== sig
+    ordersCache = { key, rows: next, sig }
+    if (opts?.force || changed || rowsLenRef.current === 0) {
+      setRows(next)
+      rowsLenRef.current = next.length
+    }
+  }
+
+  async function loadPublished(opts?: { force?: boolean }) {
     setErr('')
     try {
       void syncClientStateWithServer().catch(() => null)
@@ -235,10 +276,10 @@ export default function PrOrdersPage() {
       pruneOrphanPublishedOrders(mpList)
       const local = listPublishedOrdersForCurrentPr(mpList)
       if (!local.length) {
-        setRows([])
+        commitRows([], { force: true })
         return
       }
-      setRows(
+      commitRows(
         local.map((item) => {
           const mp = mpList.find((o) => o && o.id === item.mpOrderId) as Record<string, unknown> | undefined
           if (mp && isTargetedOrder(mp)) {
@@ -278,11 +319,13 @@ export default function PrOrdersPage() {
             workflowStage: resolvePrWorkflowStage(mp || null),
           }
         }),
+        { force: !!opts?.force },
       )
     } catch (e) {
+      if (rowsLenRef.current > 0 && !opts?.force) return
       setErr(e instanceof Error ? e.message : '加载失败')
       const fallback = readPublishedOrders()
-      setRows(
+      commitRows(
         fallback.map((item) => {
           const enriched = listFilters.enrichMpOrderListItem(null, item, { lookupFailed: true })
           return {
@@ -307,20 +350,59 @@ export default function PrOrdersPage() {
             workflowStage: 'recruiting' as const,
           }
         }),
+        { force: true },
       )
     }
   }
 
-  async function load() {
-    setLoading(true)
+  const ordersBusy = useRef(false)
+  const ordersPending = useRef<{ silent?: boolean; force?: boolean } | null>(null)
+  const loadRef = useRef<(opts?: { silent?: boolean; force?: boolean }) => Promise<void>>(async () => {})
+
+  async function load(opts?: { silent?: boolean; force?: boolean }) {
+    const silent = !!opts?.silent
+    const force = !!opts?.force || !silent
+    if (ordersBusy.current) {
+      const prev = ordersPending.current
+      ordersPending.current = {
+        silent: silent && (!prev || !!prev.silent),
+        force: force || !!prev?.force,
+      }
+      return
+    }
+    ordersBusy.current = true
+    if (!silent && rowsLenRef.current === 0) setLoading(true)
+    if (opts?.force) setRefreshing(true)
     refreshDrafts()
-    await loadPublished()
-    setLoading(false)
+    try {
+      await loadPublished({ force })
+    } finally {
+      ordersBusy.current = false
+      setLoading(false)
+      setRefreshing(false)
+      const next = ordersPending.current
+      ordersPending.current = null
+      if (next) void loadRef.current(next)
+    }
   }
 
+  loadRef.current = load
+
   useEffect(() => {
-    void load()
-  }, [refreshDrafts])
+    const hit = ordersCache && ordersCache.key === ordersCacheKey() ? ordersCache : null
+    if (hit) {
+      setRows(hit.rows)
+      rowsLenRef.current = hit.rows.length
+      setLoading(false)
+      void loadRef.current({ silent: true })
+    } else {
+      void loadRef.current()
+    }
+    const timer = window.setInterval(() => {
+      void loadRef.current({ silent: true })
+    }, ORDERS_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const platformFilteredRows = useMemo(
     () => rows.filter((row) => matchPrPlatformGroup(row.platform, platformGroup)),
@@ -714,12 +796,19 @@ export default function PrOrdersPage() {
         </div>
 
         <div className="pr-orders-list-head">
-          <span>
+          <span className="inline-flex items-center gap-3">
             共{' '}
             {tab === 'drafts'
               ? filteredDrafts.length
               : filteredRows.length}{' '}
             条
+            <button
+              type="button"
+              className="pr-orders-toolbar__reset"
+              onClick={() => void load({ silent: true, force: true })}
+            >
+              {refreshing ? '刷新中' : '刷新'}
+            </button>
           </span>
           <div className="pr-orders-list-head__right">
             <select
@@ -753,7 +842,7 @@ export default function PrOrdersPage() {
         </div>
 
         <div className="pr-orders-body">
-          {loading ? <p className="pr-orders-muted">加载中…</p> : null}
+          {loading && rows.length === 0 ? <p className="pr-orders-muted">加载中…</p> : null}
           {err && (tab !== 'drafts' && tab !== 'deleted') ? (
             <p className="pr-orders-err">{err}</p>
           ) : null}

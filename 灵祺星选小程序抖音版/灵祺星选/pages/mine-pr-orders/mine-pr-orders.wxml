@@ -166,7 +166,10 @@
   </view>
 
   <view class="pr-list-body">
-  <view wx:if="{{loading}}" class="card pr-state-card"><text class="hint">加载中…</text></view>
+  <view class="pr-orders-refresh-row">
+    <view class="pr-target-chip" bindtap="onRefreshTap">{{refreshing ? '刷新中' : '刷新'}}</view>
+  </view>
+  <view wx:if="{{loading && !rows.length}}" class="card pr-state-card"><text class="hint">加载中…</text></view>
   <view wx:if="{{err && (tab === 'published' || tab === 'stopped')}}" class="card pr-state-card pr-state-card--warn"><text class="hint">{{err}}</text></view>
 
   <block wx:if="{{tab === 'published' || tab === 'pending_schedule' || tab === 'pending_video_review' || tab === 'completed' || tab === 'stopped' || tab === 'deleted'}}">

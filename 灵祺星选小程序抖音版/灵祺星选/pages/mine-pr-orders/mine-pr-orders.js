@@ -27,6 +27,7 @@ const appDisplay = require('../../utils/applicationDisplay.js')
 const mpTargetedRecruit = require('../../utils/mpTargetedRecruit.js')
 const mpTargetedRecruitApi = require('../../utils/mpTargetedRecruitApi.js')
 const mpAccountClientSync = require('../../utils/mpAccountClientSync.js')
+const auth = require('../../utils/auth.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -122,6 +123,27 @@ function buildOrderSharePayload(order) {
   return recruitShareCover.attachShareCoverPromise(share, coverUrl)
 }
 
+const ORDERS_POLL_MS = 60 * 1000
+let ordersMem = null
+
+function ordersCacheKey() {
+  const acct = auth.readAccount() || {}
+  return String(acct.registryPrId || acct.registryMemberId || acct.id || acct.phone || 'pr')
+}
+
+function readOrdersMem() {
+  if (!ordersMem || ordersMem.key !== ordersCacheKey()) return null
+  return ordersMem
+}
+
+function orderListSignature(rows) {
+  return (rows || [])
+    .map((row) =>
+      [row.mpOrderId, row.applicantCount || 0, row.workflowStage || '', row.pendingReviewCount || 0, row.status || '', row.deletedAt || ''].join(':'),
+    )
+    .join('|')
+}
+
 function statusFilterBarLabel(val) {
   const v = String(val || '').trim()
   if (!v || v === '全部') return '状态'
@@ -155,6 +177,7 @@ Page({
     filteredDrafts: [],
     keyword: '',
     loading: true,
+    refreshing: false,
     err: '',
     deletingId: '',
     togglingId: '',
@@ -219,7 +242,54 @@ Page({
       return
     }
     mpShare.enableShareMenu()
-    this.load()
+    const cached = readOrdersMem()
+    if (cached && cached.rows) {
+      this.setData({ rows: cached.rows, loading: false, err: '' })
+      this.refreshFiltered(cached.rows)
+    }
+    this.load(cached ? { silent: true } : undefined)
+    this.startOrdersPoll()
+  },
+  onHide() {
+    this.stopOrdersPoll()
+  },
+  onUnload() {
+    this.stopOrdersPoll()
+  },
+  startOrdersPoll() {
+    this.stopOrdersPoll()
+    this._ordersTimer = setInterval(() => {
+      this.load({ silent: true })
+    }, ORDERS_POLL_MS)
+  },
+  stopOrdersPoll() {
+    if (this._ordersTimer) {
+      clearInterval(this._ordersTimer)
+      this._ordersTimer = null
+    }
+  },
+  onRefreshTap() {
+    this.load({ silent: true, force: true })
+  },
+  applyLoadedRows(rows, opts) {
+    const list = rows || []
+    const sig = orderListSignature(list)
+    const cached = readOrdersMem()
+    const force = !!(opts && opts.force)
+    const changed = !cached || cached.sig !== sig
+    ordersMem = { key: ordersCacheKey(), rows: list, sig }
+    const hasView = !!((this.data.rows && this.data.rows.length) || (this.data.filteredRows && this.data.filteredRows.length))
+    if (force || changed || !hasView) {
+      this.setData({
+        rows: list,
+        loading: false,
+        refreshing: false,
+        err: (opts && opts.err) || '',
+      })
+      this.refreshFiltered(list)
+      return
+    }
+    this.setData({ loading: false, refreshing: false, err: '' })
   },
   platformScopedRows(rows) {
     const group = this.data.platformGroup || 'video'
@@ -461,7 +531,7 @@ Page({
     })
   },
   onPullDownRefresh() {
-    this.load().finally(() => wx.stopPullDownRefresh())
+    this.load({ silent: true, force: true }).finally(() => wx.stopPullDownRefresh())
   },
   async syncTargetedInvitePhases(rows) {
     const ids = (rows || [])
@@ -478,30 +548,32 @@ Page({
     await Promise.all(ids.map((id) => mpTargetedRecruitApi.finalizeIfNeeded(id).catch(() => null)))
     return true
   },
-  async load() {
-    if (!api.hasApi()) {
-      const local = applicationsStore.readPublishedOrders()
-      if (!local.length) {
-        this.setData({
-          rows: [],
-          loading: false,
-          err: '',
-          filterCountText: '',
-        })
-        this.refreshFiltered([])
-        return
+  async load(opts) {
+    const silent = !!(opts && opts.silent)
+    const force = !!(opts && opts.force) || !silent
+    if (this._ordersBusy) {
+      const prev = this._ordersPending
+      this._ordersPending = {
+        silent: silent && (!prev || prev.silent),
+        force: force || !!(prev && prev.force),
       }
-      const rows = local.map((item) => mapRow(item, null, { lookupFailed: true }))
-      this.setData({
-        rows,
-        loading: false,
-        err: '未配置后台，无法同步报名人数',
-      })
-      this.refreshFiltered(rows)
       return
     }
-    this.setData({ loading: true, err: '' })
+    const hasView = !!(this.data.rows && this.data.rows.length)
+    if (!silent && !hasView) this.setData({ loading: true, err: '' })
+    if (opts && opts.force) this.setData({ refreshing: true })
+    this._ordersBusy = true
     try {
+      if (!api.hasApi()) {
+        const local = applicationsStore.readPublishedOrders()
+        if (!local.length) {
+          this.applyLoadedRows([], { force: true })
+          return
+        }
+        const rows = local.map((item) => mapRow(item, null, { lookupFailed: true }))
+        this.applyLoadedRows(rows, { force: true, err: '未配置后台，无法同步报名人数' })
+        return
+      }
       await mpAccountClientSync.ensureClientStatePulled().catch(() => null)
       const localIds = applicationsStore
         .readPublishedOrders()
@@ -516,13 +588,7 @@ Page({
       prPublishedOrders.pruneOrphanPublishedOrders(mpList)
       const local = prPublishedOrders.listPublishedOrdersForCurrentPr(mpList)
       if (!local.length) {
-        this.setData({
-          rows: [],
-          loading: false,
-          err: '',
-          filterCountText: '',
-        })
-        this.refreshFiltered([])
+        this.applyLoadedRows([], { force: true })
         return
       }
       const rows = local.map((item) => {
@@ -543,21 +609,24 @@ Page({
         const mp = mpListFinal.find((o) => o && o.id === item.mpOrderId)
         return mapRow(item, mp)
       })
-      this.setData({
-        rows: rowsFinal,
-        loading: false,
-        err: '',
-      })
-      this.refreshFiltered(rowsFinal)
+      this.applyLoadedRows(rowsFinal, { force })
     } catch (e) {
+      if (hasView && silent) {
+        this.setData({ loading: false, refreshing: false })
+        return
+      }
       const fallbackLocal = applicationsStore.readPublishedOrders()
       const rows = fallbackLocal.map((item) => mapRow(item, null, { lookupFailed: true }))
-      this.setData({
-        rows,
-        loading: false,
+      this.applyLoadedRows(rows, {
+        force: true,
         err: String(e && e.message ? e.message : e).slice(0, 60),
       })
-      this.refreshFiltered(rows)
+    } finally {
+      this._ordersBusy = false
+      this.setData({ loading: false, refreshing: false })
+      const next = this._ordersPending
+      this._ordersPending = null
+      if (next) this.load(next)
     }
   },
   goSchedule(e) {
