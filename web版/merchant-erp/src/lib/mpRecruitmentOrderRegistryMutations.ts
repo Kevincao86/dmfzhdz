@@ -6,7 +6,7 @@ import type {
 } from './opsRegistryTypes.js'
 import { filterSelectedIdsToApplicants, pruneApplicantIdRefsOnOrder } from './mpApplicantIdentity.js'
 import { normalizeMarketingCenter, reconcileCashGrantsWithOrders } from './marketingCampaignCore.js'
-import { applyOpenLoopSettleAction } from './openLoopSettlement.js'
+import { applyOpenLoopSettleAction, setOpenLoopSettleRemind } from './openLoopSettlement.js'
 
 export type MpRecruitmentPatchBody = {
   id?: string
@@ -21,6 +21,8 @@ export type MpRecruitmentPatchBody = {
   talentInvoice?: { applicantId?: string; url?: string; fileName?: string }
   /** 开环：达人交片 / 结算自记 */
   openLoopSettle?: { applicantId?: string; action?: string }
+  /** 达人打开或关闭商单结算提醒，不需要订单号 */
+  settleRemind?: { memberId?: string; enabled?: boolean }
 }
 
 /** 整单 patch 时：客户端未加载 applicants 常会传 []，不得覆盖注册表已有报名 */
@@ -101,6 +103,13 @@ export function patchMpRecruitmentOrderInSnapshot(
   data: RegistrySnapshot,
   body: MpRecruitmentPatchBody,
 ): { ok: true } | { ok: false; error: string; status: number } {
+  if (body.settleRemind != null) {
+    return setOpenLoopSettleRemind(
+      data,
+      String(body.settleRemind.memberId || ''),
+      body.settleRemind.enabled === true,
+    )
+  }
   const id = (body.id ?? '').trim()
   const order = body.order
   const status = body.status

@@ -59,6 +59,8 @@ export type ApplicationDisplayOpts = {
   withdrawnAt?: boolean
   /** 本机报名 applicantId（注册表暂未匹配时仍允许取消） */
   localApplicantId?: string
+  /** 达人已在我的报名打开商单结算提醒 */
+  settleRemindOn?: boolean
 }
 
 export const TALENT_APP_PROGRESS_FILTERS: { id: TalentAppProgressId; label: string }[] = [
@@ -626,6 +628,7 @@ function resolveApplicationDisplayStatusCore(
   const openLoopCard = resolveOpenLoopCard(mp, applicant, {
     selected: isApplicantPrSelected(mp, applicant),
     selectionNotified: opts?.selectionNotified,
+    enabled: opts?.settleRemindOn === true,
   })
   if (openLoopCard) {
     return {

@@ -57,7 +57,8 @@ import {
 } from '../lib/mpRecruitment/talentApplicationStatus'
 import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
 import { visitCheckIn } from '../lib/mpSync/visitScheduleRuntime'
-import { submitOpenLoopAction, syncOpenLoopReminder } from '../lib/mpSync/openLoopReminderSync'
+import { readSettleRemindOn, setSettleRemind, submitOpenLoopAction, syncOpenLoopReminder } from '../lib/mpSync/openLoopReminderSync'
+import { resolveTalentMemberId } from '../lib/mpSync/participant'
 import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
@@ -127,6 +128,8 @@ function TalentApplicationsPage() {
   const [searchParams] = useSearchParams()
   const [apps, setApps] = useState<EnrichedApplication[]>([])
   const [loading, setLoading] = useState(true)
+  const [settleRemindOn, setSettleRemindOn] = useState(false)
+  const [settleRemindBusy, setSettleRemindBusy] = useState(false)
   const [invoiceBusyKey, setInvoiceBusyKey] = useState('')
   const invoiceInputRef = useRef<HTMLInputElement>(null)
   const invoiceTargetRef = useRef<{ mpOrderId: string; applicantId: string } | null>(null)
@@ -222,6 +225,10 @@ function TalentApplicationsPage() {
       isIce,
       withdrawnAt,
       localApplicantId: applicantId || undefined,
+      settleRemindOn: readSettleRemindOn(
+        reg as { mpTalentMembers?: Array<Record<string, unknown>> },
+        resolveTalentMemberId(),
+      ),
     })
     let iceActionLabel = ''
     if (isIce) {
@@ -330,10 +337,17 @@ function TalentApplicationsPage() {
           return st ? { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : r
         }),
       )
-      for (const row of enriched) {
-        const phase = row.displayStatus?.openLoop?.phase
-        if (phase !== 'in_group' && phase !== 'pending') continue
-        void syncOpenLoopReminder(row._progressMp || null, row._progressMe || null, !!row.selectionNotified)
+      const remindOn = readSettleRemindOn(
+        reg as { mpTalentMembers?: Array<Record<string, unknown>> },
+        resolveTalentMemberId(),
+      )
+      setSettleRemindOn(remindOn)
+      if (remindOn) {
+        for (const row of enriched) {
+          const phase = row.displayStatus?.openLoop?.phase
+          if (phase !== 'in_group' && phase !== 'pending') continue
+          void syncOpenLoopReminder(row._progressMp || null, row._progressMe || null, !!row.selectionNotified)
+        }
       }
       maybeSwitchToPendingVideoTab(enriched)
     } catch {
@@ -354,6 +368,7 @@ function TalentApplicationsPage() {
           resolveApplicationDisplayStatus(r._progressMp || null, r._progressMe || null, r.mpOrderId, {
             selectionNotified: r.selectionNotified,
             isIce: r.isIce,
+            settleRemindOn,
           })
         return st.tabId === 'pending_video' && isTalentVisitCheckedIn(r._progressMp || null, r._progressMe || null)
       })
@@ -428,6 +443,21 @@ function TalentApplicationsPage() {
       alert(err instanceof Error ? err.message : '取消报名失败')
     } finally {
       setCancelApplyKey('')
+    }
+  }
+
+  async function onToggleSettleRemind(enabled: boolean) {
+    if (settleRemindBusy) return
+    setSettleRemindBusy(true)
+    setSettleRemindOn(enabled)
+    try {
+      await setSettleRemind(resolveTalentMemberId(), enabled)
+      await reloadApps()
+    } catch (err) {
+      setSettleRemindOn(!enabled)
+      alert(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setSettleRemindBusy(false)
     }
   }
 
@@ -844,6 +874,7 @@ function TalentApplicationsPage() {
         selectionNotified: a.selectionNotified,
         isIce: a.isIce,
         withdrawnAt: !!String(a.withdrawnAt || '').trim(),
+        settleRemindOn,
       }),
     )
     return filterApplicationRows(byTab, {
@@ -854,7 +885,7 @@ function TalentApplicationsPage() {
       province: filterProvince,
       city: filterCity,
     })
-  }, [apps, filterTab, platformGroup, timeFilter, filterPlatform, filterCategory, filterProvince, filterCity])
+  }, [apps, filterTab, platformGroup, timeFilter, filterPlatform, filterCategory, filterProvince, filterCity, settleRemindOn])
 
   function onPlatformGroupChange(group: PrDeliveryPlatformGroup) {
     if (group === platformGroup) return
@@ -901,6 +932,20 @@ function TalentApplicationsPage() {
           </Link>
         </div>
       </header>
+
+      <label className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-[var(--shell-border)] bg-white/70 px-4 py-3">
+        <span>
+          <span className="block text-sm font-semibold text-[var(--shell-text)]">商单结算提醒</span>
+          <span className="mt-1 block text-xs leading-5 text-[var(--shell-muted)]">开启后，开环商单才会提醒你确认交片和未结算</span>
+        </span>
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={settleRemindOn}
+          disabled={settleRemindBusy}
+          onChange={(e) => void onToggleSettleRemind(e.target.checked)}
+        />
+      </label>
 
       <div className="pr-orders-platform-group orders-page__platform-group">
         {PR_PLATFORM_GROUP_OPTIONS.map((opt) => (
@@ -1021,7 +1066,11 @@ function TalentApplicationsPage() {
           </thead>
           <tbody>
         {filtered.map((a) => {
-          const ds = a.displayStatus || resolveApplicationDisplayStatus(a._progressMp || null, a._progressMe || null, a.mpOrderId)
+          const ds = a.displayStatus || resolveApplicationDisplayStatus(a._progressMp || null, a._progressMe || null, a.mpOrderId, {
+            selectionNotified: a.selectionNotified,
+            isIce: a.isIce,
+            settleRemindOn,
+          })
           const href = detailHref(a.mpOrderId)
           const confirmLabel =
             ds.showConfirmVisitBtn

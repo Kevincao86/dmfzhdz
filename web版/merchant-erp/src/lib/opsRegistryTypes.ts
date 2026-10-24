@@ -581,6 +581,8 @@ export type RegistryMpTalentMember = {
   >
   alipayAccount?: string
   gender?: string
+  /** 达人自行开启：开环商单交片 / 未结算提醒。默认关 */
+  openLoopSettleRemind?: boolean
   /** 运营台开通：增值服务 / 推荐大厅 + 单项权限覆盖 */
   mpFeatureAccess?: {
     addons?: boolean

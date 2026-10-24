@@ -453,6 +453,7 @@ function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
   const openLoopCard = openLoopSettlement.resolveOpenLoopCard(mp, applicant, {
     selected: isApplicantPrSelected(mp, applicant),
     selectionNotified: options.selectionNotified,
+    enabled: options.settleRemindOn === true,
   })
   if (openLoopCard) {
     return {

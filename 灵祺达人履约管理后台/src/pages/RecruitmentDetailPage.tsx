@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement, cancelMpRecruitmentApply } from '../lib/mpApi'
-import { submitOpenLoopAction, syncOpenLoopReminder } from '../lib/mpSync/openLoopReminderSync'
+import { readSettleRemindOn, submitOpenLoopAction, syncOpenLoopReminder } from '../lib/mpSync/openLoopReminderSync'
 import { detailCacheIsCurrent, readHallOrders, readOrderDetail, writeOrderDetail } from '../lib/mpRecruitment/hallOrderCache'
 import { resolveSignupDeadlineMsFromMp } from '../lib/mpRecruitment/listFilters'
 import { getAccount, getActiveRole } from '../lib/mpSession'
@@ -198,7 +198,14 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
           mpRaw as Record<string, unknown> | null,
           myApplicant as Record<string, unknown>,
           id || '',
-          { selectionNotified: visitSelectionNotified, isIce: false },
+          {
+            selectionNotified: visitSelectionNotified,
+            isIce: false,
+            settleRemindOn: readSettleRemindOn(
+              mpRegistry as { mpTalentMembers?: Array<Record<string, unknown>> } | null,
+              resolveTalentMemberId(),
+            ),
+          },
         )
       : null
   useEffect(() => {

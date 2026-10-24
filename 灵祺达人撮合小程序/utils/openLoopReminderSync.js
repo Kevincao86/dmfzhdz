@@ -56,6 +56,7 @@ async function syncOne(mp, applicant, selectionNotified) {
   const plan = openLoop.planOpenLoopReminders(mp, applicant, {
     selected: true,
     selectionNotified: !!selectionNotified,
+    enabled: true,
   })
   if (!plan) return
   inflight.add(key)
@@ -71,6 +72,70 @@ async function syncOne(mp, applicant, selectionNotified) {
     /* 下次打开再试，不打断报名列表 */
   } finally {
     inflight.delete(key)
+  }
+}
+
+async function cancelAllOpenLoopReminders() {
+  const rows = await calReminder.listReminders()
+  const pending = (rows || []).filter((row) => {
+    const kind = String((row && row.eventKind) || '')
+    return row && row.status === 'pending' && (kind === 'open_loop_checkin' || kind === 'open_loop_settle')
+  })
+  for (let i = 0; i < pending.length; i++) {
+    const id = String(pending[i].id || '').trim()
+    if (!id) continue
+    try {
+      await calReminder.cancelReminder(id)
+    } catch (e) {
+      /* 已取消的跳过 */
+    }
+  }
+}
+
+async function postSettleRemind(memberId, enabled) {
+  const api = require('./api.js')
+  const auth = require('./auth.js')
+  const paths = [
+    '/api/meoo-ops-mp-recruitment-orders-patch',
+    '/api/ops-sync/mp-recruitment-orders/patch',
+  ]
+  let lastErr
+  for (let i = 0; i < paths.length; i++) {
+    try {
+      const data = await api.post(paths[i], { settleRemind: { memberId, enabled: enabled === true } }, auth.authHeaders())
+      if (data && data.ok === false) throw new Error(String(data.detail || data.error || '保存失败'))
+      return data
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('保存失败')
+}
+
+async function setSettleRemind(enabled) {
+  const who = openLoop.readSettleRemindMemberId()
+  if (!who.memberId) throw new Error('请先完善达人资料')
+  const previous = openLoop.readSettleRemindOn(null)
+  openLoop.rememberSettleRemindOn(enabled === true)
+  try {
+    await postSettleRemind(who.memberId, enabled === true)
+  } catch (err) {
+    openLoop.rememberSettleRemindOn(previous)
+    throw err
+  }
+  try {
+    require('./registryCache.js').bust()
+  } catch (e) {
+    /* ignore */
+  }
+  if (!enabled) {
+    try {
+      await cancelAllOpenLoopReminders()
+    } catch (e) {
+      /* 开关已关上，未发出的提醒下次再清 */
+    }
   }
 }
 
@@ -104,4 +169,5 @@ module.exports = {
   syncRows,
   syncOne,
   submitAction,
+  setSettleRemind,
 }

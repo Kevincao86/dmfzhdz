@@ -91,6 +91,7 @@ function eventId(mpOrderId, applicantId, tag) {
 function resolveOpenLoopCard(mp, applicant, opts) {
   const options = opts || {}
   if (!isOpenLoopOrder(mp) || !applicant) return null
+  if (options.enabled !== true) return null
   if (String(applicant.taskStatus || '') === 'rejected') return null
   const selected = !!(options.selected || options.selectionNotified)
   if (!selected) return null
@@ -226,6 +227,55 @@ function planOpenLoopReminders(mp, applicant, opts) {
   return null
 }
 
+function readSettleRemindMemberId() {
+  let memberId = ''
+  let localOn = false
+  try {
+    const auth = require('./auth.js')
+    const account = auth.readAccount()
+    memberId = String((account && account.registryMemberId) || '').trim()
+  } catch (e) {
+    memberId = ''
+  }
+  try {
+    const member = require('./talentMember.js').readMember()
+    if (!memberId) memberId = String((member && member.id) || '').trim()
+    localOn = !!(member && member.openLoopSettleRemind)
+  } catch (e) {
+    localOn = false
+  }
+  return { memberId, localOn }
+}
+
+function settleRemindStorageKey(memberId) {
+  return `meoo_open_loop_settle_remind_v1:${memberId || 'self'}`
+}
+
+function readSettleRemindOn(reg) {
+  const who = readSettleRemindMemberId()
+  const list = reg && Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  if (who.memberId) {
+    const row = list.find((m) => m && String(m.id) === who.memberId)
+    if (row && typeof row.openLoopSettleRemind === 'boolean') return row.openLoopSettleRemind
+  }
+  try {
+    const cached = wx.getStorageSync(settleRemindStorageKey(who.memberId))
+    if (cached === '1' || cached === '0') return cached === '1'
+  } catch (e) {
+    /* ignore */
+  }
+  return who.localOn
+}
+
+function rememberSettleRemindOn(enabled) {
+  const who = readSettleRemindMemberId()
+  try {
+    wx.setStorageSync(settleRemindStorageKey(who.memberId), enabled ? '1' : '0')
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 module.exports = {
   isOpenLoopOrder,
   parseOpenLoopMs,
@@ -233,4 +283,7 @@ module.exports = {
   reminderPrefix,
   resolveOpenLoopCard,
   planOpenLoopReminders,
+  readSettleRemindMemberId,
+  readSettleRemindOn,
+  rememberSettleRemindOn,
 }

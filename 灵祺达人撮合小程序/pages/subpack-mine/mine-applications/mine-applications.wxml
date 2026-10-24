@@ -1,5 +1,12 @@
 <page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
 <view class="{{lqAccentClass}} app-list-page page-shell {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
+  <view class="app-settle-switch">
+    <view class="app-settle-switch__main">
+      <text class="app-settle-switch__title">商单结算提醒</text>
+      <text class="app-settle-switch__sub">开启后，开环商单才会提醒你确认交片和未结算</text>
+    </view>
+    <switch checked="{{settleRemindOn}}" disabled="{{settleRemindBusy}}" bindchange="onSettleRemindChange" color="#6b4c3b" />
+  </view>
   <scroll-view wx:if="{{rows.length > 0 || !loading}}" class="app-platform-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="app-platform-bar">
       <view

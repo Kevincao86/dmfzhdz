@@ -358,6 +358,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     isIce,
     withdrawnAt,
     localApplicantId: applicantId || undefined,
+    settleRemindOn: require('./openLoopSettlement.js').readSettleRemindOn(reg),
   })
   const iceVerifyMode = mp ? getIceVerifyMode(mp) : 'ai'
   let iceActionLabel = ''

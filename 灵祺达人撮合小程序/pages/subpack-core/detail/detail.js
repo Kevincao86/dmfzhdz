@@ -1055,6 +1055,7 @@ Page({
         visitApplicantId = String(gate.applicant.id || '').trim()
         const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, id, mp)
         const visitDisplay = talentAppStatus.resolveApplicationDisplayStatus(mp, gate.applicant, id, {
+          settleRemindOn: require('../../../utils/openLoopSettlement.js').readSettleRemindOn(reg),
           selectionNotified: notifiedIds.has(visitApplicantId),
           isIce: false,
         })
@@ -1172,6 +1173,7 @@ Page({
           const st = talentAppStatus.resolveApplicationDisplayStatus(mp, gate.applicant, id, {
             selectionNotified: talentAppStatus.isApplicantSelectionNotified(mp, gate.applicant),
             isIce,
+            settleRemindOn: require('../../../utils/openLoopSettlement.js').readSettleRemindOn(reg),
           })
           return st.openLoop || null
         })(),
@@ -1228,7 +1230,11 @@ Page({
         targetedInviteBusy: false,
       })
       this.syncSignupState()
-      if (gate.applicant && xingxuanRecruitLoop.isXingxuanOpenLoop(mp)) {
+      if (
+        gate.applicant &&
+        xingxuanRecruitLoop.isXingxuanOpenLoop(mp) &&
+        require('../../../utils/openLoopSettlement.js').readSettleRemindOn(reg)
+      ) {
         void openLoopReminderSync.syncOne(
           mp,
           gate.applicant,

@@ -2,7 +2,11 @@
  * 开环商单：进群后先记「群内进行中」，达人点「我已交片」才开始未结算提醒。
  * 闭环单不走这里。
  */
-import type { RegistryMpRecruitmentApplicant, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
+import type {
+  RegistryMpRecruitmentApplicant,
+  RegistryMpRecruitmentOrder,
+  RegistryMpTalentMember,
+} from './opsRegistryTypes.js'
 
 export type OpenLoopPhase = 'in_group' | 'pending' | 'settled' | 'dropped'
 
@@ -134,6 +138,7 @@ export function resolveOpenLoopCard(
   opts?: { selected?: boolean; selectionNotified?: boolean; nowMs?: number },
 ): OpenLoopCard | null {
   if (!isOpenLoopOrder(mp) || !applicant) return null
+  if (opts?.enabled !== true) return null
   if (String(applicant.taskStatus || '') === 'rejected') return null
   const selected = !!(opts?.selected || opts?.selectionNotified)
   if (!selected) return null
@@ -222,7 +227,7 @@ export function resolveOpenLoopCard(
 export function planOpenLoopReminders(
   mp: OrderLike,
   applicant: ApplicantLike,
-  opts?: { selected?: boolean; selectionNotified?: boolean; nowMs?: number },
+  opts?: { selected?: boolean; selectionNotified?: boolean; nowMs?: number; enabled?: boolean },
 ): OpenLoopReminderPlan | null {
   const card = resolveOpenLoopCard(mp, applicant, opts)
   if (!card || !applicant) return null
@@ -287,6 +292,21 @@ function patchApplicant(
   if (idx < 0) return { ok: false, error: 'applicant_not_found' }
   applicants[idx] = map(applicants[idx]!)
   return { ok: true, order: { ...order, applicants, updatedAt: now } }
+}
+
+export function setOpenLoopSettleRemind(
+  data: { mpTalentMembers?: RegistryMpTalentMember[] },
+  memberId: string,
+  enabled: boolean,
+): { ok: true } | { ok: false; error: string; status: number } {
+  const id = String(memberId || '').trim()
+  if (!id) return { ok: false, error: 'invalid_member', status: 400 }
+  const list = data.mpTalentMembers ?? []
+  const idx = list.findIndex((m) => m && String(m.id) === id)
+  if (idx < 0) return { ok: false, error: 'member_not_found', status: 404 }
+  list[idx] = { ...list[idx]!, openLoopSettleRemind: enabled === true }
+  data.mpTalentMembers = list
+  return { ok: true }
 }
 
 export function stampOpenLoopNotifiedAt(

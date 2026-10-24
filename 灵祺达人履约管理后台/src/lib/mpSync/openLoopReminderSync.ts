@@ -1,6 +1,6 @@
 import { planOpenLoopReminders, reminderPrefix } from '@merchant/lib/openLoopSettlement'
-import { cancelCalendarReminder, createCalendarReminder, listCalendarReminders } from './mpCalendarReminderApi'
-import { patchMpRecruitmentOrder } from '../mpApi'
+import { cancelCalendarReminder, createCalendarReminder, listCalendarReminders } from '../mpCalendarReminderApi'
+import { clearMpRegistryCache, patchMpRecruitmentOrder } from '../mpApi'
 
 const inflight = new Set<string>()
 
@@ -34,7 +34,7 @@ export async function syncOpenLoopReminder(
   if (!applicantId || !mpOrderId) return
   const key = `${mpOrderId}:${applicantId}`
   if (inflight.has(key)) return
-  const plan = planOpenLoopReminders(mp, applicant, { selected: true, selectionNotified })
+  const plan = planOpenLoopReminders(mp, applicant, { selected: true, selectionNotified, enabled: true })
   if (!plan) return
   inflight.add(key)
   try {
@@ -65,6 +65,73 @@ export async function syncOpenLoopReminder(
     /* 下次打开再试 */
   } finally {
     inflight.delete(key)
+  }
+}
+
+export async function cancelAllOpenLoopReminders(): Promise<void> {
+  const rows = await listCalendarReminders()
+  const pending = rows.filter(
+    (row) =>
+      row.status === 'pending' &&
+      (row.eventKind === 'open_loop_checkin' || row.eventKind === 'open_loop_settle'),
+  )
+  for (const row of pending) {
+    if (!row.id) continue
+    try {
+      await cancelCalendarReminder(row.id)
+    } catch {
+      /* 已取消 */
+    }
+  }
+}
+
+const SETTLE_REMIND_KEY = 'meoo_open_loop_settle_remind_v1'
+
+export function readSettleRemindOn(
+  reg: { mpTalentMembers?: Array<Record<string, unknown>> } | null | undefined,
+  memberId: string,
+): boolean {
+  const id = String(memberId || '').trim()
+  const list = Array.isArray(reg?.mpTalentMembers) ? reg!.mpTalentMembers! : []
+  if (id) {
+    const row = list.find((m) => m && String(m.id || '') === id)
+    if (row && typeof row.openLoopSettleRemind === 'boolean') return row.openLoopSettleRemind
+  }
+  try {
+    const cached = localStorage.getItem(`${SETTLE_REMIND_KEY}:${id || 'self'}`)
+    if (cached === '1' || cached === '0') return cached === '1'
+  } catch {
+    /* ignore */
+  }
+  return false
+}
+
+export function rememberSettleRemindOn(memberId: string, enabled: boolean): void {
+  try {
+    localStorage.setItem(`${SETTLE_REMIND_KEY}:${memberId || 'self'}`, enabled ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function setSettleRemind(memberId: string, enabled: boolean): Promise<void> {
+  const id = String(memberId || '').trim()
+  if (!id) throw new Error('请先完善达人资料')
+  const previous = readSettleRemindOn(null, id)
+  rememberSettleRemindOn(id, enabled)
+  try {
+    await patchMpRecruitmentOrder({ settleRemind: { memberId: id, enabled } })
+  } catch (err) {
+    rememberSettleRemindOn(id, previous)
+    throw err
+  }
+  clearMpRegistryCache()
+  if (!enabled) {
+    try {
+      await cancelAllOpenLoopReminders()
+    } catch {
+      /* 开关已关 */
+    }
   }
 }
 
