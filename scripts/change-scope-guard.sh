@@ -29,6 +29,7 @@ list_scopes() {
   visit_slot_roster 闭环排期：PR 先定可探店时段，按日期时段排人并备注、导出、打印
   publish_loop_first 发布招募第一页选择开环或闭环，表单里不再切换
   visit_photo_checkin 探店拍照签到：不限探店当天，达人拍照后即可签到
+  publish_link_cta   待回传链接报名页：把回传链接入口做得更明显
   recruit_video     探店成片上传
   recruit_share_poster_ai  招募创建成功分享页 AI 海报生图（星选+撮合）
   merchant_recruit_loop  商家 ERP 达人招募引导闭环（不改星选小程序/dr）
@@ -2512,6 +2513,18 @@ PublishWizard.tsx
 pages/publish/publish.wxml
 pages/publish/publish.js
 pages/publish/publish.wxss
+change-scope-guard
+PAT
+      ;;
+    publish_link_cta)
+      cat <<'PAT'
+mine-applications.wxml
+mine-applications.wxss
+detail/detail.wxml
+detail/detail.wxss
+OrdersPage.tsx
+VisitPublishLinkPanel.tsx
+index.css
 change-scope-guard
 PAT
       ;;

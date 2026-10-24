@@ -51,15 +51,16 @@ export default function VisitPublishLinkPanel({
 
   return (
     <FormSection title="回传发布链接">
-      <p className="text-xs text-[var(--shell-muted)]">
-        视频已通过 PR 审核。请发布作品并回传平台链接，AI 将核查标题与内容与商单的关联度，通过后订单完结。
+      <div className="rounded-2xl border-2 border-orange-500 bg-orange-50 p-4 space-y-3">
+      <p className="text-sm font-medium text-orange-800">
+        视频已通过审核。把已发布的作品链接粘贴到下面。
       </p>
-      {hint ? <p className="text-xs text-amber-700 rounded-lg bg-amber-50 px-3 py-2">{hint}</p> : null}
+      {hint ? <p className="text-sm text-amber-800 rounded-lg bg-amber-100 px-3 py-2">{hint}</p> : null}
       {publishPhase === 'link_failed' ? (
-        <p className="text-xs text-red-600 rounded-lg bg-red-50 px-3 py-2">上次链接未通过 AI 核查，请重新提交</p>
+        <p className="text-sm text-red-700 rounded-lg bg-red-50 px-3 py-2">上次链接未通过，请重新提交</p>
       ) : null}
       <textarea
-        className="w-full min-h-[88px] rounded-xl border border-slate-200 px-3 py-2 text-sm"
+        className="w-full min-h-[120px] rounded-xl border-2 border-orange-300 bg-white px-4 py-3 text-base text-slate-900"
         placeholder={publishLinkPlaceholder(platform)}
         value={url}
         onChange={(e) => setUrl(e.target.value)}
@@ -68,6 +69,7 @@ export default function VisitPublishLinkPanel({
       <BtnPrimary disabled={busy} onClick={() => void onSubmit()}>
         {busy ? 'AI 核查中…' : publishPhase === 'link_failed' ? '重新提交链接' : '提交链接 · AI 核查'}
       </BtnPrimary>
+      </div>
     </FormSection>
   )
 }

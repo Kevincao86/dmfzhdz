@@ -784,7 +784,7 @@ function TalentApplicationsPage() {
         <Link
           to={detailHref(a.mpOrderId)}
           state={detailReturnState}
-          className="app-order-card__btn app-order-card__btn--ice no-underline"
+          className="app-order-card__btn app-order-card__btn--link no-underline"
         >
           回传发布链接
         </Link>

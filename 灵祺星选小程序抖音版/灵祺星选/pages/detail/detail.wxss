@@ -868,6 +868,41 @@
   color: #0369a1;
 }
 
+.visit-link-box {
+  margin-top: 8rpx;
+  padding: 24rpx;
+  background: #fff7ed;
+  border: 3rpx solid #f97316;
+  border-radius: 20rpx;
+}
+
+.visit-link-box__title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #c2410c;
+}
+
+.visit-link-box__hint {
+  display: block;
+  margin: 10rpx 0 16rpx;
+  font-size: 24rpx;
+  line-height: 1.45;
+  color: #9a3412;
+}
+
+.visit-link-box__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 96rpx;
+  padding: 24rpx;
+  background: #fff;
+  border: 2rpx solid #fdba74;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  color: #0f172a;
+}
+
 .visit-plan-picker {
   display: flex;
   align-items: center;

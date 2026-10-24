@@ -6516,6 +6516,18 @@ html[data-theme='dark'] .hall-order-card__detail {
   box-shadow: 0 6px 16px -8px rgb(124 58 237 / 0.55);
 }
 
+.app-order-card__btn--link {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.7rem 1rem;
+  color: #c2410c;
+  background: #fff7ed;
+  border: 2px solid #f97316;
+  border-radius: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
 .app-order-card__applied {
   margin: 0.25rem 0 0;
   font-size: 0.6875rem;

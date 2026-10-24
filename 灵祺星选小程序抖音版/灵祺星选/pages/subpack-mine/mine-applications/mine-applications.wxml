@@ -1,0 +1,473 @@
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} app-list-page page-shell {{lqThemeClass}} foot-col" style="{{lqPageStyle}}">
+  <scroll-view wx:if="{{rows.length > 0 || !loading}}" class="app-platform-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="app-platform-bar">
+      <view
+        wx:for="{{platformGroupOptions}}"
+        wx:key="id"
+        class="app-platform-chip {{platformGroup === item.id ? 'app-platform-chip--on' : ''}}"
+        data-group="{{item.id}}"
+        bindtap="onPlatformGroupTap"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+  <scroll-view wx:if="{{rows.length > 0 || !loading}}" class="app-tab-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="app-tab-bar">
+      <view
+        wx:for="{{tabOptions}}"
+        wx:key="id"
+        class="app-tab {{filterTab === item.id ? 'app-tab--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onTabChange"
+      >
+        <text>{{item.label}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{rows.length > 0}}" class="app-list-toolbar">
+  <view class="app-search-bar">
+    <text class="app-search-icon" aria-hidden="true">⌕</text>
+    <input
+      class="app-search-input"
+      type="text"
+      placeholder="搜索商单、门店、城市、单号"
+      placeholder-class="app-search-ph"
+      value="{{keyword}}"
+      bindinput="onKeywordInput"
+      confirm-type="search"
+    />
+  </view>
+  <scroll-view class="app-filter-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+  <view class="app-filter-bar">
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{timeOptions}}" range-key="label" bindchange="onTimeFilterChange">
+        <view class="app-filter-item {{timeFilter !== 'all' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{timeFilterLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{orderTypeOptions}}" range-key="label" bindchange="onOrderTypeFilterChange">
+        <view class="app-filter-item {{orderTypeFilter !== 'all' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{orderTypeFilterLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
+        <view class="app-filter-item {{category !== '全部' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{categoryLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{progressOptions}}" range-key="label" bindchange="onProgressFilterChange">
+        <view class="app-filter-item {{progressFilter !== 'all' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{progressFilterLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
+        <view class="app-filter-item {{city !== '全部' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{regionLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+  </view>
+  </scroll-view>
+  </view>
+
+  <view wx:if="{{loading && rows.length === 0}}" class="card state-loading">
+    <text class="hint">加载报名记录…</text>
+  </view>
+
+  <view
+    wx:for="{{filteredRows}}"
+    wx:key="mpOrderId"
+    class="app-card"
+  >
+    <view class="app-card__top">
+      <view class="app-card__top-main">
+        <view class="app-card__head app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
+          <image class="app-card__icon" src="{{item.platformIcon}}" mode="aspectFill" />
+          <view class="app-card__main">
+            <text class="app-card__title">{{item.title}}</text>
+            <text class="app-card__sub">{{item.merchantName}} · {{item.storeName}}</text>
+          </view>
+        </view>
+        <view class="app-card__tags">
+          <text class="app-card__tag app-card__tag--status app-card__tag--status-{{item.displayStatusTone}}">{{item.displayStatusLabel || item.progressLabel}}</text>
+          <text wx:if="{{item.orderTypeLabel}}" class="app-card__tag app-card__tag--type">{{item.orderTypeLabel}}</text>
+          <text class="app-card__tag app-card__tag--hall">{{item.hallLabel}}</text>
+          <text class="app-card__tag">{{item.platform}}</text>
+          <text wx:if="{{item.videoStatusLabel}}" class="app-card__tag app-card__tag--video">{{item.videoStatusLabel}}</text>
+        </view>
+      </view>
+      <view wx:if="{{item.showFlowSteps}}" class="app-card__flow">
+        <view
+          wx:for="{{item.flowSteps}}"
+          wx:for-item="step"
+          wx:for-index="stepIdx"
+          wx:key="label"
+          class="app-card__flow-item app-card__flow-item--{{step.state}}"
+        >
+          <view wx:if="{{stepIdx > 0}}" class="app-card__flow-connector app-card__flow-connector--{{step.state}}"></view>
+          <view class="app-card__flow-dot-wrap">
+            <view class="app-card__flow-dot"></view>
+            <text wx:if="{{step.state === 'done'}}" class="app-card__flow-check">✓</text>
+          </view>
+          <text class="app-card__flow-label">{{step.label}}</text>
+        </view>
+      </view>
+      <view wx:else class="app-card__side-placeholder" aria-hidden="true"></view>
+    </view>
+    <view class="app-card__meta-grid">
+      <view class="app-card__meta-item app-card__meta-item--budget">
+        <text class="app-card__meta-label">酬劳</text>
+        <text class="app-card__meta-value">{{item.budgetText || '—'}}</text>
+      </view>
+      <view class="app-card__meta-item">
+        <text class="app-card__meta-label">地区</text>
+        <text class="app-card__meta-value">{{item.region || '—'}}</text>
+      </view>
+      <view class="app-card__meta-item">
+        <text class="app-card__meta-label">报名</text>
+        <text class="app-card__meta-value">{{item.appliedAt || '—'}}</text>
+      </view>
+      <view class="app-card__meta-item app-card__meta-item--order">
+        <text class="app-card__meta-label">单号</text>
+        <text class="app-card__meta-value">{{item.mpOrderId || item.merchantOrderNo || '—'}}</text>
+      </view>
+    </view>
+    <view wx:if="{{item.aiCheckStatusText}}" class="app-card__ai-banner">
+      <text class="app-card__ai-banner-text app-card__ai-banner-text--{{item.aiCheckStatusTone}}">{{item.aiCheckStatusText}}</text>
+    </view>
+    <view wx:if="{{item.videoStatus === 'rejected' && item.videoRejectReason}}" class="app-card__reject">
+      <text>驳回原因：{{item.videoRejectReason}}</text>
+    </view>
+    <view wx:if="{{item.scriptStatus === 'rejected' && item.scriptRejectReason}}" class="app-card__reject">
+      <text>驳回原因：{{item.scriptRejectReason}}</text>
+    </view>
+    <view wx:if="{{item.visitHint}}" class="app-card__visit-hint">
+      <text>{{item.visitHint}}</text>
+    </view>
+    <view class="app-card__actions">
+      <button
+        wx:if="{{item.showCancelBtn}}"
+        class="app-card__btn app-card__btn--view"
+        plain
+        hover-class="app-card__btn--hover"
+        loading="{{cancelApplyKey === item.mpOrderId + '-' + item.applicantId}}"
+        disabled="{{cancelApplyKey === item.mpOrderId + '-' + item.applicantId}}"
+        catchtap="onCancelApply"
+        data-id="{{item.mpOrderId}}"
+        data-applicant-id="{{item.applicantId}}"
+      >
+        取消报名
+      </button>
+      <button
+        wx:if="{{item.showConfirmBtn}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        确认档期
+      </button>
+      <button
+        wx:if="{{item.showAssignConfirmBtn}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        确认排期
+      </button>
+      <button
+        wx:if="{{item.showConfirmVisitBtn}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        loading="{{visitConfirmKey === item.mpOrderId + '-' + item.applicantId}}"
+        disabled="{{visitConfirmKey === item.mpOrderId + '-' + item.applicantId}}"
+        catchtap="onConfirmVisit"
+        data-id="{{item.mpOrderId}}"
+        data-applicant-id="{{item.applicantId}}"
+      >
+        {{visitConfirmKey === item.mpOrderId + '-' + item.applicantId ? '确认中…' : '确认已探店'}}
+      </button>
+      <button
+        wx:elif="{{item.showCheckInBtn}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        {{item.checkInReady ? '探店签到' : '查看探店排期'}}
+      </button>
+      <button
+        wx:if="{{item.isIce && item.progressId === 'completed'}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        查看详情
+      </button>
+      <button
+        wx:if="{{item.isIce && item.iceActionLabel && item.progressId !== 'completed'}}"
+        class="app-card__btn app-card__btn--ice"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        {{item.iceActionLabel}}
+      </button>
+      <view class="app-card__action-bottom">
+        <view class="app-card__btn-group">
+          <view wx:if="{{item.canSubmitScript}}" class="app-card__btn-grid">
+            <button
+              class="app-card__btn app-card__btn--grid app-card__btn--view"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onViewScript"
+              data-url="{{item.scriptUrl}}"
+              data-link="{{item.scriptLinkUrl}}"
+            >
+              查看文稿
+            </button>
+            <button
+              class="app-card__btn app-card__btn--grid app-card__btn--ai"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onAiDetect"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              AI检测
+            </button>
+            <button
+              class="app-card__btn app-card__btn--grid app-card__btn--submit"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onSubmitScript"
+              loading="{{submittingKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{submittingKey === item.mpOrderId + '-' + item.applicantId || uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{submittingKey === item.mpOrderId + '-' + item.applicantId ? '提交中…' : '提交'}}
+            </button>
+            <button
+              class="app-card__btn app-card__btn--grid app-card__btn--upload"
+              plain
+              hover-class="app-card__btn--hover"
+              bindtap="onUploadScript"
+              loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || submittingKey === item.mpOrderId + '-' + item.applicantId}}"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? '上传中…' : '重新上传'}}
+            </button>
+          </view>
+          <view wx:elif="{{item.canUploadScript}}" class="app-card__btn-row app-card__btn-row--triple">
+            <button
+              class="app-card__btn app-card__btn--upload app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              bindtap="onUploadScript"
+              loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId}}"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? '上传中…' : item.uploadBtnLabel}}
+            </button>
+            <button
+              class="app-card__btn app-card__btn--view app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onPasteScriptLink"
+              disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId}}"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              粘贴链接
+            </button>
+            <button
+              class="app-card__btn app-card__btn--ai app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onAiDetect"
+              loading="{{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId || uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId ? '检测中…' : 'AI检测'}}
+            </button>
+          </view>
+          <view wx:elif="{{item.canSubmitVideo}}" class="app-card__btn-grid">
+            <button
+              class="app-card__btn app-card__btn--grid app-card__btn--view"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onViewVideo"
+              data-id="{{item.mpOrderId}}"
+              data-url="{{item.visitVideoUrl}}"
+            >
+              查看视频
+            </button>
+            <button
+              class="app-card__btn app-card__btn--grid app-card__btn--ai"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onAiDetect"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              AI检测
+            </button>
+            <button
+              class="app-card__btn app-card__btn--grid app-card__btn--submit"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onSubmitVideo"
+              loading="{{submittingKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{submittingKey === item.mpOrderId + '-' + item.applicantId || uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{submittingKey === item.mpOrderId + '-' + item.applicantId ? '提交中…' : '提交'}}
+            </button>
+            <button
+              class="app-card__btn app-card__btn--grid app-card__btn--upload"
+              plain
+              hover-class="app-card__btn--hover"
+              bindtap="onUploadVideo"
+              loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || submittingKey === item.mpOrderId + '-' + item.applicantId}}"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? '上传中…' : '重新上传'}}
+            </button>
+          </view>
+          <view wx:elif="{{item.canViewVideo && item.canSubmitPublishLink}}" class="app-card__link-stack">
+            <button
+              class="app-card__btn app-card__btn--link"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="goDetail"
+              data-id="{{item.mpOrderId}}"
+            >
+              {{item.publishLinkBtnLabel}}
+            </button>
+            <view class="app-card__btn-row">
+              <button
+                class="app-card__btn app-card__btn--view app-card__btn--pair"
+                plain
+                hover-class="app-card__btn--hover"
+                catchtap="onViewVideo"
+                data-id="{{item.mpOrderId}}"
+                data-url="{{item.visitVideoUrl}}"
+              >
+                查看视频
+              </button>
+              <button
+                class="app-card__btn app-card__btn--ai app-card__btn--pair"
+                plain
+                hover-class="app-card__btn--hover"
+                catchtap="onAiDetect"
+                data-id="{{item.mpOrderId}}"
+                data-applicant-id="{{item.applicantId}}"
+              >
+                AI检测
+              </button>
+            </view>
+          </view>
+          <button
+            wx:elif="{{item.canSubmitPublishLink}}"
+            class="app-card__btn app-card__btn--link"
+            plain
+            hover-class="app-card__btn--hover"
+            catchtap="goDetail"
+            data-id="{{item.mpOrderId}}"
+          >
+            {{item.publishLinkBtnLabel}}
+          </button>
+          <view wx:elif="{{item.canViewVideo && item.videoStatus === 'pending'}}" class="app-card__btn-row">
+            <button
+              class="app-card__btn app-card__btn--view app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onViewVideo"
+              data-id="{{item.mpOrderId}}"
+              data-url="{{item.visitVideoUrl}}"
+            >
+              查看视频
+            </button>
+            <button
+              class="app-card__btn app-card__btn--ai app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onAiDetect"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              AI检测
+            </button>
+          </view>
+          <button
+            wx:elif="{{item.canUploadVideo}}"
+            class="app-card__btn app-card__btn--upload"
+            plain
+            hover-class="app-card__btn--hover"
+            bindtap="onUploadVideo"
+            loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+            disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+            data-id="{{item.mpOrderId}}"
+            data-applicant-id="{{item.applicantId}}"
+          >
+            {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? '上传中…' : item.uploadBtnLabel}}
+          </button>
+        </view>
+        <view class="app-card__foot app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
+          <text>查看商单详情</text>
+          <text class="app-card__link">›</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{mineGuestMode}}" class="card state-empty">
+    <text class="state-empty-icon">🔒</text>
+    <text class="empty-title">没有数据，请登录后查看</text>
+    <text class="hint">请返回「我的」完成抖音登录后再查看报名记录</text>
+  </view>
+
+  <view wx:elif="{{!loading && rows.length === 0}}" class="card state-empty">
+    <text class="state-empty-icon">📋</text>
+    <text class="empty-title">暂无报名记录</text>
+    <text class="hint">在招募大厅报名后，将在此展示商单与报名状态</text>
+  </view>
+
+  <view wx:if="{{!loading && rows.length > 0 && filteredRows.length === 0}}" class="card state-empty">
+    <text class="hint">当前 Tab 或筛选条件下暂无报名</text>
+  </view>
+  <mp-privacy-gate show="{{showMpPrivacyGate}}" bind:agreed="onMpPrivacyGateAgreed" bind:close="onMpPrivacyGateClose" />
+  <site-icp-footer />
+</view>
