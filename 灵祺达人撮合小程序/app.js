@@ -1,6 +1,41 @@
 const config = require('./utils/config.js')
 const mpRuntime = require('./utils/mpRuntime.js')
 const mpPrivacyAuthorize = require('./utils/mpPrivacyAuthorize.js')
+const ossDisplay = require('./utils/mpOssDisplayUrl.js')
+
+function patchOssSetData(ctx) {
+  if (!ctx || ctx.__ossDisplaySetData || typeof ctx.setData !== 'function') return
+  const rawSetData = ctx.setData
+  ctx.setData = function (data, cb) {
+    const next = data && typeof data === 'object' ? ossDisplay.rewriteOssDisplayUrlDeep(data) : data
+    return rawSetData.call(this, next, cb)
+  }
+  ctx.__ossDisplaySetData = true
+}
+
+function patchWxRead(name) {
+  if (typeof wx === 'undefined' || typeof wx[name] !== 'function' || wx[name].__ossDisplayPatched) return
+  const raw = wx[name]
+  const wrapped = function (opts) {
+    if (!opts || typeof opts !== 'object') return raw.call(wx, opts)
+    const next = Object.assign({}, opts)
+    if (typeof next.url === 'string') next.url = ossDisplay.rewriteOssDisplayUrl(next.url)
+    if (typeof next.src === 'string') next.src = ossDisplay.rewriteOssDisplayUrl(next.src)
+    if (typeof next.current === 'string') next.current = ossDisplay.rewriteOssDisplayUrl(next.current)
+    if (Array.isArray(next.urls)) {
+      next.urls = next.urls.map((u) => ossDisplay.rewriteOssDisplayUrl(u))
+    }
+    return raw.call(wx, next)
+  }
+  wrapped.__ossDisplayPatched = true
+  try {
+    wx[name] = wrapped
+  } catch (_) {}
+}
+
+patchWxRead('downloadFile')
+patchWxRead('getImageInfo')
+patchWxRead('previewImage')
 
 const _NativePage = Page
 Page = function (opts) {
@@ -9,6 +44,12 @@ Page = function (opts) {
     const accentTheme = require('./utils/accentTheme.js')
     pageOpts.data = Object.assign({}, accentTheme.viewModel(), pageOpts.data || {})
   } catch (_) {}
+  pageOpts.data = ossDisplay.rewriteOssDisplayUrlDeep(pageOpts.data || {})
+  const userOnLoad = pageOpts.onLoad
+  pageOpts.onLoad = function () {
+    patchOssSetData(this)
+    if (typeof userOnLoad === 'function') return userOnLoad.apply(this, arguments)
+  }
   const userOnShow = pageOpts.onShow
   pageOpts.onShow = function () {
     const ret = typeof userOnShow === 'function' ? userOnShow.apply(this, arguments) : undefined
@@ -18,6 +59,21 @@ Page = function (opts) {
     return ret
   }
   return _NativePage(pageOpts)
+}
+
+const _NativeComponent = Component
+Component = function (opts) {
+  const compOpts = opts || {}
+  if (compOpts.data) compOpts.data = ossDisplay.rewriteOssDisplayUrlDeep(compOpts.data)
+  const lifetimes = compOpts.lifetimes || (compOpts.lifetimes = {})
+  const userCreated = lifetimes.created || compOpts.created
+  const created = function () {
+    patchOssSetData(this)
+    if (typeof userCreated === 'function') return userCreated.apply(this, arguments)
+  }
+  lifetimes.created = created
+  compOpts.created = created
+  return _NativeComponent(compOpts)
 }
 
 function currentRoute() {

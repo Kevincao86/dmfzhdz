@@ -3,6 +3,7 @@
  */
 const recruitCoverLib = require('./recruitCoverLibrary.js')
 const mpRuntime = require('./mpRuntime.js')
+const ossDisplay = require('./mpOssDisplayUrl.js')
 const { joinUserDataPath, readUserDataPath } = require('./mpUserDataPath.js')
 
 const SHARE_W = 500
@@ -160,7 +161,7 @@ function ensureLocalImagePath(src) {
   if (!s) return Promise.reject(new Error('empty_src'))
   if (s.startsWith('data:image/')) return writeDataUrlToTemp(s)
   if (/^https?:\/\//i.test(s)) {
-    const url = normalizeShareRemoteUrl(s) || s
+    const url = ossDisplay.rewriteOssDisplayUrl(normalizeShareRemoteUrl(s) || s)
     return new Promise((resolve, reject) => {
       wx.downloadFile({
         url,

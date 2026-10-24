@@ -38,13 +38,30 @@ if [[ -d "$FESTIVAL_SRC" ]]; then
   sudo cp -f "$FESTIVAL_SRC"/*.jpg "$STATIC_ROOT/festivals/" 2>/dev/null || true
 fi
 
-for f in hero-talent.png hero-talent-v2-search.png hero-shoot.png hero-edit.png home-banner-clouds.png; do
+for f in hero-talent.png hero-talent-v2-search.png hero-shoot.png hero-edit.png home-banner-clouds.png poster-default.jpg kpi-recruit.jpg kpi-urgent.jpg kpi-today.jpg; do
   if [[ -f "$MP/images/home/$f" ]]; then
     sudo cp -f "$MP/images/home/$f" "$STATIC_ROOT/home/$f"
   elif [[ -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/home/$f" ]]; then
     sudo cp -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/home/$f" "$STATIC_ROOT/home/$f"
   fi
 done
+
+if [[ -d "$MP/images/mine-icons" ]]; then
+  sudo mkdir -p "$STATIC_ROOT/mine-icons"
+  sudo cp -f "$MP/images/mine-icons"/*.png "$STATIC_ROOT/mine-icons/"
+fi
+if [[ -d "$MP/images/ai-addon-icons" ]]; then
+  sudo mkdir -p "$STATIC_ROOT/ai-addon-icons"
+  sudo cp -f "$MP/images/ai-addon-icons"/*.png "$STATIC_ROOT/ai-addon-icons/"
+fi
+if [[ -f "$MP/images/share/talent-lift-poster.jpg" ]]; then
+  sudo cp -f "$MP/images/share/talent-lift-poster.jpg" "$STATIC_ROOT/share/talent-lift-poster.jpg"
+fi
+AVATAR_SRC="$ROOT/web版/merchant-erp/public/digital-human/avatars"
+if [[ -d "$AVATAR_SRC" ]]; then
+  sudo mkdir -p "$STATIC_ROOT/web-static/merchant/digital-human/avatars"
+  sudo cp -f "$AVATAR_SRC"/*.jpg "$STATIC_ROOT/web-static/merchant/digital-human/avatars/"
+fi
 
 if [[ -d "$MP/images/auth" ]]; then
   sudo cp -f "$MP/images/auth"/*.{jpg,jpeg,png} "$STATIC_ROOT/auth/" 2>/dev/null || true
@@ -96,7 +113,12 @@ for path in \
   "/recruit-covers/share/share-cover-ai-match.jpg" \
   "/recruit-covers/share/merchant-notify-talent-review.png" \
   "/recruit-covers/share/merchant-notify-content-review.png" \
-  "/recruit-covers/posters/style-sunset-v1.png"; do
+  "/recruit-covers/posters/style-sunset-v1.png" \
+  "/recruit-covers/mine-icons/info.png" \
+  "/recruit-covers/home/kpi-recruit.jpg" \
+  "/recruit-covers/share/talent-lift-poster.jpg" \
+  "/recruit-covers/ai-addon-icons/shortvideo.png" \
+  "/recruit-covers/web-static/merchant/digital-human/avatars/av-real-1.jpg"; do
   CODE="$(curl -sS -L -o /dev/null -w '%{http_code}' -H 'Host: mofangdianai.com' "http://127.0.0.1${path}" || echo 000)"
   echo "  127.0.0.1${path} -> HTTP $CODE"
   [[ "$CODE" == "200" ]] || exit 1

@@ -6,6 +6,7 @@ const posterCore = require('./recruitmentSharePosterCore.js')
 const prRecruitQr = require('./prRecruitQr.js')
 const hallFilters = require('./recruitmentHallFilters.js')
 const ossBase = require('./recruitCoverOssBase.js')
+const ossDisplay = require('./mpOssDisplayUrl.js')
 
 const CARD_W = 750
 const CARD_H = 600
@@ -148,7 +149,7 @@ function downloadFile(url) {
       return
     }
     wx.downloadFile({
-      url,
+      url: ossDisplay.rewriteOssDisplayUrl(url),
       success(res) {
         if (res.statusCode === 200 && res.tempFilePath) resolve(res.tempFilePath)
         else reject(new Error('bg_download_failed'))

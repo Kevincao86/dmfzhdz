@@ -155,12 +155,13 @@ async function uploadIceLocalFile(filePath, fileName, contentType) {
 }
 
 async function postIcePipeline(body) {
+  const payload = require('./mpOssDisplayUrl.js').restoreOssCanonicalUrlDeep(body)
   const r = await postPaths(
     [
       '/api/meoo-merchant-ai-video-ice-pipeline',
       '/api/merchant/ai/video/ice/pipeline',
     ],
-    body,
+    payload,
     mpAuthHeaders(),
   )
   if (!r.ok) return r
