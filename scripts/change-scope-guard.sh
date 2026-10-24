@@ -2480,8 +2480,8 @@ PAT
       cat <<'PAT'
 pages/index/index.js
 ecs-sync-mp-recruit-covers-static.sh
-entry-calendar.jpg
-entry-ai-review.jpg
+images/home/entry-
+poster-pr.jpg
 change-scope-guard
 PAT
       ;;

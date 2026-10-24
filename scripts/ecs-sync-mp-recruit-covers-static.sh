@@ -40,7 +40,9 @@ fi
 
 shopt -s nullglob
 for f in "$MP/images/home"/entry-*.jpg "$MP/images/home"/poster-pr.jpg; do
-  sudo cp -f "$f" "$STATIC_ROOT/home/"
+  if [[ -f "$f" ]]; then
+    sudo cp -f "$f" "$STATIC_ROOT/home/"
+  fi
 done
 shopt -u nullglob
 
