@@ -407,6 +407,11 @@
   -webkit-text-fill-color: #fafafa !important;
 }
 
+.mine-page.lq-accent-dark .wb-profile-meta .wb-nick-input {
+  background-color: var(--lq-card) !important;
+  background: var(--lq-card) !important;
+}
+
 .mine-page.lq-accent-dark .mine-vip-hint,
 .mine-page.lq-accent-dark .mine-vip-label,
 .mine-page.lq-accent-dark .mine-more-sub,
@@ -1155,9 +1160,19 @@
   background: transparent;
 }
 
+.mine-page.lq-accent-on .id-sheet-mask {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
 .id-sheet-mask-bg {
   flex: 1;
   background: rgba(45, 27, 78, 0.35);
+}
+
+.mine-page.lq-accent-on .id-sheet-mask-bg {
+  background: rgba(0, 0, 0, 0.45) !important;
+  background-color: rgba(0, 0, 0, 0.45) !important;
 }
 
 .mine-more {
