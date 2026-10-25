@@ -304,6 +304,26 @@ function buildDetailDisplayFields(view, mp, opts) {
   }
 }
 
+function settleFieldsFromApplicant(applicant) {
+  const openLoop = require('../../../utils/openLoopSettlement.js')
+  const on = !!(applicant && applicant.orderSettleRemindOn === true)
+  const presetRaw = String((applicant && applicant.orderSettleRemindPreset) || '')
+  const preset = presetRaw === '15' || presetRaw === '30' || presetRaw === 'custom' ? presetRaw : '7'
+  const dateKey = String((applicant && applicant.orderSettleRemindDate) || '')
+  const timeRaw = String((applicant && applicant.orderSettleRemindTime) || '10:00')
+  const timeLabel = /^([01]\d|2[0-3]):[0-5]\d$/.test(timeRaw) ? timeRaw : '10:00'
+  const day = on ? openLoop.orderSettleMonthDay(dateKey) : ''
+  return {
+    settleRemindOn: on,
+    settleRemindPreset: preset,
+    settleRemindDate: dateKey,
+    settleRemindTime: timeLabel,
+    settleRemindLabel: day ? `${day} ${timeLabel}` : '',
+    settleRemindMin: openLoop.orderSettleDateKey(0),
+    settleRemindBusy: false,
+  }
+}
+
 Page({
   data: {
     subNavTitle: '招募详情',
@@ -320,6 +340,14 @@ Page({
     isOpenLoop: false,
     openLoop: null,
     openLoopApplicantId: '',
+    isPr: false,
+    settleRemindOn: false,
+    settleRemindPreset: '7',
+    settleRemindDate: '',
+    settleRemindTime: '10:00',
+    settleRemindLabel: '',
+    settleRemindMin: '',
+    settleRemindBusy: false,
     fromApply: false,
     applicationApproved: false,
     openLoopGroupQr: '',
@@ -1055,7 +1083,6 @@ Page({
         visitApplicantId = String(gate.applicant.id || '').trim()
         const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, id, mp)
         const visitDisplay = talentAppStatus.resolveApplicationDisplayStatus(mp, gate.applicant, id, {
-          settleRemindOn: require('../../../utils/openLoopSettlement.js').readSettleRemindOn(reg),
           selectionNotified: notifiedIds.has(visitApplicantId),
           isIce: false,
         })
@@ -1173,11 +1200,11 @@ Page({
           const st = talentAppStatus.resolveApplicationDisplayStatus(mp, gate.applicant, id, {
             selectionNotified: talentAppStatus.isApplicantSelectionNotified(mp, gate.applicant),
             isIce,
-            settleRemindOn: require('../../../utils/openLoopSettlement.js').readSettleRemindOn(reg),
           })
           return st.openLoop || null
         })(),
         openLoopApplicantId: gate.applicant ? String(gate.applicant.id || '') : '',
+        ...settleFieldsFromApplicant(gate.applicant),
         fromApply: !!this._fromApply,
         applicationApproved: gate.reason === 'approved',
         openLoopGroupQr:
@@ -1230,17 +1257,6 @@ Page({
         targetedInviteBusy: false,
       })
       this.syncSignupState()
-      if (
-        gate.applicant &&
-        xingxuanRecruitLoop.isXingxuanOpenLoop(mp) &&
-        require('../../../utils/openLoopSettlement.js').readSettleRemindOn(reg)
-      ) {
-        void openLoopReminderSync.syncOne(
-          mp,
-          gate.applicant,
-          talentAppStatus.isApplicantSelectionNotified(mp, gate.applicant),
-        )
-      }
       this.startSignupCountdownTimer()
       this.renderPrQrImage()
       if (this._detailViewBumpId !== id) {
@@ -1700,6 +1716,65 @@ Page({
           .catch((e) => wx.showToast({ title: String((e && e.message) || e).slice(0, 24), icon: 'none' }))
           .finally(() => that.setData({ visitBusy: false }))
       },
+    })
+  },
+  _saveOrderSettle(input) {
+    const mp = this.data.mpOrder
+    const applicantId = String(this.data.openLoopApplicantId || '').trim()
+    if (!mp || !applicantId || this.data.settleRemindBusy) return
+    const applicant = { id: applicantId, orderSettleCalendarEventId: '' }
+    const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
+    const found = applicants.find((row) => row && String(row.id || '') === applicantId)
+    if (found && found.orderSettleCalendarEventId) applicant.orderSettleCalendarEventId = found.orderSettleCalendarEventId
+    this.setData({ settleRemindBusy: true })
+    wx.showLoading({ title: '保存中', mask: true })
+    openLoopReminderSync
+      .saveOrderSettleRemind(mp, applicant, input)
+      .then(() => {
+        wx.hideLoading()
+        wx.showToast({ title: input && input.enabled ? '已写入商单日历' : '已关闭结算提醒', icon: 'none' })
+        return this.loadOrder(this.data.id)
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        this.setData(settleFieldsFromApplicant(found || null))
+        wx.showToast({ title: String((err && err.message) || '保存失败').slice(0, 24), icon: 'none' })
+      })
+  },
+  onOrderSettleRemindToggle(e) {
+    const enabled = !!(e.detail && e.detail.value)
+    this.setData({ settleRemindOn: enabled })
+    if (!enabled) this._saveOrderSettle({ enabled: false })
+  },
+  onOrderSettlePreset(e) {
+    const preset = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.preset) || '')
+    if (preset === 'custom') {
+      const openLoop = require('../../../utils/openLoopSettlement.js')
+      this.setData({
+        settleRemindPreset: 'custom',
+        settleRemindDate: this.data.settleRemindDate || openLoop.settlementDateKeyForPreset('7'),
+        settleRemindTime: this.data.settleRemindTime || '10:00',
+      })
+      return
+    }
+    if (preset !== '7' && preset !== '15' && preset !== '30') return
+    const openLoop = require('../../../utils/openLoopSettlement.js')
+    const dateKey = openLoop.settlementDateKeyForPreset(preset)
+    this.setData({ settleRemindPreset: preset, settleRemindDate: dateKey, settleRemindTime: '10:00' })
+    this._saveOrderSettle({ enabled: true, preset, dateKey, timeLabel: '10:00' })
+  },
+  onOrderSettleDate(e) {
+    this.setData({ settleRemindDate: String((e.detail && e.detail.value) || '') })
+  },
+  onOrderSettleTime(e) {
+    this.setData({ settleRemindTime: String((e.detail && e.detail.value) || '10:00') })
+  },
+  onOrderSettleSaveCustom() {
+    this._saveOrderSettle({
+      enabled: true,
+      preset: 'custom',
+      dateKey: this.data.settleRemindDate,
+      timeLabel: this.data.settleRemindTime || '10:00',
     })
   },
   onOpenLoopAction(e) {

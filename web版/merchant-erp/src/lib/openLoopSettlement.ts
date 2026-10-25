@@ -138,7 +138,6 @@ export function resolveOpenLoopCard(
   opts?: { selected?: boolean; selectionNotified?: boolean; nowMs?: number; enabled?: boolean },
 ): OpenLoopCard | null {
   if (!isOpenLoopOrder(mp) || !applicant) return null
-  if (opts?.enabled !== true) return null
   if (String(applicant.taskStatus || '') === 'rejected') return null
   const selected = !!(opts?.selected || opts?.selectionNotified)
   if (!selected) return null
@@ -281,6 +280,104 @@ export function planOpenLoopReminders(
   return null
 }
 
+export type OrderSettlePreset = '7' | '15' | '30' | 'custom'
+
+export function orderSettleDateKey(plusDays: number, now = new Date()): string {
+  const days = Number.isFinite(plusDays) ? Math.trunc(plusDays) : 0
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, 12, 0, 0, 0)
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+export function settlementDateKeyForPreset(preset: '7' | '15' | '30', now = new Date()): string {
+  const days = preset === '15' ? 15 : preset === '30' ? 30 : 7
+  return orderSettleDateKey(days, now)
+}
+
+export function orderSettleMonthDay(dateKey: string): string {
+  const m = String(dateKey || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return ''
+  return `${Number(m[2])}月${Number(m[3])}日`
+}
+
+export function orderSettleRemindAtIso(dateKey: string, timeLabel: string): string {
+  const d = String(dateKey || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const t = String(timeLabel || '').trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/)
+  if (!d || !t) return ''
+  const dt = new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]), Number(t[1]), Number(t[2]), 0, 0)
+  if (!Number.isFinite(dt.getTime())) return ''
+  return dt.toISOString()
+}
+
+function clearedOrderSettleRemind(): Pick<
+  RegistryMpRecruitmentApplicant,
+  | 'orderSettleRemindOn'
+  | 'orderSettleRemindPreset'
+  | 'orderSettleRemindDate'
+  | 'orderSettleRemindTime'
+  | 'orderSettleCalendarEventId'
+> {
+  return {
+    orderSettleRemindOn: false,
+    orderSettleRemindPreset: '',
+    orderSettleRemindDate: '',
+    orderSettleRemindTime: '',
+    orderSettleCalendarEventId: '',
+  }
+}
+
+const ORDER_SETTLE_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+const ORDER_SETTLE_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+const ORDER_SETTLE_EVENT_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export function applyOrderSettleRemind(
+  order: RegistryMpRecruitmentOrder,
+  input: {
+    applicantId?: string
+    enabled?: boolean
+    preset?: string
+    dateKey?: string
+    timeLabel?: string
+    calendarEventId?: string
+  },
+  now: Date,
+): { ok: true; order: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
+  const aid = String(input?.applicantId || '').trim()
+  if (!aid) return { ok: false, error: 'invalid_order_settle' }
+  const nowText = now.toLocaleString('zh-CN', { hour12: false })
+  if (input?.enabled !== true) {
+    return patchApplicant(order, aid, nowText, (row) => ({ ...row, ...clearedOrderSettleRemind() }))
+  }
+  const presetRaw = String(input.preset || '').trim()
+  const preset: OrderSettlePreset | '' =
+    presetRaw === '7' || presetRaw === '15' || presetRaw === '30' || presetRaw === 'custom' ? presetRaw : ''
+  if (!preset) return { ok: false, error: 'invalid_order_settle' }
+  const dateKey = String(input.dateKey || '').trim()
+  const dm = dateKey.match(ORDER_SETTLE_DATE_RE)
+  if (!dm) return { ok: false, error: 'invalid_order_settle' }
+  const parsed = new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]))
+  if (
+    parsed.getFullYear() !== Number(dm[1]) ||
+    parsed.getMonth() !== Number(dm[2]) - 1 ||
+    parsed.getDate() !== Number(dm[3])
+  ) {
+    return { ok: false, error: 'invalid_order_settle' }
+  }
+  const timeLabel = String(input.timeLabel || '10:00').trim()
+  if (!ORDER_SETTLE_TIME_RE.test(timeLabel)) return { ok: false, error: 'invalid_order_settle' }
+  const eventId = String(input.calendarEventId || '').trim()
+  if (eventId && !ORDER_SETTLE_EVENT_RE.test(eventId)) return { ok: false, error: 'invalid_order_settle' }
+  return patchApplicant(order, aid, nowText, (row) => ({
+    ...row,
+    orderSettleRemindOn: true,
+    orderSettleRemindPreset: preset,
+    orderSettleRemindDate: dateKey,
+    orderSettleRemindTime: timeLabel,
+    orderSettleCalendarEventId: eventId,
+  }))
+}
+
 function patchApplicant(
   order: RegistryMpRecruitmentOrder,
   applicantId: string,
@@ -377,6 +474,7 @@ export function applyOpenLoopSettleAction(
         ...row,
         openLoopSettlementStatus: 'dropped',
         openLoopCheckinClosed: true,
+        ...clearedOrderSettleRemind(),
       }
     }
     if (act === 'settled') {
@@ -386,6 +484,7 @@ export function applyOpenLoopSettleAction(
         openLoopSettlementStatus: 'settled',
         openLoopSettledAt: iso,
         openLoopRemindMuted: true,
+        ...clearedOrderSettleRemind(),
       }
     }
     if (act === 'mute') {

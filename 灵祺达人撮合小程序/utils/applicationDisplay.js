@@ -360,7 +360,6 @@ function enrichTalentApplicationRow(localApp, mp, reg, extra) {
     isIce,
     withdrawnAt,
     localApplicantId: applicantId || undefined,
-    settleRemindOn: require('./openLoopSettlement.js').readSettleRemindOn(reg),
     prCancelled,
   })
   const iceVerifyMode = mp ? getIceVerifyMode(mp) : 'ai'
@@ -434,6 +433,11 @@ function enrichTalentApplicationRow(localApp, mp, reg, extra) {
     editVisitMode: displayStatus.editVisitMode,
     visitHint: displayStatus.visitHint,
     openLoop: displayStatus.openLoop || null,
+    settleRemindLabel: (() => {
+      const dateKey = me && me.orderSettleRemindOn === true ? String(me.orderSettleRemindDate || '') : ''
+      const day = dateKey ? require('./openLoopSettlement.js').orderSettleMonthDay(dateKey) : ''
+      return day ? `结算日 ${day}` : ''
+    })(),
     videoStatusLabel: isScript
       ? scriptStatus
         ? scriptUpload.scriptStatusLabel(scriptStatus) || displayStatus.label

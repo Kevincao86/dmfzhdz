@@ -6,7 +6,7 @@ import type {
 } from './opsRegistryTypes.js'
 import { filterSelectedIdsToApplicants, pruneApplicantIdRefsOnOrder } from './mpApplicantIdentity.js'
 import { normalizeMarketingCenter, reconcileCashGrantsWithOrders } from './marketingCampaignCore.js'
-import { applyOpenLoopSettleAction, setOpenLoopSettleRemind } from './openLoopSettlement.js'
+import { applyOpenLoopSettleAction, applyOrderSettleRemind, setOpenLoopSettleRemind } from './openLoopSettlement.js'
 
 export type MpRecruitmentPatchBody = {
   id?: string
@@ -21,6 +21,15 @@ export type MpRecruitmentPatchBody = {
   talentInvoice?: { applicantId?: string; url?: string; fileName?: string }
   /** 开环：达人交片 / 结算自记 */
   openLoopSettle?: { applicantId?: string; action?: string }
+  /** 这笔报名的结算日。写入商单日历由客户端完成，这里只记选择 */
+  orderSettleRemind?: {
+    applicantId?: string
+    enabled?: boolean
+    preset?: string
+    dateKey?: string
+    timeLabel?: string
+    calendarEventId?: string
+  }
   /** 达人打开或关闭商单结算提醒，不需要订单号 */
   settleRemind?: { memberId?: string; enabled?: boolean }
 }
@@ -119,12 +128,13 @@ export function patchMpRecruitmentOrderInSnapshot(
   const hasCpsLinkage = body.cpsLinkage !== undefined
   const hasTalentInvoice = body.talentInvoice != null
   const hasOpenLoopSettle = body.openLoopSettle != null
+  const hasOrderSettleRemind = body.orderSettleRemind != null
   const MAX_GROUP_QR_LEN = 120_000
   if (!id) return { ok: false, error: 'invalid_patch', status: 400 }
   if (hasGroupQr && String(body.groupQrImage || '').length > MAX_GROUP_QR_LEN) {
     return { ok: false, error: 'group_qr_too_large', status: 400 }
   }
-  if (!order && !status && !applicants && !selectedApplicantIds && !hasGroupQr && !hasCpsLinkage && !hasTalentInvoice && !hasOpenLoopSettle) {
+  if (!order && !status && !applicants && !selectedApplicantIds && !hasGroupQr && !hasCpsLinkage && !hasTalentInvoice && !hasOpenLoopSettle && !hasOrderSettleRemind) {
     return { ok: false, error: 'invalid_patch', status: 400 }
   }
   if (
@@ -153,6 +163,12 @@ export function patchMpRecruitmentOrderInSnapshot(
       String(body.openLoopSettle?.action || ''),
       new Date(),
     )
+    if (!result.ok) return { ok: false, error: result.error, status: result.error === 'applicant_not_found' ? 404 : 400 }
+    data.mpRecruitmentOrders[idx] = result.order
+    return { ok: true }
+  }
+  if (hasOrderSettleRemind) {
+    const result = applyOrderSettleRemind(cur, body.orderSettleRemind || {}, new Date())
     if (!result.ok) return { ok: false, error: result.error, status: result.error === 'applicant_not_found' ? 404 : 400 }
     data.mpRecruitmentOrders[idx] = result.order
     return { ok: true }

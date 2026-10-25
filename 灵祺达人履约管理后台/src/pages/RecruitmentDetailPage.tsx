@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement, cancelMpRecruitmentApply } from '../lib/mpApi'
-import { readSettleRemindOn, submitOpenLoopAction, syncOpenLoopReminder } from '../lib/mpSync/openLoopReminderSync'
+import { orderSettleDateKey, orderSettleMonthDay, settlementDateKeyForPreset } from '@merchant/lib/openLoopSettlement'
+import { saveOrderSettleRemind, submitOpenLoopAction } from '../lib/mpSync/openLoopReminderSync'
 import { detailCacheIsCurrent, readHallOrders, readOrderDetail, writeOrderDetail } from '../lib/mpRecruitment/hallOrderCache'
 import { resolveSignupDeadlineMsFromMp } from '../lib/mpRecruitment/listFilters'
 import { getAccount, getActiveRole } from '../lib/mpSession'
@@ -131,6 +132,12 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
   const [targetedInviteStatus, setTargetedInviteStatus] = useState('')
   const [targetedInviteStatusLabel, setTargetedInviteStatusLabel] = useState('')
   const [orderFavorited, setOrderFavorited] = useState(false)
+  const [settleOn, setSettleOn] = useState(false)
+  const [settlePreset, setSettlePreset] = useState<'7' | '15' | '30' | 'custom'>('7')
+  const [settleDate, setSettleDate] = useState('')
+  const [settleTime, setSettleTime] = useState('10:00')
+  const [settleBusy, setSettleBusy] = useState(false)
+  const [settleMsg, setSettleMsg] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const detailViewBumpRef = useRef('')
   const appliedFromUrl = search.get('applied') === '1'
@@ -201,31 +208,27 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
           {
             selectionNotified: visitSelectionNotified,
             isIce: false,
-            settleRemindOn: readSettleRemindOn(
-              mpRegistry as { mpTalentMembers?: Array<Record<string, unknown>> } | null,
-              resolveTalentMemberId(),
-            ),
           },
         )
       : null
+  const settleSavedKey = myApplicant
+    ? [
+        String((myApplicant as Record<string, unknown>).id || ''),
+        (myApplicant as Record<string, unknown>).orderSettleRemindOn === true ? '1' : '0',
+        String((myApplicant as Record<string, unknown>).orderSettleRemindPreset || ''),
+        String((myApplicant as Record<string, unknown>).orderSettleRemindDate || ''),
+        String((myApplicant as Record<string, unknown>).orderSettleRemindTime || ''),
+      ].join('|')
+    : ''
   useEffect(() => {
-    if (role !== 'talent' || !mpRaw || !myApplicant) return
-    const phase = visitDisplay?.openLoop?.phase
-    if (phase !== 'in_group' && phase !== 'pending') return
-    void syncOpenLoopReminder(
-      mpRaw,
-      myApplicant as Record<string, unknown>,
-      visitSelectionNotified,
-    )
-  }, [
-    role,
-    id,
-    visitApplicantId,
-    visitSelectionNotified,
-    visitDisplay?.openLoop?.phase,
-    myApplicant,
-    mpRaw,
-  ])
+    const row = (myApplicant || null) as Record<string, unknown> | null
+    const preset = String(row?.orderSettleRemindPreset || '')
+    setSettleOn(row?.orderSettleRemindOn === true)
+    setSettlePreset(preset === '15' || preset === '30' || preset === 'custom' ? preset : '7')
+    setSettleDate(String(row?.orderSettleRemindDate || ''))
+    setSettleTime(String(row?.orderSettleRemindTime || '10:00') || '10:00')
+    setSettleMsg('')
+  }, [settleSavedKey])
   const isEditIce = mpRaw ? isEditTeamIceMpOrder(mpRaw) : false
   const isPackIce = mpRaw ? isPackSlotIceOrder(mpRaw) : false
   const iceSlotsFull =
@@ -581,6 +584,37 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
     setTargetedInviteStatusLabel(inviteState.targetedInviteStatusLabel)
   }
 
+  function restoreSettleFromApplicant() {
+    const row = (myApplicant || null) as Record<string, unknown> | null
+    const preset = String(row?.orderSettleRemindPreset || '')
+    setSettleOn(row?.orderSettleRemindOn === true)
+    setSettlePreset(preset === '15' || preset === '30' || preset === 'custom' ? preset : '7')
+    setSettleDate(String(row?.orderSettleRemindDate || ''))
+    setSettleTime(String(row?.orderSettleRemindTime || '10:00') || '10:00')
+  }
+
+  async function persistSettle(input: {
+    enabled: boolean
+    preset?: '7' | '15' | '30' | 'custom'
+    dateKey?: string
+    timeLabel?: string
+  }) {
+    if (!mpRaw || !myApplicant || settleBusy) return
+    setSettleBusy(true)
+    setSettleMsg('')
+    try {
+      await saveOrderSettleRemind(mpRaw, myApplicant as Record<string, unknown>, input)
+      clearMpRegistryCache()
+      setSettleMsg(input.enabled ? '已按结算日写入商单日历' : '已关闭这笔商单的结算提醒')
+      await reloadOrder()
+    } catch (err) {
+      restoreSettleFromApplicant()
+      window.alert(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setSettleBusy(false)
+    }
+  }
+
   async function onOpenLoopSettle(action: string) {
     const applicantId = visitApplicantId
     if (!id || !applicantId) {
@@ -740,6 +774,113 @@ export default function RecruitmentDetailPage({ orderId, embedded = false }: Rec
               {id ? <PrRecruitQrCard mpOrderId={id} /> : null}
             </div>
           </div>
+
+          {role === 'talent' && applied && myApplicant ? (
+            <section className="surface-card rounded-xl border p-4 space-y-3">
+              <label className="flex items-center justify-between gap-4">
+                <span>
+                  <span className="block font-medium">结算提醒</span>
+                  <span className="mt-1 block text-sm text-[var(--shell-muted)]">
+                    选 7 天、15 天、30 天或自定义时间，按结算日写入商单日历
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={settleOn}
+                  disabled={settleBusy}
+                  onChange={(e) => {
+                    const on = e.target.checked
+                    setSettleOn(on)
+                    if (!on) void persistSettle({ enabled: false })
+                  }}
+                />
+              </label>
+              {settleOn ? (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {(['7', '15', '30'] as const).map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        className={`btn-mockup ${settlePreset === days ? 'btn-mockup--primary' : ''}`}
+                        disabled={settleBusy}
+                        onClick={() => {
+                          const dateKey = settlementDateKeyForPreset(days)
+                          setSettlePreset(days)
+                          setSettleDate(dateKey)
+                          setSettleTime('10:00')
+                          void persistSettle({ enabled: true, preset: days, dateKey, timeLabel: '10:00' })
+                        }}
+                      >
+                        {days}天
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={`btn-mockup ${settlePreset === 'custom' ? 'btn-mockup--primary' : ''}`}
+                      disabled={settleBusy}
+                      onClick={() => {
+                        setSettlePreset('custom')
+                        if (!settleDate) setSettleDate(settlementDateKeyForPreset('7'))
+                        if (!settleTime) setSettleTime('10:00')
+                      }}
+                    >
+                      自定义时间
+                    </button>
+                  </div>
+                  {settlePreset === 'custom' ? (
+                    <div className="flex flex-wrap items-end gap-3">
+                      <label className="text-sm">
+                        <span className="mb-1 block text-[var(--shell-muted)]">结算日</span>
+                        <input
+                          type="date"
+                          className="rounded-lg border border-[var(--shell-border)] bg-white px-3 py-2"
+                          value={settleDate}
+                          min={orderSettleDateKey(0)}
+                          disabled={settleBusy}
+                          onChange={(e) => setSettleDate(e.target.value)}
+                        />
+                      </label>
+                      <label className="text-sm">
+                        <span className="mb-1 block text-[var(--shell-muted)]">时间</span>
+                        <input
+                          type="time"
+                          className="rounded-lg border border-[var(--shell-border)] bg-white px-3 py-2"
+                          value={settleTime}
+                          disabled={settleBusy}
+                          onChange={(e) => setSettleTime(e.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="btn-mockup btn-mockup--primary"
+                        disabled={settleBusy || !settleDate}
+                        onClick={() =>
+                          void persistSettle({
+                            enabled: true,
+                            preset: 'custom',
+                            dateKey: settleDate,
+                            timeLabel: settleTime || '10:00',
+                          })
+                        }
+                      >
+                        写入商单日历
+                      </button>
+                    </div>
+                  ) : null}
+                  {settleDate ? (
+                    <p className="text-sm text-[var(--shell-muted)]">
+                      结算日 {orderSettleMonthDay(settleDate)} {settleTime || '10:00'}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-[var(--shell-muted)]">选择结算时间后写入商单日历</p>
+                  )}
+                  {settleMsg ? <p className="text-sm text-emerald-700">{settleMsg}</p> : null}
+                </>
+              ) : null}
+            </section>
+          ) : null}
 
           <TwoColumnLayout
             className="mockup-two-col--wide-aside"

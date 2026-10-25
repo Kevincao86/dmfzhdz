@@ -1,5 +1,6 @@
 const openLoop = require('./openLoopSettlement.js')
 const calReminder = require('./mpCalendarReminderApi.js')
+const customEvent = require('./mpCalendarCustomEventApi.js')
 const orderOps = require('./mpOrderRegistryOps.js')
 
 const inflight = new Set()
@@ -148,10 +149,142 @@ function syncRows(rows) {
   })
 }
 
+function settleNote(mpOrderId, applicantId) {
+  return `order-settle|${mpOrderId}|${applicantId}`.slice(0, 200)
+}
+
+function settleTitle(mp) {
+  return `结算日 · ${storeNameOf(mp)}`.slice(0, 40)
+}
+
+async function cancelRemindersForEvents(eventIds) {
+  const ids = {}
+  ;(eventIds || []).forEach((id) => {
+    const key = String(id || '').trim()
+    if (key) ids[key] = true
+  })
+  if (!Object.keys(ids).length) return
+  const rows = await calReminder.listReminders()
+  const pending = (rows || []).filter((row) => row && row.status === 'pending' && ids[String(row.eventId || '')])
+  for (let i = 0; i < pending.length; i++) {
+    const reminderId = String(pending[i].id || '').trim()
+    if (!reminderId) continue
+    try {
+      await calReminder.cancelReminder(reminderId)
+    } catch (e) {
+      /* 已发出或已取消 */
+    }
+  }
+}
+
+async function removeOrderSettleCalendar(mpOrderId, applicantId) {
+  const note = settleNote(mpOrderId, applicantId)
+  const events = await customEvent.listEvents()
+  const hit = (events || []).filter((row) => row && String(row.note || '') === note)
+  await cancelRemindersForEvents(hit.map((row) => row.id))
+  for (let i = 0; i < hit.length; i++) {
+    const id = String(hit[i].id || '').trim()
+    if (!id) continue
+    try {
+      await customEvent.deleteEvent(id)
+    } catch (e) {
+      /* 已删除 */
+    }
+  }
+}
+
+async function saveOrderSettleRemind(mp, applicant, input) {
+  const mpOrderId = String((mp && mp.id) || '').trim()
+  const applicantId = String((applicant && applicant.id) || '').trim()
+  if (!mpOrderId || !applicantId) throw new Error('订单信息缺失')
+  const enabled = !!(input && input.enabled)
+  if (!enabled) {
+    await removeOrderSettleCalendar(mpOrderId, applicantId)
+    await orderOps.patchMpRecruitmentOrder({
+      id: mpOrderId,
+      orderSettleRemind: { applicantId, enabled: false },
+    })
+    try {
+      require('./registryCache.js').bust()
+    } catch (e) {
+      /* ignore */
+    }
+    return
+  }
+  const presetRaw = String((input && input.preset) || '')
+  const preset = presetRaw === '15' || presetRaw === '30' || presetRaw === 'custom' ? presetRaw : '7'
+  const dateKey = String((input && input.dateKey) || '').trim()
+  const timeLabel = String((input && input.timeLabel) || '10:00').trim()
+  const remindAt = openLoop.orderSettleRemindAtIso(dateKey, timeLabel)
+  if (!remindAt || Date.parse(remindAt) <= Date.now() + 60000) throw new Error('结算时间要晚于现在')
+  const title = settleTitle(mp)
+  const note = settleNote(mpOrderId, applicantId)
+  let eventId = String((applicant && applicant.orderSettleCalendarEventId) || '').trim()
+  if (eventId) {
+    try {
+      await customEvent.saveEvent({ id: eventId, title, eventDateKey: dateKey, timeLabel, note })
+    } catch (e) {
+      eventId = ''
+    }
+  }
+  if (!eventId) {
+    const saved = await customEvent.saveEvent({ title, eventDateKey: dateKey, timeLabel, note })
+    const event = saved && saved.event ? saved.event : null
+    eventId = String((event && event.id) || '').trim()
+  }
+  if (!eventId) throw new Error('写入商单日历失败')
+  const events = await customEvent.listEvents()
+  const extras = (events || []).filter((row) => row && String(row.note || '') === note && String(row.id || '') !== eventId)
+  await cancelRemindersForEvents([eventId].concat(extras.map((row) => row.id)))
+  for (let i = 0; i < extras.length; i++) {
+    const extraId = String(extras[i].id || '').trim()
+    if (!extraId) continue
+    try {
+      await customEvent.deleteEvent(extraId)
+    } catch (e) {
+      /* 旧日程已不在 */
+    }
+  }
+  await calReminder.createReminder({
+    eventId,
+    mpOrderId,
+    eventKind: 'order_settle',
+    eventDateKey: dateKey,
+    eventTitle: title,
+    storeName: storeNameOf(mp),
+    leadPreset: 'at',
+    remindAt,
+    channels: ['oa'],
+  })
+  await orderOps.patchMpRecruitmentOrder({
+    id: mpOrderId,
+    orderSettleRemind: {
+      applicantId,
+      enabled: true,
+      preset,
+      dateKey,
+      timeLabel,
+      calendarEventId: eventId,
+    },
+  })
+  try {
+    require('./registryCache.js').bust()
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 async function submitAction(mpOrderId, applicantId, action) {
   const id = String(mpOrderId || '').trim()
   const aid = String(applicantId || '').trim()
   if (!id || !aid || !action) throw new Error('订单信息缺失')
+  if (action === 'settled' || action === 'dropped') {
+    try {
+      await removeOrderSettleCalendar(id, aid)
+    } catch (e) {
+      /* 状态仍要记下 */
+    }
+  }
   await orderOps.patchMpRecruitmentOrder({
     id,
     openLoopSettle: { applicantId: aid, action },
@@ -170,4 +303,5 @@ module.exports = {
   syncOne,
   submitAction,
   setSettleRemind,
+  saveOrderSettleRemind,
 }

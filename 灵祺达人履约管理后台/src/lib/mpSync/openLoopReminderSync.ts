@@ -1,5 +1,6 @@
-import { planOpenLoopReminders, reminderPrefix } from '@merchant/lib/openLoopSettlement'
+import { orderSettleRemindAtIso, planOpenLoopReminders, reminderPrefix } from '@merchant/lib/openLoopSettlement'
 import { cancelCalendarReminder, createCalendarReminder, listCalendarReminders } from '../mpCalendarReminderApi'
+import { deleteCalendarCustomEvent, listCalendarCustomEvents, saveCalendarCustomEvent } from '../mpCalendarCustomEventApi'
 import { clearMpRegistryCache, patchMpRecruitmentOrder } from '../mpApi'
 
 const inflight = new Set<string>()
@@ -135,10 +136,126 @@ export async function setSettleRemind(memberId: string, enabled: boolean): Promi
   }
 }
 
+function settleNote(mpOrderId: string, applicantId: string): string {
+  return `order-settle|${mpOrderId}|${applicantId}`.slice(0, 200)
+}
+
+function settleTitle(mp: Record<string, unknown> | null | undefined): string {
+  return `结算日 · ${storeNameOf(mp)}`.slice(0, 40)
+}
+
+async function cancelRemindersForEvents(eventIds: string[]): Promise<void> {
+  const ids = new Set(eventIds.map((id) => String(id || '').trim()).filter(Boolean))
+  if (!ids.size) return
+  const rows = await listCalendarReminders()
+  const pending = rows.filter((row) => row.status === 'pending' && ids.has(row.eventId))
+  for (const row of pending) {
+    if (!row.id) continue
+    try {
+      await cancelCalendarReminder(row.id)
+    } catch {
+      /* 已发出或已取消 */
+    }
+  }
+}
+
+export async function removeOrderSettleCalendar(mpOrderId: string, applicantId: string): Promise<void> {
+  const note = settleNote(mpOrderId, applicantId)
+  const events = await listCalendarCustomEvents()
+  const hit = events.filter((row) => row.note === note)
+  await cancelRemindersForEvents(hit.map((row) => row.id))
+  for (const row of hit) {
+    try {
+      await deleteCalendarCustomEvent(row.id)
+    } catch {
+      /* 已删除 */
+    }
+  }
+}
+
+export async function saveOrderSettleRemind(
+  mp: Record<string, unknown>,
+  applicant: Record<string, unknown>,
+  input: { enabled: boolean; preset?: string; dateKey?: string; timeLabel?: string },
+): Promise<void> {
+  const mpOrderId = String(mp?.id || '').trim()
+  const applicantId = String(applicant?.id || '').trim()
+  if (!mpOrderId || !applicantId) throw new Error('订单信息缺失')
+  const enabled = input.enabled === true
+  if (!enabled) {
+    await removeOrderSettleCalendar(mpOrderId, applicantId)
+    await patchMpRecruitmentOrder({
+      id: mpOrderId,
+      orderSettleRemind: { applicantId, enabled: false },
+    })
+    clearMpRegistryCache()
+    return
+  }
+  const preset = input.preset === '15' || input.preset === '30' || input.preset === 'custom' ? input.preset : '7'
+  const dateKey = String(input.dateKey || '').trim()
+  const timeLabel = String(input.timeLabel || '10:00').trim()
+  const remindAt = orderSettleRemindAtIso(dateKey, timeLabel)
+  if (!remindAt || Date.parse(remindAt) <= Date.now() + 60_000) throw new Error('结算时间要晚于现在')
+  const title = settleTitle(mp)
+  const note = settleNote(mpOrderId, applicantId)
+  let eventId = String(applicant.orderSettleCalendarEventId || '').trim()
+  if (eventId) {
+    try {
+      await saveCalendarCustomEvent({ id: eventId, title, eventDateKey: dateKey, timeLabel, note })
+    } catch {
+      eventId = ''
+    }
+  }
+  if (!eventId) {
+    eventId = await saveCalendarCustomEvent({ title, eventDateKey: dateKey, timeLabel, note })
+  }
+  if (!eventId) throw new Error('写入商单日历失败')
+  const events = await listCalendarCustomEvents()
+  const extras = events.filter((row) => row.note === note && row.id !== eventId).map((row) => row.id)
+  await cancelRemindersForEvents([eventId, ...extras])
+  for (const extraId of extras) {
+    try {
+      await deleteCalendarCustomEvent(extraId)
+    } catch {
+      /* 旧日程已不在 */
+    }
+  }
+  await createCalendarReminder({
+    eventId,
+    mpOrderId,
+    eventKind: 'order_settle',
+    eventDateKey: dateKey,
+    eventTitle: title,
+    storeName: storeNameOf(mp),
+    leadPreset: 'at',
+    remindAt,
+    channels: ['oa'],
+  })
+  await patchMpRecruitmentOrder({
+    id: mpOrderId,
+    orderSettleRemind: {
+      applicantId,
+      enabled: true,
+      preset,
+      dateKey,
+      timeLabel,
+      calendarEventId: eventId,
+    },
+  })
+  clearMpRegistryCache()
+}
+
 export async function submitOpenLoopAction(mpOrderId: string, applicantId: string, action: string): Promise<void> {
   const id = String(mpOrderId || '').trim()
   const aid = String(applicantId || '').trim()
   if (!id || !aid || !action) throw new Error('订单信息缺失')
+  if (action === 'settled' || action === 'dropped') {
+    try {
+      await removeOrderSettleCalendar(id, aid)
+    } catch {
+      /* 状态仍要记下 */
+    }
+  }
   await patchMpRecruitmentOrder({
     id,
     openLoopSettle: { applicantId: aid, action },

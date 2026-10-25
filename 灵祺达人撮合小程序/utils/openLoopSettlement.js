@@ -91,7 +91,6 @@ function eventId(mpOrderId, applicantId, tag) {
 function resolveOpenLoopCard(mp, applicant, opts) {
   const options = opts || {}
   if (!isOpenLoopOrder(mp) || !applicant) return null
-  if (options.enabled !== true) return null
   if (String(applicant.taskStatus || '') === 'rejected') return null
   const selected = !!(options.selected || options.selectionNotified)
   if (!selected) return null
@@ -267,6 +266,35 @@ function readSettleRemindOn(reg) {
   return who.localOn
 }
 
+function orderSettleDateKey(plusDays, now) {
+  const base = now instanceof Date ? now : new Date()
+  const days = Number.isFinite(Number(plusDays)) ? Math.trunc(Number(plusDays)) : 0
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + days, 12, 0, 0, 0)
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+function settlementDateKeyForPreset(preset, now) {
+  const days = preset === '15' ? 15 : preset === '30' ? 30 : 7
+  return orderSettleDateKey(days, now)
+}
+
+function orderSettleMonthDay(dateKey) {
+  const m = String(dateKey || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return ''
+  return `${Number(m[2])}月${Number(m[3])}日`
+}
+
+function orderSettleRemindAtIso(dateKey, timeLabel) {
+  const d = String(dateKey || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const t = String(timeLabel || '').trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/)
+  if (!d || !t) return ''
+  const dt = new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3]), Number(t[1]), Number(t[2]), 0, 0)
+  if (!Number.isFinite(dt.getTime())) return ''
+  return dt.toISOString()
+}
+
 function rememberSettleRemindOn(enabled) {
   const who = readSettleRemindMemberId()
   try {
@@ -286,4 +314,8 @@ module.exports = {
   readSettleRemindMemberId,
   readSettleRemindOn,
   rememberSettleRemindOn,
+  orderSettleDateKey,
+  settlementDateKeyForPreset,
+  orderSettleMonthDay,
+  orderSettleRemindAtIso,
 }

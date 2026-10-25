@@ -51,8 +51,6 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     displayStatusFilter: 'all',
     focusMpOrderId: '',
     mineGuestMode: false,
-    settleRemindOn: false,
-    settleRemindBusy: false,
     platformGroup: 'video',
     platformGroupOptions: deliveryReview.PR_PLATFORM_GROUP_OPTIONS,
   },
@@ -92,7 +90,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         r.progressMp || null,
         r.progressMe || null,
         r.mpOrderId,
-        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined, settleRemindOn: this.data.settleRemindOn === true, prCancelled: !!r.prCancelled },
+        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined, prCancelled: !!r.prCancelled },
       ),
     )
     return appFilters.filterApplicationRows(byTab, {
@@ -115,7 +113,7 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
         r.progressMp,
         r.progressMe,
         r.mpOrderId,
-        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined, settleRemindOn: this.data.settleRemindOn === true, prCancelled: !!r.prCancelled },
+        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined, prCancelled: !!r.prCancelled },
       )
       return (
         st.tabId === 'pending_video' &&
@@ -277,8 +275,6 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     }
     try {
       const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({ includeLocalContext: true })
-      const openLoopSettlement = require('../../../utils/openLoopSettlement.js')
-      this.data.settleRemindOn = openLoopSettlement.readSettleRemindOn(reg)
       const local = applicationsStore.readApplications()
       const mpList = reg.mpRecruitmentOrders || []
       const enriched = this.mergeAiStatusToRows(
@@ -293,13 +289,11 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
       )
       const cityOptions = hallFilters.buildCityFilterOptions(enriched)
       const tabPatch = this._maybeSwitchToPendingVideoTab(enriched)
-      if (this.data.settleRemindOn) openLoopReminderSync.syncRows(enriched)
       this.setData({
         rows: enriched,
         filteredRows: tabPatch ? tabPatch.filteredRows : this.applyFilters(enriched),
         filterTab: tabPatch ? tabPatch.filterTab : this.data.filterTab,
         cityOptions,
-        settleRemindOn: this.data.settleRemindOn === true,
         loading: false,
       })
     } catch {
@@ -511,22 +505,6 @@ Page(mpPrivacyPageMixin.mergeIntoPage({
     this._pendingUploadKind = 'video'
     this._pendingUploadEvent = e
     this._runUploadVideoOnce(() => this._doUploadVideo(e))
-  },
-  onSettleRemindChange(e) {
-    if (this.data.settleRemindBusy) return
-    const enabled = !!(e.detail && e.detail.value)
-    this.setData({ settleRemindBusy: true, settleRemindOn: enabled })
-    openLoopReminderSync
-      .setSettleRemind(enabled)
-      .then(() => {
-        wx.showToast({ title: enabled ? '已开启结算提醒' : '已关闭结算提醒', icon: 'none' })
-        return this.load({ silent: true })
-      })
-      .catch((err) => {
-        this.setData({ settleRemindOn: !enabled })
-        wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
-      })
-      .finally(() => this.setData({ settleRemindBusy: false }))
   },
   onOpenLoopAction(e) {
     const ds = (e.currentTarget && e.currentTarget.dataset) || {}

@@ -55,6 +55,41 @@
         <canvas type="2d" id="detailPrQrCanvas" class="detail-hero-qr-canvas" />
       </view>
 
+      <view class="card" wx:if="{{applied && !isPr && openLoopApplicantId}}">
+        <view style="display:flex;align-items:center;justify-content:space-between;gap:16rpx;">
+          <view style="flex:1;">
+            <text class="success-title">结算提醒</text>
+            <text class="hint" style="display:block;margin-top:8rpx;">选 7 天、15 天、30 天或自定义时间，按结算日写入商单日历</text>
+          </view>
+          <switch checked="{{settleRemindOn}}" disabled="{{settleRemindBusy}}" bindchange="onOrderSettleRemindToggle" color="#6b4c3b" />
+        </view>
+        <block wx:if="{{settleRemindOn}}">
+          <view class="app-card__actions" style="margin-top:16rpx;">
+            <button class="btn-secondary visit-action-btn" data-preset="7" disabled="{{settleRemindBusy}}" bindtap="onOrderSettlePreset" style="{{settleRemindPreset === '7' ? 'border-color:#6b4c3b;color:#6b4c3b;' : ''}}">7天</button>
+            <button class="btn-secondary visit-action-btn" data-preset="15" disabled="{{settleRemindBusy}}" bindtap="onOrderSettlePreset" style="{{settleRemindPreset === '15' ? 'border-color:#6b4c3b;color:#6b4c3b;' : ''}}">15天</button>
+            <button class="btn-secondary visit-action-btn" data-preset="30" disabled="{{settleRemindBusy}}" bindtap="onOrderSettlePreset" style="{{settleRemindPreset === '30' ? 'border-color:#6b4c3b;color:#6b4c3b;' : ''}}">30天</button>
+            <button class="btn-secondary visit-action-btn" data-preset="custom" disabled="{{settleRemindBusy}}" bindtap="onOrderSettlePreset" style="{{settleRemindPreset === 'custom' ? 'border-color:#6b4c3b;color:#6b4c3b;' : ''}}">自定义时间</button>
+          </view>
+          <block wx:if="{{settleRemindPreset === 'custom'}}">
+            <picker mode="date" value="{{settleRemindDate}}" start="{{settleRemindMin}}" bindchange="onOrderSettleDate">
+              <view class="visit-plan-picker" style="margin-top:16rpx;">
+                <text class="visit-plan-picker__label">结算日</text>
+                <text class="visit-plan-picker__value">{{settleRemindDate || '请选择日期'}}</text>
+              </view>
+            </picker>
+            <picker mode="time" value="{{settleRemindTime}}" bindchange="onOrderSettleTime">
+              <view class="visit-plan-picker" style="margin-top:12rpx;">
+                <text class="visit-plan-picker__label">时间</text>
+                <text class="visit-plan-picker__value">{{settleRemindTime || '10:00'}}</text>
+              </view>
+            </picker>
+            <button class="btn-primary visit-action-btn" style="margin-top:16rpx;" disabled="{{settleRemindBusy}}" bindtap="onOrderSettleSaveCustom">写入商单日历</button>
+          </block>
+          <text wx:if="{{settleRemindDate}}" class="hint" style="display:block;margin-top:12rpx;">结算日 {{settleRemindDate}} {{settleRemindTime}}</text>
+          <text wx:else class="hint" style="display:block;margin-top:12rpx;">选择结算时间后写入商单日历</text>
+        </block>
+      </view>
+
       <view class="card card--success {{fromApply ? 'card--success-pop' : ''}}" wx:if="{{applied && !isIce}}">
         <text class="success-title">✓ 报名已提交</text>
         <view wx:if="{{visitScheduleSubmitted}}" class="visit-schedule-status">

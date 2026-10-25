@@ -308,6 +308,12 @@ export type RegistryMpRecruitmentApplicant = {
   openLoopCheckinClosed?: boolean
   openLoopCheckinArmed?: boolean
   openLoopSettleArmed?: boolean
+  /** 这笔报名自己的结算提醒。结算日写入商单日历 */
+  orderSettleRemindOn?: boolean
+  orderSettleRemindPreset?: '' | '7' | '15' | '30' | 'custom'
+  orderSettleRemindDate?: string
+  orderSettleRemindTime?: string
+  orderSettleCalendarEventId?: string
   /** 达人完成且招募单要求交票后上传的发票图片（https） */
   talentInvoices?: { url: string; fileName?: string; uploadedAt: string }[]
   taskStatus?: MpApplicantTaskStatus
