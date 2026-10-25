@@ -2364,14 +2364,10 @@ export default function PublishWizard() {
           : null}
 
         <div className="space-y-3" style={{ order: 700 }}>
-          <style>{`@keyframes publish-add-plus{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,255,255,.7)}70%{transform:scale(1.18);box-shadow:0 0 0 8px rgba(255,255,255,0)}}@keyframes publish-add-sheen{0%{transform:translateX(-130%)}100%{transform:translateX(280%)}}`}</style>
+          <style>{`@keyframes publish-add-plus{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(109,40,217,.4)}70%{transform:scale(1.18);box-shadow:0 0 0 8px rgba(109,40,217,0)}}`}</style>
           <button
             type="button"
-            className={`relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl border-2 px-4 py-3 text-sm font-semibold ${
-              fieldEditorOpen
-                ? 'border-dashed border-violet-300 bg-violet-50 text-violet-700'
-                : 'border-violet-700 bg-violet-600 text-white shadow-md shadow-violet-500/30'
-            }`}
+            className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl border-2 border-[#6d28d9] bg-white px-4 py-3 text-sm font-semibold text-[#6d28d9] transition-colors duration-200 hover:border-[#6d28d9] hover:bg-[#6d28d9] hover:text-white focus-visible:bg-[#6d28d9] focus-visible:text-white"
             onClick={() => {
               if (fieldEditorOpen) {
                 setFieldEditorOpen(false)
@@ -2382,20 +2378,13 @@ export default function PublishWizard() {
             }}
           >
             {fieldEditorOpen ? null : (
-              <>
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-y-0 w-16 bg-white/25"
-                  style={{ animation: 'publish-add-sheen 2.4s ease-in-out infinite' }}
-                />
-                <span
-                  aria-hidden
-                  className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-lg font-bold leading-none text-violet-700"
-                  style={{ animation: 'publish-add-plus 1.4s ease-in-out infinite' }}
-                >
-                  +
-                </span>
-              </>
+              <span
+                aria-hidden
+                className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#6d28d9] text-lg font-bold leading-none text-white transition-colors duration-200 group-hover:bg-white group-hover:text-[#6d28d9] group-focus-visible:bg-white group-focus-visible:text-[#6d28d9]"
+                style={{ animation: 'publish-add-plus 1.4s ease-in-out infinite' }}
+              >
+                +
+              </span>
             )}
             <span className="relative">{fieldEditorOpen ? '收起' : '添加字段'}</span>
           </button>
