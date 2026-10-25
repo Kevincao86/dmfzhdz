@@ -2364,9 +2364,14 @@ export default function PublishWizard() {
           : null}
 
         <div className="space-y-3" style={{ order: 700 }}>
+          <style>{`@keyframes publish-add-plus{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,255,255,.7)}70%{transform:scale(1.18);box-shadow:0 0 0 8px rgba(255,255,255,0)}}@keyframes publish-add-sheen{0%{transform:translateX(-130%)}100%{transform:translateX(280%)}}`}</style>
           <button
             type="button"
-            className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]"
+            className={`relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl border-2 px-4 py-3 text-sm font-semibold ${
+              fieldEditorOpen
+                ? 'border-dashed border-violet-300 bg-violet-50 text-violet-700'
+                : 'border-violet-700 bg-violet-600 text-white shadow-md shadow-violet-500/30'
+            }`}
             onClick={() => {
               if (fieldEditorOpen) {
                 setFieldEditorOpen(false)
@@ -2376,7 +2381,23 @@ export default function PublishWizard() {
               setFieldEditorOpen(true)
             }}
           >
-            {fieldEditorOpen ? '收起' : '添加字段'}
+            {fieldEditorOpen ? null : (
+              <>
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 w-16 bg-white/25"
+                  style={{ animation: 'publish-add-sheen 2.4s ease-in-out infinite' }}
+                />
+                <span
+                  aria-hidden
+                  className="relative inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-lg font-bold leading-none text-violet-700"
+                  style={{ animation: 'publish-add-plus 1.4s ease-in-out infinite' }}
+                >
+                  +
+                </span>
+              </>
+            )}
+            <span className="relative">{fieldEditorOpen ? '收起' : '添加字段'}</span>
           </button>
           {fieldEditorOpen ? (
             <div className="divide-y border border-[var(--shell-border)] rounded-lg">

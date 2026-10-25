@@ -920,7 +920,10 @@
             </view>
           </view>
           <view class="pub-field" style="order:700">
-            <view class="pub-radio-opt" bindtap="onToggleFieldEditor">{{fieldEditorOpen ? '收起' : '添加字段'}}</view>
+            <view class="pub-add-field {{fieldEditorOpen ? 'pub-add-field--open' : ''}}" bindtap="onToggleFieldEditor">
+              <text wx:if="{{!fieldEditorOpen}}" class="pub-add-field__plus">+</text>
+              <text class="pub-add-field__text">{{fieldEditorOpen ? '收起' : '添加字段'}}</text>
+            </view>
             <block wx:if="{{fieldEditorOpen}}">
               <view class="tpl-row tpl-row--hint">
                 <text class="tpl-row__hint">可一次勾选多个。保存后系统字段才会显示；自己新增的字段需要填写内容。长按 ≡ 再拖动排序。</text>
