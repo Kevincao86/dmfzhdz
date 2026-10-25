@@ -19,7 +19,46 @@ import {
   type PublishFormTemplate,
 } from '../lib/mpSync/publishFormTemplates'
 import PageHero from '../components/ui/PageHero'
-import { EmptyState, StatusTabBar, TemplateGridCard } from '../components/ui/MockupLayouts'
+import { EmptyState, StatusTabBar } from '../components/ui/MockupLayouts'
+
+function TemplateCard({
+  title,
+  meta,
+  inUse,
+  onUse,
+  onEdit,
+  onDelete,
+}: {
+  title: string
+  meta?: string
+  inUse?: boolean
+  onUse: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  return (
+    <article className="template-grid-card surface-card hover-panel">
+      <div className="template-grid-card__cover">
+        <div className="template-grid-card__placeholder">📄</div>
+      </div>
+      <div className="template-grid-card__body">
+        <h3 className="template-grid-card__title">{title}</h3>
+        {meta ? <p className="template-grid-card__meta">{meta}</p> : null}
+        <div className="template-grid-card__actions">
+          <button type="button" className="btn-mockup btn-mockup--primary btn-mockup--sm" onClick={onUse}>
+            {inUse ? '使用中' : '使用模版'}
+          </button>
+          <button type="button" className="btn-mockup btn-mockup--outline btn-mockup--sm" onClick={onEdit}>
+            编辑
+          </button>
+          <button type="button" className="btn-mockup btn-mockup--outline btn-mockup--sm btn-mockup--danger" onClick={onDelete}>
+            删除
+          </button>
+        </div>
+      </div>
+    </article>
+  )
+}
 
 export default function TemplatesPage() {
   if (getActiveRole() !== 'pr') return <Navigate to="/hall" replace />
@@ -205,9 +244,10 @@ export default function TemplatesPage() {
         ) : (
           <div className="template-grid">
             {formTpls.map((t) => (
-              <TemplateGridCard
+              <TemplateCard
                 key={t.id}
                 title={t.name}
+                inUse={activeFormId === t.id}
                 meta={`${t.recruitTarget === 'shoot' ? '拍摄' : t.recruitTarget === 'edit' ? '剪辑' : '达人'} · ${t.recruitMode}${activeFormId === t.id ? ' · 使用中' : ''}`}
                 onUse={() => {
                   setActivePublishFormTemplateId(t.id)
@@ -237,9 +277,10 @@ export default function TemplatesPage() {
       ) : (
         <div className="template-grid">
           {filtered.map((t) => (
-            <TemplateGridCard
+            <TemplateCard
               key={t.id}
               title={t.name}
+              inUse={activeId === t.id}
               meta={`${t.fields.length} 个报名项${activeId === t.id ? ' · 使用中' : ''}`}
               onUse={() => {
                 setActiveTemplateId(t.id, kind)

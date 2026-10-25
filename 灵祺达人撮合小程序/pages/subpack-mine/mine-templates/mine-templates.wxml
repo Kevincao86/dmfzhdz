@@ -37,7 +37,7 @@
     </view>
     <text class="hint">{{item.fields.length}} 个字段</text>
     <view class="tpl-actions">
-      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseTemplate">使用</button>
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseTemplate">{{activeId === item.id ? '使用中' : '使用'}}</button>
       <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onEdit">编辑</button>
       <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onDelete">删除</button>
     </view>
@@ -76,7 +76,7 @@
         </view>
         <text class="hint">发招募时选用的字段</text>
         <view class="tpl-actions">
-          <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseFormTemplate">使用</button>
+          <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseFormTemplate">{{activeFormId === item.id ? '使用中' : '使用'}}</button>
           <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onEditFormTemplate">编辑</button>
           <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onDeleteFormTemplate">删除</button>
         </view>
