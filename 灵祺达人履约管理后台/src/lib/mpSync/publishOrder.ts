@@ -2,7 +2,6 @@ import type { ApplyField } from './applyFormTemplates'
 import {
   emptyCustomTemplate,
   buildEditorRows,
-  validateTemplateFields,
   getActiveTemplateId,
   getTemplateById,
   templateKindFromRecruitTarget,
@@ -21,13 +20,12 @@ import { buildPrProfileSnapshot } from './prRecruitQr'
 import { prDisplayName, readPrProfile } from './userProfile'
 import { prParticipantKey } from './participant'
 import { getAccount } from '../mpSession'
-import { emptySupplierPublishFields, validateSupplierPublish } from './supplierPublishForm'
+import { emptySupplierPublishFields } from './supplierPublishForm'
 import { defaultSupplierApplyFields } from './supplierPublishForm'
 import {
   buildLiveRecruitmentLines,
   emptyLiveFields,
   isDouyinLivePlatform,
-  validateLivePublish,
   type LivePublishFields,
 } from './livePublishForm'
 import { buildCoverFieldsForOrder } from './recruitCoverLibrary'
@@ -339,93 +337,17 @@ export type PublishTemplateGate = {
   fieldOn?: Record<string, boolean>
 }
 
-function fieldNeeded(gate: PublishTemplateGate | undefined, key: string) {
-  if (!gate || gate.mode !== 'custom') return true
-  return gate.fieldOn?.[key] !== false
-}
-
 export function validatePublishForm(
   f: PublishForm,
-  recruitMode: string,
-  recruitTarget = 'talent',
-  isTargetedRecruit = false,
-  gate?: PublishTemplateGate,
+  _recruitMode = '',
+  _recruitTarget = 'talent',
+  _isTargetedRecruit = false,
+  _gate?: PublishTemplateGate,
 ): string | null {
-  const need = (key: string) => fieldNeeded(gate, key)
-  const isSupplier = recruitTarget === 'shoot' || recruitTarget === 'edit'
-  if (!String(f.title || '').trim()) return '请填写招募标题'
-  if (recruitMode === 'live') {
-    const liveErr = validateLivePublish(f)
-    if (liveErr) return liveErr
-    if (need('level') && isDouyinLivePlatform(f.livePlatform) && !(f.douyinSalesLevels || []).length) {
-      return '请选择达人带货等级'
-    }
-  } else if (need('platform') && !isSupplier && !f.platform) return '请选择招募平台'
-  if (need('city') && !f.cityNational && !(f.selectedCities || []).length && !(f.selectedProvinces || []).length) {
-    return '请选择招募城市'
-  }
-  if (need('tags') && !(f.talentTags || []).length) return isSupplier ? '请选择需求品类标签' : '请选择需求达人标签'
-  if (need('fans') && !isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
-  if (need('deadline') && !isTargetedRecruit && f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
-    return '请选择招募报名截止时间'
-  }
-  if (
-    need('level') &&
-    !isSupplier &&
-    recruitMode !== 'live' &&
-    f.platform === '抖音' &&
-    !(f.douyinSalesLevels || []).length
-  ) {
-    return '请选择达人带货等级'
-  }
-  if (need('fee') && !f.feeTypeId) return '请选择费用模式'
-  if (need('fee')) {
-    const feeErr = validatePublishFee(f)
-    if (feeErr) return feeErr
-  }
-  if (need('count') && !isTargetedRecruit) {
-    const n = Math.max(1, parseNonNegativeInt(String(f.recruitCount || '1'), 1))
-    if (n < 1) return '招募人数至少为 1'
-  } else if (!f.inviteResponseHours && isTargetedRecruit) {
-    return '请设置邀约响应时间'
-  }
-  if (need('detail') && !String(f.recruitDetail || '').trim() && recruitMode !== 'live') return '请填写招募详情'
-  if (isSupplier) {
-    const sErr = validateSupplierPublish(recruitTarget, f, recruitMode)
-    if (sErr) return sErr
-  }
-  if (recruitMode === 'ice' && !resolveIceReferenceVideoUrl(f)) {
-    return '云剪任务请填写参考片链接'
-  }
-  if (
-    recruitMode !== 'ice' &&
-    recruitMode !== 'edit_ice' &&
-    f.fulfillmentLoop === 'open' &&
-    !String(f.groupQrImage || '').trim()
-  ) {
-    return '开环招募请上传群二维码'
-  }
-  if (
-    recruitMode === 'ice' &&
-    (f.iceVerifyMode || 'ai') === 'ai' &&
-    !String(f.groupQrImage || '').trim()
-  ) {
-    return 'AI 核查模式请上传群二维码'
-  }
-  if (
-    recruitMode === 'edit_ice' &&
-    (f.iceVerifyMode || 'ai') === 'ai' &&
-    !String(f.editGroupQrImage || '').trim()
-  ) {
-    return '剪辑云剪请上传剪辑师群二维码'
-  }
-  if (need('apply')) {
-    if (!(f.applyFormFields || []).length) {
-      return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
-    }
-    const tplErr = validateTemplateFields(f.applyFormFields)
-    if (tplErr) return tplErr
-  }
+  void _recruitMode
+  void _recruitTarget
+  void _isTargetedRecruit
+  void _gate
   const lk = f.linkeAttach
   if (lk?.enabled) {
     if (!lk.clientId) return '挂接林客时请选择客户商家'

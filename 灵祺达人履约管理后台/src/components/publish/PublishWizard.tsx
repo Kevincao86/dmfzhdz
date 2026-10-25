@@ -109,6 +109,40 @@ const PUBLISH_FIELD_CATALOG = [
 
 const PUBLISH_FIELD_KEYS = PUBLISH_FIELD_CATALOG.map((item) => item.key)
 
+const DEFAULT_PUBLISH_FIELD_ON: Record<string, boolean> = {
+  delivery: true,
+  deadline: true,
+  platform: false,
+  city: true,
+  location: false,
+  tags: false,
+  fans: false,
+  level: false,
+  fee: false,
+  count: false,
+  detail: false,
+  apply: false,
+  cover: false,
+}
+
+function allPublishFieldsOn(): Record<string, boolean> {
+  return {
+    delivery: true,
+    deadline: true,
+    platform: true,
+    city: true,
+    location: true,
+    tags: true,
+    fans: true,
+    level: true,
+    fee: true,
+    count: true,
+    detail: true,
+    apply: true,
+    cover: true,
+  }
+}
+
 function mergePublishFieldOrder(saved: string[] | undefined, customIds: string[]) {
   const known = new Set<string>([...PUBLISH_FIELD_KEYS, ...customIds.filter(Boolean)])
   const next: string[] = []
@@ -195,22 +229,8 @@ export default function PublishWizard() {
   const pr = readPrProfile()
 
   const [step, setStep] = useState<'platform' | 'channel' | 'recruit' | 'target' | 'mode' | 'tpl' | 'tplCustom' | 'placeholder' | 'form' | 'done'>('platform')
-  const [publishTemplateMode, setPublishTemplateMode] = useState<'system' | 'custom'>('system')
-  const [fieldOn, setFieldOn] = useState<Record<string, boolean>>({
-    delivery: true,
-    deadline: true,
-    platform: true,
-    city: true,
-    location: true,
-    tags: true,
-    fans: true,
-    level: true,
-    fee: true,
-    count: true,
-    detail: true,
-    apply: true,
-    cover: true,
-  })
+  const [publishTemplateMode, setPublishTemplateMode] = useState<'system' | 'custom'>('custom')
+  const [fieldOn, setFieldOn] = useState<Record<string, boolean>>({ ...DEFAULT_PUBLISH_FIELD_ON })
   const [customPublishFields, setCustomPublishFields] = useState<
     { id: string; label: string; value: string; format: 'text' | 'image' | 'video' }[]
   >([])
@@ -386,9 +406,12 @@ export default function PublishWizard() {
     const isTargeted = String(meta.recruitScope || '') === 'targeted'
     let recruitTargetId = String(meta.recruitTarget || '').trim() || 'talent'
     setStep('form')
-    setPublishTemplateMode(meta.publishTemplateMode === 'custom' ? 'custom' : 'system')
     if (meta.publishFieldOn && typeof meta.publishFieldOn === 'object') {
-      setFieldOn((prev) => ({ ...prev, ...(meta.publishFieldOn as Record<string, boolean>) }))
+      setPublishTemplateMode('custom')
+      setFieldOn({ ...DEFAULT_PUBLISH_FIELD_ON, ...(meta.publishFieldOn as Record<string, boolean>) })
+    } else {
+      setPublishTemplateMode(meta.publishTemplateMode === 'custom' ? 'custom' : 'system')
+      setFieldOn(allPublishFieldsOn())
     }
     const restoredCustom = Array.isArray(meta.customPublishFields)
       ? (meta.customPublishFields as { id?: string; label?: string; value?: string; format?: string }[])
@@ -670,7 +693,9 @@ export default function PublishWizard() {
       setIsTargetedRecruit(false)
       setRecruitChannel('open')
       setLoopChosen(true)
-      setPublishTemplateMode('system')
+      setPublishTemplateMode('custom')
+      setFieldOn({ ...DEFAULT_PUBLISH_FIELD_ON })
+      setFieldOrder([...PUBLISH_FIELD_KEYS])
       setCustomPublishFields([])
       setForm({ ...emptyPublishForm('talent'), platform, fulfillmentLoop: 'closed' })
       setTagSelected(new Set())
@@ -947,7 +972,7 @@ export default function PublishWizard() {
   }
 
 
-  const showField = (key: string) => publishTemplateMode !== 'custom' || fieldOn[key] !== false
+  const showField = (key: string) => fieldOn[key] === true
   const fieldRank = (key: string) => {
     const index = orderedKeys.indexOf(key)
     return index < 0 ? 200 : index
@@ -1164,7 +1189,7 @@ export default function PublishWizard() {
         {row.kind === 'sys' ? (
           <input
             type="checkbox"
-            checked={fieldOn[row.key] !== false}
+            checked={fieldOn[row.key] === true}
             onChange={(e) => {
               const next = { ...fieldOn, [row.key]: e.target.checked }
               setFieldOn(next)
@@ -1194,7 +1219,7 @@ export default function PublishWizard() {
         <p className="text-sm text-slate-400">系统模版沿用现有表单，自定义可勾选字段并新增</p>
         {step === 'tpl' ? (
           <div className="space-y-3">
-            <button type="button" className="choice-card w-full text-left surface-card rounded-xl border p-4" onClick={() => { setPublishTemplateMode('system'); setStep('form') }}>
+            <button type="button" className="choice-card w-full text-left surface-card rounded-xl border p-4" onClick={() => { setPublishTemplateMode('system'); setFieldOn(allPublishFieldsOn()); setStep('form') }}>
               <div className="font-semibold">系统模版</div>
               <div className="text-sm text-slate-400 mt-1">使用现在的完整招募表单</div>
             </button>
@@ -1433,10 +1458,10 @@ export default function PublishWizard() {
           ) : null}
           <div className="md:col-span-2">
             <div className="text-sm font-medium text-[var(--shell-text)]">表单字段</div>
-            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">可关掉不需要的项，或另加字段。存进我的模版后，下次选平台会自动套用。</p>
+            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">默认显示标题、投放窗口、截止时间和招募城市。点添加字段后，勾选系统字段即可显示；自己新增的字段需要填写内容。</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]" onClick={() => setFieldEditorOpen((v) => !v)}>
-              {fieldEditorOpen ? '收起自定义字段' : '自定义字段'}
+              {fieldEditorOpen ? '收起字段' : '添加字段'}
             </button>
             <button
               type="button"
@@ -1472,7 +1497,7 @@ export default function PublishWizard() {
           </div>
           {fieldEditorOpen ? (
             <div className="divide-y border border-[var(--shell-border)] rounded-lg md:col-span-2">
-              <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">长按左侧 ≡ 再拖动排序，下方表单会跟着排</p>
+              <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">勾选系统字段后显示在下方。自己新增的字段需要填写内容。长按左侧 ≡ 再拖动排序。</p>
               {renderFieldEditor()}
               <div className="flex items-center gap-2 px-3 py-2">
                 <select
@@ -1526,7 +1551,7 @@ export default function PublishWizard() {
         </div>
         <div className="flex flex-col gap-4">
           <div style={{ order: -10 }}>
-            <PubLabel>招募标题 *</PubLabel>
+            <PubLabel>招募标题</PubLabel>
             <input
               className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
               placeholder={recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}
@@ -1550,7 +1575,7 @@ export default function PublishWizard() {
           {showField('city') ? (
             <div style={{ order: fieldRank('city') }}>
               <PubSelectRow
-                label="招募城市 *"
+                label="招募城市"
                 value={display.cityDisplayText}
                 placeholder={display.cityDisplayText === '请选择招募城市'}
                 onClick={() => openPicker('city')}
@@ -1559,7 +1584,7 @@ export default function PublishWizard() {
           ) : null}
           {!isTargetedRecruit && showField('delivery') ? (
             <div style={{ order: fieldRank('delivery') }}>
-              <PubLabel>投放窗口 *</PubLabel>
+              <PubLabel>投放窗口</PubLabel>
               <div className="mt-1 grid grid-cols-2 gap-2">
                 {DELIVERY_WINDOWS.map((w) => (
                   <button
@@ -1588,7 +1613,7 @@ export default function PublishWizard() {
           <div className="space-y-2" style={{ order: fieldRank('deadline') }}>
             {display.showSignupDeadline && showField('deadline') ? (
               <PubSelectRow
-                label="招募报名截止时间 *"
+                label="招募报名截止时间"
                 value={deadlineDisplayText}
                 placeholder={!signupDeadlineDate}
                 onClick={() => setShowDeadlineSheet(true)}
@@ -1602,7 +1627,7 @@ export default function PublishWizard() {
 
         {isTargetedRecruit ? (
           <div style={{ order: 800 }}>
-            <PubLabel hint="达人须在此时间内接受或拒绝邀约；可随时补邀更多人">邀约响应时间 *</PubLabel>
+            <PubLabel hint="达人须在此时间内接受或拒绝邀约；可随时补邀更多人">邀约响应时间</PubLabel>
             <div className="flex flex-wrap gap-2 mt-1">
               {INVITE_HOUR_OPTIONS.map((opt) => (
                 <button
@@ -1624,7 +1649,7 @@ export default function PublishWizard() {
 
         {recruitMode === 'live' ? (
           <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3" style={{ order: 800 }}>
-            <PubLabel>直播平台 *</PubLabel>
+            <PubLabel>直播平台</PubLabel>
             <div className="flex flex-wrap gap-2">
               {LIVE_PLATFORMS.map((p) => (
                 <button
@@ -1642,21 +1667,21 @@ export default function PublishWizard() {
                 </button>
               ))}
             </div>
-            <PubLabel>直播日期 *</PubLabel>
+            <PubLabel>直播日期</PubLabel>
             <input
               type="date"
               className="w-full rounded-lg panel-input border px-3 py-2"
               value={form.liveDate}
               onChange={(e) => patchForm({ liveDate: e.target.value })}
             />
-            <PubLabel>开播时间 *</PubLabel>
+            <PubLabel>开播时间</PubLabel>
             <input
               type="time"
               className="w-full rounded-lg panel-input border px-3 py-2"
               value={form.liveTimeStart}
               onChange={(e) => patchForm({ liveTimeStart: e.target.value })}
             />
-            <PubLabel>预计时长 *</PubLabel>
+            <PubLabel>预计时长</PubLabel>
             <div className="flex flex-wrap gap-2">
               {LIVE_DURATIONS.map((d) => (
                 <button
@@ -1669,7 +1694,7 @@ export default function PublishWizard() {
                 </button>
               ))}
             </div>
-            <PubLabel>直播类型 *</PubLabel>
+            <PubLabel>直播类型</PubLabel>
             <div className="flex flex-wrap gap-2">
               {LIVE_TYPES.map((t) => (
                 <button
@@ -1682,14 +1707,14 @@ export default function PublishWizard() {
                 </button>
               ))}
             </div>
-            <PubLabel>带货商品/套餐说明 *</PubLabel>
+            <PubLabel>带货商品/套餐说明</PubLabel>
             <textarea
               className="w-full rounded-lg panel-input border px-3 py-2 min-h-[88px]"
               placeholder="商品名称、规格、团购价、佣金空间、是否独家等"
               value={form.productSummary}
               onChange={(e) => patchForm({ productSummary: e.target.value })}
             />
-            <PubLabel>样品/寄样方式 *</PubLabel>
+            <PubLabel>样品/寄样方式</PubLabel>
             <div className="flex flex-wrap gap-2">
               {SAMPLE_POLICIES.map((s) => (
                 <button
@@ -1715,7 +1740,7 @@ export default function PublishWizard() {
         {!isSupplierPublish && recruitMode !== 'live' && showField('platform') && !form.platform ? (
           <div style={{ order: 800 }}>
             <PubSelectRow
-              label="招募平台 *"
+              label="招募平台"
               value={display.platformDisplayText}
               placeholder={!form.platform}
               iconUrl={form.platform ? platformIconUrl(form.platform) : undefined}
@@ -1745,7 +1770,7 @@ export default function PublishWizard() {
         {showField('tags') ? (
         <div style={{ order: fieldRank('tags') }}>
         <PubSelectRow
-          label={isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}
+          label={isSupplierPublish ? '需求品类标签' : '需求达人标签'}
           hint="最多 2 个，不可重复"
           value={display.tagsDisplayText}
           placeholder={!form.talentTags.length}
@@ -1756,16 +1781,16 @@ export default function PublishWizard() {
 
         {isSupplierPublish && recruitTarget === 'shoot' ? (
           <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3" style={{ order: 800 }}>
-            <PubLabel>拍摄日期 *</PubLabel>
+            <PubLabel>拍摄日期</PubLabel>
             <input type="date" className="w-full rounded-lg panel-input border px-3 py-2" value={form.shootDate} onChange={(e) => patchForm({ shootDate: e.target.value })} />
-            <PubLabel>拍摄时段 *</PubLabel>
+            <PubLabel>拍摄时段</PubLabel>
             <div className="flex gap-2">
               <input type="time" className="flex-1 rounded-lg panel-input border px-3 py-2" value={form.shootTimeStart} onChange={(e) => patchForm({ shootTimeStart: e.target.value })} />
               <input type="time" className="flex-1 rounded-lg panel-input border px-3 py-2" value={form.shootTimeEnd} onChange={(e) => patchForm({ shootTimeEnd: e.target.value })} />
             </div>
-            <PubLabel>拍摄地点 *</PubLabel>
+            <PubLabel>拍摄地点</PubLabel>
             <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.shootLocation} onChange={(e) => patchForm({ shootLocation: e.target.value })} />
-            <PubLabel>成片交付 *</PubLabel>
+            <PubLabel>成片交付</PubLabel>
             <div className="flex flex-wrap gap-2">
               {DELIVERABLES.map((d) => (
                 <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.deliverables.includes(d) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ deliverables: toggleMultiTagList(form.deliverables, d) })}>{d}</button>
@@ -1782,7 +1807,7 @@ export default function PublishWizard() {
 
         {isSupplierPublish && recruitTarget === 'edit' ? (
           <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3" style={{ order: 800 }}>
-            <PubLabel>素材来源 *</PubLabel>
+            <PubLabel>素材来源</PubLabel>
             <div className="flex flex-wrap gap-2">
               {MATERIAL_SOURCES.map((s) => (
                 <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.materialSource === s ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ materialSource: s })}>{s}</button>
@@ -1790,19 +1815,19 @@ export default function PublishWizard() {
             </div>
             <PubLabel>素材链接</PubLabel>
             <input className="w-full rounded-lg panel-input border px-3 py-2" placeholder="网盘/链接（选填）" value={form.materialUrl} onChange={(e) => patchForm({ materialUrl: e.target.value })} />
-            <PubLabel>成片画幅 *</PubLabel>
+            <PubLabel>成片画幅</PubLabel>
             <div className="flex flex-wrap gap-2">
               {ASPECT_RATIOS.map((a) => (
                 <button key={a} type="button" className={`px-2 py-1 rounded text-xs ${form.aspectRatio === a ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ aspectRatio: a })}>{a}</button>
               ))}
             </div>
-            <PubLabel>目标时长 *</PubLabel>
+            <PubLabel>目标时长</PubLabel>
             <div className="flex flex-wrap gap-2">
               {TARGET_DURATIONS.map((d) => (
                 <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.targetDuration === d ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ targetDuration: d })}>{d}</button>
               ))}
             </div>
-            <PubLabel>剪辑风格 *</PubLabel>
+            <PubLabel>剪辑风格</PubLabel>
             <div className="flex flex-wrap gap-2">
               {EDIT_STYLES.map((s) => (
                 <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.styleTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ styleTags: toggleSingleTagList(form.styleTags, s) })}>{s}</button>
@@ -1822,7 +1847,7 @@ export default function PublishWizard() {
               </>
             ) : null}
             <PubSelectRow
-              label="交付截止时间 *"
+              label="交付截止时间"
               value={deliveryDeadlineDisplayText}
               placeholder={!deliveryDeadlineDate}
               onClick={() => setShowDeliveryDeadlineSheet(true)}
@@ -1832,7 +1857,7 @@ export default function PublishWizard() {
 
         {!isSupplierPublish && showField('fans') ? (
         <div style={{ order: fieldRank('fans') }}>
-          <PubLabel>达人粉丝要求 *</PubLabel>
+          <PubLabel>达人粉丝要求</PubLabel>
           <div className="flex gap-2 mt-1">
             {(['unlimited', 'limit'] as const).map((mode) => (
               <button
@@ -1872,14 +1897,14 @@ export default function PublishWizard() {
 
         {display.showDouyinLevel && !isSupplierPublish && showField('level') ? (
           <div style={{ order: fieldRank('level') }}>
-            <PubSelectRow label="达人带货等级 *" value={display.levelDisplayText} onClick={() => openPicker('reqLevel')} />
+            <PubSelectRow label="达人带货等级" value={display.levelDisplayText} onClick={() => openPicker('reqLevel')} />
           </div>
         ) : null}
 
         {showField('fee') ? (
         <div className="space-y-3" style={{ order: fieldRank('fee') }}>
         <PubSelectRow
-          label="费用模式 *"
+          label="费用模式"
           value={display.feeTypeLabel}
           placeholder={!form.feeTypeId}
           onClick={() => openPicker('fee')}
@@ -1887,7 +1912,7 @@ export default function PublishWizard() {
 
         {form.feeTypeId === 'fixed' ? (
           <div>
-            <PubLabel>一口价金额 *</PubLabel>
+            <PubLabel>一口价金额</PubLabel>
             <input
               type="number"
               min={0}
@@ -1901,7 +1926,7 @@ export default function PublishWizard() {
 
         {form.feeTypeId === 'self_quote' ? (
           <div>
-            <PubLabel>可接受报价区间 *</PubLabel>
+            <PubLabel>可接受报价区间</PubLabel>
             <div className="flex items-center gap-2 mt-1">
               <input
                 type="number"
@@ -2113,7 +2138,7 @@ export default function PublishWizard() {
 
         {!isTargetedRecruit && showField('count') ? (
         <div style={{ order: fieldRank('count') }}>
-          <PubLabel>{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}</PubLabel>
+          <PubLabel>{recruitMode === 'edit_ice' ? '成片位总数' : '招募人数'}</PubLabel>
           <input
             type="number"
             min={0}
@@ -2126,7 +2151,7 @@ export default function PublishWizard() {
 
         {showField('detail') ? (
         <div style={{ order: fieldRank('detail') }}>
-          <PubLabel>招募详情 *</PubLabel>
+          <PubLabel>招募详情</PubLabel>
           <textarea
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2 min-h-[120px]"
             placeholder="合作要求、交付内容、档期说明、注意事项等"
@@ -2155,7 +2180,7 @@ export default function PublishWizard() {
         {recruitMode !== 'ice' && recruitMode !== 'edit_ice' && (form.fulfillmentLoop || 'closed') === 'open' ? (
           <div style={{ order: 800 }}>
               <div className="mt-3">
-                <PubLabel hint="本单已选开环。审核通过后，达人在我的报名详情里扫码进群">上传群二维码 *</PubLabel>
+                <PubLabel hint="本单已选开环。审核通过后，达人在我的报名详情里扫码进群">上传群二维码</PubLabel>
                 <input
                   ref={groupQrInputRef}
                   type="file"
@@ -2216,7 +2241,7 @@ export default function PublishWizard() {
 
         {recruitMode === 'ice' || recruitMode === 'edit_ice' ? (
           <div style={{ order: 800 }}>
-            <PubLabel>云剪审核方式 *</PubLabel>
+            <PubLabel>云剪审核方式</PubLabel>
             <div className="mt-2 flex flex-wrap gap-2">
               {ICE_VERIFY_MODES.map((m) => (
                 <button
@@ -2241,8 +2266,7 @@ export default function PublishWizard() {
             {recruitMode === 'ice' && (form.iceVerifyMode || 'ai') === 'ai' ? (
               <div className="mt-3">
                 <PubLabel hint="订单完成后用于群结算，达人入选通知将附带此二维码">
-                  上传群二维码 *
-                </PubLabel>
+                  上传群二维码                </PubLabel>
                 <input
                   ref={groupQrInputRef}
                   type="file"
@@ -2302,8 +2326,7 @@ export default function PublishWizard() {
             {recruitMode === 'edit_ice' && (form.iceVerifyMode || 'ai') === 'ai' ? (
               <div className="mt-3">
                 <PubLabel hint="剪辑师确认认领后可见，用于素材沟通">
-                  上传剪辑师群二维码 *
-                </PubLabel>
+                  上传剪辑师群二维码                </PubLabel>
                 <input
                   ref={editGroupQrInputRef}
                   type="file"
@@ -2353,7 +2376,7 @@ export default function PublishWizard() {
         {showField('apply') ? (
         <div style={{ order: fieldRank('apply') }}>
         <PubSelectRow
-          label={isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}
+          label={isSupplierPublish ? '团队报名必填信息' : '达人报名必填信息'}
           value={display.applyFormDisplayText}
           placeholder={display.applyFormPlaceholder}
           onClick={() => openPicker('applyMenu')}

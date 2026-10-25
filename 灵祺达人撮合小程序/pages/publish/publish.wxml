@@ -351,16 +351,16 @@
             </view>
             <view class="pub-field">
               <text class="pub-label">表单字段</text>
-              <text class="pub-label-hint">可关掉不需要的项，或另加字段。存进我的模版后，下次选平台会自动套用。</text>
+              <text class="pub-label-hint">默认显示标题、投放窗口、截止时间和招募城市。点添加字段后，勾选系统字段即可显示；自己新增的字段需要填写内容。</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
-                <view class="pub-radio-opt" bindtap="onToggleFieldEditor">{{fieldEditorOpen ? '收起自定义' : '自定义字段'}}</view>
+                <view class="pub-radio-opt" bindtap="onToggleFieldEditor">{{fieldEditorOpen ? '收起字段' : '添加字段'}}</view>
                 <view class="pub-radio-opt" bindtap="onSavePublishFormTemplate">存入我的模版</view>
                 <view class="pub-radio-opt" bindtap="onUsePublishFormTemplate">使用我的模版</view>
               </view>
             </view>
             <block wx:if="{{fieldEditorOpen}}">
               <view class="tpl-row tpl-row--hint">
-                <text class="tpl-row__hint">长按 ≡ 再拖动排序，下方表单会跟着排</text>
+                <text class="tpl-row__hint">勾选系统字段后显示在下方。自己新增的字段需要填写内容。长按 ≡ 再拖动排序。</text>
               </view>
               <view
                 class="tpl-row tpl-row--item {{fieldDragKey === item.key ? 'tpl-row--lift' : ''}} {{fieldPressKey === item.key ? 'tpl-row--press' : ''}}"
@@ -377,7 +377,7 @@
             </block>
           </view>
           <view class="pub-form-card pub-field-stack">
-          <view class="pub-field" id="field-cover" style="order:{{fieldRank.cover}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.cover}}">
+          <view class="pub-field" id="field-cover" style="order:{{fieldRank.cover}}" wx:if="{{fieldOn.cover}}">
             <text class="pub-label">招募海报</text>
             <text class="pub-cover-hint">{{coverSourceHint}}</text>
             <view wx:if="{{coverPreviewUrl}}" class="pub-cover-preview-wrap" bindtap="onPreviewCoverImage">
@@ -400,8 +400,8 @@
               <button class="pub-cover-btn pub-cover-btn--ai" loading="{{posterAiBusy}}" disabled="{{posterAiBusy}}" bindtap="onCoverAiGenerate">开始生成 · {{posterAiPoints}}积分</button>
             </view>
           </view>
-          <view class="pub-field" id="field-delivery-window" style="order:{{fieldRank.delivery}}" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.delivery)}}">
-            <text class="pub-label">投放窗口 *</text>
+          <view class="pub-field" id="field-delivery-window" style="order:{{fieldRank.delivery}}" wx:if="{{!isTargetedRecruit && (fieldOn.delivery)}}">
+            <text class="pub-label">投放窗口</text>
             <view class="pub-window-row">
               <view
                 wx:for="{{deliveryWindows}}"
@@ -415,8 +415,8 @@
               </view>
             </view>
           </view>
-          <view class="pub-field" id="field-signup-deadline" style="order:{{fieldRank.deadline}}" wx:if="{{showSignupDeadline && !isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.deadline)}}">
-            <text class="pub-label">招募报名截止时间 *</text>
+          <view class="pub-field" id="field-signup-deadline" style="order:{{fieldRank.deadline}}" wx:if="{{showSignupDeadline && !isTargetedRecruit && (fieldOn.deadline)}}">
+            <text class="pub-label">招募报名截止时间</text>
             <view class="pub-deadline-row">
               <picker class="pub-deadline-pick" mode="date" value="{{signupDeadlineDate}}" start="{{todayDate}}" bindchange="onSignupDeadlineDate">
                 <view class="pub-select pub-select--half">
@@ -437,7 +437,7 @@
             <text class="pub-urgent-deadline-hint">急单大厅：发布后 24 小时内截止报名（无需填写）</text>
           </view>
           <view class="pub-field" style="order:800" wx:if="{{isTargetedRecruit}}">
-            <text class="pub-label">邀约响应时间 *</text>
+            <text class="pub-label">邀约响应时间</text>
             <view class="pub-radio-pair pub-radio-pair--wrap">
               <view
                 wx:for="{{inviteHourOptions}}"
@@ -450,12 +450,12 @@
             <text class="pub-hint">达人须在此时间内接受或拒绝邀约；可随时补邀更多人</text>
           </view>
           <view class="pub-field" id="field-title" style="order:-10">
-            <text class="pub-label">招募标题 *</text>
+            <text class="pub-label">招募标题</text>
             <input class="pub-input" placeholder="{{recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}}" value="{{form.title}}" data-key="title" bindinput="onFieldInput" />
           </view>
           <view wx:if="{{recruitMode === 'live'}}" style="order:800;width:100%">
             <view class="pub-field">
-              <text class="pub-label">直播平台 *</text>
+              <text class="pub-label">直播平台</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view
                   wx:for="{{livePlatforms}}"
@@ -468,7 +468,7 @@
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">直播日期 *</text>
+              <text class="pub-label">直播日期</text>
               <picker mode="date" value="{{form.liveDate}}" start="{{todayDate}}" bindchange="onLiveDatePick">
                 <view class="pub-select">
                   <text class="pub-select-text {{form.liveDate ? '' : 'pub-select-text--ph'}}">{{form.liveDate || '选择日期'}}</text>
@@ -477,7 +477,7 @@
               </picker>
             </view>
             <view class="pub-field">
-              <text class="pub-label">开播时间 *</text>
+              <text class="pub-label">开播时间</text>
               <picker mode="time" value="{{form.liveTimeStart}}" bindchange="onLiveTimePick">
                 <view class="pub-select">
                   <text class="pub-select-text {{form.liveTimeStart ? '' : 'pub-select-text--ph'}}">{{form.liveTimeStart || '选择时间'}}</text>
@@ -486,7 +486,7 @@
               </picker>
             </view>
             <view class="pub-field">
-              <text class="pub-label">预计时长 *</text>
+              <text class="pub-label">预计时长</text>
               <view class="pub-radio-pair">
                 <view
                   wx:for="{{liveDurations}}"
@@ -499,7 +499,7 @@
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">直播类型 *</text>
+              <text class="pub-label">直播类型</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view
                   wx:for="{{liveTypes}}"
@@ -512,7 +512,7 @@
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">带货商品/套餐说明 *</text>
+              <text class="pub-label">带货商品/套餐说明</text>
               <textarea
                 class="pub-textarea"
                 placeholder="商品名称、规格、团购价、佣金空间、是否独家等"
@@ -523,7 +523,7 @@
               />
             </view>
             <view class="pub-field">
-              <text class="pub-label">样品/寄样方式 *</text>
+              <text class="pub-label">样品/寄样方式</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view
                   wx:for="{{samplePolicies}}"
@@ -547,22 +547,22 @@
               />
             </view>
           </view>
-          <view class="pub-field" id="field-platform" style="order:800" wx:if="{{!isSupplierPublish && recruitMode !== 'live' && !form.platform && (publishTemplateMode !== 'custom' || fieldOn.platform)}}">
-            <text class="pub-label">招募平台 *</text>
+          <view class="pub-field" id="field-platform" style="order:800" wx:if="{{!isSupplierPublish && recruitMode !== 'live' && !form.platform && (fieldOn.platform)}}">
+            <text class="pub-label">招募平台</text>
             <view class="pub-select" data-view="platform" bindtap="openPicker">
               <image wx:if="{{platformSelectIcon}}" class="pub-select__icon" src="{{platformSelectIcon}}" mode="aspectFit" />
               <text class="pub-select-text {{platformPlaceholder ? 'pub-select-text--ph' : ''}}">{{platformDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-city" style="order:{{fieldRank.city}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.city}}">
-            <text class="pub-label">招募城市 *</text>
+          <view class="pub-field" id="field-city" style="order:{{fieldRank.city}}" wx:if="{{fieldOn.city}}">
+            <text class="pub-label">招募城市</text>
             <view class="pub-select" data-view="city" bindtap="openPicker">
               <text class="pub-select-text {{cityPlaceholder ? 'pub-select-text--ph' : ''}}">{{cityDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-merchant-location" style="order:{{fieldRank.location}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.location}}">
+          <view class="pub-field" id="field-merchant-location" style="order:{{fieldRank.location}}" wx:if="{{fieldOn.location}}">
             <text class="pub-label">商家位置</text>
             <text class="pub-label-hint">选填；地图选点后可导航</text>
             <view class="pub-location-row">
@@ -576,16 +576,16 @@
             </view>
             <text wx:if="{{merchantLocationMapReady}}" class="pub-location-map-tag">已地图定位 · 达人端可一键导航</text>
           </view>
-          <view class="pub-field" id="field-tag" style="order:{{fieldRank.tags}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.tags}}">
-            <text class="pub-label">{{isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}}</text>
+          <view class="pub-field" id="field-tag" style="order:{{fieldRank.tags}}" wx:if="{{fieldOn.tags}}">
+            <text class="pub-label">{{isSupplierPublish ? '需求品类标签' : '需求达人标签'}}</text>
             <text class="pub-label-hint">最多 2 个，不可重复</text>
             <view class="pub-select" data-view="tag" bindtap="openPicker">
               <text class="pub-select-text {{tagsPlaceholder ? 'pub-select-text--ph' : ''}}">{{tagsDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-fans" style="order:{{fieldRank.fans}}" wx:if="{{!isSupplierPublish && (publishTemplateMode !== 'custom' || fieldOn.fans)}}">
-            <text class="pub-label">达人粉丝要求 *</text>
+          <view class="pub-field" id="field-fans" style="order:{{fieldRank.fans}}" wx:if="{{!isSupplierPublish && (fieldOn.fans)}}">
+            <text class="pub-label">达人粉丝要求</text>
             <view class="pub-radio-pair pub-radio-pair--fans">
               <view
                 class="pub-radio-opt {{form.fansLimitMode === 'unlimited' ? 'pub-radio-opt--on' : ''}}"
@@ -610,13 +610,13 @@
           </view>
           <view wx:if="{{isSupplierPublish && recruitTarget === 'shoot'}}" style="order:800;width:100%">
             <view class="pub-field">
-              <text class="pub-label">拍摄日期 *</text>
+              <text class="pub-label">拍摄日期</text>
               <picker mode="date" value="{{form.shootDate}}" bindchange="onShootDatePick">
                 <view class="pub-select"><text class="pub-select-text {{form.shootDate ? '' : 'pub-select-text--ph'}}">{{form.shootDate || '选择日期'}}</text><text class="pub-select-arrow">›</text></view>
               </picker>
             </view>
             <view class="pub-field">
-              <text class="pub-label">拍摄时段 *</text>
+              <text class="pub-label">拍摄时段</text>
               <view class="pub-deadline-row">
                 <picker mode="time" value="{{form.shootTimeStart}}" data-key="shootTimeStart" bindchange="onShootTimePick">
                   <view class="pub-select pub-select--half"><text class="pub-select-text">{{form.shootTimeStart || '开始'}}</text></view>
@@ -627,11 +627,11 @@
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">拍摄地点 *</text>
+              <text class="pub-label">拍摄地点</text>
               <input class="pub-input" placeholder="门店名 + 详细地址" value="{{form.shootLocation}}" data-key="shootLocation" bindinput="onFieldInput" />
             </view>
             <view class="pub-field">
-              <text class="pub-label">成片交付 *</text>
+              <text class="pub-label">成片交付</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view wx:for="{{deliverableGrid}}" wx:key="name" class="pub-radio-opt {{item.on ? 'pub-radio-opt--on' : ''}}" data-field="deliverables" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
               </view>
@@ -645,7 +645,7 @@
           </view>
           <view wx:if="{{isSupplierPublish && recruitTarget === 'edit'}}" style="order:800;width:100%">
             <view class="pub-field">
-              <text class="pub-label">素材来源 *</text>
+              <text class="pub-label">素材来源</text>
               <view class="pub-radio-pair">
                 <view wx:for="{{materialSources}}" wx:key="*this" class="pub-radio-opt {{form.materialSource === item ? 'pub-radio-opt--on' : ''}}" data-val="{{item}}" bindtap="onMaterialSourcePick">{{item}}</view>
               </view>
@@ -655,19 +655,19 @@
               <input class="pub-input" placeholder="网盘/链接（选填）" value="{{form.materialUrl}}" data-key="materialUrl" bindinput="onFieldInput" />
             </view>
             <view class="pub-field">
-              <text class="pub-label">成片画幅 *</text>
+              <text class="pub-label">成片画幅</text>
               <view class="pub-radio-pair">
                 <view wx:for="{{aspectRatios}}" wx:key="*this" class="pub-radio-opt {{form.aspectRatio === item ? 'pub-radio-opt--on' : ''}}" data-val="{{item}}" bindtap="onAspectRatioPick">{{item}}</view>
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">目标时长 *</text>
+              <text class="pub-label">目标时长</text>
               <view class="pub-radio-pair">
                 <view wx:for="{{targetDurations}}" wx:key="*this" class="pub-radio-opt {{form.targetDuration === item ? 'pub-radio-opt--on' : ''}}" data-val="{{item}}" bindtap="onTargetDurationPick">{{item}}</view>
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">剪辑风格 *</text>
+              <text class="pub-label">剪辑风格</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view wx:for="{{styleTagGrid}}" wx:key="name" class="pub-radio-opt {{item.on ? 'pub-radio-opt--on' : ''}}" data-field="styleTags" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
               </view>
@@ -680,7 +680,7 @@
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">交付截止时间 *</text>
+              <text class="pub-label">交付截止时间</text>
               <view class="pub-deadline-row">
                 <picker class="pub-deadline-pick" mode="date" value="{{deliveryDeadlineDate}}" start="{{todayDate}}" bindchange="onDeliveryDeadlineDate">
                   <view class="pub-select pub-select--half">
@@ -699,26 +699,26 @@
               <input class="pub-input" placeholder="选填" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
             </view>
           </view>
-          <view class="pub-field" id="field-req-level" style="order:{{fieldRank.level}}" wx:if="{{showDouyinLevel && !isSupplierPublish && (publishTemplateMode !== 'custom' || fieldOn.level)}}">
-            <text class="pub-label">达人带货等级 *</text>
+          <view class="pub-field" id="field-req-level" style="order:{{fieldRank.level}}" wx:if="{{showDouyinLevel && !isSupplierPublish && (fieldOn.level)}}">
+            <text class="pub-label">达人带货等级</text>
             <view class="pub-select" data-view="reqLevel" bindtap="openPicker">
               <text class="pub-select-text">{{levelDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-fee" style="order:{{fieldRank.fee}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.fee}}">
-            <text class="pub-label">费用模式 *</text>
+          <view class="pub-field" id="field-fee" style="order:{{fieldRank.fee}}" wx:if="{{fieldOn.fee}}">
+            <text class="pub-label">费用模式</text>
             <view class="pub-select" data-view="fee" bindtap="openPicker">
               <text class="pub-select-text {{feePlaceholder ? 'pub-select-text--ph' : ''}}">{{feeTypeLabel}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{form.feeTypeId === 'fixed'}}">
-            <text class="pub-label">一口价金额 *</text>
+          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{fieldOn.fee && form.feeTypeId === 'fixed'}}">
+            <text class="pub-label">一口价金额</text>
             <input class="pub-input" type="digit" placeholder="请填写，0 代表置换" value="{{form.fixedPrice}}" data-key="fixedPrice" bindinput="onFieldInput" />
           </view>
-          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{form.feeTypeId === 'self_quote'}}">
-            <text class="pub-label">可接受报价区间 *</text>
+          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{fieldOn.fee && form.feeTypeId === 'self_quote'}}">
+            <text class="pub-label">可接受报价区间</text>
             <view class="pub-range-row">
               <input class="pub-input pub-input--range" type="digit" placeholder="最低" value="{{form.selfQuoteMin}}" data-key="selfQuoteMin" bindinput="onFieldInput" />
               <text class="pub-range-sep">-</text>
@@ -726,7 +726,7 @@
             </view>
             <text class="pub-label-hint">如 0-2000，单位为元</text>
           </view>
-          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{form.feeTypeId === 'level_tier'}}">
+          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{fieldOn.fee && form.feeTypeId === 'level_tier'}}">
             <text class="pub-fee-panel-title">请继续设置费用阶梯</text>
             <view class="pub-tier-card" id="field-tier-lv-{{tierIdx}}" wx:for="{{form.levelTiers}}" wx:key="id" wx:for-index="tierIdx">
               <view class="pub-tier-del" data-index="{{tierIdx}}" bindtap="onRemoveLevelTier">🗑</view>
@@ -753,7 +753,7 @@
             </view>
             <view class="pub-add-tier" bindtap="onAddLevelTier">+ 添加阶梯</view>
           </view>
-          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{form.feeTypeId === 'fans_tier'}}">
+          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{fieldOn.fee && form.feeTypeId === 'fans_tier'}}">
             <text class="pub-fee-panel-title">粉丝阶梯费用</text>
             <view class="pub-tier-card" id="field-tier-fans-{{tierIdx}}" wx:for="{{form.fansTiers}}" wx:key="id" wx:for-index="tierIdx">
               <view class="pub-tier-del" data-index="{{tierIdx}}" bindtap="onRemoveFansTier">🗑</view>
@@ -780,7 +780,7 @@
             </view>
             <view class="pub-add-tier" bindtap="onAddFansTier">+ 添加阶梯</view>
           </view>
-          <view class="pub-field" style="order:{{fieldRank.fee}}">
+          <view class="pub-field" style="order:{{fieldRank.fee}}" wx:if="{{fieldOn.fee}}">
             <text class="pub-label">佣金 CPS（%）</text>
             <input class="pub-input" type="digit" placeholder="选填" value="{{form.cpsPercent}}" data-key="cpsPercent" bindinput="onFieldInput" />
           </view>
@@ -826,11 +826,11 @@
                   </view>
                 </view>
                 <view class="pub-field" wx:if="{{form.linkeAttach.clientId}}">
-                  <text class="pub-label">商家联系电话 *</text>
+                  <text class="pub-label">商家联系电话</text>
                   <input class="pub-input" type="number" maxlength="11" placeholder="11 位手机号" value="{{form.linkeAttach.merchantPhone}}" bindinput="onLinkePhoneInput" />
                 </view>
                 <view class="pub-field" wx:if="{{form.linkeAttach.clientId}}">
-                  <text class="pub-label">林客团购商品 *</text>
+                  <text class="pub-label">林客团购商品</text>
                   <view class="pub-linke-search-row">
                     <input class="pub-input pub-linke-search-input" placeholder="商品名称关键词" value="{{linkeProductKw}}" bindinput="onLinkeProductKwInput" />
                     <button class="pub-linke-search-btn" loading="{{linkeProductSearching}}" bindtap="onLinkeSearchProducts">搜索</button>
@@ -849,12 +849,12 @@
               </block>
             </block>
           </view>
-          <view class="pub-field" id="field-recruit-count" style="order:{{fieldRank.count}}" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.count)}}">
-            <text class="pub-label">{{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}}</text>
+          <view class="pub-field" id="field-recruit-count" style="order:{{fieldRank.count}}" wx:if="{{!isTargetedRecruit && (fieldOn.count)}}">
+            <text class="pub-label">{{recruitMode === 'edit_ice' ? '成片位总数' : '招募人数'}}</text>
             <input class="pub-input" type="number" placeholder="1" value="{{form.recruitCount}}" data-key="recruitCount" bindinput="onFieldInput" />
           </view>
-          <view class="pub-field" id="field-recruit-detail" style="order:{{fieldRank.detail}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.detail}}">
-            <text class="pub-label">招募详情 *</text>
+          <view class="pub-field" id="field-recruit-detail" style="order:{{fieldRank.detail}}" wx:if="{{fieldOn.detail}}">
+            <text class="pub-label">招募详情</text>
             <textarea
               class="pub-textarea"
               placeholder="合作要求、交付内容、档期说明、注意事项等"
@@ -883,7 +883,7 @@
           </view>
           <view class="pub-field" style="order:800" wx:if="{{recruitMode !== 'ice' && recruitMode !== 'edit_ice' && form.fulfillmentLoop === 'open'}}">
             <view class="pub-field">
-              <text class="pub-label">上传群二维码 *</text>
+              <text class="pub-label">上传群二维码</text>
               <text class="pub-cover-hint">本单已选开环。审核通过后，达人在我的报名详情里扫码进群。</text>
               <view class="pub-cover-actions" wx:if="{{!form.groupQrImage}}">
                 <button class="pub-cover-btn pub-cover-btn--on" loading="{{groupQrUploading}}" bindtap="onUploadOpenLoopGroupQr">上传群二维码</button>
@@ -897,7 +897,7 @@
             </view>
           </view>
           <view class="pub-field" style="order:800" wx:if="{{recruitMode === 'ice' || recruitMode === 'edit_ice'}}">
-            <text class="pub-label">云剪审核方式 *</text>
+            <text class="pub-label">云剪审核方式</text>
             <view class="pub-radio-pair">
               <view
                 class="pub-radio-opt {{form.iceVerifyMode !== 'pr' ? 'pub-radio-opt--on' : ''}}"
@@ -912,7 +912,7 @@
             </view>
             <text class="pub-cover-hint">{{recruitMode === 'edit_ice' ? '剪辑师确认认领后可见群码，并批量回传成片链接。' : 'AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。'}}</text>
             <view class="pub-field" wx:if="{{recruitMode === 'edit_ice' && form.iceVerifyMode !== 'pr'}}">
-              <text class="pub-label">上传剪辑师群二维码 *</text>
+              <text class="pub-label">上传剪辑师群二维码</text>
               <view class="pub-cover-actions" wx:if="{{!form.editGroupQrImage}}">
                 <button class="pub-cover-btn pub-cover-btn--on" loading="{{editGroupQrUploading}}" bindtap="onUploadEditGroupQr">上传群二维码</button>
               </view>
@@ -938,8 +938,8 @@
               </block>
             </view>
           </block>
-          <view class="pub-field" id="field-apply-form" style="order:{{fieldRank.apply}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.apply}}">
-            <text class="pub-label">{{isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}}</text>
+          <view class="pub-field" id="field-apply-form" style="order:{{fieldRank.apply}}" wx:if="{{fieldOn.apply}}">
+            <text class="pub-label">{{isSupplierPublish ? '团队报名必填信息' : '达人报名必填信息'}}</text>
             <view class="pub-select" data-view="applyForm" bindtap="openPicker">
               <text class="pub-select-text {{applyFormPlaceholder ? 'pub-select-text--ph' : ''}}">{{applyFormDisplayText}}</text>
               <text class="pub-select-arrow">›</text>

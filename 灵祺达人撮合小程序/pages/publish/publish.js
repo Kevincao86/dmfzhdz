@@ -342,6 +342,32 @@ function layoutFromOrder(order, customFields) {
   return { fieldOrder: next, fieldRank, editorRows }
 }
 
+function defaultPublishFieldOn() {
+  return {
+    delivery: true,
+    deadline: true,
+    platform: false,
+    city: true,
+    location: false,
+    tags: false,
+    fans: false,
+    level: false,
+    fee: false,
+    count: false,
+    detail: false,
+    apply: false,
+    cover: false,
+  }
+}
+
+function allPublishFieldOn() {
+  const on = defaultPublishFieldOn()
+  Object.keys(on).forEach((key) => {
+    on[key] = true
+  })
+  return on
+}
+
 const initialFieldLayout = layoutFromOrder(DEFAULT_PUBLISH_FIELD_ORDER, [])
 
 Page({
@@ -368,22 +394,8 @@ Page({
     signupDeadlinePlaceholder: true,
     recruitMode: '',
     recruitModeLabel: '',
-    publishTemplateMode: 'system',
-    fieldOn: {
-      delivery: true,
-      deadline: true,
-      platform: true,
-      city: true,
-      location: true,
-      tags: true,
-      fans: true,
-      level: true,
-      fee: true,
-      count: true,
-      detail: true,
-      apply: true,
-      cover: true,
-    },
+    publishTemplateMode: 'custom',
+    fieldOn: defaultPublishFieldOn(),
     publishFieldCatalog: [
       { key: 'delivery', label: '投放窗口' },
       { key: 'deadline', label: '报名截止时间' },
@@ -1149,11 +1161,11 @@ Page({
         signupDeadlineTime: restored.signupDeadlineTime || '23:59',
         deliveryDeadlineDate: restored.deliveryDeadlineDate || '',
         deliveryDeadlineTime: restored.deliveryDeadlineTime || '18:00',
-        publishTemplateMode: meta.publishTemplateMode === 'custom' ? 'custom' : 'system',
+        publishTemplateMode: meta.publishTemplateMode === 'custom' || (meta.publishFieldOn && typeof meta.publishFieldOn === 'object') ? 'custom' : 'system',
         fieldOn:
           meta.publishFieldOn && typeof meta.publishFieldOn === 'object'
-            ? { ...this.data.fieldOn, ...meta.publishFieldOn }
-            : this.data.fieldOn,
+            ? { ...defaultPublishFieldOn(), ...meta.publishFieldOn }
+            : allPublishFieldOn(),
         customPublishFields: (() => {
           const rows = Array.isArray(meta.customPublishFields)
             ? meta.customPublishFields.map((row) => {
@@ -1326,7 +1338,10 @@ Page({
       isTargetedRecruit: false,
       loopChosen: true,
       isSupplierPublish: false,
-      publishTemplateMode: 'system',
+      publishTemplateMode: 'custom',
+      fieldOn: defaultPublishFieldOn(),
+      ...layoutFromOrder(DEFAULT_PUBLISH_FIELD_ORDER, []),
+      customPublishFields: [],
       form,
       tagGrid: buildTagGrid([]),
       publishFormTemplates: publishFormTemplates.listPublishFormTemplates(),
@@ -1626,12 +1641,10 @@ Page({
     })
   },
   sysFieldOn(key) {
-    if (this.data.publishTemplateMode !== 'custom') return true
-    const on = this.data.fieldOn || {}
-    return on[key] !== false
+    return !!(this.data.fieldOn && this.data.fieldOn[key])
   },
   onPickSystemTemplate() {
-    this.setData({ publishTemplateMode: 'system', step: 'form' }, () => {
+    this.setData({ publishTemplateMode: 'system', fieldOn: allPublishFieldOn(), step: 'form' }, () => {
       this.syncTabBarOverlay()
       this.resetFormScrollToTop()
     })
@@ -2295,75 +2308,6 @@ Page({
   },
   validate() {
     const f = this.data.form
-    const target = this.data.recruitTarget || 'talent'
-    const isSupplier = target === 'shoot' || target === 'edit'
-    if (!String(f.title || '').trim()) return '请填写招募标题'
-    const need = (key) => this.sysFieldOn(key)
-    if (this.data.recruitMode === 'live') {
-      const liveErr = livePublishForm.validateLivePublish(f)
-      if (liveErr) return liveErr
-      if (livePublishForm.isDouyinLivePlatform(f.livePlatform) && !(f.douyinSalesLevels || []).length) {
-        return '请选择达人带货等级'
-      }
-    } else if (need('platform') && !isSupplier && !f.platform) return '请选择招募平台'
-    if (need('city') && !f.cityNational && !(f.selectedCities || []).length && !(f.selectedProvinces || []).length) {
-      return '请选择招募城市'
-    }
-    if (need('tags') && !isSupplier && !(f.talentTags || []).length) return '请选择需求达人标签'
-    if (need('fans') && !isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
-    if (need('deadline') && f.deliveryWindow !== 'urgent' && !this.data.isTargetedRecruit && !String(f.signupDeadline || '').trim()) {
-      return '请选择招募报名截止时间'
-    }
-    if (
-      need('level') &&
-      !isSupplier &&
-      this.data.recruitMode !== 'live' &&
-      f.platform === '抖音' &&
-      !(f.douyinSalesLevels || []).length
-    ) {
-      return '请选择达人带货等级'
-    }
-    if (need('fee') && !f.feeTypeId) return '请选择费用模式'
-    if (need('fee')) {
-      const feeErr = this.validateFee(f)
-      if (feeErr) return feeErr
-    }
-    if (!this.data.isTargetedRecruit) {
-      const n = Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
-      if (n < 1) return '招募人数至少为 1'
-    } else if (!f.inviteResponseHours) {
-      return '请设置邀约响应时间'
-    }
-    if (need('detail') && !String(f.recruitDetail || '').trim() && this.data.recruitMode !== 'live') return '请填写招募详情'
-    if (isSupplier) {
-      const sErr = supplierPublishForm.validateSupplierPublish(target, f, this.data.recruitMode)
-      if (sErr) return sErr
-    }
-    if (
-      this.data.recruitMode !== 'ice' &&
-      this.data.recruitMode !== 'edit_ice' &&
-      f.fulfillmentLoop === 'open' &&
-      !String(f.groupQrImage || '').trim()
-    ) {
-      return '开环招募请上传群二维码'
-    }
-    if (this.data.recruitMode === 'ice') {
-      if (!resolveIceReferenceVideoUrl(f)) return '云剪任务请填写参考片链接'
-    }
-    if (
-      this.data.recruitMode === 'edit_ice' &&
-      (f.iceVerifyMode || 'ai') === 'ai' &&
-      !String(f.editGroupQrImage || '').trim()
-    ) {
-      return '剪辑云剪请上传剪辑师群二维码'
-    }
-    if (need('apply') && !(f.applyFormFields || []).length) {
-      return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
-    }
-    if (need('apply')) {
-      const afErr = applyTemplates.validateTemplateFields(f.applyFormFields)
-      if (afErr) return afErr
-    }
     const lk = f.linkeAttach
     if (lk && lk.enabled) {
       if (!lk.clientId) return '挂接林客时请选择客户商家'
