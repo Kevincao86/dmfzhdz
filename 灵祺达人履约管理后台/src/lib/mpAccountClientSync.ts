@@ -258,7 +258,8 @@ export function applyRemoteClientState(
       state.activeApplyTemplateIds,
     )
   }
-  if (Array.isArray(state.publishFormTemplates)) {
+  const publishTplStale = epochAtStart != null && epochAtStart !== localEpoch
+  if (!publishTplStale && Array.isArray(state.publishFormTemplates)) {
     applyPublishFormTemplatesFromSync(state.publishFormTemplates)
   }
   if (Array.isArray(state.talentFavoriteIds)) {

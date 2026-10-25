@@ -1339,14 +1339,12 @@ Page({
     wx.showModal({
       title: '存入我的模版',
       editable: true,
+      content: '我的发单模版',
       placeholderText: '模版名称，如：探店默认',
+      confirmText: '保存',
       success: (res) => {
         if (!res.confirm) return
-        const name = String(res.content || '').trim()
-        if (!name) {
-          wx.showToast({ title: '请填写模版名称', icon: 'none' })
-          return
-        }
+        const name = String(res.content != null ? res.content : '我的发单模版').trim() || '我的发单模版'
         const row = publishFormTemplates.savePublishFormTemplate({
           name,
           recruitTarget: this.data.recruitTarget || 'talent',

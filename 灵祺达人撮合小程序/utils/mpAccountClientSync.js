@@ -261,7 +261,8 @@ function applyRemoteState(state, epochAtStart) {
   if (Array.isArray(state.applyFormTemplates) || state.activeApplyTemplateIds) {
     applyTemplates.applyTemplatesFromSync(state.applyFormTemplates, state.activeApplyTemplateIds)
   }
-  if (Array.isArray(state.publishFormTemplates)) {
+  const publishTplStale = epochAtStart != null && epochAtStart !== localEpoch
+  if (!publishTplStale && Array.isArray(state.publishFormTemplates)) {
     publishFormTemplates.applyPublishFormTemplatesFromSync(state.publishFormTemplates)
   }
   if (Array.isArray(state.talentFavoriteIds)) {

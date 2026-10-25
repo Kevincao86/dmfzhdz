@@ -68,7 +68,14 @@ export function listPublishFormTemplates(): PublishFormTemplate[] {
 }
 
 function writeAll(list: PublishFormTemplate[]) {
-  localStorage.setItem(storageKey(), JSON.stringify(list.slice(0, 30)))
+  const next = JSON.stringify(list.slice(0, 30))
+  const key = storageKey()
+  try {
+    if (localStorage.getItem(key) === next) return
+  } catch {
+    /* ignore quota / private mode */
+  }
+  localStorage.setItem(key, next)
   notify()
 }
 
@@ -116,6 +123,13 @@ export function deletePublishFormTemplate(id: string) {
 
 export function applyPublishFormTemplatesFromSync(templates: unknown) {
   if (!Array.isArray(templates)) return
-  const list = templates.map(normalize).filter((row): row is PublishFormTemplate => !!row)
-  writeAll(list)
+  const remote = templates.map(normalize).filter((row): row is PublishFormTemplate => !!row)
+  const map = new Map<string, PublishFormTemplate>()
+  for (const row of remote) map.set(row.id, row)
+  for (const row of listPublishFormTemplates()) {
+    const prev = map.get(row.id)
+    if (!prev || row.updatedAt > prev.updatedAt) map.set(row.id, row)
+  }
+  const merged = [...map.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 30)
+  writeAll(merged)
 }
