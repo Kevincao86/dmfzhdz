@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { appendMpRecruitmentOrder, clearMpRegistryCache, fetchMpRegistry, updateMpRecruitmentOrder } from '../../lib/mpApi'
 import { addPublishedOrder } from '../../lib/mpSync/applicationsStore'
@@ -175,6 +175,20 @@ function PubSelectRow({
   )
 }
 
+type FieldDragSlot = { key: string; top: number; height: number; el: HTMLDivElement }
+type FieldDragState = {
+  key: string
+  pointerId: number
+  startX: number
+  startY: number
+  armed: boolean
+  timer: number
+  from: number
+  target: number
+  grabY: number
+  slots: FieldDragSlot[]
+}
+
 export default function PublishWizard() {
   const nav = useNavigate()
   const [search] = useSearchParams()
@@ -201,7 +215,10 @@ export default function PublishWizard() {
     { id: string; label: string; value: string; format: 'text' | 'image' | 'video' }[]
   >([])
   const [fieldOrder, setFieldOrder] = useState<string[]>([...PUBLISH_FIELD_KEYS])
-  const dragFieldKey = useRef('')
+  const fieldRowEls = useRef<Record<string, HTMLDivElement | null>>({})
+  const fieldDragRef = useRef<FieldDragState | null>(null)
+  const fieldDropFlipRef = useRef<Map<string, number> | null>(null)
+  const orderedKeysRef = useRef<string[]>([])
   const [customFieldFormat, setCustomFieldFormat] = useState<'text' | 'image' | 'video'>('text')
   const [customFieldDraft, setCustomFieldDraft] = useState('')
   const [recruitChannel, setRecruitChannel] = useState('')
@@ -258,6 +275,35 @@ export default function PublishWizard() {
     () => mergePublishFieldOrder(fieldOrder, customPublishFields.map((row) => row.id)),
     [fieldOrder, customPublishFields],
   )
+  orderedKeysRef.current = orderedKeys
+  useLayoutEffect(() => {
+    const before = fieldDropFlipRef.current
+    if (!before) return
+    fieldDropFlipRef.current = null
+    const nodes: HTMLDivElement[] = []
+    before.forEach((top, key) => {
+      const el = fieldRowEls.current[key]
+      if (!el) return
+      const dy = top - el.getBoundingClientRect().top
+      if (Math.abs(dy) < 1) return
+      el.style.transition = 'none'
+      el.style.transform = `translateY(${dy}px)`
+      nodes.push(el)
+    })
+    if (!nodes.length) return
+    requestAnimationFrame(() => {
+      nodes.forEach((el) => {
+        el.style.transition = 'transform 220ms cubic-bezier(.2,.7,.2,1)'
+        el.style.transform = ''
+      })
+      window.setTimeout(() => {
+        nodes.forEach((el) => {
+          if (el.style.transform) return
+          el.style.transition = ''
+        })
+      }, 260)
+    })
+  }, [fieldOrder])
   const isSupplierPublish = recruitTarget === 'shoot' || recruitTarget === 'edit'
   const filteredModes = useMemo(() => modesForTarget(recruitTarget || 'talent'), [recruitTarget])
 
@@ -937,41 +983,181 @@ export default function PublishWizard() {
     setFieldOrder((order) => order.filter((key) => key !== id))
     setPublishTemplateMode(layoutIsCustom(fieldOn, list) ? 'custom' : 'system')
   }
-  function moveField(from: string, to: string) {
-    if (!from || !to || from === to) return
+  function clearFieldDragMotion() {
+    for (const el of Object.values(fieldRowEls.current)) {
+      if (!el) continue
+      el.style.transform = ''
+      el.style.zIndex = ''
+      el.style.boxShadow = ''
+      el.style.background = ''
+      el.style.transition = ''
+      el.style.borderRadius = ''
+    }
+  }
+  function moveFieldToIndex(key: string, target: number) {
     setFieldOrder(() => {
-      const list = orderedKeys.slice()
-      const fromIndex = list.indexOf(from)
-      const toIndex = list.indexOf(to)
-      if (fromIndex < 0 || toIndex < 0) return list
-      list.splice(fromIndex, 1)
-      list.splice(toIndex, 0, from)
+      const list = orderedKeysRef.current.slice()
+      const from = list.indexOf(key)
+      if (from < 0 || target < 0 || target >= list.length || from === target) return list
+      const [item] = list.splice(from, 1)
+      list.splice(target, 0, item)
       return list
     })
+  }
+  function paintFieldDrag(clientY: number) {
+    const drag = fieldDragRef.current
+    if (!drag?.armed || !drag.slots.length) return
+    const from = drag.from
+    let target = 0
+    for (let i = 0; i < drag.slots.length; i += 1) {
+      const mid = drag.slots[i].top + drag.slots[i].height / 2
+      if (clientY >= mid) target = i
+    }
+    drag.target = target
+    const dragged = drag.slots[from]
+    if (!dragged) return
+    const dy = clientY - drag.grabY - dragged.top
+    dragged.el.style.zIndex = '3'
+    dragged.el.style.borderRadius = '12px'
+    dragged.el.style.background = 'var(--panel-card)'
+    dragged.el.style.boxShadow = '0 14px 32px rgba(20, 16, 40, 0.18)'
+    dragged.el.style.transition = 'box-shadow 160ms ease, background 160ms ease'
+    dragged.el.style.transform = `translateY(${dy}px) scale(1.03)`
+    drag.slots.forEach((slot, index) => {
+      if (index === from) return
+      let shift = 0
+      if (target > from && index > from && index <= target) shift = -dragged.height
+      if (target < from && index < from && index >= target) shift = dragged.height
+      slot.el.style.zIndex = ''
+      slot.el.style.transition = 'transform 200ms cubic-bezier(.2,.7,.2,1)'
+      slot.el.style.transform = shift ? `translateY(${shift}px)` : 'translateY(0px)'
+    })
+  }
+  function finishFieldDrag(ev: PointerEvent) {
+    const drag = fieldDragRef.current
+    fieldDragRef.current = null
+    if (!drag) return
+    window.clearTimeout(drag.timer)
+    if (!drag.armed) {
+      clearFieldDragMotion()
+      return
+    }
+    if (drag.target !== drag.from && drag.target >= 0) {
+      const before = new Map<string, number>()
+      drag.slots.forEach((slot) => before.set(slot.key, slot.el.getBoundingClientRect().top))
+      clearFieldDragMotion()
+      fieldDropFlipRef.current = before
+      moveFieldToIndex(drag.key, drag.target)
+      return
+    }
+    drag.slots.forEach((slot) => {
+      slot.el.style.transition = 'transform 200ms cubic-bezier(.2,.7,.2,1), box-shadow 200ms ease, background 200ms ease'
+      slot.el.style.transform = ''
+      slot.el.style.boxShadow = ''
+      slot.el.style.background = ''
+      slot.el.style.zIndex = ''
+    })
+    window.setTimeout(() => {
+      if (fieldDragRef.current) return
+      drag.slots.forEach((slot) => {
+        slot.el.style.transition = ''
+        slot.el.style.borderRadius = ''
+      })
+    }, 220)
+    void ev
+  }
+  function startFieldDrag(e: React.PointerEvent<HTMLElement>, key: string) {
+    if (e.button !== 0) return
+    e.preventDefault()
+    const row = fieldRowEls.current[key]
+    if (!row) return
+    window.clearTimeout(fieldDragRef.current?.timer)
+    const pointerId = e.pointerId
+    const startX = e.clientX
+    const startY = e.clientY
+    const timer = window.setTimeout(() => {
+      const drag = fieldDragRef.current
+      if (!drag || drag.pointerId !== pointerId || drag.key !== key) return
+      row.style.transition = 'none'
+      row.style.transform = ''
+      row.style.background = ''
+      const keys = orderedKeysRef.current
+      const slots = keys
+        .map((itemKey) => {
+          const el = fieldRowEls.current[itemKey]
+          if (!el) return null
+          const rect = el.getBoundingClientRect()
+          return { key: itemKey, top: rect.top, height: rect.height, el }
+        })
+        .filter((slot): slot is FieldDragSlot => Boolean(slot))
+      const from = slots.findIndex((slot) => slot.key === key)
+      if (from < 0) return
+      drag.armed = true
+      drag.slots = slots
+      drag.from = from
+      drag.target = from
+      drag.grabY = startY - slots[from].top
+      if (navigator.vibrate) navigator.vibrate(12)
+      paintFieldDrag(startY)
+    }, 320)
+    fieldDragRef.current = {
+      key,
+      pointerId,
+      startX,
+      startY,
+      armed: false,
+      timer,
+      from: -1,
+      target: -1,
+      grabY: 0,
+      slots: [],
+    }
+    row.style.transition = 'transform 140ms ease, background 140ms ease'
+    row.style.transform = 'scale(0.98)'
+    row.style.background = 'rgba(91, 45, 204, 0.07)'
+    const onMove = (ev: PointerEvent) => {
+      const drag = fieldDragRef.current
+      if (!drag || drag.pointerId !== pointerId) return
+      if (!drag.armed) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) {
+          window.clearTimeout(drag.timer)
+          fieldDragRef.current = null
+          clearFieldDragMotion()
+          window.removeEventListener('pointermove', onMove)
+          window.removeEventListener('pointerup', onUp)
+          window.removeEventListener('pointercancel', onUp)
+        }
+        return
+      }
+      ev.preventDefault()
+      paintFieldDrag(ev.clientY)
+    }
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      if (fieldDragRef.current?.pointerId === pointerId) finishFieldDrag(ev)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
   function renderFieldEditor() {
     return editorRows.map((row) => (
       <div
         key={row.key}
-        draggable
-        onDragStart={(e) => {
-          dragFieldKey.current = row.key
-          e.dataTransfer.effectAllowed = 'move'
-          e.dataTransfer.setData('text/plain', row.key)
+        data-field-key={row.key}
+        ref={(el) => {
+          fieldRowEls.current[row.key] = el
         }}
-        onDragOver={(e) => {
-          e.preventDefault()
-          e.dataTransfer.dropEffect = 'move'
-        }}
-        onDrop={(e) => {
-          e.preventDefault()
-          const from = dragFieldKey.current || e.dataTransfer.getData('text/plain')
-          if (from) moveField(from, row.key)
-          dragFieldKey.current = ''
-        }}
-        className="flex items-center gap-2 px-3 py-2.5 text-sm"
+        className="relative flex items-center gap-2 px-3 py-2.5 text-sm"
       >
-        <span className="cursor-grab select-none px-1 text-base leading-none text-[#8B909A]" title="拖拽排序">
+        <span
+          className="cursor-grab touch-none select-none px-1 text-base leading-none text-[#8B909A]"
+          title="长按后拖动排序"
+          onPointerDown={(e) => startFieldDrag(e, row.key)}
+          onDragStart={(e) => e.preventDefault()}
+        >
           ≡
         </span>
         <span className="min-w-0 flex-1">{row.label}</span>
@@ -1019,7 +1205,7 @@ export default function PublishWizard() {
           </div>
         ) : (
           <div className="surface-card rounded-xl border divide-y">
-            <p className="px-4 py-2 text-xs text-slate-400">拖拽左侧 ≡ 排序，表单会跟着排</p>
+            <p className="px-4 py-2 text-xs text-slate-400">长按左侧 ≡ 再拖动排序，表单会跟着排</p>
             {renderFieldEditor()}
             <div className="flex items-center gap-2 px-4 py-2.5">
               <select
@@ -1286,7 +1472,7 @@ export default function PublishWizard() {
           </div>
           {fieldEditorOpen ? (
             <div className="divide-y border border-[var(--shell-border)] rounded-lg md:col-span-2">
-              <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">拖拽左侧 ≡ 排序，下方表单会跟着排</p>
+              <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">长按左侧 ≡ 再拖动排序，下方表单会跟着排</p>
               {renderFieldEditor()}
               <div className="flex items-center gap-2 px-3 py-2">
                 <select

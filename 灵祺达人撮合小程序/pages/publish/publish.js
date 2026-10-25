@@ -402,6 +402,10 @@ Page({
     fieldOrder: initialFieldLayout.fieldOrder,
     fieldRank: initialFieldLayout.fieldRank,
     editorRows: initialFieldLayout.editorRows,
+    fieldPressKey: '',
+    fieldDragKey: '',
+    fieldDragDy: 0,
+    fieldDragShift: {},
     customFieldDraft: '',
     iceVerifyModes: publishOpts.ICE_VERIFY_MODES,
     form: emptyForm('talent'),
@@ -1696,34 +1700,110 @@ Page({
   },
   onFieldDragStart(e) {
     const touch = e.touches && e.touches[0]
+    const key = e.currentTarget.dataset.key
+    if (!key || !touch) return
+    if (this._fieldPressTimer) clearTimeout(this._fieldPressTimer)
+    const order = this.data.fieldOrder || []
+    const index = order.indexOf(key)
     this._fieldDrag = {
-      key: e.currentTarget.dataset.key,
-      y: touch ? touch.clientY : 0,
+      key,
+      x: touch.clientX,
+      y: touch.clientY,
+      lastY: touch.clientY,
+      index,
+      target: index,
+      armed: false,
+      rowH: 44,
     }
+    this.setData({ fieldPressKey: key, fieldDragKey: '', fieldDragDy: 0, fieldDragShift: {} })
+    this._fieldPressTimer = setTimeout(() => this._armFieldDrag(key), 320)
+  },
+  _armFieldDrag(key) {
+    const drag = this._fieldDrag
+    if (!drag || drag.key !== key || drag.armed) return
+    const query = wx.createSelectorQuery().in(this)
+    query.selectAll('.tpl-row--item').boundingClientRect()
+    query.exec((res) => {
+      const live = this._fieldDrag
+      if (!live || live.key !== key) return
+      const rects = (res && res[0]) || []
+      const order = this.data.fieldOrder || []
+      const index = order.indexOf(key)
+      const rect = rects[index]
+      live.armed = true
+      live.index = index
+      live.target = index
+      live.rowH = (rect && rect.height) || 44
+      try {
+        wx.vibrateShort({ type: 'medium' })
+      } catch (err) {
+        try { wx.vibrateShort() } catch (err2) { /* 机型不支持震动时忽略 */ }
+      }
+      this.setData({ fieldPressKey: '', fieldDragKey: key, fieldDragDy: 0, fieldDragShift: {} })
+      if (Math.abs(live.lastY - live.y) > 1) this._paintFieldDrag(live.lastY)
+    })
+  },
+  _paintFieldDrag(clientY) {
+    const drag = this._fieldDrag
+    if (!drag || !drag.armed) return
+    const order = this.data.fieldOrder || []
+    const from = drag.index
+    const rowH = drag.rowH || 44
+    if (from < 0 || !order.length) return
+    let target = from + Math.round((clientY - drag.y) / rowH)
+    if (target < 0) target = 0
+    if (target >= order.length) target = order.length - 1
+    drag.target = target
+    const shift = {}
+    for (let i = 0; i < order.length; i += 1) {
+      if (i === from) continue
+      let px = 0
+      if (target > from && i > from && i <= target) px = -rowH
+      else if (target < from && i >= target && i < from) px = rowH
+      if (px) shift[order[i]] = px
+    }
+    this.setData({ fieldDragDy: clientY - drag.y, fieldDragShift: shift })
   },
   onFieldDragMove(e) {
     const drag = this._fieldDrag
     if (!drag || !drag.key) return
     const touch = e.touches && e.touches[0]
     if (!touch) return
-    const dy = touch.clientY - drag.y
-    if (Math.abs(dy) < 36) return
-    const order = (this.data.fieldOrder || []).slice()
-    const index = order.indexOf(drag.key)
-    if (index < 0) return
-    const next = index + (dy > 0 ? 1 : -1)
-    if (next < 0 || next >= order.length) {
-      drag.y = touch.clientY
+    drag.lastY = touch.clientY
+    if (!drag.armed) {
+      if (Math.abs(touch.clientX - drag.x) > 10 || Math.abs(touch.clientY - drag.y) > 10) {
+        if (this._fieldPressTimer) clearTimeout(this._fieldPressTimer)
+        this._fieldPressTimer = null
+        this._fieldDrag = null
+        this.setData({ fieldPressKey: '', fieldDragKey: '', fieldDragDy: 0, fieldDragShift: {} })
+      }
       return
     }
-    const moved = order[index]
-    order[index] = order[next]
-    order[next] = moved
-    drag.y = touch.clientY
-    this.setData(layoutFromOrder(order, this.data.customPublishFields))
+    const now = Date.now()
+    if (drag.paintAt && now - drag.paintAt < 16) return
+    drag.paintAt = now
+    this._paintFieldDrag(touch.clientY)
   },
   onFieldDragEnd() {
+    if (this._fieldPressTimer) {
+      clearTimeout(this._fieldPressTimer)
+      this._fieldPressTimer = null
+    }
+    const drag = this._fieldDrag
     this._fieldDrag = null
+    const clear = { fieldPressKey: '', fieldDragKey: '', fieldDragDy: 0, fieldDragShift: {} }
+    if (!drag || !drag.armed || drag.target == null || drag.target === drag.index || drag.index < 0) {
+      this.setData(clear)
+      return
+    }
+    const order = (this.data.fieldOrder || []).slice()
+    const [item] = order.splice(drag.index, 1)
+    if (!item) {
+      this.setData(clear)
+      return
+    }
+    order.splice(drag.target, 0, item)
+    this.setData(Object.assign(clear, layoutFromOrder(order, this.data.customPublishFields)))
   },
   onRemoveCustomPublishField(e) {
     const id = e.currentTarget.dataset.id

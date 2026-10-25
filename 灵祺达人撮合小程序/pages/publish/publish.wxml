@@ -262,10 +262,15 @@
         <block wx:else>
           <view class="tpl-sheet">
             <view class="tpl-row tpl-row--hint">
-              <text class="tpl-row__hint">按住 ≡ 上下拖动排序，表单会跟着排</text>
+              <text class="tpl-row__hint">长按 ≡ 再拖动排序，松手后表单跟着排</text>
             </view>
-            <view class="tpl-row" wx:for="{{editorRows}}" wx:key="key">
-              <view class="tpl-row__handle" data-key="{{item.key}}" catchtouchstart="onFieldDragStart" catchtouchmove="onFieldDragMove" catchtouchend="onFieldDragEnd">≡</view>
+            <view
+              class="tpl-row tpl-row--item {{fieldDragKey === item.key ? 'tpl-row--lift' : ''}} {{fieldPressKey === item.key ? 'tpl-row--press' : ''}}"
+              wx:for="{{editorRows}}"
+              wx:key="key"
+              style="{{fieldDragKey === item.key ? 'transform:translateY(' + fieldDragDy + 'px) scale(1.03);' : (fieldDragShift[item.key] ? 'transform:translateY(' + fieldDragShift[item.key] + 'px);' : '')}}"
+            >
+              <view class="tpl-row__handle" data-key="{{item.key}}" catchtouchstart="onFieldDragStart" catchtouchmove="onFieldDragMove" catchtouchend="onFieldDragEnd" catchtouchcancel="onFieldDragEnd">≡</view>
               <text class="tpl-row__name">{{item.kind === 'custom' ? item.label + ' · ' + item.formatLabel : item.label}}</text>
               <switch wx:if="{{item.kind === 'sys'}}" class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
               <text wx:else class="tpl-row__del" data-id="{{item.key}}" bindtap="onRemoveCustomPublishField">删除</text>
@@ -355,10 +360,15 @@
             </view>
             <block wx:if="{{fieldEditorOpen}}">
               <view class="tpl-row tpl-row--hint">
-                <text class="tpl-row__hint">按住 ≡ 上下拖动排序，下方表单会跟着排</text>
+                <text class="tpl-row__hint">长按 ≡ 再拖动排序，下方表单会跟着排</text>
               </view>
-              <view class="tpl-row" wx:for="{{editorRows}}" wx:key="key">
-                <view class="tpl-row__handle" data-key="{{item.key}}" catchtouchstart="onFieldDragStart" catchtouchmove="onFieldDragMove" catchtouchend="onFieldDragEnd">≡</view>
+              <view
+                class="tpl-row tpl-row--item {{fieldDragKey === item.key ? 'tpl-row--lift' : ''}} {{fieldPressKey === item.key ? 'tpl-row--press' : ''}}"
+                wx:for="{{editorRows}}"
+                wx:key="key"
+                style="{{fieldDragKey === item.key ? 'transform:translateY(' + fieldDragDy + 'px) scale(1.03);' : (fieldDragShift[item.key] ? 'transform:translateY(' + fieldDragShift[item.key] + 'px);' : '')}}"
+              >
+                <view class="tpl-row__handle" data-key="{{item.key}}" catchtouchstart="onFieldDragStart" catchtouchmove="onFieldDragMove" catchtouchend="onFieldDragEnd" catchtouchcancel="onFieldDragEnd">≡</view>
                 <text class="tpl-row__name">{{item.kind === 'custom' ? item.label + ' · ' + item.formatLabel : item.label}}</text>
                 <switch wx:if="{{item.kind === 'sys'}}" class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
                 <text wx:else class="tpl-row__del" data-id="{{item.key}}" bindtap="onRemoveCustomPublishField">删除</text>

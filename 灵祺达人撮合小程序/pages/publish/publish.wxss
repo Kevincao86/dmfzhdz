@@ -777,7 +777,7 @@
   background: #fff;
   border-radius: 16rpx;
   border: 1rpx solid rgba(91, 45, 204, 0.08);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .tpl-row {
@@ -788,6 +788,22 @@
   padding: 0 8rpx 0 24rpx;
   box-sizing: border-box;
   border-bottom: 1rpx solid #f1eef8;
+  position: relative;
+  background: #fff;
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 160ms ease, background 160ms ease;
+}
+
+.tpl-row--press {
+  transform: scale(0.98);
+  background: rgba(91, 45, 204, 0.07);
+}
+
+.tpl-row--lift {
+  z-index: 3;
+  border-radius: 16rpx;
+  background: #fff;
+  box-shadow: 0 16rpx 36rpx rgba(30, 20, 60, 0.18);
+  transition: box-shadow 160ms ease, background 160ms ease;
 }
 
 .tpl-row__handle {
