@@ -73,17 +73,22 @@
     bindrefresherrefresh="onStatRefresh"
    enable-flex>
     <view class="mine-vip">
-      <view class="mine-vip-rank">
-        <text class="mine-vip-level">{{workRankTitle}}</text>
-        <view class="mine-vip-track">
-          <view class="mine-vip-track-on" style="width: {{workRankProgress}}%;"></view>
+      <view class="mine-vip-head">
+        <view class="mine-vip-rank">
+          <text class="mine-vip-level">{{workRankTitle}}</text>
+          <view class="mine-vip-track">
+            <view class="mine-vip-track-on" style="width: {{workRankProgress}}%;"></view>
+          </view>
+          <text class="mine-vip-hint">{{workRankHint}}</text>
         </view>
-        <text class="mine-vip-hint">{{workRankHint}}</text>
-      </view>
-      <view class="mine-vip-badge" bindtap="onGoMembership" hover-class="mine-vip-badge--on">
-        <text class="mine-vip-badge-k">会员信息</text>
-        <text class="mine-vip-badge-plan">{{membershipLevelLabel}}</text>
-        <text class="mine-vip-badge-foot">{{membershipBadgeFoot}}</text>
+        <view class="mine-vip-badge" bindtap="onGoMembership" hover-class="mine-vip-badge--on">
+          <image class="mine-vip-badge-bg" src="/images/mine-line/vip-badge.png" mode="scaleToFill" />
+          <view class="mine-vip-badge-copy">
+            <text class="mine-vip-badge-k">会员信息</text>
+            <text class="mine-vip-badge-plan">{{membershipLevelLabel}}</text>
+            <text class="mine-vip-badge-foot">{{membershipBadgeFoot}}</text>
+          </view>
+        </view>
       </view>
       <view class="mine-vip-icons">
         <view
