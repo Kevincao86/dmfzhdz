@@ -84,10 +84,14 @@
         <view class="mine-vip-badge" bindtap="onGoMembership" hover-class="mine-vip-badge--on">
           <image class="mine-vip-badge-bg" src="/images/mine-line/vip-badge.png" mode="scaleToFill" />
           <view class="mine-vip-badge-copy">
-            <image class="mine-vip-crown" src="/images/mine-line/vip-crown.png" mode="aspectFit" />
-            <text class="mine-vip-badge-k">会员信息</text>
-            <text class="mine-vip-badge-plan">{{membershipLevelLabel}}</text>
-            <text class="mine-vip-badge-foot">{{membershipBadgeFoot}}</text>
+            <view class="mine-vip-badge-left">
+              <text class="mine-vip-badge-k">会员信息</text>
+              <text class="mine-vip-badge-plan">{{membershipLevelLabel}}</text>
+            </view>
+            <view class="mine-vip-badge-right">
+              <image class="mine-vip-crown" src="/images/mine-line/vip-crown.png" mode="aspectFit" />
+              <text class="mine-vip-badge-foot">{{membershipBadgeFoot}}</text>
+            </view>
           </view>
         </view>
       </view>
