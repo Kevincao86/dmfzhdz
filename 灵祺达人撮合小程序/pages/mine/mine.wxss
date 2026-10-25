@@ -250,7 +250,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: row;
-  align-items: flex-end;
+  align-items: center;
   justify-content: flex-end;
   gap: 12rpx;
 }
@@ -314,7 +314,7 @@
   display: flex;
   flex-shrink: 0;
   height: 132rpx;
-  margin-top: 12rpx;
+  margin-top: 22rpx;
   padding: 2rpx 8rpx 0;
   box-sizing: border-box;
 }
