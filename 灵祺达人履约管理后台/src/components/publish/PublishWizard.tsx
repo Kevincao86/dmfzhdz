@@ -65,9 +65,6 @@ import { readPrProfile } from '../../lib/mpSync/userProfile'
 import { canUseTargetedRecruit } from '../../lib/mpSync/mpTargetedRecruitAccess'
 import {
   getActivePublishFormTemplate,
-  listPublishFormTemplates,
-  savePublishFormTemplate,
-  setActivePublishFormTemplateId,
   type PublishFormTemplate,
 } from '../../lib/mpSync/publishFormTemplates'
 import { INVITE_HOUR_OPTIONS, RECRUIT_CHANNELS } from '../../lib/mpSync/mpTargetedRecruit'
@@ -269,7 +266,7 @@ export default function PublishWizard() {
   const [cityActiveProvince, setCityActiveProvince] = useState('')
   const [cityProvinceRows, setCityProvinceRows] = useState<{ name: string; active: boolean; whole?: boolean }[]>([])
   const [fieldEditorOpen, setFieldEditorOpen] = useState(false)
-  const [formTplOpen, setFormTplOpen] = useState(false)
+  const [fieldPick, setFieldPick] = useState<Record<string, boolean>>({ ...DEFAULT_PUBLISH_FIELD_ON })
   const [cityCheckGrid, setCityCheckGrid] = useState<{ name: string; on: boolean }[]>([])
 
   const [tagSelected, setTagSelected] = useState<Set<string>>(new Set())
@@ -700,6 +697,10 @@ export default function PublishWizard() {
       setForm({ ...emptyPublishForm('talent'), platform, fulfillmentLoop: 'closed' })
       setTagSelected(new Set())
     }
+    setFieldOn({ ...DEFAULT_PUBLISH_FIELD_ON })
+    setCustomPublishFields([])
+    setFieldPick({ ...DEFAULT_PUBLISH_FIELD_ON })
+    setFieldEditorOpen(false)
     setStep('form')
   }
 
@@ -1167,8 +1168,12 @@ export default function PublishWizard() {
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
   }
-  function renderFieldEditor() {
-    return editorRows.map((row) => (
+  function renderFieldEditor(useDraft = false) {
+    const selected = useDraft ? fieldPick : fieldOn
+    const rows = useDraft
+      ? editorRows.filter((row) => row.key !== 'delivery' && row.key !== 'deadline' && row.key !== 'city')
+      : editorRows
+    return rows.map((row) => (
       <div
         key={row.key}
         data-field-key={row.key}
@@ -1189,9 +1194,13 @@ export default function PublishWizard() {
         {row.kind === 'sys' ? (
           <input
             type="checkbox"
-            checked={fieldOn[row.key] === true}
+            checked={selected[row.key] === true}
             onChange={(e) => {
-              const next = { ...fieldOn, [row.key]: e.target.checked }
+              const next = { ...selected, [row.key]: e.target.checked }
+              if (useDraft) {
+                setFieldPick(next)
+                return
+              }
               setFieldOn(next)
               setPublishTemplateMode(layoutIsCustom(next, customPublishFields) ? 'custom' : 'system')
             }}
@@ -1203,6 +1212,19 @@ export default function PublishWizard() {
         )}
       </div>
     ))
+  }
+  function saveFieldPick() {
+    setFieldOn({
+      ...DEFAULT_PUBLISH_FIELD_ON,
+      ...fieldPick,
+      delivery: true,
+      deadline: true,
+      city: true,
+    })
+    setPublishTemplateMode('custom')
+    setFieldEditorOpen(false)
+    setDraftHint('已保存字段')
+    setErr('')
   }
 
   if (step === 'tpl' || step === 'tplCustom') {
@@ -1454,98 +1476,6 @@ export default function PublishWizard() {
                   </button>
                 ))}
               </div>
-            </div>
-          ) : null}
-          <div className="md:col-span-2">
-            <div className="text-sm font-medium text-[var(--shell-text)]">表单字段</div>
-            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">默认显示标题、投放窗口、截止时间和招募城市。点添加字段后，勾选系统字段即可显示；自己新增的字段需要填写内容。</p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]" onClick={() => setFieldEditorOpen((v) => !v)}>
-              {fieldEditorOpen ? '收起字段' : '添加字段'}
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]"
-              onClick={() => {
-                const name = window.prompt('存入我的模版', '我的发单模版')
-                if (!name?.trim()) return
-                const row = savePublishFormTemplate({
-                  name: name.trim(),
-                  recruitTarget: recruitTarget || 'talent',
-                  recruitMode: recruitMode || 'visit',
-                  fulfillmentLoop: form.fulfillmentLoop === 'open' ? 'open' : 'closed',
-                  isTargeted: isTargetedRecruit,
-                  fieldOn,
-                  fieldOrder: orderedKeys,
-                  customFields: customPublishFields.map((row) => ({
-                    id: row.id,
-                    label: row.label,
-                    format: row.format || 'text',
-                  })),
-                })
-                setActivePublishFormTemplateId(row.id)
-                setDraftHint(`已存入我的模版「${row.name}」`)
-                setErr('')
-              }}
-            >
-              存入我的模版
-            </button>
-            <button type="button" className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]" onClick={() => setFormTplOpen((v) => !v)}>
-              使用我的模版
-            </button>
-          </div>
-          </div>
-          {fieldEditorOpen ? (
-            <div className="divide-y border border-[var(--shell-border)] rounded-lg md:col-span-2">
-              <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">勾选系统字段后显示在下方。自己新增的字段需要填写内容。长按左侧 ≡ 再拖动排序。</p>
-              {renderFieldEditor()}
-              <div className="flex items-center gap-2 px-3 py-2">
-                <select
-                  className="rounded-lg panel-input border px-2 py-1.5 text-sm"
-                  value={customFieldFormat}
-                  onChange={(e) => setCustomFieldFormat(e.target.value as 'text' | 'image' | 'video')}
-                >
-                  <option value="text">文字</option>
-                  <option value="image">图片</option>
-                  <option value="video">视频</option>
-                </select>
-                <input
-                  className="flex-1 rounded-lg panel-input border px-3 py-1.5 text-sm"
-                  placeholder="新增字段，如到店时间"
-                  value={customFieldDraft}
-                  onChange={(e) => setCustomFieldDraft(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="shrink-0 text-sm font-medium text-violet-600"
-                  onClick={() => addCustomPublishField(customFieldDraft, customFieldFormat)}
-                >
-                  添加
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {formTplOpen ? (
-            <div className="space-y-2 md:col-span-2">
-              {listPublishFormTemplates().length ? (
-                listPublishFormTemplates().map((tpl) => (
-                  <button
-                    key={tpl.id}
-                    type="button"
-                    className="block w-full text-left rounded-lg border border-[var(--shell-border)] px-3 py-2 text-sm"
-                    onClick={() => {
-                      applyTemplateToState(tpl, form.platform || '抖音', true)
-                      setActivePublishFormTemplateId(tpl.id)
-                      setFormTplOpen(false)
-                      setDraftHint(`已使用模版「${tpl.name}」`)
-                    }}
-                  >
-                    {tpl.name}
-                  </button>
-                ))
-              ) : (
-                <p className="text-xs text-[var(--shell-muted)]">还没有发单模版。自定义字段后点「存入我的模版」。</p>
-              )}
             </div>
           ) : null}
         </div>
@@ -2432,6 +2362,58 @@ export default function PublishWizard() {
               </div>
             ))
           : null}
+
+        <div className="space-y-3" style={{ order: 700 }}>
+          <button
+            type="button"
+            className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]"
+            onClick={() => {
+              if (fieldEditorOpen) {
+                setFieldEditorOpen(false)
+                return
+              }
+              setFieldPick({ ...fieldOn })
+              setFieldEditorOpen(true)
+            }}
+          >
+            {fieldEditorOpen ? '收起' : '添加字段'}
+          </button>
+          {fieldEditorOpen ? (
+            <div className="divide-y border border-[var(--shell-border)] rounded-lg">
+              <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">可一次勾选多个。勾选的系统字段在保存后显示；自己新增的字段需要填写内容。长按左侧 ≡ 再拖动排序。</p>
+              {renderFieldEditor(true)}
+              <div className="flex items-center gap-2 px-3 py-2">
+                <select
+                  className="rounded-lg panel-input border px-2 py-1.5 text-sm"
+                  value={customFieldFormat}
+                  onChange={(e) => setCustomFieldFormat(e.target.value as 'text' | 'image' | 'video')}
+                >
+                  <option value="text">文字</option>
+                  <option value="image">图片</option>
+                  <option value="video">视频</option>
+                </select>
+                <input
+                  className="flex-1 rounded-lg panel-input border px-3 py-1.5 text-sm"
+                  placeholder="新增字段，如到店时间"
+                  value={customFieldDraft}
+                  onChange={(e) => setCustomFieldDraft(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="shrink-0 text-sm font-medium text-violet-600"
+                  onClick={() => addCustomPublishField(customFieldDraft, customFieldFormat)}
+                >
+                  添加
+                </button>
+              </div>
+              <div className="px-3 py-3">
+                <button type="button" className="w-full rounded-lg bg-violet-700 text-white text-sm py-2" onClick={saveFieldPick}>
+                  保存字段
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         </div>
 

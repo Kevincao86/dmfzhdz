@@ -449,6 +449,7 @@ Page({
     provinceWhole: false,
     provinceScopeLabel: '全省',
     fieldEditorOpen: false,
+    fieldPick: defaultPublishFieldOn(),
     publishFormTemplates: [],
     cityDisplayText: '请选择招募城市',
     merchantLocationMapReady: false,
@@ -1233,7 +1234,8 @@ Page({
     const custom = customFields || []
     return custom.length > 0 || keys.some((key) => fieldOn && fieldOn[key] === false)
   },
-  applyPublishTemplate(tpl, platform, keepContent) {
+  applyPublishTemplate(tpl, platform, keepContent, resetFields) {
+    if (!tpl) return
     if (!tpl) return
     const targetId = tpl.recruitTarget || 'talent'
     const target = targetById(targetId) || targetById('talent')
@@ -1271,12 +1273,14 @@ Page({
       form.applyFormFields = livePublishForm.defaultLiveApplyFields()
       form.applyFormTemplateName = '直播达人报名默认项'
     }
-    const fieldOn = { ...this.data.fieldOn, ...(tpl.fieldOn || {}) }
-    const customPublishFields = (tpl.customFields || []).map((row) => ({
-      ...row,
-      value: '',
-      formatLabel: row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字',
-    }))
+    const fieldOn = resetFields ? defaultPublishFieldOn() : { ...this.data.fieldOn, ...(tpl.fieldOn || {}) }
+    const customPublishFields = resetFields
+      ? []
+      : (tpl.customFields || []).map((row) => ({
+          ...row,
+          value: '',
+          formatLabel: row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字',
+        }))
     const fieldLayout = layoutFromOrder(tpl.fieldOrder, customPublishFields)
     this.setData({
       step: 'form',
@@ -1289,8 +1293,10 @@ Page({
       isTargetedRecruit: targeted,
       loopChosen: true,
       isSupplierPublish: isSupplier,
-      publishTemplateMode: this.layoutIsCustom(fieldOn, customPublishFields) ? 'custom' : 'system',
+      publishTemplateMode: resetFields || this.layoutIsCustom(fieldOn, customPublishFields) ? 'custom' : 'system',
       fieldOn,
+      fieldPick: resetFields ? defaultPublishFieldOn() : { ...fieldOn },
+      fieldEditorOpen: false,
       customPublishFields,
       fieldOrder: fieldLayout.fieldOrder,
       fieldRank: fieldLayout.fieldRank,
@@ -1321,7 +1327,7 @@ Page({
     }
     const active = publishFormTemplates.getActivePublishFormTemplate()
     if (active) {
-      this.applyPublishTemplate(active, platform, false)
+      this.applyPublishTemplate(active, platform, false, true)
       return
     }
     const form = emptyForm('talent')
@@ -1426,7 +1432,28 @@ Page({
     this.setData({ recruitChannel: id, isTargetedRecruit: id === 'targeted' })
   },
   onToggleFieldEditor() {
-    this.setData({ fieldEditorOpen: !this.data.fieldEditorOpen })
+    if (this.data.fieldEditorOpen) {
+      this.setData({ fieldEditorOpen: false })
+      return
+    }
+    this.setData({ fieldEditorOpen: true, fieldPick: { ...(this.data.fieldOn || {}) } })
+  },
+  onToggleFieldPick(e) {
+    const key = e.currentTarget.dataset.key
+    if (!key) return
+    const on = !!(e.detail && e.detail.value)
+    this.setData({ fieldPick: { ...(this.data.fieldPick || {}), [key]: on } })
+  },
+  onSaveFieldPick() {
+    const fieldOn = {
+      ...defaultPublishFieldOn(),
+      ...(this.data.fieldPick || {}),
+      delivery: true,
+      deadline: true,
+      city: true,
+    }
+    this.setData({ fieldOn, fieldEditorOpen: false, publishTemplateMode: 'custom' })
+    wx.showToast({ title: '已保存字段', icon: 'none' })
   },
   onSavePublishFormTemplate() {
     wx.showModal({

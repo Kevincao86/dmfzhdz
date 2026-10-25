@@ -349,32 +349,6 @@
                 <view class="pub-radio-opt {{isTargetedRecruit ? 'pub-radio-opt--on' : ''}}" data-id="targeted" bindtap="onFormPickChannel">定向邀约</view>
               </view>
             </view>
-            <view class="pub-field">
-              <text class="pub-label">表单字段</text>
-              <text class="pub-label-hint">默认显示标题、投放窗口、截止时间和招募城市。点添加字段后，勾选系统字段即可显示；自己新增的字段需要填写内容。</text>
-              <view class="pub-radio-pair pub-radio-pair--wrap">
-                <view class="pub-radio-opt" bindtap="onToggleFieldEditor">{{fieldEditorOpen ? '收起字段' : '添加字段'}}</view>
-                <view class="pub-radio-opt" bindtap="onSavePublishFormTemplate">存入我的模版</view>
-                <view class="pub-radio-opt" bindtap="onUsePublishFormTemplate">使用我的模版</view>
-              </view>
-            </view>
-            <block wx:if="{{fieldEditorOpen}}">
-              <view class="tpl-row tpl-row--hint">
-                <text class="tpl-row__hint">勾选系统字段后显示在下方。自己新增的字段需要填写内容。长按 ≡ 再拖动排序。</text>
-              </view>
-              <view
-                class="tpl-row tpl-row--item {{fieldDragKey === item.key ? 'tpl-row--lift' : ''}} {{fieldPressKey === item.key ? 'tpl-row--press' : ''}}"
-                wx:for="{{editorRows}}"
-                wx:key="key"
-                style="{{fieldDragKey === item.key ? 'transform:translateY(' + fieldDragDy + 'px) scale(1.03);' : (fieldDragShift[item.key] ? 'transform:translateY(' + fieldDragShift[item.key] + 'px);' : '')}}"
-              >
-                <view class="tpl-row__handle" data-key="{{item.key}}" catchtouchstart="onFieldDragStart" catchtouchmove="onFieldDragMove" catchtouchend="onFieldDragEnd" catchtouchcancel="onFieldDragEnd">≡</view>
-                <text class="tpl-row__name">{{item.kind === 'custom' ? item.label + ' · ' + item.formatLabel : item.label}}</text>
-                <switch wx:if="{{item.kind === 'sys'}}" class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
-                <text wx:else class="tpl-row__del" data-id="{{item.key}}" bindtap="onRemoveCustomPublishField">删除</text>
-              </view>
-              <view class="pub-radio-opt" bindtap="onAddCustomFieldMenu">新增字段</view>
-            </block>
           </view>
           <view class="pub-form-card pub-field-stack">
           <view class="pub-field" id="field-cover" style="order:{{fieldRank.cover}}" wx:if="{{fieldOn.cover}}">
@@ -944,6 +918,28 @@
               <text class="pub-select-text {{applyFormPlaceholder ? 'pub-select-text--ph' : ''}}">{{applyFormDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
+          </view>
+          <view class="pub-field" style="order:700">
+            <view class="pub-radio-opt" bindtap="onToggleFieldEditor">{{fieldEditorOpen ? '收起' : '添加字段'}}</view>
+            <block wx:if="{{fieldEditorOpen}}">
+              <view class="tpl-row tpl-row--hint">
+                <text class="tpl-row__hint">可一次勾选多个。保存后系统字段才会显示；自己新增的字段需要填写内容。长按 ≡ 再拖动排序。</text>
+              </view>
+              <block wx:for="{{editorRows}}" wx:key="key">
+                <view
+                  wx:if="{{item.key !== 'delivery' && item.key !== 'deadline' && item.key !== 'city'}}"
+                  class="tpl-row tpl-row--item {{fieldDragKey === item.key ? 'tpl-row--lift' : ''}} {{fieldPressKey === item.key ? 'tpl-row--press' : ''}}"
+                  style="{{fieldDragKey === item.key ? 'transform:translateY(' + fieldDragDy + 'px) scale(1.03);' : (fieldDragShift[item.key] ? 'transform:translateY(' + fieldDragShift[item.key] + 'px);' : '')}}"
+                >
+                  <view class="tpl-row__handle" data-key="{{item.key}}" catchtouchstart="onFieldDragStart" catchtouchmove="onFieldDragMove" catchtouchend="onFieldDragEnd" catchtouchcancel="onFieldDragEnd">≡</view>
+                  <text class="tpl-row__name">{{item.kind === 'custom' ? item.label + ' · ' + item.formatLabel : item.label}}</text>
+                  <switch wx:if="{{item.kind === 'sys'}}" class="tpl-switch" checked="{{fieldPick[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onToggleFieldPick" />
+                  <text wx:else class="tpl-row__del" data-id="{{item.key}}" bindtap="onRemoveCustomPublishField">删除</text>
+                </view>
+              </block>
+              <view class="pub-radio-opt" bindtap="onAddCustomFieldMenu">新增字段</view>
+              <view class="pub-radio-opt pub-radio-opt--on" bindtap="onSaveFieldPick">保存字段</view>
+            </block>
           </view>
           </view>
           <view class="pub-form-submit">
