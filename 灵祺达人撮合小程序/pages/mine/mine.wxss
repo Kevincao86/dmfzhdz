@@ -165,42 +165,36 @@
 }
 
 .mine-vip {
+  position: relative;
+  overflow: hidden;
   margin: 4rpx 24rpx 16rpx;
-  padding: 16rpx 16rpx 12rpx;
+  padding: 16rpx 18rpx 14rpx;
   border-radius: 28rpx;
   background: linear-gradient(180deg, #efe6ff 0%, #e4d7ff 100%);
 }
 
-.mine-vip-bar {
+.mine-vip-rank {
+  position: relative;
+  z-index: 1;
+  min-height: 128rpx;
+  padding-right: 156rpx;
   display: flex;
-  align-items: center;
-  min-height: 72rpx;
-}
-
-.mine-vip-bar--on {
-  opacity: 0.86;
-}
-
-.mine-vip-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8rpx;
+  box-sizing: border-box;
 }
 
 .mine-vip-level {
-  flex-shrink: 0;
-  font-size: 32rpx;
+  font-size: 36rpx;
   font-weight: 800;
   color: #3b246b;
   line-height: 1.2;
 }
 
 .mine-vip-track {
-  width: 72rpx;
+  width: 120rpx;
   height: 8rpx;
-  flex-shrink: 0;
   border-radius: 999rpx;
   background: rgba(91, 53, 201, 0.18);
   overflow: hidden;
@@ -213,60 +207,59 @@
 }
 
 .mine-vip-hint {
-  flex: 1;
-  min-width: 0;
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: #6d5a94;
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mine-vip-task {
-  flex-shrink: 0;
-  margin-right: 8rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.mine-vip-task-k {
-  font-size: 20rpx;
-  font-weight: 700;
-  color: #3b246b;
-  line-height: 1.2;
-}
-
-.mine-vip-task-go {
-  margin-top: 2rpx;
-  font-size: 18rpx;
-  color: #6d5a94;
-  line-height: 1.2;
+  line-height: 1.3;
 }
 
 .mine-vip-badge {
-  width: 64rpx;
-  height: 64rpx;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: #ffc53d;
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  width: 156rpx;
+  min-height: 132rpx;
+  padding: 18rpx 8rpx 16rpx;
+  box-sizing: border-box;
+  background: #4527a8;
+  border-bottom-left-radius: 32rpx;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6rpx 0 rgba(255, 176, 32, 0.35);
 }
 
-.mine-vip-badge-txt {
-  font-size: 26rpx;
+.mine-vip-badge--on {
+  background: #3b1f96;
+}
+
+.mine-vip-badge-k {
+  font-size: 18rpx;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.2;
+}
+
+.mine-vip-badge-plan {
+  margin-top: 6rpx;
+  font-size: 28rpx;
   font-weight: 800;
-  color: #6a3b00;
-  line-height: 1;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.mine-vip-badge-foot {
+  margin-top: 4rpx;
+  font-size: 18rpx;
+  color: #efe6ff;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .mine-vip-icons {
+  position: relative;
+  z-index: 1;
   display: flex;
-  margin-top: 14rpx;
+  margin-top: 8rpx;
 }
 
 .mine-vip-item {
@@ -277,14 +270,14 @@
 }
 
 .mine-vip-icon {
-  width: 48rpx;
-  height: 48rpx;
+  width: 76rpx;
+  height: 76rpx;
 }
 
 .mine-vip-label {
-  margin-top: 6rpx;
-  font-size: 20rpx;
-  font-weight: 600;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  font-weight: 700;
   color: #3b246b;
   text-align: center;
   line-height: 1.25;
@@ -838,8 +831,8 @@
 }
 
 .wb-tile-icon {
-  width: 48rpx;
-  height: 48rpx;
+  width: 72rpx;
+  height: 72rpx;
   overflow: visible;
   margin-bottom: 8rpx;
   position: relative;
@@ -1013,6 +1006,113 @@
 .id-sheet-mask-bg {
   flex: 1;
   background: rgba(45, 27, 78, 0.35);
+}
+
+.mine-more {
+  margin: 8rpx 24rpx 16rpx;
+  padding: 18rpx 18rpx 18rpx 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: #fff;
+  border-radius: 28rpx;
+  box-shadow: 0 8rpx 24rpx rgba(69, 39, 168, 0.08);
+}
+
+.mine-more--on {
+  opacity: 0.88;
+}
+
+.mine-more-mosaic {
+  width: 92rpx;
+  height: 92rpx;
+  flex-shrink: 0;
+  border-radius: 24rpx;
+  background: linear-gradient(160deg, #efe6ff, #d9c8ff);
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 4rpx;
+  padding: 10rpx;
+  box-sizing: border-box;
+}
+
+.mine-more-mini {
+  width: 32rpx;
+  height: 32rpx;
+}
+
+.mine-more-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.mine-more-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #1c1917;
+  line-height: 1.2;
+}
+
+.mine-more-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #78716c;
+  line-height: 1.3;
+}
+
+.mine-more-go {
+  flex-shrink: 0;
+  min-width: 104rpx;
+  height: 60rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  background: #4527a8;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.mine-more-sheet {
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.mine-more-sheet-lead {
+  display: block;
+  margin: 4rpx 0 12rpx;
+  font-size: 22rpx;
+  color: #78716c;
+}
+
+.mine-more-sheet-body {
+  max-height: 62vh;
+}
+
+.mine-more-block {
+  margin-bottom: 8rpx;
+}
+
+.mine-more-block-title {
+  display: block;
+  margin: 8rpx 4rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #6d5a94;
+}
+
+.mine-more-grid {
+  box-shadow: none;
+  border: none;
+  background: #f7f4ff;
 }
 
 .id-sheet {

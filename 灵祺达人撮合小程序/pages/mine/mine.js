@@ -15,7 +15,7 @@ const wxAccount = require('../../utils/wxAccount.js')
 const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
-const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
+const { attachMenuGlyphs, spotlightSolidSrc } = require('../../utils/mineMenuIcons.js')
 const identityTheme = require('../../utils/identityTheme.js')
 const accountSessionActions = require('../../utils/accountSessionActions.js')
 const mpMembershipUi = require('../../utils/mpMembershipUi.js')
@@ -189,27 +189,54 @@ const QUICK_MENU_KEYS = {
 }
 
 const PLAN_LEVEL = { basic: '基础版', pro: '专业版', flagship: '旗舰版', enterprise: '企业版' }
-const PLAN_PROGRESS = { basic: 22, pro: 48, flagship: 74, enterprise: 100 }
+
+const TALENT_RANKS = [
+  { min: 0, title: '新星探店', next: '城市体验官', cap: 3 },
+  { min: 3, title: '城市体验官', next: '金牌探店官', cap: 10 },
+  { min: 10, title: '金牌探店官', next: '星选体验官', cap: 30 },
+  { min: 30, title: '星选体验官', next: '', cap: 30 },
+]
+
+const PR_RANKS = [
+  { min: 0, title: '新锐主理', next: '城市主理', cap: 3 },
+  { min: 3, title: '城市主理', next: '品牌主理', cap: 10 },
+  { min: 10, title: '品牌主理', next: '星选主理', cap: 30 },
+  { min: 30, title: '星选主理', next: '', cap: 30 },
+]
 
 function membershipLevelShort(planId) {
   return PLAN_LEVEL[String(planId || 'basic')] || '基础版'
 }
 
-function membershipBarProgress(planId) {
-  return PLAN_PROGRESS[String(planId || 'basic')] || 22
+function membershipBadgeFoot(planId, expiryLabel) {
+  const plan = String(planId || 'basic')
+  if (plan === 'basic') return '去升级'
+  return expiryLabel || '去续费'
 }
 
-function membershipBarHint(planId, expiryLabel) {
-  const plan = String(planId || 'basic')
-  if (plan === 'basic') return '还差一档升级'
-  if (expiryLabel) return expiryLabel
-  if (plan === 'enterprise') return '已是最高档'
-  return '可继续升级'
-}
-
-function membershipCtaShort(planId) {
-  const plan = String(planId || 'basic')
-  return plan === 'basic' ? '去升级' : '去续费'
+function workRank(identity, count) {
+  const ranks = identity === 'pr' ? PR_RANKS : TALENT_RANKS
+  const n = Math.max(0, Math.floor(Number(count) || 0))
+  let current = ranks[0]
+  for (const row of ranks) {
+    if (n >= row.min) current = row
+  }
+  const verb = identity === 'pr' ? '已发' : '已接'
+  if (!current.next) {
+    return {
+      workRankTitle: current.title,
+      workRankHint: `${verb} ${n} 单 · 已是最高档`,
+      workRankProgress: 100,
+    }
+  }
+  const span = Math.max(1, current.cap - current.min)
+  const into = Math.max(0, Math.min(span, n - current.min))
+  const left = Math.max(1, current.cap - n)
+  return {
+    workRankTitle: current.title,
+    workRankHint: `${verb} ${n} 单 · 还差 ${left} 单`,
+    workRankProgress: Math.round((into / span) * 100),
+  }
 }
 
 function workbenchGreeting(displayName) {
@@ -247,7 +274,7 @@ const BIZ_GROUP_DEFS = [
   {
     id: 'account',
     title: '账号与通知',
-    keys: ['accountBind', 'wechatOaBind', 'subscriptions', 'targetedInvites', 'prQuotes', 'talentCredit'],
+    keys: ['accountBind', 'wechatOaBind', 'subscriptions', 'targetedInvites', 'prQuotes'],
   },
   {
     id: 'deal',
@@ -264,8 +291,32 @@ const BIZ_GROUP_DEFS = [
     title: 'AI 创作',
     keys: ['talentCheck', 'briefGen', 'aiReview', 'addonsHub', 'myCourses', 'analytics'],
   },
-  { id: 'help', title: '帮助服务', keys: ['manual', 'support'] },
+  { id: 'help', title: '帮助与服务', keys: ['manual', 'support'] },
+  { id: 'credit', title: '达人信用', keys: ['talentCredit'] },
 ]
+
+const MORE_GROUP_IDS = new Set(['money', 'tools', 'help', 'credit'])
+
+function morePreviewFrom(groups) {
+  const out = []
+  for (const group of groups || []) {
+    for (const item of group.items || []) {
+      out.push(item)
+      if (out.length >= 4) return out
+    }
+  }
+  return out
+}
+
+function partitionBizGroups(groups) {
+  const pageGroups = []
+  const moreGroups = []
+  for (const group of groups || []) {
+    if (MORE_GROUP_IDS.has(group.id)) moreGroups.push(group)
+    else pageGroups.push(group)
+  }
+  return { pageGroups, moreGroups, morePreview: morePreviewFrom(moreGroups) }
+}
 
 function groupBizMenus(biz) {
   const used = new Set()
@@ -291,7 +342,9 @@ function groupBizMenus(biz) {
 
 function splitWorkbenchMenus(menus, identity) {
   const spotKeys = new Set(spotlightItems(identity).map((item) => item.key))
-  const spotlightMenus = attachMenuGlyphs(spotlightItems(identity).map((item) => ({ ...item })))
+  const spotlightMenus = attachMenuGlyphs(spotlightItems(identity).map((item) => ({ ...item }))).map(
+    (item) => ({ ...item, iconSrc: spotlightSolidSrc(item.key) || item.iconSrc }),
+  )
   const keys = QUICK_MENU_KEYS[identity] || QUICK_MENU_KEYS.talent
   const keySet = new Set(keys)
   const quick = []
@@ -302,7 +355,15 @@ function splitWorkbenchMenus(menus, identity) {
     else biz.push({ ...item })
   }
   const orderedQuick = keys.map((k) => quick.find((i) => i.key === k)).filter(Boolean)
-  return { spotlightMenus, quickMenus: orderedQuick, bizMenus: biz, bizGroups: groupBizMenus(biz) }
+  const parts = partitionBizGroups(groupBizMenus(biz))
+  return {
+    spotlightMenus,
+    quickMenus: orderedQuick,
+    bizMenus: biz,
+    bizGroups: parts.pageGroups,
+    moreGroups: parts.moreGroups,
+    morePreview: parts.morePreview,
+  }
 }
 const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
@@ -466,6 +527,12 @@ Page({
     spotlightMenus: [],
     bizMenus: [],
     bizGroups: [],
+    moreGroups: [],
+    morePreview: [],
+    showMoreSheet: false,
+    workRankTitle: '新星探店',
+    workRankHint: '已接 0 单 · 还差 3 单',
+    workRankProgress: 0,
     greeting: '',
     notifyBadge: 0,
     calendarTodoCount: 0,
@@ -488,11 +555,9 @@ Page({
     profileVerified: false,
     membershipPlanLabel: '基础版（免费）',
     membershipLevelLabel: '基础版',
-    membershipHint: '还差一档升级',
-    membershipProgress: 22,
     membershipExpiryLabel: '',
     membershipCtaLabel: '升级会员',
-    membershipCtaShort: '去升级',
+    membershipBadgeFoot: '去升级',
     statusBarHeightPx: 32,
     accentSwatches: accentTheme.SWATCHES,
     themeVeilOn: false,
@@ -769,7 +834,8 @@ Page({
       identity,
     )
     menus = injectMyCoursesMenu(menus)
-    const { quickMenus, spotlightMenus, bizMenus, bizGroups } = splitWorkbenchMenus(menus, identity)
+    const { quickMenus, spotlightMenus, bizMenus, bizGroups, moreGroups, morePreview } =
+      splitWorkbenchMenus(menus, identity)
     const planId = mpMembershipUi.readMembershipPlanId(acct, identity, member, prProfile)
     const membershipPlanLabel = mpMembershipUi.planLabel(planId)
     const membershipExpiryLabel = mpMembershipUi.formatExpiryLabel(
@@ -778,9 +844,7 @@ Page({
     )
     const membershipCtaLabel = mpMembershipUi.membershipCtaLabel(planId)
     const membershipLevelLabel = membershipLevelShort(planId)
-    const membershipHint = membershipBarHint(planId, membershipExpiryLabel)
-    const membershipProgress = membershipBarProgress(planId)
-    const membershipCtaShortLabel = membershipCtaShort(planId)
+    const membershipBadgeFootLabel = membershipBadgeFoot(planId, membershipExpiryLabel)
     this.setData({
       identity,
       identityLabel: userProfile.identityLabel(identity),
@@ -799,6 +863,8 @@ Page({
       spotlightMenus,
       bizMenus,
       bizGroups,
+      moreGroups,
+      morePreview,
       greeting: workbenchGreeting(displayName),
       statAppliedKey: identity === 'pr' ? 'prOrders' : 'applications',
       statBoardTitle: identity === 'pr' ? '招募进展' : '合作进展',
@@ -808,12 +874,11 @@ Page({
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
       membershipPlanLabel,
       membershipLevelLabel,
-      membershipHint,
-      membershipProgress,
       membershipExpiryLabel,
       membershipCtaLabel,
-      membershipCtaShort: membershipCtaShortLabel,
+      membershipBadgeFoot: membershipBadgeFootLabel,
       ...stats,
+      ...workRank(identity, stats.statApplied),
     })
     if (identity === 'pr' && wxLoggedIn && this._mineStatsStale) void this.refreshPrStatsIfNeeded()
     if (wxLoggedIn) void this.attachLecturerCourses(identity)
@@ -835,6 +900,8 @@ Page({
         spotlightMenus: split.spotlightMenus,
         bizMenus: split.bizMenus,
         bizGroups: split.bizGroups,
+        moreGroups: split.moreGroups,
+        morePreview: split.morePreview,
       })
     } catch (_) {}
   },
@@ -845,7 +912,7 @@ Page({
       if (userProfile.readIdentity() !== 'pr') return
       mineProfileStats.writeMineStatCache('pr', auth.readAccount(), stats)
       this._mineStatsStale = false
-      this.setData(stats)
+      this.setData({ ...stats, ...workRank('pr', stats.statApplied) })
     } catch (_) {}
   },
   onGoMembership() {
@@ -884,6 +951,7 @@ Page({
       const menus = patchMenusCalendarMeta(this.data.menus, identity, count)
       const quickMenus = patchMenusCalendarMeta(this.data.quickMenus, identity, count)
       const bizMenus = patchMenusCalendarMeta(this.data.bizMenus, identity, count)
+      const parts = partitionBizGroups(groupBizMenus(bizMenus))
       const app = getApp()
       if (app && app.globalData) app.globalData.calendarTodoCount = count
       this.setData({
@@ -891,7 +959,9 @@ Page({
         menus,
         quickMenus,
         bizMenus,
-        bizGroups: groupBizMenus(bizMenus),
+        bizGroups: parts.pageGroups,
+        moreGroups: parts.moreGroups,
+        morePreview: parts.morePreview,
       })
     } catch (_) {}
   },
@@ -1192,7 +1262,14 @@ Page({
       wx.navigateTo({ url: applyUrl })
     }
   },
+  onOpenMore() {
+    this.setData({ showMoreSheet: true })
+  },
+  onCloseMore() {
+    this.setData({ showMoreSheet: false })
+  },
   onMenuTap(e) {
+    if (this.data.showMoreSheet) this.setData({ showMoreSheet: false })
     const key = e.currentTarget.dataset.key
     const url = MENU_URLS[key]
     if (!url) return

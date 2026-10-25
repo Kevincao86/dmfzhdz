@@ -73,21 +73,17 @@
     bindrefresherrefresh="onStatRefresh"
    enable-flex>
     <view class="mine-vip">
-      <view class="mine-vip-bar" bindtap="onGoMembership" hover-class="mine-vip-bar--on">
-        <view class="mine-vip-main">
-          <text class="mine-vip-level">{{membershipLevelLabel}}</text>
-          <view class="mine-vip-track">
-            <view class="mine-vip-track-on" style="width: {{membershipProgress}}%;"></view>
-          </view>
-          <text class="mine-vip-hint">{{membershipHint}}</text>
+      <view class="mine-vip-rank">
+        <text class="mine-vip-level">{{workRankTitle}}</text>
+        <view class="mine-vip-track">
+          <view class="mine-vip-track-on" style="width: {{workRankProgress}}%;"></view>
         </view>
-        <view class="mine-vip-task">
-          <text class="mine-vip-task-k">会员</text>
-          <text class="mine-vip-task-go">{{membershipCtaShort}}</text>
-        </view>
-        <view class="mine-vip-badge">
-          <text class="mine-vip-badge-txt">升</text>
-        </view>
+        <text class="mine-vip-hint">{{workRankHint}}</text>
+      </view>
+      <view class="mine-vip-badge" bindtap="onGoMembership" hover-class="mine-vip-badge--on">
+        <text class="mine-vip-badge-k">会员信息</text>
+        <text class="mine-vip-badge-plan">{{membershipLevelLabel}}</text>
+        <text class="mine-vip-badge-foot">{{membershipBadgeFoot}}</text>
       </view>
       <view class="mine-vip-icons">
         <view
@@ -179,6 +175,25 @@
       </view>
     </view>
 
+    <view class="mine-more" wx:if="{{moreGroups.length}}" bindtap="onOpenMore" hover-class="mine-more--on">
+      <view class="mine-more-mosaic">
+        <image
+          wx:for="{{morePreview}}"
+          wx:key="key"
+          class="mine-more-mini"
+          src="{{item.iconSrc}}"
+          mode="aspectFit"
+        />
+      </view>
+      <view class="mine-more-copy">
+        <text class="mine-more-title">全部功能</text>
+        <text class="mine-more-sub">资金、创作和帮助</text>
+      </view>
+      <view class="mine-more-go">
+        <text>展开</text>
+      </view>
+    </view>
+
     <view class="mine-accent-row">
       <view
         wx:for="{{accentSwatches}}"
@@ -197,6 +212,38 @@
 
     <site-icp-footer />
   </scroll-view>
+
+  <view class="id-sheet-mask" wx:if="{{showMoreSheet}}" catchtouchmove="noopSheetTap">
+    <view class="id-sheet-mask-bg" bindtap="onCloseMore"></view>
+    <view class="id-sheet mine-more-sheet">
+      <view class="id-sheet-head">
+        <text class="id-sheet-title">全部功能</text>
+        <text class="id-sheet-close" bindtap="onCloseMore">×</text>
+      </view>
+      <text class="mine-more-sheet-lead">资金推广、AI 创作和帮助都在这里</text>
+      <scroll-view scroll-y class="mine-more-sheet-body" show-scrollbar="{{false}}">
+        <view class="mine-more-block" wx:for="{{moreGroups}}" wx:key="id">
+          <text class="mine-more-block-title">{{item.title}}</text>
+          <view class="wb-biz-grid mine-more-grid">
+            <view
+              wx:for="{{item.items}}"
+              wx:for-item="menu"
+              wx:key="key"
+              class="wb-quick-tile"
+              hover-class="tap-press"
+              data-key="{{menu.key}}"
+              bindtap="onMenuTap"
+            >
+              <view class="wb-tile-icon">
+                <image class="wb-tile-img" src="{{menu.iconSrc}}" mode="aspectFit" />
+              </view>
+              <text class="wb-tile-label">{{menu.label}}</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
 
   <view
     class="id-sheet-mask"

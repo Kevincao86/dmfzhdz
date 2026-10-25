@@ -68,6 +68,18 @@ function menuGlyph(icon) {
   return ICON_GLYPH[icon] || '◫'
 }
 
+const SPOTLIGHT_SOLID = {
+  accountEval: mineIcon('spot-recommend.png'),
+  talentCheck: mineIcon('spot-user.png'),
+  aiReview: mineIcon('spot-ai-review.png'),
+  addonsHub: mineIcon('spot-addons.png'),
+  affiliatePortal: mineIcon('spot-affiliate.png'),
+}
+
+function spotlightSolidSrc(key) {
+  return SPOTLIGHT_SOLID[key] || ''
+}
+
 function menuIconSrc(item) {
   if (!item) return MENU_KEY_ICON.profile
   if (item.key && MENU_KEY_ICON[item.key]) return MENU_KEY_ICON[item.key]
@@ -88,5 +100,6 @@ module.exports = {
   MENU_KEY_ICON,
   menuGlyph,
   menuIconSrc,
+  spotlightSolidSrc,
   attachMenuGlyphs,
 }
