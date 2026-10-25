@@ -9,6 +9,12 @@ import {
   TEMPLATE_KINDS,
   type TemplateKind,
 } from '../lib/mpSync/applyFormTemplates'
+import {
+  deletePublishFormTemplate,
+  getActivePublishFormTemplateId,
+  listPublishFormTemplates,
+  setActivePublishFormTemplateId,
+} from '../lib/mpSync/publishFormTemplates'
 import PageHero from '../components/ui/PageHero'
 import { EmptyState, StatusTabBar, TemplateGridCard } from '../components/ui/MockupLayouts'
 
@@ -17,12 +23,15 @@ export default function TemplatesPage() {
 
   const [kind, setKind] = useState<TemplateKind>('talent')
   const [rows, setRows] = useState(() => listCustomTemplates())
+  const [formTpls, setFormTpls] = useState(() => listPublishFormTemplates())
   const activeId = getActiveTemplateId(kind)
+  const activeFormId = getActivePublishFormTemplateId()
 
   const filtered = useMemo(() => listCustomTemplates(kind), [rows, kind])
 
   function refresh() {
     setRows(listCustomTemplates())
+    setFormTpls(listPublishFormTemplates())
   }
 
   useEffect(() => {
@@ -80,6 +89,34 @@ export default function TemplatesPage() {
               onDelete={() => {
                 if (!confirm(`确定删除模版「${t.name}」？`)) return
                 deleteCustomTemplate(t.id)
+                refresh()
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      <PageHero title="发单表单" subtitle="发招募时保存的字段设置。设为当前后，下次选好平台会自动套用。" />
+      {!formTpls.length ? (
+        <EmptyState title="暂无发单模版" desc="在发布招募的表单里点「存入我的模版」" />
+      ) : (
+        <div className="template-grid">
+          {formTpls.map((t) => (
+            <TemplateGridCard
+              key={t.id}
+              title={t.name}
+              meta={`${t.recruitTarget === 'shoot' ? '拍摄' : t.recruitTarget === 'edit' ? '剪辑' : '达人'} · ${t.recruitMode}${activeFormId === t.id ? ' · 当前默认' : ''}`}
+              onUse={() => {
+                setActivePublishFormTemplateId(t.id)
+                refresh()
+              }}
+              onEdit={() => {
+                setActivePublishFormTemplateId(t.id)
+                refresh()
+              }}
+              onDelete={() => {
+                if (!confirm(`确定删除发单模版「${t.name}」？`)) return
+                deletePublishFormTemplate(t.id)
                 refresh()
               }}
             />

@@ -1,4 +1,5 @@
 const templates = require('../../../utils/applyFormTemplates.js')
+const publishFormTemplates = require('../../../utils/publishFormTemplates.js')
 const { prepareMineSubPage } = require('../../../utils/pageIdentityChrome.js')
 
 Page({
@@ -7,6 +8,8 @@ Page({
     kindTabs: templates.TEMPLATE_KINDS,
     rows: [],
     activeId: '',
+    formTpls: [],
+    activeFormId: '',
     mineGuestMode: false,
   },
   refresh() {
@@ -14,12 +17,14 @@ Page({
     this.setData({
       rows: templates.listCustomTemplates(kind),
       activeId: templates.getActiveTemplateId(kind),
+      formTpls: publishFormTemplates.listPublishFormTemplates(),
+      activeFormId: publishFormTemplates.getActivePublishFormTemplateId(),
     })
   },
   async onShow() {
     const ready = await prepareMineSubPage(this)
     if (!ready) {
-      this.setData({ rows: [], activeId: '' })
+      this.setData({ rows: [], activeId: '', formTpls: [], activeFormId: '' })
       return
     }
     this.refresh()
@@ -57,6 +62,27 @@ Page({
       success: (r) => {
         if (r.confirm) {
           templates.deleteCustomTemplate(id)
+          this.refresh()
+        }
+      },
+    })
+  },
+  onUseFormTemplate(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    publishFormTemplates.setActivePublishFormTemplateId(id)
+    wx.showToast({ title: '下次发单将套用', icon: 'success' })
+    this.refresh()
+  },
+  onDeleteFormTemplate(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    wx.showModal({
+      title: '删除发单模版',
+      content: '确定删除这份发单字段设置？',
+      success: (r) => {
+        if (r.confirm) {
+          publishFormTemplates.deletePublishFormTemplate(id)
           this.refresh()
         }
       },

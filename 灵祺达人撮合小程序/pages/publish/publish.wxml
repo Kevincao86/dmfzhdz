@@ -55,8 +55,38 @@
 </template>
 
 <view class="pub-page pub-page--{{step}} {{lqThemeClass}} foot-col">
-  <!-- 第一步：选择普通招募 / 定向邀约 -->
-  <block wx:if="{{step === 'channel'}}">
+  <block wx:if="{{step === 'platform'}}">
+    <view class="pub-screen pub-screen--mode">
+      <template is="pubLifeBg" />
+      <view class="pub-target-top" style="{{heroHeadStyle}}">
+        <view class="pub-target-nav">
+          <text class="pub-target-back" bindtap="onBackFromPlatform">‹</text>
+        </view>
+      </view>
+      <view class="pub-target-main">
+        <text class="pub-target-title">选择招募平台</text>
+        <text class="pub-target-sub">选好后直接填写。字段可以自定义，并存入我的模版。</text>
+        <view class="pub-mode-list pub-mode-list--target">
+          <view
+            wx:for="{{platformRows}}"
+            wx:key="name"
+            class="pub-mode-card pub-mode-card--icon"
+            data-name="{{item.name}}"
+            bindtap="onSelectPlatform"
+          >
+            <view class="pub-mode-copy">
+              <text class="pub-mode-name">{{item.name}}</text>
+              <text class="pub-mode-sub">进入发单表单</text>
+            </view>
+            <text class="pub-mode-arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 旧步骤保留，入口已改为先选平台 -->
+  <block wx:elif="{{step === 'channel'}}">
     <view class="pub-screen pub-screen--mode">
       <template is="pubLifeBg" />
       <view class="pub-target-top" style="{{heroHeadStyle}}">
@@ -280,6 +310,66 @@
         scroll-with-animation="{{scrollWithAnimation}}"
       >
         <view class="pub-form-body">
+          <view class="pub-form-card">
+            <view class="pub-field">
+              <text class="pub-label">招募对象</text>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view
+                  wx:for="{{recruitTargets}}"
+                  wx:key="id"
+                  class="pub-radio-opt {{recruitTarget === item.id ? 'pub-radio-opt--on' : ''}}"
+                  data-id="{{item.id}}"
+                  bindtap="onFormPickTarget"
+                >{{item.label}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">招募模式</text>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view
+                  wx:for="{{recruitModes}}"
+                  wx:key="id"
+                  class="pub-radio-opt {{recruitMode === item.id ? 'pub-radio-opt--on' : ''}}"
+                  data-id="{{item.id}}"
+                  bindtap="onFormPickMode"
+                >{{item.label}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">履约方式</text>
+              <view class="pub-radio-pair">
+                <view class="pub-radio-opt {{form.fulfillmentLoop !== 'open' ? 'pub-radio-opt--on' : ''}}" data-val="closed" bindtap="onFormPickLoop">闭环</view>
+                <view class="pub-radio-opt {{form.fulfillmentLoop === 'open' ? 'pub-radio-opt--on' : ''}}" data-val="open" bindtap="onFormPickLoop">开环</view>
+              </view>
+            </view>
+            <view class="pub-field" wx:if="{{recruitTarget === 'talent'}}">
+              <text class="pub-label">招募方式</text>
+              <view class="pub-radio-pair">
+                <view class="pub-radio-opt {{!isTargetedRecruit ? 'pub-radio-opt--on' : ''}}" data-id="open" bindtap="onFormPickChannel">普通招募</view>
+                <view class="pub-radio-opt {{isTargetedRecruit ? 'pub-radio-opt--on' : ''}}" data-id="targeted" bindtap="onFormPickChannel">定向邀约</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">表单字段</text>
+              <text class="pub-hint">可关掉不需要的项，或新增字段。设置可存入我的模版，下次发单自动套用。</text>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view class="pub-radio-opt" bindtap="onToggleFieldEditor">{{fieldEditorOpen ? '收起自定义' : '自定义字段'}}</view>
+                <view class="pub-radio-opt" bindtap="onSavePublishFormTemplate">存入我的模版</view>
+                <view class="pub-radio-opt" bindtap="onUsePublishFormTemplate">使用我的模版</view>
+              </view>
+            </view>
+            <block wx:if="{{fieldEditorOpen}}">
+              <view class="tpl-row" wx:for="{{publishFieldCatalog}}" wx:key="key">
+                <text class="tpl-row__name">{{item.label}}</text>
+                <switch class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
+              </view>
+              <view class="tpl-row" wx:for="{{customPublishFields}}" wx:key="id">
+                <text class="tpl-row__name">{{item.label}} · {{item.formatLabel || '文字'}}</text>
+                <text class="tpl-row__del" data-id="{{item.id}}" bindtap="onRemoveCustomPublishField">删除</text>
+              </view>
+              <view class="pub-radio-opt" bindtap="onAddCustomFieldMenu">新增字段</view>
+            </block>
+          </view>
           <view class="pub-form-card">
           <view class="pub-field" id="field-delivery-window" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.delivery)}}">
             <text class="pub-label">投放窗口 *</text>
@@ -924,7 +1014,7 @@
       </view>
       <scroll-view class="pub-full-scroll" scroll-y>
         <view class="pub-full-body">
-          <text class="pub-full-hint">可多选城市；选「全国」则不限地域</text>
+          <text class="pub-full-hint">可多选城市，也可勾选整个省；选「全国」则不限地域</text>
           <view class="pub-full-card pub-full-card--pad">
             <view class="pub-city-national" bindtap="onCityNational">全国</view>
             <view class="pub-city-search">
@@ -948,9 +1038,13 @@
                   class="pub-city-prov-item {{item.active ? 'pub-city-prov-item--on' : ''}}"
                   data-name="{{item.name}}"
                   bindtap="onCityProvinceTap"
-                >{{item.name}}</view>
+                >{{item.name}}{{item.whole ? ' · 全省' : ''}}</view>
               </scroll-view>
               <scroll-view class="pub-city-list-scroll" scroll-y>
+                <view class="pub-city-check-row" wx:if="{{cityActiveProvince}}" bindtap="onCityProvinceWholeTap">
+                  <text class="pub-city-check-box {{provinceWhole ? 'pub-city-check-box--on' : ''}}">{{provinceWhole ? '✓' : ''}}</text>
+                  <text class="pub-city-check-name">{{cityActiveProvince}}（{{provinceScopeLabel}}）</text>
+                </view>
                 <view
                   wx:for="{{cityCheckGrid}}"
                   wx:key="name"
@@ -966,8 +1060,8 @@
             </view>
             <view class="pub-city-chips" wx:if="{{citySelectedChips.length}}">
               <view wx:for="{{citySelectedChips}}" wx:key="name" class="pub-city-chip">
-                <text>{{item.name}}</text>
-                <text class="pub-chip-x" data-name="{{item.name}}" bindtap="onRemoveCityChip">×</text>
+                <text>{{item.label || item.name}}</text>
+                <text class="pub-chip-x" data-name="{{item.name}}" data-kind="{{item.kind}}" bindtap="onRemoveCityChip">×</text>
               </view>
             </view>
           </view>

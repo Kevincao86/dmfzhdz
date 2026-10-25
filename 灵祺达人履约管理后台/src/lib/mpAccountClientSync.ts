@@ -20,6 +20,7 @@ import { applyOrderFavoriteIdsFromSync, readOrderFavoriteIds } from './mpSync/or
 import { applyHandledMapFromSync, exportHandledMapForSync } from './mpSync/inboxNoticeState'
 import { applyGroupQrCacheFromSync, exportGroupQrCacheForSync } from './mpSync/mpGroupQr'
 import { applyTalentEvalsFromSync, exportTalentEvalsForSync } from './talentLocalLifeEval'
+import { applyPublishFormTemplatesFromSync, listPublishFormTemplates } from './mpSync/publishFormTemplates'
 
 const MSG_KEY = 'meoo_talent_messages_v1'
 const NOTIFY_KEY = 'meoo_talent_notifications_v1'
@@ -37,6 +38,7 @@ export type MpClientStatePayload = {
   inboxSeen?: string[]
   publishWizardDrafts?: Record<string, unknown>[]
   applyFormTemplates?: Record<string, unknown>[]
+  publishFormTemplates?: Record<string, unknown>[]
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
   orderFavoriteIds?: string[]
@@ -88,6 +90,7 @@ export function collectLocalClientState(): MpClientStatePayload {
     inboxSeen: readJson<string[]>(inboxKey, []),
     publishWizardDrafts: listPublishDrafts() as unknown as Record<string, unknown>[],
     applyFormTemplates: listCustomTemplates() as unknown as Record<string, unknown>[],
+    publishFormTemplates: listPublishFormTemplates() as unknown as Record<string, unknown>[],
     activeApplyTemplateIds: readActiveApplyTemplateIds(),
     talentFavoriteIds: readFavoriteIds(),
     orderFavoriteIds: [...readOrderFavoriteIds()],
@@ -254,6 +257,9 @@ export function applyRemoteClientState(
       state.applyFormTemplates as Parameters<typeof applyTemplatesFromSync>[0],
       state.activeApplyTemplateIds,
     )
+  }
+  if (Array.isArray(state.publishFormTemplates)) {
+    applyPublishFormTemplatesFromSync(state.publishFormTemplates)
   }
   if (Array.isArray(state.talentFavoriteIds)) {
     applyFavoriteIdsFromSync(state.talentFavoriteIds)

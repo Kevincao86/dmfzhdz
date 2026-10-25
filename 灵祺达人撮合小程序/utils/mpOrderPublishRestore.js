@@ -4,6 +4,7 @@ const livePublishForm = require('./livePublishForm.js')
 const supplierPublishForm = require('./supplierPublishForm.js')
 const merchantLocation = require('./merchantLocation.js')
 const { emptyPublishLinkeAttach } = require('./prDouyinLinkeTypes.js')
+const cityPicker = require('./publishCityPicker.js')
 
 const { modeById, newLevelTier, newFansTier } = publishOpts
 
@@ -43,6 +44,7 @@ function formPatchFromMpOrder(mp) {
     platform: String(mp?.platform || '').trim(),
     cityNational: !!meta.cityNational,
     selectedCities: Array.isArray(meta.cities) ? [...meta.cities] : [],
+    selectedProvinces: Array.isArray(meta.provinces) ? [...meta.provinces] : [],
     talentTags: Array.isArray(meta.talentTags) ? [...meta.talentTags] : [],
     fansLimitMode,
     fansMin,
@@ -109,11 +111,18 @@ function formPatchFromMpOrder(mp) {
     ...livePublishForm.restoreLiveFields(meta),
     ...merchantLocation.readFromMp(mp),
   }
-  if (!patch.selectedCities.length && mp?.region && mp.region !== '全国') {
-    patch.selectedCities = String(mp.region)
-      .split(/[、,]/)
-      .map((s) => s.trim())
-      .filter(Boolean)
+  const area = cityPicker.partitionAreaTokens([...(patch.selectedProvinces || []), ...(patch.selectedCities || [])])
+  patch.selectedProvinces = area.selectedProvinces
+  patch.selectedCities = area.selectedCities
+  if (!patch.selectedCities.length && !patch.selectedProvinces.length && mp?.region && mp.region !== '全国') {
+    const fromRegion = cityPicker.partitionAreaTokens(
+      String(mp.region)
+        .split(/[、,]/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
+    patch.selectedProvinces = fromRegion.selectedProvinces
+    patch.selectedCities = fromRegion.selectedCities
   }
   if (mp?.region === '全国') patch.cityNational = true
   if (!patch.referenceUrl && Array.isArray(mp?.iceVideoSlots) && mp.iceVideoSlots[0]) {

@@ -23,6 +23,7 @@ import {
   TALENT_TAGS,
 } from '../../lib/mpSync/publishFormOptions'
 import { platformIconUrl } from '../../lib/mpRecruitment/hallFilters'
+import { areaChips, provinceScopeLabel, toggleCity, toggleProvince } from '../../lib/mpSync/publishCityPicker'
 
 export type PickerView =
   | ''
@@ -60,7 +61,7 @@ type Props = {
   setReqLevelSelected: Dispatch<SetStateAction<Set<string>>>
   cityKeyword: string
   setCityKeyword: (v: string) => void
-  cityProvinceRows: { name: string; active: boolean }[]
+  cityProvinceRows: { name: string; active: boolean; whole?: boolean }[]
   cityCheckGrid: { name: string; on: boolean }[]
   refreshCityUi: (hint?: string) => void
   editingTierIndex: number
@@ -280,18 +281,18 @@ export default function PublishWizardSheets(props: Props) {
         tall
         onClose={() => setPickerView('')}
         onConfirm={() => {
-          if (!form.cityNational && !form.selectedCities.length) {
-            setErr('请选择全国或添加城市')
+          if (!form.cityNational && !form.selectedCities.length && !(form.selectedProvinces || []).length) {
+            setErr('请选择全国、省份或城市')
             return
           }
           setPickerView('')
         }}
       >
-        <p className="text-xs text-slate-500 mb-3">可多选城市；选「全国」则不限地域</p>
+        <p className="text-xs text-slate-500 mb-3">可多选城市，也可勾选整个省；选「全国」则不限地域</p>
         <button
           type="button"
           className={`w-full mb-3 py-2 rounded-lg text-sm ${form.cityNational ? 'bg-violet-600' : 'bg-white/10'}`}
-          onClick={() => patchForm({ cityNational: true, selectedCities: [] })}
+          onClick={() => patchForm({ cityNational: true, selectedCities: [], selectedProvinces: [] })}
         >
           全国
         </button>
@@ -311,22 +312,46 @@ export default function PublishWizardSheets(props: Props) {
                 onClick={() => refreshCityUi(p.name)}
               >
                 {p.name}
+                {p.whole ? ' · 全省' : ''}
               </button>
             ))}
           </div>
           <div className="overflow-auto border border-[var(--shell-border)] rounded-lg">
+            {(() => {
+              const activeProvince = cityProvinceRows.find((p) => p.active)?.name || ''
+              if (!activeProvince) return null
+              const whole = (form.selectedProvinces || []).includes(activeProvince)
+              return (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-2 py-2 text-sm font-medium hover:bg-white/5"
+                  onClick={() => {
+                    const next = toggleProvince(activeProvince, form.selectedProvinces || [], form.selectedCities)
+                    patchForm({ ...next, cityNational: false })
+                    refreshCityUi(activeProvince)
+                  }}
+                >
+                  <span
+                    className={`w-4 h-4 border rounded text-xs flex items-center justify-center shrink-0 ${
+                      whole ? 'bg-violet-600 border-violet-600' : 'border-white/30'
+                    }`}
+                  >
+                    {whole ? '✓' : ''}
+                  </span>
+                  {activeProvince}（{provinceScopeLabel(activeProvince)}）
+                </button>
+              )
+            })()}
             {cityCheckGrid.map((c) => (
               <button
                 key={c.name}
                 type="button"
                 className="flex w-full items-center gap-2 px-2 py-2 text-sm hover:bg-white/5"
                 onClick={() => {
-                  const cities = [...form.selectedCities]
-                  const idx = cities.indexOf(c.name)
-                  if (idx >= 0) cities.splice(idx, 1)
-                  else cities.push(c.name)
-                  patchForm({ selectedCities: cities, cityNational: false })
-                  refreshCityUi()
+                  const activeProvince = cityProvinceRows.find((p) => p.active)?.name || ''
+                  const next = toggleCity(activeProvince, c.name, form.selectedProvinces || [], form.selectedCities)
+                  patchForm({ ...next, cityNational: false })
+                  refreshCityUi(activeProvince)
                 }}
               >
                 <span
@@ -341,15 +366,21 @@ export default function PublishWizardSheets(props: Props) {
             ))}
           </div>
         </div>
-        {form.selectedCities.length ? (
+        {areaChips(form.selectedProvinces || [], form.selectedCities).length ? (
           <div className="flex flex-wrap gap-1 mt-3">
-            {form.selectedCities.map((c) => (
-              <span key={c} className="text-xs px-2 py-0.5 rounded bg-violet-500/20">
-                {c}
+            {areaChips(form.selectedProvinces || [], form.selectedCities).map((c) => (
+              <span key={`${c.kind}-${c.name}`} className="text-xs px-2 py-0.5 rounded bg-violet-500/20">
+                {c.label}
                 <button
                   type="button"
                   className="ml-1"
-                  onClick={() => patchForm({ selectedCities: form.selectedCities.filter((x) => x !== c) })}
+                  onClick={() =>
+                    patchForm(
+                      c.kind === 'province'
+                        ? { selectedProvinces: (form.selectedProvinces || []).filter((x) => x !== c.name) }
+                        : { selectedCities: form.selectedCities.filter((x) => x !== c.name) },
+                    )
+                  }
                 >
                   ×
                 </button>

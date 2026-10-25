@@ -43,6 +43,7 @@ import {
   type MerchantLocationFormFields,
 } from './merchantLocation'
 import { resolvePublishFulfillmentLoop } from './xingxuanRecruitLoop'
+import { areaDisplayText } from './publishCityPicker'
 
 export type PublishForm = {
   deliveryWindow: 'normal' | 'urgent'
@@ -50,6 +51,8 @@ export type PublishForm = {
   platform: string
   cityNational: boolean
   selectedCities: string[]
+  /** 按省招募。与 selectedCities 可同时存在 */
+  selectedProvinces: string[]
   talentTags: string[]
   fansLimitMode: 'unlimited' | 'limit'
   fansMin: string
@@ -139,6 +142,7 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
     platform: isSupplier ? '通用' : '',
     cityNational: false,
     selectedCities: [],
+    selectedProvinces: [],
     talentTags: [],
     fansLimitMode: 'unlimited',
     fansMin: '',
@@ -192,9 +196,10 @@ export function defaultSignupDate() {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-export function buildRegionText(f: PublishForm) {
+export function buildRegionText(f: Pick<PublishForm, 'cityNational' | 'selectedCities' | 'selectedProvinces'>) {
   if (f.cityNational) return '全国'
-  return (f.selectedCities || []).join('、')
+  const parts = [...(f.selectedProvinces || []), ...(f.selectedCities || [])]
+  return parts.join('、')
 }
 
 export function resolveSignupDeadline(f: PublishForm) {
@@ -356,7 +361,9 @@ export function validatePublishForm(
       return '请选择达人带货等级'
     }
   } else if (need('platform') && !isSupplier && !f.platform) return '请选择招募平台'
-  if (need('city') && !f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
+  if (need('city') && !f.cityNational && !(f.selectedCities || []).length && !(f.selectedProvinces || []).length) {
+    return '请选择招募城市'
+  }
   if (need('tags') && !(f.talentTags || []).length) return isSupplier ? '请选择需求品类标签' : '请选择需求达人标签'
   if (need('fans') && !isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
   if (need('deadline') && !isTargetedRecruit && f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
@@ -451,13 +458,8 @@ export type PublishDisplay = {
 
 export function computePublishDisplay(form: PublishForm, recruitMode = ''): PublishDisplay {
   const isLive = recruitMode === 'live'
-  let cityDisplayText = '请选择招募城市'
-  if (form.cityNational) cityDisplayText = '全国'
-  else if ((form.selectedCities || []).length) {
-    const cities = form.selectedCities
-    cityDisplayText =
-      cities.length <= 2 ? cities.join('、') : `${cities.slice(0, 2).join('、')} 等${cities.length}城`
-  }
+  const cityDisplayText =
+    areaDisplayText(!!form.cityNational, form.selectedProvinces || [], form.selectedCities || []) || '请选择招募城市'
   const tags = form.talentTags || []
   const tagsDisplayText = tags.length ? tags.join('、') : '请选择达人标签（最多2个）'
   const platformDisplayText = isLive
@@ -630,6 +632,7 @@ export function buildPublishOrder(
       recruitDetail: form.recruitDetail,
       cityNational: !!form.cityNational,
       cities: form.selectedCities || [],
+      provinces: form.selectedProvinces || [],
       applyFormTemplateId: form.applyFormTemplateId,
       applyFormTemplateName: form.applyFormTemplateName || '',
       applyFormFields: form.applyFormFields || [],

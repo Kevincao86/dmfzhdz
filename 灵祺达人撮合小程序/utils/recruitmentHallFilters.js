@@ -1,5 +1,6 @@
 /** 与发招募页一致（勿 require publishFormOptions，避免小程序分包/循环加载） */
 const china = require('./chinaRegion.js')
+const cityPicker = require('./publishCityPicker.js')
 const PLATFORM_LIST = ['抖音', '小红书', '大众点评', '快手', '微信视频号']
 const PLATFORM_FILTERS = ['全部', ...PLATFORM_LIST]
 
@@ -89,6 +90,7 @@ function matchCity(region, storeName, cityFilter) {
   const short = cf.replace(/市$/, '')
   if (short.length >= 2 && blob.includes(short)) return true
   if (cf.endsWith('市') && blob.includes(cf.slice(0, -1))) return true
+  if (cityPicker.regionCoversCity(region, cf)) return true
   return false
 }
 

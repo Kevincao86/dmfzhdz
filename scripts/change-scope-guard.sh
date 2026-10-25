@@ -178,6 +178,7 @@ list_scopes() {
   merchant_ops_talent_head 商家运营方案：同城达人库头部按 5 级及以上统计，不单看小红书
   merchant_mp_erp_sync 商家小程序：达人推荐与智能回复对齐商家 ERP
   recruit_publish_default_tpl 发招募时带上我的模版里设为当前默认的报名项
+  publish_platform_form 发招募先选平台再进表单；城市可整省勾选；表单字段可存入我的模版
 
 示例:
   bash scripts/change-scope-guard.sh --scope group_qr
@@ -872,6 +873,24 @@ pages/ai-agent/ai-agent
 pages/ai-ops-plan/ai-ops-plan
 agentComposerMp
 AiAgentContext.tsx
+change-scope-guard
+PAT
+      ;;
+    publish_platform_form)
+      cat <<'PAT'
+PublishWizard
+PublishWizardSheets
+pages/publish/publish
+publishCityPicker
+publishOrder
+mpOrderPublishRestore
+recruitmentHallFilters
+hallFilters.ts
+publishFormTemplates
+mine-templates
+TemplatesPage
+mpAccountClientSync
+mpAccountClientStateMerge
 change-scope-guard
 PAT
       ;;

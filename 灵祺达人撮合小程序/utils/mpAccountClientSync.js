@@ -7,6 +7,7 @@ const scope = require('./mpAccountLocalScope.js')
 const memberStore = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
 const applyTemplates = require('./applyFormTemplates.js')
+const publishFormTemplates = require('./publishFormTemplates.js')
 const talentFavorites = require('./talentFavorites.js')
 const orderFavorites = require('./orderFavorites.js')
 const prDouyinLinkeStore = require('./prDouyinLinkeStore.js')
@@ -77,6 +78,7 @@ function collectLocalState() {
     selectionHandled: inboxNoticeState.exportHandledMapForSync(),
     publishWizardDrafts: readList(draftsKey),
     applyFormTemplates: applyTemplates.listAllTemplates(),
+    publishFormTemplates: publishFormTemplates.listPublishFormTemplates(),
     activeApplyTemplateIds: applyTemplates.readActiveApplyTemplateIds(),
     talentFavoriteIds: [...talentFavorites.readIdSet()],
     orderFavoriteIds: [...orderFavorites.readIdSet()],
@@ -258,6 +260,9 @@ function applyRemoteState(state, epochAtStart) {
   }
   if (Array.isArray(state.applyFormTemplates) || state.activeApplyTemplateIds) {
     applyTemplates.applyTemplatesFromSync(state.applyFormTemplates, state.activeApplyTemplateIds)
+  }
+  if (Array.isArray(state.publishFormTemplates)) {
+    publishFormTemplates.applyPublishFormTemplatesFromSync(state.publishFormTemplates)
   }
   if (Array.isArray(state.talentFavoriteIds)) {
     talentFavorites.applyFavoriteIdsFromSync(state.talentFavoriteIds)

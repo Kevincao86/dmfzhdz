@@ -1,4 +1,5 @@
 import { getApplyConfigForMpOrder, getTemplateById } from './applyFormTemplates'
+import { partitionAreaTokens } from './publishCityPicker'
 import { modeById, newFansTier, newLevelTier } from './publishFormOptions'
 import type { PublishForm } from './publishOrder'
 import { restoreLiveFields } from './livePublishForm'
@@ -45,6 +46,7 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     platform: String(mp.platform || '').trim(),
     cityNational: !!meta.cityNational,
     selectedCities: Array.isArray(meta.cities) ? [...(meta.cities as string[])] : [],
+    selectedProvinces: Array.isArray(meta.provinces) ? [...(meta.provinces as string[])] : [],
     talentTags: Array.isArray(meta.talentTags) ? [...(meta.talentTags as string[])] : [],
     fansLimitMode,
     fansMin,
@@ -113,11 +115,18 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     ...restoreLiveFields(meta),
     ...merchantLocationFromMeta(meta),
   }
-  if (!patch.selectedCities.length && mp.region && mp.region !== '全国') {
-    patch.selectedCities = String(mp.region)
-      .split(/[、,]/)
-      .map((s) => s.trim())
-      .filter(Boolean)
+  const area = partitionAreaTokens([...(patch.selectedProvinces || []), ...(patch.selectedCities || [])])
+  patch.selectedProvinces = area.selectedProvinces
+  patch.selectedCities = area.selectedCities
+  if (!patch.selectedCities.length && !patch.selectedProvinces.length && mp.region && mp.region !== '全国') {
+    const fromRegion = partitionAreaTokens(
+      String(mp.region)
+        .split(/[、,]/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    )
+    patch.selectedProvinces = fromRegion.selectedProvinces
+    patch.selectedCities = fromRegion.selectedCities
   }
   if (mp.region === '全国') patch.cityNational = true
   const slots = mp.iceVideoSlots as { downloadUrl?: string }[] | undefined

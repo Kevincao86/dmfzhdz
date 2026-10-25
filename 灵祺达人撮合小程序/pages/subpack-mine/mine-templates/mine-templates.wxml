@@ -35,6 +35,24 @@
   <view wx:if="{{!rows.length}}" class="card">
     <text class="hint">暂无模版，点击上方按钮新建</text>
   </view>
+  <view class="card">
+    <text class="title-lg">发单表单</text>
+    <text class="hint">发招募时保存的字段设置。设为当前后，下次选好平台会自动套用。</text>
+  </view>
+  <view wx:for="{{formTpls}}" wx:key="id" class="card tpl-card">
+    <view class="tpl-head">
+      <text class="title-lg">{{item.name}}</text>
+      <text class="tpl-active-badge" wx:if="{{activeFormId === item.id}}">当前默认</text>
+    </view>
+    <text class="hint">{{item.recruitTarget === 'shoot' ? '拍摄' : item.recruitTarget === 'edit' ? '剪辑' : '达人'}} · {{item.recruitMode}}</text>
+    <view class="tpl-actions">
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseFormTemplate">使用</button>
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onDeleteFormTemplate">删除</button>
+    </view>
+  </view>
+  <view wx:if="{{!formTpls.length}}" class="card">
+    <text class="hint">暂无发单模版。在发招募表单里点「存入我的模版」。</text>
+  </view>
   </block>
   <site-icp-footer />
 </view>

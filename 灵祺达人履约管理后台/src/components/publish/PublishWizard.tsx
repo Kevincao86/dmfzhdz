@@ -29,6 +29,7 @@ import {
   DELIVERY_WINDOWS,
   newFansTier,
   newLevelTier,
+  PLATFORMS,
   RECRUIT_MODES,
   RECRUIT_TARGETS,
   ICE_VERIFY_MODES,
@@ -62,6 +63,13 @@ import {
 } from '../../lib/mpSync/publishDraft'
 import { readPrProfile } from '../../lib/mpSync/userProfile'
 import { canUseTargetedRecruit } from '../../lib/mpSync/mpTargetedRecruitAccess'
+import {
+  getActivePublishFormTemplate,
+  listPublishFormTemplates,
+  savePublishFormTemplate,
+  setActivePublishFormTemplateId,
+  type PublishFormTemplate,
+} from '../../lib/mpSync/publishFormTemplates'
 import { INVITE_HOUR_OPTIONS, RECRUIT_CHANNELS } from '../../lib/mpSync/mpTargetedRecruit'
 import { readImageFileAsDataUrl, patchGroupQrImage } from '../../lib/mpSync/mpGroupQr'
 import {
@@ -135,7 +143,7 @@ export default function PublishWizard() {
   const [search] = useSearchParams()
   const pr = readPrProfile()
 
-  const [step, setStep] = useState<'channel' | 'recruit' | 'target' | 'mode' | 'tpl' | 'tplCustom' | 'placeholder' | 'form' | 'done'>('channel')
+  const [step, setStep] = useState<'platform' | 'channel' | 'recruit' | 'target' | 'mode' | 'tpl' | 'tplCustom' | 'placeholder' | 'form' | 'done'>('platform')
   const [publishTemplateMode, setPublishTemplateMode] = useState<'system' | 'custom'>('system')
   const [fieldOn, setFieldOn] = useState<Record<string, boolean>>({
     delivery: true,
@@ -183,7 +191,9 @@ export default function PublishWizard() {
 
   const [cityKeyword, setCityKeyword] = useState('')
   const [cityActiveProvince, setCityActiveProvince] = useState('')
-  const [cityProvinceRows, setCityProvinceRows] = useState<{ name: string; active: boolean }[]>([])
+  const [cityProvinceRows, setCityProvinceRows] = useState<{ name: string; active: boolean; whole?: boolean }[]>([])
+  const [fieldEditorOpen, setFieldEditorOpen] = useState(false)
+  const [formTplOpen, setFormTplOpen] = useState(false)
   const [cityCheckGrid, setCityCheckGrid] = useState<{ name: string; on: boolean }[]>([])
 
   const [tagSelected, setTagSelected] = useState<Set<string>>(new Set())
@@ -226,12 +236,12 @@ export default function PublishWizard() {
 
   const refreshCityUi = useCallback(
     (hint?: string) => {
-      const st = initModalState(cityKeyword, hint ?? cityActiveProvince, form.selectedCities)
+      const st = initModalState(cityKeyword, hint ?? cityActiveProvince, form.selectedCities, form.selectedProvinces || [])
       setCityActiveProvince(st.activeProvince)
       setCityProvinceRows(st.provinceRows)
       setCityCheckGrid(st.cityCheckGrid)
     },
-    [cityKeyword, cityActiveProvince, form.selectedCities],
+    [cityKeyword, cityActiveProvince, form.selectedCities, form.selectedProvinces],
   )
 
   useEffect(() => {
@@ -502,6 +512,88 @@ export default function PublishWizard() {
     }
   }
 
+  const fieldKeys = ['delivery', 'deadline', 'platform', 'city', 'location', 'tags', 'fans', 'level', 'fee', 'count', 'detail', 'apply', 'cover']
+  const layoutIsCustom = (fieldMap: Record<string, boolean>, custom: { label: string }[]) =>
+    custom.length > 0 || fieldKeys.some((key) => fieldMap[key] === false)
+
+  const applyTemplateToState = (tpl: PublishFormTemplate, platform: string, keepContent: boolean) => {
+    const target = tpl.recruitTarget || 'talent'
+    const modes = modesForTarget(target)
+    const mode = modes.find((m) => m.id === tpl.recruitMode) || modes[0]
+    const targeted = !!(tpl.isTargeted && target === 'talent' && canUseTargetedRecruit())
+    setRecruitTarget(target)
+    setRecruitTargetLabel(target === 'shoot' ? '拍摄' : target === 'edit' ? '剪辑' : '达人')
+    setRecruitMode(mode.id)
+    setRecruitModeLabel(mode.label)
+    setIsTargetedRecruit(targeted)
+    setRecruitChannel(targeted ? 'targeted' : 'open')
+    setLoopChosen(true)
+    const loop = mode.id === 'edit_ice' ? 'closed' : tpl.fulfillmentLoop
+    setFieldOn((prev) => ({ ...prev, ...tpl.fieldOn }))
+    setCustomPublishFields(tpl.customFields.map((row) => ({ ...row, value: '' })))
+    setPublishTemplateMode(layoutIsCustom(tpl.fieldOn, tpl.customFields) ? 'custom' : 'system')
+    setForm((prev) => {
+      const base = emptyPublishForm(target)
+      const kept = keepContent
+        ? {
+            title: prev.title,
+            cityNational: prev.cityNational,
+            selectedCities: prev.selectedCities,
+            selectedProvinces: prev.selectedProvinces || [],
+            talentTags: prev.talentTags,
+            recruitDetail: prev.recruitDetail,
+            feeTypeId: prev.feeTypeId,
+            fixedPrice: prev.fixedPrice,
+            recruitCount: prev.recruitCount,
+            signupDeadline: prev.signupDeadline,
+            deliveryWindow: prev.deliveryWindow,
+            coverImage: prev.coverImage,
+            coverLibraryId: prev.coverLibraryId,
+            groupQrImage: prev.groupQrImage,
+          }
+        : {}
+      return {
+        ...base,
+        ...kept,
+        platform: target === 'talent' ? platform : '通用',
+        fulfillmentLoop: loop,
+        applyFormFields: mode.id === 'live' ? defaultLiveApplyFields() : base.applyFormFields,
+        applyFormTemplateName: mode.id === 'live' ? '直播达人报名默认项' : base.applyFormTemplateName,
+      }
+    })
+  }
+
+  const enterFromPlatform = (platform: string) => {
+    const active = getActivePublishFormTemplate()
+    if (active) applyTemplateToState(active, platform, false)
+    else {
+      setRecruitTarget('talent')
+      setRecruitTargetLabel('达人')
+      setRecruitMode('visit')
+      setRecruitModeLabel('探店')
+      setIsTargetedRecruit(false)
+      setRecruitChannel('open')
+      setLoopChosen(true)
+      setPublishTemplateMode('system')
+      setCustomPublishFields([])
+      setForm({ ...emptyPublishForm('talent'), platform, fulfillmentLoop: 'closed' })
+      setTagSelected(new Set())
+    }
+    setStep('form')
+  }
+
+  const onPickPlatform = (platform: string) => {
+    if (recruitMode) {
+      setForm((prev) => ({
+        ...prev,
+        platform: recruitTarget === 'shoot' || recruitTarget === 'edit' ? prev.platform : platform,
+      }))
+      setStep('form')
+      return
+    }
+    enterFromPlatform(platform)
+  }
+
   if (step === 'done' && doneId) {
     return (
       <div className="page-content-shell page-content-shell--narrow space-y-4">
@@ -516,7 +608,9 @@ export default function PublishWizard() {
             className="px-4 py-2 rounded-lg border border-white/20"
             onClick={() => {
               setDoneId('')
-              setStep('channel')
+              setStep('platform')
+              setRecruitMode('')
+              setRecruitModeLabel('')
               setRecruitChannel('')
               setLoopChosen(false)
               setIsTargetedRecruit(false)
@@ -531,6 +625,27 @@ export default function PublishWizard() {
           >
             再发一单
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'platform') {
+    return (
+      <div className="page-content-shell page-content-shell--narrow space-y-5">
+        <PageHero title="发布招募" subtitle="选择招募平台后直接填写" badge="选平台" />
+        <div className="grid gap-3">
+          {PLATFORMS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="choice-card w-full text-left surface-card rounded-xl border p-5 hover-panel"
+              onClick={() => onPickPlatform(name)}
+            >
+              <div className="font-semibold text-lg text-[var(--shell-text)]">{name}</div>
+              <div className="text-sm text-[var(--shell-muted)] mt-1.5">进入发单表单，字段可自定义并存入我的模版</div>
+            </button>
+          ))}
         </div>
       </div>
     )
@@ -858,7 +973,7 @@ export default function PublishWizard() {
         <button
           type="button"
           className="text-[var(--shell-muted)] text-sm hover:text-[var(--shell-text)]"
-          onClick={() => (isEditMode ? nav('/orders') : setStep(publishTemplateMode === 'custom' ? 'tplCustom' : 'tpl'))}
+          onClick={() => (isEditMode ? nav('/orders') : setStep('platform'))}
         >
           ‹ 返回
         </button>
@@ -876,6 +991,252 @@ export default function PublishWizard() {
         aside={<TipsCard title="填写小贴士" items={PUBLISH_TIPS} />}
         main={
       <section className="pub-form-card space-y-4 text-sm">
+        <div className="rounded-xl border border-[var(--shell-border)] p-3 space-y-3">
+          <div className="text-xs text-[var(--shell-muted)]">平台 {form.platform || '未选'} · 可在表单里调整对象、模式和履约</div>
+          <div className="flex flex-wrap gap-2">
+            {RECRUIT_TARGETS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`px-3 py-1.5 rounded-full text-sm border ${recruitTarget === t.id ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                onClick={() => {
+                  const isSupplier = t.id === 'shoot' || t.id === 'edit'
+                  if (isSupplier && isTargetedRecruit) {
+                    setIsTargetedRecruit(false)
+                    setRecruitChannel('open')
+                  }
+                  const modes = modesForTarget(t.id)
+                  const mode = modes[0]
+                  setRecruitTarget(t.id)
+                  setRecruitTargetLabel(t.label)
+                  setRecruitMode(mode.id)
+                  setRecruitModeLabel(mode.label)
+                  setForm((prev) => {
+                    const next = emptyPublishForm(t.id)
+                    return {
+                      ...next,
+                      title: prev.title,
+                      platform: isSupplier ? '通用' : prev.platform,
+                      cityNational: prev.cityNational,
+                      selectedCities: prev.selectedCities,
+                      selectedProvinces: prev.selectedProvinces || [],
+                      talentTags: prev.talentTags,
+                      recruitDetail: prev.recruitDetail,
+                      feeTypeId: prev.feeTypeId,
+                      fixedPrice: prev.fixedPrice,
+                      recruitCount: prev.recruitCount,
+                      fulfillmentLoop: mode.id === 'edit_ice' ? 'closed' : prev.fulfillmentLoop || 'closed',
+                      groupQrImage: prev.groupQrImage,
+                      coverImage: prev.coverImage,
+                      coverLibraryId: prev.coverLibraryId,
+                      signupDeadline: prev.signupDeadline,
+                      deliveryWindow: prev.deliveryWindow,
+                      applyFormFields: mode.id === 'live' ? defaultLiveApplyFields() : next.applyFormFields,
+                      applyFormTemplateName: mode.id === 'live' ? '直播达人报名默认项' : next.applyFormTemplateName,
+                    }
+                  })
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {filteredModes.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={`px-3 py-1.5 rounded-full text-sm border ${recruitMode === m.id ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                onClick={() => {
+                  setRecruitMode(m.id)
+                  setRecruitModeLabel(m.label)
+                  if (m.id === 'live') {
+                    setForm((prev) => ({
+                      ...prev,
+                      applyFormFields: defaultLiveApplyFields(),
+                      applyFormTemplateName: '直播达人报名默认项',
+                    }))
+                  }
+                  if (m.id === 'edit_ice') setForm((prev) => ({ ...prev, fulfillmentLoop: 'closed' }))
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ['closed', '闭环'],
+                ['open', '开环'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                disabled={recruitMode === 'edit_ice'}
+                className={`px-3 py-1.5 rounded-full text-sm border ${(form.fulfillmentLoop || 'closed') === id ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                onClick={() => setForm((prev) => ({ ...prev, fulfillmentLoop: id }))}
+              >
+                {label}
+              </button>
+            ))}
+            {recruitTarget === 'talent'
+              ? (
+                  [
+                    ['open', '普通招募'],
+                    ['targeted', '定向邀约'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`px-3 py-1.5 rounded-full text-sm border ${(id === 'targeted' ? isTargetedRecruit : !isTargetedRecruit) ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                    onClick={() => {
+                      if (id === 'targeted' && !canUseTargetedRecruit()) {
+                        window.alert('当前会员档位不含定向邀约，请升级会员或联系运营开通。')
+                        return
+                      }
+                      setRecruitChannel(id)
+                      setIsTargetedRecruit(id === 'targeted')
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))
+              : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="text-sm text-violet-600" onClick={() => setFieldEditorOpen((v) => !v)}>
+              {fieldEditorOpen ? '收起自定义字段' : '自定义字段'}
+            </button>
+            <button
+              type="button"
+              className="text-sm text-violet-600"
+              onClick={() => {
+                const name = window.prompt('存入我的模版', '我的发单模版')
+                if (!name?.trim()) return
+                const row = savePublishFormTemplate({
+                  name: name.trim(),
+                  recruitTarget: recruitTarget || 'talent',
+                  recruitMode: recruitMode || 'visit',
+                  fulfillmentLoop: form.fulfillmentLoop === 'open' ? 'open' : 'closed',
+                  isTargeted: isTargetedRecruit,
+                  fieldOn,
+                  customFields: customPublishFields.map((row) => ({
+                    id: row.id,
+                    label: row.label,
+                    format: row.format || 'text',
+                  })),
+                })
+                setActivePublishFormTemplateId(row.id)
+                setDraftHint(`已存入我的模版「${row.name}」`)
+                setErr('')
+              }}
+            >
+              存入我的模版
+            </button>
+            <button type="button" className="text-sm text-violet-600" onClick={() => setFormTplOpen((v) => !v)}>
+              使用我的模版
+            </button>
+          </div>
+          {fieldEditorOpen ? (
+            <div className="divide-y border border-[var(--shell-border)] rounded-lg">
+              {publishFieldCatalog.map((item) => (
+                <label key={item.key} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <span>{item.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={fieldOn[item.key] !== false}
+                    onChange={(e) => {
+                      const next = { ...fieldOn, [item.key]: e.target.checked }
+                      setFieldOn(next)
+                      setPublishTemplateMode(layoutIsCustom(next, customPublishFields) ? 'custom' : 'system')
+                    }}
+                  />
+                </label>
+              ))}
+              {customPublishFields.map((row) => (
+                <div key={row.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <span>
+                    {row.label} · {row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字'}
+                  </span>
+                  <button
+                    type="button"
+                    className="text-xs text-slate-400"
+                    onClick={() => {
+                      const list = customPublishFields.filter((x) => x.id !== row.id)
+                      setCustomPublishFields(list)
+                      setPublishTemplateMode(layoutIsCustom(fieldOn, list) ? 'custom' : 'system')
+                    }}
+                  >
+                    删除
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2 px-3 py-2">
+                <select
+                  className="rounded-lg panel-input border px-2 py-1.5 text-sm"
+                  value={customFieldFormat}
+                  onChange={(e) => setCustomFieldFormat(e.target.value as 'text' | 'image' | 'video')}
+                >
+                  <option value="text">文字</option>
+                  <option value="image">图片</option>
+                  <option value="video">视频</option>
+                </select>
+                <input
+                  className="flex-1 rounded-lg panel-input border px-3 py-1.5 text-sm"
+                  placeholder="新增字段，如到店时间"
+                  value={customFieldDraft}
+                  onChange={(e) => setCustomFieldDraft(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="shrink-0 text-sm font-medium text-violet-600"
+                  onClick={() => {
+                    const label = customFieldDraft.trim()
+                    if (!label) {
+                      setErr('请填写字段名称')
+                      return
+                    }
+                    const list = customPublishFields.concat([
+                      { id: `c-${Date.now()}`, label, value: '', format: customFieldFormat },
+                    ])
+                    setCustomPublishFields(list)
+                    setCustomFieldDraft('')
+                    setPublishTemplateMode('custom')
+                    setErr('')
+                  }}
+                >
+                  添加
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {formTplOpen ? (
+            <div className="space-y-2">
+              {listPublishFormTemplates().length ? (
+                listPublishFormTemplates().map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    className="block w-full text-left rounded-lg border border-[var(--shell-border)] px-3 py-2 text-sm"
+                    onClick={() => {
+                      applyTemplateToState(tpl, form.platform || '抖音', true)
+                      setActivePublishFormTemplateId(tpl.id)
+                      setFormTplOpen(false)
+                      setDraftHint(`已使用模版「${tpl.name}」`)
+                    }}
+                  >
+                    {tpl.name}
+                  </button>
+                ))
+              ) : (
+                <p className="text-xs text-[var(--shell-muted)]">还没有发单模版。自定义字段后点「存入我的模版」。</p>
+              )}
+            </div>
+          ) : null}
+        </div>
         {!isTargetedRecruit && showField('delivery') ? (
         <div>
           <PubLabel>投放窗口 *</PubLabel>

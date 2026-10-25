@@ -6,6 +6,7 @@ const messagesStore = require('../../utils/messagesStore.js')
 const participant = require('../../utils/participant.js')
 const publishOpts = require('../../utils/publishFormOptions.js')
 const cityPicker = require('../../utils/publishCityPicker.js')
+const publishFormTemplates = require('../../utils/publishFormTemplates.js')
 const applyFormEditor = require('../../utils/applyFormEditor.js')
 const applyTemplates = applyFormEditor.templates
 const shareCopy = require('../../utils/recruitmentShareCopy.js')
@@ -154,6 +155,7 @@ function emptyForm(recruitTarget) {
     platform: target === 'talent' ? '' : '通用',
     cityNational: false,
     selectedCities: [],
+    selectedProvinces: [],
     talentTags: [],
     fansLimitMode: 'unlimited',
     fansMin: '',
@@ -285,7 +287,7 @@ function attachApplyFieldFormat(page) {
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
-    step: 'channel',
+    step: 'platform',
     recruitTargets: RECRUIT_TARGETS,
     recruitChannels: mpTargetedRecruit.RECRUIT_CHANNELS,
     inviteHourOptions: mpTargetedRecruit.INVITE_HOUR_OPTIONS,
@@ -366,6 +368,10 @@ Page({
     cityProvinceRows: [],
     cityCheckGrid: [],
     citySelectedChips: [],
+    provinceWhole: false,
+    provinceScopeLabel: '全省',
+    fieldEditorOpen: false,
+    publishFormTemplates: [],
     cityDisplayText: '请选择招募城市',
     merchantLocationMapReady: false,
     reqLevelGrid: buildLevelGrid(['不限'], null),
@@ -654,22 +660,20 @@ Page({
     const kw = this.data.cityKeyword
     const hint = activeProvinceHint != null ? activeProvinceHint : this.data.cityActiveProvince
     const selected = this.data.form.selectedCities || []
-    const st = cityPicker.initModalState(kw, hint, selected)
+    const st = cityPicker.initModalState(kw, hint, selected, this.data.form.selectedProvinces || [])
     this.setData({
       cityActiveProvince: st.activeProvince,
       cityProvinceRows: st.provinceRows,
       cityCheckGrid: st.cityCheckGrid,
+      provinceWhole: st.provinceWhole,
+      provinceScopeLabel: st.provinceScopeLabel,
     })
   },
   syncDisplayFields() {
     const f = this.data.form
-    let cityDisplayText = '请选择招募城市'
-    if (f.cityNational) cityDisplayText = '全国'
-    else if ((f.selectedCities || []).length) {
-      const cities = f.selectedCities
-      cityDisplayText =
-        cities.length <= 2 ? cities.join('、') : `${cities.slice(0, 2).join('、')} 等${cities.length}城`
-    }
+    const cityDisplayText =
+      cityPicker.areaDisplayText(!!f.cityNational, f.selectedProvinces || [], f.selectedCities || []) ||
+      '请选择招募城市'
     const tags = f.talentTags || []
     const tagsDisplayText = tags.length ? tags.join('、') : '请选择达人标签（最多2个）'
     const isLive = this.data.recruitMode === 'live'
@@ -679,7 +683,7 @@ Page({
     const levels = f.douyinSalesLevels || []
     const levelDisplayText =
       !levels.length || levels.includes('不限') ? '不限' : levels.join('、')
-    const chips = (f.selectedCities || []).map((name) => ({ name }))
+    const chips = cityPicker.areaChips(f.selectedProvinces || [], f.selectedCities || [])
     const urgentWin = f.deliveryWindow === 'urgent'
     const af = f.applyFormFields || []
     let applyFormDisplayText = '请配置达人报名必填信息'
@@ -1110,7 +1114,7 @@ Page({
   },
   resetToChannel() {
     this.setData({
-      step: 'channel',
+      step: 'platform',
       pickerView: '',
       recruitTarget: '',
       recruitTargetLabel: '',
@@ -1135,6 +1139,249 @@ Page({
   },
   onBackFromChannel() {
     wx.switchTab({ url: '/pages/index/index' })
+  },
+  onBackFromPlatform() {
+    wx.switchTab({ url: '/pages/index/index' })
+  },
+  layoutIsCustom(fieldOn, customFields) {
+    const keys = (this.data.publishFieldCatalog || []).map((item) => item.key)
+    const custom = customFields || []
+    return custom.length > 0 || keys.some((key) => fieldOn && fieldOn[key] === false)
+  },
+  applyPublishTemplate(tpl, platform, keepContent) {
+    if (!tpl) return
+    const targetId = tpl.recruitTarget || 'talent'
+    const target = targetById(targetId) || targetById('talent')
+    const modes = modesForTarget(target.id)
+    const mode = modes.find((item) => item.id === tpl.recruitMode) || modes[0]
+    const isSupplier = target.id === 'shoot' || target.id === 'edit'
+    const targeted = !!(tpl.isTargeted && !isSupplier && mpTargetedRecruitAccess.canUseTargetedRecruit())
+    const prev = this.data.form || {}
+    const base = emptyForm(target.id)
+    const loop = mode.id === 'edit_ice' || mode.id === 'ice' ? 'closed' : tpl.fulfillmentLoop === 'open' ? 'open' : 'closed'
+    const form = {
+      ...base,
+      platform: isSupplier ? '通用' : platform || prev.platform,
+      fulfillmentLoop: loop,
+      ...(keepContent
+        ? {
+            title: prev.title,
+            cityNational: prev.cityNational,
+            selectedCities: prev.selectedCities || [],
+            selectedProvinces: prev.selectedProvinces || [],
+            talentTags: prev.talentTags || [],
+            recruitDetail: prev.recruitDetail,
+            feeTypeId: prev.feeTypeId,
+            fixedPrice: prev.fixedPrice,
+            recruitCount: prev.recruitCount,
+            signupDeadline: prev.signupDeadline,
+            deliveryWindow: prev.deliveryWindow,
+            coverImage: prev.coverImage,
+            coverLibraryId: prev.coverLibraryId,
+            groupQrImage: prev.groupQrImage,
+          }
+        : {}),
+    }
+    if (mode.id === 'live') {
+      form.applyFormFields = livePublishForm.defaultLiveApplyFields()
+      form.applyFormTemplateName = '直播达人报名默认项'
+    }
+    const fieldOn = { ...this.data.fieldOn, ...(tpl.fieldOn || {}) }
+    const customPublishFields = (tpl.customFields || []).map((row) => ({
+      ...row,
+      value: '',
+      formatLabel: row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字',
+    }))
+    this.setData({
+      step: 'form',
+      recruitTarget: target.id,
+      recruitTargetLabel: target.label,
+      recruitModes: modes,
+      recruitMode: mode.id,
+      recruitModeLabel: mode.label,
+      recruitChannel: targeted ? 'targeted' : 'open',
+      isTargetedRecruit: targeted,
+      loopChosen: true,
+      isSupplierPublish: isSupplier,
+      publishTemplateMode: this.layoutIsCustom(fieldOn, customPublishFields) ? 'custom' : 'system',
+      fieldOn,
+      customPublishFields,
+      form,
+      tagGrid: buildTagGrid(form.talentTags || []),
+      publishFormTemplates: publishFormTemplates.listPublishFormTemplates(),
+    }, () => {
+      if (isSupplier) this.syncSupplierPublishGrids(form)
+      this.syncDisplayFields()
+      this.syncTabBarOverlay()
+      this.resetFormScrollToTop()
+    })
+  },
+  onSelectPlatform(e) {
+    const platform = e.currentTarget.dataset.name
+    if (!platform) return
+    if (this.data.recruitMode) {
+      const isSupplier = this.data.recruitTarget === 'shoot' || this.data.recruitTarget === 'edit'
+      this.setData({
+        step: 'form',
+        'form.platform': isSupplier ? this.data.form.platform : platform,
+      }, () => {
+        this.syncDisplayFields()
+        this.syncTabBarOverlay()
+      })
+      return
+    }
+    const active = publishFormTemplates.getActivePublishFormTemplate()
+    if (active) {
+      this.applyPublishTemplate(active, platform, false)
+      return
+    }
+    const form = emptyForm('talent')
+    form.platform = platform
+    form.fulfillmentLoop = 'closed'
+    this.setData({
+      step: 'form',
+      recruitTarget: 'talent',
+      recruitTargetLabel: '达人',
+      recruitModes: modesForTarget('talent'),
+      recruitMode: 'visit',
+      recruitModeLabel: '探店',
+      recruitChannel: 'open',
+      isTargetedRecruit: false,
+      loopChosen: true,
+      isSupplierPublish: false,
+      publishTemplateMode: 'system',
+      form,
+      tagGrid: buildTagGrid([]),
+      publishFormTemplates: publishFormTemplates.listPublishFormTemplates(),
+    }, () => {
+      this.syncDisplayFields()
+      this.syncTabBarOverlay()
+      this.resetFormScrollToTop()
+    })
+  },
+  onFormPickTarget(e) {
+    const target = targetById(e.currentTarget.dataset.id)
+    if (!target) return
+    const isSupplier = target.id === 'shoot' || target.id === 'edit'
+    const modes = modesForTarget(target.id)
+    const mode = modes[0]
+    const prev = this.data.form || {}
+    const form = emptyForm(target.id)
+    form.title = prev.title
+    form.platform = isSupplier ? '通用' : prev.platform
+    form.cityNational = prev.cityNational
+    form.selectedCities = prev.selectedCities || []
+    form.selectedProvinces = prev.selectedProvinces || []
+    form.talentTags = prev.talentTags || []
+    form.recruitDetail = prev.recruitDetail
+    form.feeTypeId = prev.feeTypeId
+    form.fixedPrice = prev.fixedPrice
+    form.recruitCount = prev.recruitCount
+    form.fulfillmentLoop = mode.id === 'edit_ice' ? 'closed' : prev.fulfillmentLoop || 'closed'
+    form.groupQrImage = prev.groupQrImage
+    form.coverImage = prev.coverImage
+    form.coverLibraryId = prev.coverLibraryId
+    form.signupDeadline = prev.signupDeadline
+    form.deliveryWindow = prev.deliveryWindow
+    if (mode.id === 'live') {
+      form.applyFormFields = livePublishForm.defaultLiveApplyFields()
+      form.applyFormTemplateName = '直播达人报名默认项'
+    }
+    this.setData({
+      recruitTarget: target.id,
+      recruitTargetLabel: target.label,
+      recruitModes: modes,
+      recruitMode: mode.id,
+      recruitModeLabel: mode.label,
+      isSupplierPublish: isSupplier,
+      isTargetedRecruit: isSupplier ? false : this.data.isTargetedRecruit,
+      recruitChannel: isSupplier ? 'open' : this.data.recruitChannel,
+      form,
+      tagGrid: buildTagGrid(form.talentTags || []),
+    }, () => {
+      if (isSupplier) this.syncSupplierPublishGrids(form)
+      this.syncDisplayFields()
+    })
+  },
+  onFormPickMode(e) {
+    const mode = modeById(e.currentTarget.dataset.id)
+    if (!mode) return
+    const patch = { recruitMode: mode.id, recruitModeLabel: mode.label }
+    if (mode.id === 'live') {
+      patch['form.applyFormFields'] = livePublishForm.defaultLiveApplyFields()
+      patch['form.applyFormTemplateName'] = '直播达人报名默认项'
+    }
+    if (mode.id === 'edit_ice' || mode.id === 'ice') patch['form.fulfillmentLoop'] = 'closed'
+    this.setData(patch, () => this.syncDisplayFields())
+  },
+  onFormPickLoop(e) {
+    const val = e.currentTarget.dataset.val === 'open' ? 'open' : 'closed'
+    if (this.data.recruitMode === 'edit_ice') return
+    this.setData({ loopChosen: true, 'form.fulfillmentLoop': val })
+  },
+  onFormPickChannel(e) {
+    const id = e.currentTarget.dataset.id
+    if (id !== 'open' && id !== 'targeted') return
+    if (id === 'targeted' && !mpTargetedRecruitAccess.canUseTargetedRecruit()) {
+      wx.showModal({
+        title: '定向邀约未开通',
+        content: '你现在的会员还不能定向邀请达人，请升级会员，或联系客服开通。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
+    this.setData({ recruitChannel: id, isTargetedRecruit: id === 'targeted' })
+  },
+  onToggleFieldEditor() {
+    this.setData({ fieldEditorOpen: !this.data.fieldEditorOpen })
+  },
+  onSavePublishFormTemplate() {
+    wx.showModal({
+      title: '存入我的模版',
+      editable: true,
+      placeholderText: '模版名称，如：探店默认',
+      success: (res) => {
+        if (!res.confirm) return
+        const name = String(res.content || '').trim()
+        if (!name) {
+          wx.showToast({ title: '请填写模版名称', icon: 'none' })
+          return
+        }
+        const row = publishFormTemplates.savePublishFormTemplate({
+          name,
+          recruitTarget: this.data.recruitTarget || 'talent',
+          recruitMode: this.data.recruitMode || 'visit',
+          fulfillmentLoop: this.data.form.fulfillmentLoop === 'open' ? 'open' : 'closed',
+          isTargeted: !!this.data.isTargetedRecruit,
+          fieldOn: this.data.fieldOn || {},
+          customFields: (this.data.customPublishFields || []).map((item) => ({
+            id: item.id,
+            label: item.label,
+            format: item.format || 'text',
+          })),
+        })
+        if (row) publishFormTemplates.setActivePublishFormTemplateId(row.id)
+        this.setData({ publishFormTemplates: publishFormTemplates.listPublishFormTemplates() })
+        wx.showToast({ title: '已存入我的模版', icon: 'success' })
+      },
+    })
+  },
+  onUsePublishFormTemplate() {
+    const list = publishFormTemplates.listPublishFormTemplates()
+    if (!list.length) {
+      wx.showToast({ title: '还没有发单模版', icon: 'none' })
+      return
+    }
+    wx.showActionSheet({
+      itemList: list.slice(0, 6).map((item) => item.name),
+      success: (res) => {
+        const tpl = list[res.tapIndex]
+        if (!tpl) return
+        publishFormTemplates.setActivePublishFormTemplateId(tpl.id)
+        this.applyPublishTemplate(tpl, this.data.form.platform, true)
+      },
+    })
   },
   onBackFromTarget() {
     this.setData({
@@ -1334,7 +1581,11 @@ Page({
     const key = e.currentTarget.dataset.key
     if (!key) return
     const on = !!(e.detail && e.detail.value)
-    this.setData({ [`fieldOn.${key}`]: on })
+    const fieldOn = { ...(this.data.fieldOn || {}), [key]: on }
+    this.setData({
+      fieldOn,
+      publishTemplateMode: this.layoutIsCustom(fieldOn, this.data.customPublishFields) ? 'custom' : 'system',
+    })
   },
   onCustomFieldDraft(e) {
     this.setData({ customFieldDraft: e.detail.value })
@@ -1356,7 +1607,7 @@ Page({
         const list = (this.data.customPublishFields || []).concat([
           { id: `c-${Date.now()}`, label, value: '', format, formatLabel },
         ])
-        this.setData({ customPublishFields: list })
+        this.setData({ customPublishFields: list, publishTemplateMode: 'custom' })
       },
     })
   },
@@ -1369,12 +1620,14 @@ Page({
     const list = (this.data.customPublishFields || []).concat([
       { id: `c-${Date.now()}`, label, value: '', format: 'text', formatLabel: '文字' },
     ])
-    this.setData({ customPublishFields: list, customFieldDraft: '' })
+    this.setData({ customPublishFields: list, customFieldDraft: '', publishTemplateMode: 'custom' })
   },
   onRemoveCustomPublishField(e) {
     const id = e.currentTarget.dataset.id
+    const list = (this.data.customPublishFields || []).filter((x) => x.id !== id)
     this.setData({
-      customPublishFields: (this.data.customPublishFields || []).filter((x) => x.id !== id),
+      customPublishFields: list,
+      publishTemplateMode: this.layoutIsCustom(this.data.fieldOn, list) ? 'custom' : 'system',
     })
   },
   onCustomPublishValue(e) {
@@ -1466,7 +1719,7 @@ Page({
       return
     }
     this.setData({
-      step: this.data.publishTemplateMode === 'custom' ? 'tplCustom' : 'tpl',
+      step: 'platform',
       scrollIntoView: '',
       lastScrollAnchor: '',
       formScrollTop: 0,
@@ -1612,6 +1865,7 @@ Page({
     this.setData({
       'form.cityNational': true,
       'form.selectedCities': [],
+      'form.selectedProvinces': [],
     })
     this.syncDisplayFields()
     this.closePickerAndScroll()
@@ -1624,27 +1878,68 @@ Page({
     if (!province || province === this.data.cityActiveProvince) return
     this.refreshCityModalUi(province)
   },
+  onCityProvinceWholeTap() {
+    const province = this.data.cityActiveProvince
+    if (!province) return
+    const next = cityPicker.toggleProvince(
+      province,
+      this.data.form.selectedProvinces || [],
+      this.data.form.selectedCities || [],
+    )
+    this.setData(
+      {
+        'form.selectedProvinces': next.selectedProvinces,
+        'form.selectedCities': next.selectedCities,
+        'form.cityNational': false,
+      },
+      () => {
+        this.refreshCityModalUi(province)
+        this.syncDisplayFields()
+      },
+    )
+  },
   onCityCheckTap(e) {
     const name = e.currentTarget.dataset.name
     if (!name) return
-    let cities = [...(this.data.form.selectedCities || [])]
-    const idx = cities.indexOf(name)
-    if (idx >= 0) cities.splice(idx, 1)
-    else cities.push(name)
-    this.setData({ 'form.selectedCities': cities, 'form.cityNational': false }, () => {
+    const next = cityPicker.toggleCity(
+      this.data.cityActiveProvince,
+      name,
+      this.data.form.selectedProvinces || [],
+      this.data.form.selectedCities || [],
+    )
+    this.setData(
+      {
+        'form.selectedProvinces': next.selectedProvinces,
+        'form.selectedCities': next.selectedCities,
+        'form.cityNational': false,
+      },
+      () => {
+        this.refreshCityModalUi()
+        this.syncDisplayFields()
+      },
+    )
+  },
+  onRemoveCityChip(e) {
+    const name = e.currentTarget.dataset.name
+    const kind = e.currentTarget.dataset.kind
+    if (kind === 'province') {
+      const selectedProvinces = (this.data.form.selectedProvinces || []).filter((c) => c !== name)
+      this.setData({ 'form.selectedProvinces': selectedProvinces }, () => {
+        this.refreshCityModalUi()
+        this.syncDisplayFields()
+      })
+      return
+    }
+    const cities = (this.data.form.selectedCities || []).filter((c) => c !== name)
+    this.setData({ 'form.selectedCities': cities }, () => {
       this.refreshCityModalUi()
       this.syncDisplayFields()
     })
   },
-  onRemoveCityChip(e) {
-    const name = e.currentTarget.dataset.name
-    const cities = (this.data.form.selectedCities || []).filter((c) => c !== name)
-    this.setData({ 'form.selectedCities': cities })
-    this.syncDisplayFields()
-  },
   confirmCityPicker() {
-    if (!this.data.form.cityNational && !(this.data.form.selectedCities || []).length) {
-      wx.showToast({ title: '请选择全国或添加城市', icon: 'none' })
+    const f = this.data.form
+    if (!f.cityNational && !(f.selectedCities || []).length && !(f.selectedProvinces || []).length) {
+      wx.showToast({ title: '请选择全国、省份或城市', icon: 'none' })
       return
     }
     this.syncDisplayFields()
@@ -1828,7 +2123,9 @@ Page({
         return '请选择达人带货等级'
       }
     } else if (need('platform') && !isSupplier && !f.platform) return '请选择招募平台'
-    if (need('city') && !f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
+    if (need('city') && !f.cityNational && !(f.selectedCities || []).length && !(f.selectedProvinces || []).length) {
+      return '请选择招募城市'
+    }
     if (need('tags') && !isSupplier && !(f.talentTags || []).length) return '请选择需求达人标签'
     if (need('fans') && !isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
     if (need('deadline') && f.deliveryWindow !== 'urgent' && !this.data.isTargetedRecruit && !String(f.signupDeadline || '').trim()) {
@@ -1913,7 +2210,7 @@ Page({
   },
   buildRegionText(f) {
     if (f.cityNational) return '全国'
-    return (f.selectedCities || []).join('、')
+    return [...(f.selectedProvinces || []), ...(f.selectedCities || [])].join('、')
   },
   resolveSignupDeadline(f) {
     if (f.deliveryWindow === 'urgent') return formatDeadlineLocal(new Date(Date.now() + 24 * 3600000))
@@ -2193,6 +2490,7 @@ Page({
           recruitDetail: f.recruitDetail,
           cityNational: !!f.cityNational,
           cities: f.selectedCities || [],
+          provinces: f.selectedProvinces || [],
           applyFormTemplateId: f.applyFormTemplateId,
           applyFormTemplateName: f.applyFormTemplateName || '',
           applyFormFields: f.applyFormFields || [],

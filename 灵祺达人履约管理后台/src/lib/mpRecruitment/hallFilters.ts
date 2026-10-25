@@ -1,4 +1,5 @@
 import { findProvinceForCity, provinceMatchesFilter } from '../mpSync/chinaRegion'
+import { regionCoversCity } from '../mpSync/publishCityPicker'
 
 export const PLATFORM_FILTERS = ['全部', '抖音', '小红书', '大众点评', '快手', '微信视频号'] as const
 
@@ -100,6 +101,7 @@ export function matchCity(region: string, storeName: string, cityFilter: string)
   const short = cf.replace(/市$/, '')
   if (short.length >= 2 && blob.includes(short)) return true
   if (cf.endsWith('市') && blob.includes(cf.slice(0, -1))) return true
+  if (regionCoversCity(region, cf)) return true
   return false
 }
 
