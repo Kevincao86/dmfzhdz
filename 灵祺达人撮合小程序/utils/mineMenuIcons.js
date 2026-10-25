@@ -1,9 +1,6 @@
-/** 「我的」页菜单图标在 OSS，不打进主包。 */
-const MINE_ICON_OSS = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/mine-icons'
-const MINE_ICON_VER = '20261023a'
-
+/** 「我的」页圆角正方形线稿，打进主包，约 12KB。 */
 function mineIcon(file) {
-  return `${MINE_ICON_OSS}/${file}?v=${MINE_ICON_VER}`
+  return `/images/mine-line/${file}`
 }
 
 const ICON_GLYPH = {
@@ -20,49 +17,51 @@ const ICON_GLYPH = {
 }
 
 const MENU_KEY_ICON = {
-  profile: mineIcon('info.png'),
-  prProfile: mineIcon('pr-profile.png'),
+  profile: mineIcon('profile.png'),
+  prProfile: mineIcon('profile.png'),
   accountBind: mineIcon('account-bind.png'),
-  wechatOaBind: mineIcon('wechat-oa.png'),
-  applications: mineIcon('list.png'),
+  wechatOaBind: mineIcon('subscribe.png'),
+  applications: mineIcon('applications.png'),
   targetedInvites: mineIcon('invite.png'),
   orderCalendar: mineIcon('calendar.png'),
-  favorites: mineIcon('star.png'),
+  favorites: mineIcon('favorites.png'),
   talentCredit: mineIcon('credit.png'),
   prQuotes: mineIcon('quote.png'),
   subscriptions: mineIcon('subscribe.png'),
   wallet: mineIcon('wallet.png'),
   myOrders: mineIcon('orders.png'),
-  prOrders: mineIcon('pr-orders.png'),
+  prOrders: mineIcon('applications.png'),
   affiliatePortal: mineIcon('affiliate.png'),
   affiliateApply: mineIcon('affiliate.png'),
   training: mineIcon('training.png'),
   briefGen: mineIcon('brief-gen.png'),
   aiReview: mineIcon('ai-review.png'),
   addonsHub: mineIcon('addons.png'),
-  myCourses: mineIcon('courses.png'),
-  analytics: mineIcon('chart.png'),
-  talentCheck: mineIcon('talent-check.png'),
-  templates: mineIcon('tpl.png'),
+  myCourses: mineIcon('manual.png'),
+  analytics: mineIcon('analytics.png'),
+  talentCheck: mineIcon('user.png'),
+  accountEval: mineIcon('recommend.png'),
+  templates: mineIcon('quote.png'),
   briefTemplates: mineIcon('brief.png'),
-  cooperation: mineIcon('cooperation.png'),
-  talentWatchlist: mineIcon('watchlist.png'),
-  formRelay: mineIcon('relay.png'),
-  funnel: mineIcon('funnel.png'),
+  cooperation: mineIcon('affiliate.png'),
+  talentWatchlist: mineIcon('credit.png'),
+  formRelay: mineIcon('subscribe.png'),
+  funnel: mineIcon('analytics.png'),
   manual: mineIcon('manual.png'),
   support: mineIcon('support.png'),
 }
 
 const ICON_TYPE_ICON = {
-  info: mineIcon('info.png'),
-  list: mineIcon('list.png'),
-  star: mineIcon('star.png'),
-  chart: mineIcon('chart.png'),
+  info: mineIcon('profile.png'),
+  list: mineIcon('applications.png'),
+  star: mineIcon('favorites.png'),
+  chart: mineIcon('analytics.png'),
   support: mineIcon('support.png'),
-  tpl: mineIcon('tpl.png'),
+  tpl: mineIcon('brief.png'),
   manual: mineIcon('manual.png'),
   quote: mineIcon('quote.png'),
   bell: mineIcon('subscribe.png'),
+  wallet: mineIcon('wallet.png'),
 }
 
 function menuGlyph(icon) {

@@ -58,13 +58,14 @@
 
 .mine-page.lq-accent-on .wb-hero,
 .mine-page.lq-accent-on .lq-hero-header {
-  background: var(--lq-primary);
+  background: #f6f3fb;
 }
 
 .mine-page.lq-accent-on .wb-name,
 .mine-page.lq-accent-on .wb-profile-meta .wb-nick-input {
-  color: var(--lq-on-primary, #ffffff) !important;
-  -webkit-text-fill-color: var(--lq-on-primary, #ffffff) !important;
+  color: #1c1917 !important;
+  -webkit-text-fill-color: #1c1917 !important;
+  background: transparent !important;
 }
 
 /* 安卓原生 input 不吃 transparent，浅色底会把白字昵称盖住。用顶栏同色铺平。 */
@@ -77,14 +78,14 @@
 .mine-page.lq-accent-on .wb-sub,
 .mine-page.lq-accent-on .wb-id,
 .mine-page.lq-accent-on .wb-greeting {
-  color: rgba(255, 255, 255, 0.86);
+  color: #78716c;
 }
 
 .mine-page.lq-accent-on .wb-role-pill,
 .mine-page.lq-accent-on .profile-badge {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.45);
+  color: #5b3cc4;
+  background: #efe7ff;
+  border-color: #ddd6fe;
 }
 
 .mine-page.lq-accent-on .profile-badge--muted {
@@ -158,16 +159,128 @@
   z-index: 3;
   padding-left: 28rpx;
   padding-right: 28rpx;
-  padding-bottom: 96rpx;
-  min-height: 220rpx;
+  padding-bottom: 8rpx;
+  min-height: 0;
   box-sizing: border-box;
+}
+
+.mine-vip {
+  margin: 8rpx 24rpx 16rpx;
+  padding: 22rpx 18rpx 16rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(180deg, #efe6ff 0%, #e3d6ff 100%);
+}
+
+.mine-vip-top {
+  display: flex;
+  align-items: stretch;
+  gap: 16rpx;
+}
+
+.mine-vip-copy {
+  flex: 1;
+  min-width: 0;
+  padding: 8rpx 8rpx 0 10rpx;
+}
+
+.mine-vip-role {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #3b246b;
+  line-height: 1.3;
+}
+
+.mine-vip-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
+  color: #6d5a94;
+}
+
+.mine-vip-side {
+  width: 196rpx;
+  flex-shrink: 0;
+  padding: 16rpx 14rpx 14rpx;
+  border-radius: 22rpx;
+  background: #5b35c9;
+  box-sizing: border-box;
+}
+
+.mine-vip-side--on {
+  background: #4c2bb0;
+}
+
+.mine-vip-kicker {
+  display: block;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.mine-vip-plan {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 26rpx;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.mine-vip-exp {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 18rpx;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.3;
+}
+
+.mine-vip-cta {
+  display: block;
+  margin-top: 12rpx;
+  padding: 6rpx 0;
+  text-align: center;
+  font-size: 20rpx;
+  font-weight: 800;
+  color: #3b246b;
+  background: #fff;
+  border-radius: 999rpx;
+}
+
+.mine-vip-icons {
+  display: flex;
+  margin-top: 18rpx;
+}
+
+.mine-vip-item {
+  width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mine-vip-icon {
+  width: 88rpx;
+  height: 88rpx;
+  background: #fff;
+  border-radius: 22rpx;
+}
+
+.mine-vip-label {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #3b246b;
+  text-align: center;
+  line-height: 1.3;
 }
 
 .mine-accent-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin: 8rpx 28rpx 4rpx;
+  margin: 0 24rpx 12rpx;
   padding: 16rpx 12rpx 12rpx;
   background: var(--lq-card, #fffdf8);
   border: 1rpx solid var(--lq-border, #efe8dc);
@@ -513,7 +626,7 @@
 /* —— 浮动统计卡 —— */
 .wb-stats-card {
   display: flex;
-  margin: 8rpx 28rpx 8rpx;
+  margin: 0 24rpx 16rpx;
   padding: 20rpx 12rpx;
   background: var(--lq-card, #fff);
   border-radius: 24rpx;
@@ -656,7 +769,7 @@
 
 .wb-quick-grid {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   background: var(--lq-card, #fff);
   border-radius: 24rpx;
   padding: 16rpx 8rpx 10rpx;

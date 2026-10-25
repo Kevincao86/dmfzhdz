@@ -163,6 +163,24 @@ function filterMenusForAccount(menus, account, identity) {
   })
 }
 
+const SPOTLIGHT_PR = [
+  { key: 'talentCheck', label: '达人查验', icon: 'list' },
+  { key: 'aiReview', label: 'AI视频审核', icon: 'list' },
+  { key: 'addonsHub', label: 'AI创作工坊', icon: 'list' },
+  { key: 'affiliatePortal', label: '我的推广', icon: 'list' },
+]
+
+const SPOTLIGHT_TALENT = [
+  { key: 'accountEval', label: '达人账号分析', icon: 'chart' },
+  { key: 'aiReview', label: 'AI视频审核', icon: 'list' },
+  { key: 'addonsHub', label: 'AI创作工坊', icon: 'list' },
+  { key: 'affiliatePortal', label: '我的推广', icon: 'list' },
+]
+
+function spotlightItems(identity) {
+  return identity === 'pr' ? SPOTLIGHT_PR : SPOTLIGHT_TALENT
+}
+
 const QUICK_MENU_KEYS = {
   talent: ['profile', 'applications', 'orderCalendar', 'favorites', 'talentCredit'],
   shoot: ['profile', 'applications', 'orderCalendar', 'favorites', 'talentCredit'],
@@ -248,16 +266,19 @@ function groupBizMenus(biz) {
 }
 
 function splitWorkbenchMenus(menus, identity) {
+  const spotKeys = new Set(spotlightItems(identity).map((item) => item.key))
+  const spotlightMenus = attachMenuGlyphs(spotlightItems(identity).map((item) => ({ ...item })))
   const keys = QUICK_MENU_KEYS[identity] || QUICK_MENU_KEYS.talent
   const keySet = new Set(keys)
   const quick = []
   const biz = []
   for (const item of menus || []) {
+    if (spotKeys.has(item.key)) continue
     if (keySet.has(item.key)) quick.push({ ...item })
     else biz.push({ ...item })
   }
   const orderedQuick = keys.map((k) => quick.find((i) => i.key === k)).filter(Boolean)
-  return { quickMenus: orderedQuick, bizMenus: biz, bizGroups: groupBizMenus(biz) }
+  return { spotlightMenus, quickMenus: orderedQuick, bizMenus: biz, bizGroups: groupBizMenus(biz) }
 }
 const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
@@ -380,6 +401,7 @@ const MENU_URLS = {
   pointsRecharge: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge',
   wallet: '/pages/subpack-mine/mine-wallet/mine-wallet',
   talentCheck: '/pages/subpack-pr/mine-pr-talent-check/mine-pr-talent-check',
+  accountEval: '/pages/subpack-mine/mine-local-life-eval/mine-local-life-eval',
   briefGen: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
   aiReview: '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
   addonsHub: '/pages/subpack-pr/mine-pr-addons/mine-pr-addons',
@@ -417,6 +439,7 @@ Page({
     identityIdLine: '',
     menus: talentMenusForIdentity('talent'),
     quickMenus: [],
+    spotlightMenus: [],
     bizMenus: [],
     bizGroups: [],
     greeting: '',
@@ -717,7 +740,7 @@ Page({
       identity,
     )
     menus = injectMyCoursesMenu(menus)
-    const { quickMenus, bizMenus, bizGroups } = splitWorkbenchMenus(menus, identity)
+    const { quickMenus, spotlightMenus, bizMenus, bizGroups } = splitWorkbenchMenus(menus, identity)
     const planId = mpMembershipUi.readMembershipPlanId(acct, identity, member, prProfile)
     const membershipPlanLabel = mpMembershipUi.planLabel(planId)
     const membershipExpiryLabel = mpMembershipUi.formatExpiryLabel(
@@ -740,6 +763,7 @@ Page({
       identityIdLine,
       menus,
       quickMenus,
+      spotlightMenus,
       bizMenus,
       bizGroups,
       greeting: workbenchGreeting(displayName),
@@ -770,6 +794,7 @@ Page({
       this.setData({
         menus: next,
         quickMenus: split.quickMenus,
+        spotlightMenus: split.spotlightMenus,
         bizMenus: split.bizMenus,
         bizGroups: split.bizGroups,
       })

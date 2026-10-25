@@ -40,8 +40,7 @@
                 class="wb-nick-input"
                 type="nickname"
                 placeholder="点击输入昵称"
-                placeholder-style="{{accentId ? 'color:rgba(255,255,255,0.72)' : 'color:#a8a29e'}}"
-                style="{{accentId ? 'color:#ffffff;-webkit-text-fill-color:#ffffff;background-color:var(--lq-primary);background:var(--lq-primary);' : ''}}"
+                placeholder-style="color:#a8a29e"
                 value="{{profileNick}}"
                 bindinput="onProfileNickInput"
                 bindblur="onProfileNickBlur"
@@ -49,7 +48,7 @@
               <text wx:else class="wb-name">{{displayName}}</text>
             </view>
             <view class="wb-tag-row">
-              <text class="wb-role-pill">{{identityLabel}}工作台</text>
+              <text class="wb-role-pill">{{identityLabel}}</text>
               <text class="profile-badge profile-badge--verified wb-verified-pill" wx:if="{{profileVerified}}">已认证{{identityLabel}}</text>
               <text class="profile-badge profile-badge--muted" wx:if="{{!wxLoggedIn}}">未登录</text>
               <text class="profile-badge profile-badge--muted" wx:elif="{{profileIncomplete}}">资料未完善</text>
@@ -59,55 +58,7 @@
           </view>
         </view>
       </view>
-      <text class="wb-greeting" wx:if="{{greeting}}">{{greeting}}</text>
-      <view
-        wx:if="{{wxLoggedIn}}"
-        class="wb-membership-panel"
-        bindtap="onGoMembership"
-        hover-class="wb-membership-panel--hover"
-      >
-        <text class="wb-membership-kicker">会员</text>
-        <text class="wb-membership-plan">{{membershipPlanLabel}}</text>
-        <text class="wb-membership-exp" wx:if="{{membershipExpiryLabel}}">{{membershipExpiryLabel}}</text>
-        <view class="wb-membership-cta">{{membershipCtaLabel}}</view>
-      </view>
     </view>
-  </view>
-
-  <view class="mine-accent-row">
-    <view
-      wx:for="{{accentSwatches}}"
-      wx:key="id"
-      class="mine-accent-hit {{(item.id === 'origin' ? !accentId : accentId === item.id) ? 'is-on' : ''}}"
-      data-id="{{item.id}}"
-      bindtap="onPickAccent"
-    >
-      <view
-        class="mine-accent-dot mine-accent-dot--{{item.id}}"
-        style="{{item.dotStyle}}"
-      ></view>
-      <text class="mine-accent-cap" wx:if="{{item.cap}}">{{item.cap}}</text>
-    </view>
-  </view>
-
-  <view class="wb-stats-card" wx:if="{{wxLoggedIn}}">
-    <view class="wb-stat-cell" bindtap="onMenuTap" data-key="{{statAppliedKey}}">
-      <text class="wb-stat-num">{{statApplied}}</text>
-      <text class="wb-stat-lbl">{{statAppliedLabel}}</text>
-    </view>
-    <view class="wb-stat-cell">
-      <text class="wb-stat-num">{{statInProgress}}</text>
-      <text class="wb-stat-lbl">{{statInProgressLabel}}</text>
-    </view>
-    <view class="wb-stat-cell">
-      <text class="wb-stat-num">{{statCompleted}}</text>
-      <text class="wb-stat-lbl">{{statCompletedLabel}}</text>
-    </view>
-  </view>
-
-  <view class="wx-login-banner card--accent" wx:if="{{!wxLoggedIn}}">
-    <text class="vip-text">使用微信昵称头像登录，即可发招募、报名与导出</text>
-    <button class="vip-btn" bindtap="onGoLoginPage">微信登录</button>
   </view>
 
   <scroll-view
@@ -121,6 +72,71 @@
     refresher-triggered="{{statRefreshing}}"
     bindrefresherrefresh="onStatRefresh"
    enable-flex>
+    <view class="mine-vip">
+      <view class="mine-vip-top">
+        <view class="mine-vip-copy">
+          <text class="mine-vip-role">{{identityLabel}}</text>
+          <text class="mine-vip-sub">{{greeting || displaySub}}</text>
+        </view>
+        <view class="mine-vip-side" bindtap="onGoMembership" hover-class="mine-vip-side--on">
+          <text class="mine-vip-kicker">会员信息</text>
+          <text class="mine-vip-plan">{{membershipPlanLabel}}</text>
+          <text class="mine-vip-exp" wx:if="{{membershipExpiryLabel}}">{{membershipExpiryLabel}}</text>
+          <text class="mine-vip-cta">{{membershipCtaLabel}}</text>
+        </view>
+      </view>
+      <view class="mine-vip-icons">
+        <view
+          wx:for="{{spotlightMenus}}"
+          wx:key="key"
+          id="guide-{{item.key}}"
+          class="mine-vip-item"
+          hover-class="tap-press"
+          data-key="{{item.key}}"
+          bindtap="onMenuTap"
+        >
+          <image class="mine-vip-icon" src="{{item.iconSrc}}" mode="aspectFit" />
+          <text class="mine-vip-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="mine-accent-row">
+      <view
+        wx:for="{{accentSwatches}}"
+        wx:key="id"
+        class="mine-accent-hit {{(item.id === 'origin' ? !accentId : accentId === item.id) ? 'is-on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickAccent"
+      >
+        <view
+          class="mine-accent-dot mine-accent-dot--{{item.id}}"
+          style="{{item.dotStyle}}"
+        ></view>
+        <text class="mine-accent-cap" wx:if="{{item.cap}}">{{item.cap}}</text>
+      </view>
+    </view>
+
+    <view class="wb-stats-card" wx:if="{{wxLoggedIn}}">
+      <view class="wb-stat-cell" bindtap="onMenuTap" data-key="{{statAppliedKey}}">
+        <text class="wb-stat-num">{{statApplied}}</text>
+        <text class="wb-stat-lbl">{{statAppliedLabel}}</text>
+      </view>
+      <view class="wb-stat-cell">
+        <text class="wb-stat-num">{{statInProgress}}</text>
+        <text class="wb-stat-lbl">{{statInProgressLabel}}</text>
+      </view>
+      <view class="wb-stat-cell">
+        <text class="wb-stat-num">{{statCompleted}}</text>
+        <text class="wb-stat-lbl">{{statCompletedLabel}}</text>
+      </view>
+    </view>
+
+    <view class="wx-login-banner card--accent" wx:if="{{!wxLoggedIn}}">
+      <text class="vip-text">使用微信昵称头像登录，即可发招募、报名与导出</text>
+      <button class="vip-btn" bindtap="onGoLoginPage">微信登录</button>
+    </view>
+
     <view class="wb-section" wx:if="{{quickMenus.length}}">
       <view class="wb-section-head">
         <text class="wb-section-title">常用功能</text>

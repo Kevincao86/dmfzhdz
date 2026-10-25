@@ -32,6 +32,7 @@ list_scopes() {
   order_calendar_cache 商单日历：再次进入先用缓存，可手动刷新，过期后后台更新
   pr_orders_cache 招募订单：再次进入先用缓存，新报名或点刷新才更新列表
   local_life_shop_eval_skill 本地生活店铺分析技能：国内高德流程与国际版数据源
+  mine_page_layout 达人小程序我的页：头像身份、会员紫卡、四个功能入口和圆角线稿图标
   publish_link_cta   待回传链接报名页：把回传链接入口做得更明显
   recruit_video     探店成片上传
   recruit_share_poster_ai  招募创建成功分享页 AI 海报生图（星选+撮合）
@@ -1923,6 +1924,16 @@ HomeDashboard.tsx
 灵祺ERP小程序/custom-tab-bar/
 灵祺ERP小程序/pages/ai-agent/ai-agent.js
 灵祺ERP小程序/pages/mine/mine.js
+change-scope-guard
+PAT
+      ;;
+    mine_page_layout)
+      cat <<'PAT'
+pages/mine/mine.js
+pages/mine/mine.wxml
+pages/mine/mine.wxss
+utils/mineMenuIcons.js
+images/mine-line/
 change-scope-guard
 PAT
       ;;
