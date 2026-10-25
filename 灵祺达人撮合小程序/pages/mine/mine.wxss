@@ -1159,6 +1159,36 @@
   flex-direction: column;
 }
 
+.mine-more-sheet .id-sheet-head {
+  position: relative;
+  min-height: 56rpx;
+  padding-right: 72rpx;
+}
+
+.mine-more-close {
+  position: absolute;
+  top: -4rpx;
+  right: -8rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #f3f0f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mine-more-close--on {
+  opacity: 0.72;
+}
+
+.mine-more-close-x {
+  font-size: 40rpx;
+  line-height: 1;
+  color: #44403c;
+  margin-top: -4rpx;
+}
+
 .mine-more-sheet-lead {
   display: block;
   margin: 4rpx 0 12rpx;

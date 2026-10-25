@@ -230,7 +230,9 @@
     <view class="id-sheet mine-more-sheet">
       <view class="id-sheet-head">
         <text class="id-sheet-title">全部功能</text>
-        <text class="id-sheet-close" bindtap="onCloseMore">×</text>
+        <view class="mine-more-close" hover-class="mine-more-close--on" bindtap="onCloseMore">
+          <text class="mine-more-close-x">×</text>
+        </view>
       </view>
       <text class="mine-more-sheet-lead">资金推广、AI 创作和帮助都在这里</text>
       <scroll-view scroll-y class="mine-more-sheet-body" show-scrollbar="{{false}}">
