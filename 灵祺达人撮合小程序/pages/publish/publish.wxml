@@ -349,6 +349,39 @@
                 <view class="pub-radio-opt {{isTargetedRecruit ? 'pub-radio-opt--on' : ''}}" data-id="targeted" bindtap="onFormPickChannel">定向邀约</view>
               </view>
             </view>
+            <view class="pub-field">
+              <view class="pub-apply-head" bindtap="onToggleApplyInfo">
+                <text class="pub-label">{{isSupplierPublish ? '团队报名必填信息' : '达人必填信息'}}</text>
+                <text class="pub-apply-toggle">{{applyInfoOpen ? '收起' : '展开'}}</text>
+              </view>
+              <block wx:if="{{applyInfoOpen}}">
+                <view wx:if="{{applyInfoRows.length}}" class="pub-apply-list">
+                  <text wx:for="{{applyInfoRows}}" wx:key="id" class="pub-apply-item">{{item.label}}</text>
+                </view>
+                <text wx:else class="pub-cover-hint">还没有报名必填项</text>
+                <view class="pub-select" data-view="applyForm" bindtap="openPicker">
+                  <text class="pub-select-text">配置报名项</text>
+                  <text class="pub-select-arrow">›</text>
+                </view>
+              </block>
+              <text wx:else class="pub-cover-hint">{{applyFormDisplayText}}</text>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">是否需要达人交票</text>
+              <view class="pub-radio-pair">
+                <view
+                  class="pub-radio-opt {{form.requireTalentInvoice ? '' : 'pub-radio-opt--on'}}"
+                  data-val="0"
+                  catchtap="onRequireInvoicePick"
+                >不需要</view>
+                <view
+                  class="pub-radio-opt {{form.requireTalentInvoice ? 'pub-radio-opt--on' : ''}}"
+                  data-val="1"
+                  catchtap="onRequireInvoicePick"
+                >需要达人交票</view>
+              </view>
+              <text class="pub-cover-hint">需要时，达人完成该招募单后可提交发票，你可在本单查看并下载。</text>
+            </view>
           </view>
           <view class="pub-form-card pub-field-stack">
           <view class="pub-field" id="field-cover" style="order:{{fieldRank.cover}}" wx:if="{{fieldOn.cover}}">
@@ -423,7 +456,7 @@
             </view>
             <text class="pub-hint">达人须在此时间内接受或拒绝邀约；可随时补邀更多人</text>
           </view>
-          <view class="pub-field" id="field-title" style="order:-10">
+          <view class="pub-field" id="field-title" style="order:{{fieldRank.title}}" wx:if="{{fieldOn.title}}">
             <text class="pub-label">招募标题</text>
             <input class="pub-input" placeholder="{{recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}}" value="{{form.title}}" data-key="title" bindinput="onFieldInput" />
           </view>
@@ -839,22 +872,6 @@
               show-confirm-bar="{{false}}"
             />
           </view>
-          <view class="pub-field" style="order:800">
-            <text class="pub-label">是否需要达人交票</text>
-            <view class="pub-radio-pair">
-              <view
-                class="pub-radio-opt {{form.requireTalentInvoice ? '' : 'pub-radio-opt--on'}}"
-                data-val="0"
-                catchtap="onRequireInvoicePick"
-              >不需要</view>
-              <view
-                class="pub-radio-opt {{form.requireTalentInvoice ? 'pub-radio-opt--on' : ''}}"
-                data-val="1"
-                catchtap="onRequireInvoicePick"
-              >需要达人交票</view>
-            </view>
-            <text class="pub-cover-hint">需要时，达人完成该招募单后可提交发票，你可在本单查看并下载。</text>
-          </view>
           <view class="pub-field" style="order:800" wx:if="{{recruitMode !== 'ice' && recruitMode !== 'edit_ice' && form.fulfillmentLoop === 'open'}}">
             <view class="pub-field">
               <text class="pub-label">上传群二维码</text>
@@ -912,13 +929,6 @@
               </block>
             </view>
           </block>
-          <view class="pub-field" id="field-apply-form" style="order:{{fieldRank.apply}}" wx:if="{{fieldOn.apply}}">
-            <text class="pub-label">{{isSupplierPublish ? '团队报名必填信息' : '达人报名必填信息'}}</text>
-            <view class="pub-select" data-view="applyForm" bindtap="openPicker">
-              <text class="pub-select-text {{applyFormPlaceholder ? 'pub-select-text--ph' : ''}}">{{applyFormDisplayText}}</text>
-              <text class="pub-select-arrow">›</text>
-            </view>
-          </view>
           <view class="pub-field" style="order:700">
             <view class="pub-add-field {{fieldEditorOpen ? 'pub-add-field--open' : ''}}" bindtap="onToggleFieldEditor">
               <text wx:if="{{!fieldEditorOpen}}" class="pub-add-field__plus">+</text>
@@ -930,7 +940,7 @@
               </view>
               <block wx:for="{{editorRows}}" wx:key="key">
                 <view
-                  wx:if="{{item.key !== 'delivery' && item.key !== 'deadline' && item.key !== 'city'}}"
+                  wx:if="{{item.key !== 'apply'}}"
                   class="tpl-row tpl-row--item {{fieldDragKey === item.key ? 'tpl-row--lift' : ''}} {{fieldPressKey === item.key ? 'tpl-row--press' : ''}}"
                   style="{{fieldDragKey === item.key ? 'transform:translateY(' + fieldDragDy + 'px) scale(1.03);' : (fieldDragShift[item.key] ? 'transform:translateY(' + fieldDragShift[item.key] + 'px);' : '')}}"
                 >
@@ -940,8 +950,8 @@
                   <text wx:else class="tpl-row__del" data-id="{{item.key}}" bindtap="onRemoveCustomPublishField">删除</text>
                 </view>
               </block>
-              <view class="pub-radio-opt" bindtap="onAddCustomFieldMenu">新增字段</view>
-              <view class="pub-radio-opt pub-radio-opt--on" bindtap="onSaveFieldPick">保存字段</view>
+              <view class="pub-add-custom" bindtap="onAddCustomFieldMenu">+</view>
+              <view class="pub-save-fields" bindtap="onSaveFieldPick">保存字段</view>
             </block>
           </view>
           </view>

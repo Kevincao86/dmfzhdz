@@ -284,8 +284,9 @@ function attachApplyFieldFormat(page) {
   }
 }
 
-const DEFAULT_PUBLISH_FIELD_ORDER = ['delivery', 'deadline', 'city', 'location', 'tags', 'fans', 'level', 'fee', 'count', 'detail', 'apply', 'cover']
+const DEFAULT_PUBLISH_FIELD_ORDER = ['title', 'delivery', 'deadline', 'city', 'location', 'tags', 'fans', 'level', 'fee', 'count', 'detail', 'apply', 'cover']
 const PUBLISH_FIELD_LABELS = {
+  title: '招募标题',
   delivery: '投放窗口',
   deadline: '报名截止时间',
   city: '招募城市',
@@ -344,10 +345,11 @@ function layoutFromOrder(order, customFields) {
 
 function defaultPublishFieldOn() {
   return {
-    delivery: true,
-    deadline: true,
+    title: false,
+    delivery: false,
+    deadline: false,
     platform: false,
-    city: true,
+    city: false,
     location: false,
     tags: false,
     fans: false,
@@ -366,6 +368,12 @@ function allPublishFieldOn() {
     on[key] = true
   })
   return on
+}
+
+function fieldOnFromSaved(saved) {
+  const fieldOn = { ...defaultPublishFieldOn(), ...(saved || {}) }
+  if (!saved || saved.title == null) fieldOn.title = true
+  return fieldOn
 }
 
 const initialFieldLayout = layoutFromOrder(DEFAULT_PUBLISH_FIELD_ORDER, [])
@@ -449,6 +457,8 @@ Page({
     provinceWhole: false,
     provinceScopeLabel: '全省',
     fieldEditorOpen: false,
+    applyInfoOpen: false,
+    applyInfoRows: [],
     fieldPick: defaultPublishFieldOn(),
     publishFormTemplates: [],
     cityDisplayText: '请选择招募城市',
@@ -776,9 +786,14 @@ Page({
         '已配置报名项'
       applyFormDisplayText = `${name}（${applyFormEditor.applyFormSummary(af, f.platform)}）`
     }
+    const applyInfoRows = af.map((field, index) => ({
+      id: field && field.id ? String(field.id) : String(index),
+      label: applyTemplates.resolveFieldLabel(field, f.platform),
+    }))
     this.setData({
       applyFormDisplayText,
       applyFormPlaceholder,
+      applyInfoRows,
       cityDisplayText,
       tagsDisplayText,
       platformDisplayText,
@@ -1165,7 +1180,7 @@ Page({
         publishTemplateMode: meta.publishTemplateMode === 'custom' || (meta.publishFieldOn && typeof meta.publishFieldOn === 'object') ? 'custom' : 'system',
         fieldOn:
           meta.publishFieldOn && typeof meta.publishFieldOn === 'object'
-            ? { ...defaultPublishFieldOn(), ...meta.publishFieldOn }
+            ? fieldOnFromSaved(meta.publishFieldOn)
             : allPublishFieldOn(),
         customPublishFields: (() => {
           const rows = Array.isArray(meta.customPublishFields)
@@ -1431,6 +1446,9 @@ Page({
     }
     this.setData({ recruitChannel: id, isTargetedRecruit: id === 'targeted' })
   },
+  onToggleApplyInfo() {
+    this.setData({ applyInfoOpen: !this.data.applyInfoOpen })
+  },
   onToggleFieldEditor() {
     if (this.data.fieldEditorOpen) {
       this.setData({ fieldEditorOpen: false })
@@ -1448,9 +1466,6 @@ Page({
     const fieldOn = {
       ...defaultPublishFieldOn(),
       ...(this.data.fieldPick || {}),
-      delivery: true,
-      deadline: true,
-      city: true,
     }
     this.setData({ fieldOn, fieldEditorOpen: false, publishTemplateMode: 'custom' })
     wx.showToast({ title: '已保存字段', icon: 'none' })

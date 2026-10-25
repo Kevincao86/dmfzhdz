@@ -5,6 +5,7 @@ import { addPublishedOrder } from '../../lib/mpSync/applicationsStore'
 import {
   saveApplyFormForMpOrder,
   setActiveTemplateId,
+  resolveFieldLabel,
   templateKindFromRecruitTarget,
   type ApplyField,
 } from '../../lib/mpSync/applyFormTemplates'
@@ -90,6 +91,7 @@ const PUBLISH_TIPS = [
 ]
 
 const PUBLISH_FIELD_CATALOG = [
+  { key: 'title', label: '招募标题' },
   { key: 'delivery', label: '投放窗口' },
   { key: 'deadline', label: '报名截止时间' },
   { key: 'city', label: '招募城市' },
@@ -107,10 +109,11 @@ const PUBLISH_FIELD_CATALOG = [
 const PUBLISH_FIELD_KEYS = PUBLISH_FIELD_CATALOG.map((item) => item.key)
 
 const DEFAULT_PUBLISH_FIELD_ON: Record<string, boolean> = {
-  delivery: true,
-  deadline: true,
+  title: false,
+  delivery: false,
+  deadline: false,
   platform: false,
-  city: true,
+  city: false,
   location: false,
   tags: false,
   fans: false,
@@ -124,6 +127,7 @@ const DEFAULT_PUBLISH_FIELD_ON: Record<string, boolean> = {
 
 function allPublishFieldsOn(): Record<string, boolean> {
   return {
+    title: true,
     delivery: true,
     deadline: true,
     platform: true,
@@ -266,6 +270,7 @@ export default function PublishWizard() {
   const [cityActiveProvince, setCityActiveProvince] = useState('')
   const [cityProvinceRows, setCityProvinceRows] = useState<{ name: string; active: boolean; whole?: boolean }[]>([])
   const [fieldEditorOpen, setFieldEditorOpen] = useState(false)
+  const [applyInfoOpen, setApplyInfoOpen] = useState(false)
   const [fieldPick, setFieldPick] = useState<Record<string, boolean>>({ ...DEFAULT_PUBLISH_FIELD_ON })
   const [cityCheckGrid, setCityCheckGrid] = useState<{ name: string; on: boolean }[]>([])
 
@@ -405,7 +410,10 @@ export default function PublishWizard() {
     setStep('form')
     if (meta.publishFieldOn && typeof meta.publishFieldOn === 'object') {
       setPublishTemplateMode('custom')
-      setFieldOn({ ...DEFAULT_PUBLISH_FIELD_ON, ...(meta.publishFieldOn as Record<string, boolean>) })
+      const saved = meta.publishFieldOn as Record<string, boolean>
+      const next = { ...DEFAULT_PUBLISH_FIELD_ON, ...saved }
+      if (saved.title == null) next.title = true
+      setFieldOn(next)
     } else {
       setPublishTemplateMode(meta.publishTemplateMode === 'custom' ? 'custom' : 'system')
       setFieldOn(allPublishFieldsOn())
@@ -627,7 +635,7 @@ export default function PublishWizard() {
     }
   }
 
-  const fieldKeys = ['delivery', 'deadline', 'platform', 'city', 'location', 'tags', 'fans', 'level', 'fee', 'count', 'detail', 'apply', 'cover']
+  const fieldKeys = ['title', 'delivery', 'deadline', 'platform', 'city', 'location', 'tags', 'fans', 'level', 'fee', 'count', 'detail', 'apply', 'cover']
   const layoutIsCustom = (fieldMap: Record<string, boolean>, custom: { label: string }[]) =>
     custom.length > 0 || fieldKeys.some((key) => fieldMap[key] === false)
 
@@ -1170,9 +1178,7 @@ export default function PublishWizard() {
   }
   function renderFieldEditor(useDraft = false) {
     const selected = useDraft ? fieldPick : fieldOn
-    const rows = useDraft
-      ? editorRows.filter((row) => row.key !== 'delivery' && row.key !== 'deadline' && row.key !== 'city')
-      : editorRows
+    const rows = useDraft ? editorRows.filter((row) => row.key !== 'apply') : editorRows
     return rows.map((row) => (
       <div
         key={row.key}
@@ -1217,9 +1223,6 @@ export default function PublishWizard() {
     setFieldOn({
       ...DEFAULT_PUBLISH_FIELD_ON,
       ...fieldPick,
-      delivery: true,
-      deadline: true,
-      city: true,
     })
     setPublishTemplateMode('custom')
     setFieldEditorOpen(false)
@@ -1479,8 +1482,63 @@ export default function PublishWizard() {
             </div>
           ) : null}
         </div>
+        <div className="rounded-xl border border-[var(--shell-border)] p-4 space-y-4">
+          <div>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between text-sm font-semibold text-[var(--shell-text)]"
+              onClick={() => setApplyInfoOpen((open) => !open)}
+            >
+              <span>{isSupplierPublish ? '团队报名必填信息' : '达人必填信息'}</span>
+              <span className="text-[#4c1d95]">{applyInfoOpen ? '收起' : '展开'}</span>
+            </button>
+            {applyInfoOpen ? (
+              <div className="mt-3 space-y-2">
+                {(form.applyFormFields || []).length ? (
+                  <ul className="space-y-1 text-sm text-[var(--shell-text)]">
+                    {(form.applyFormFields || []).map((field) => (
+                      <li key={field.id}>{resolveFieldLabel(field, form.platform)}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-[var(--shell-muted)]">还没有报名必填项</p>
+                )}
+                <button
+                  type="button"
+                  className="text-sm font-medium text-[#6d28d9]"
+                  onClick={() => openPicker('applyMenu')}
+                >
+                  配置报名项
+                </button>
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-[var(--shell-muted)]">{display.applyFormDisplayText}</p>
+            )}
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-[var(--shell-text)]">是否需要达人交票</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-full text-sm border ${form.requireTalentInvoice ? 'border-[var(--shell-border)] text-[var(--shell-muted)]' : 'border-[#6d28d9] bg-[#f5f3ff] text-[#4c1d95] font-semibold'}`}
+                onClick={() => patchForm({ requireTalentInvoice: false })}
+              >
+                不需要
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-full text-sm border ${form.requireTalentInvoice ? 'border-[#6d28d9] bg-[#f5f3ff] text-[#4c1d95] font-semibold' : 'border-[var(--shell-border)] text-[var(--shell-muted)]'}`}
+                onClick={() => patchForm({ requireTalentInvoice: true })}
+              >
+                需要达人交票
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-[var(--shell-muted)]">需要时，达人完成该招募单后可提交发票，你可在本单查看并下载。</p>
+          </div>
+        </div>
         <div className="flex flex-col gap-4">
-          <div style={{ order: -10 }}>
+          {showField('title') ? (
+          <div style={{ order: fieldRank('title') }}>
             <PubLabel>招募标题</PubLabel>
             <input
               className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
@@ -1489,6 +1547,7 @@ export default function PublishWizard() {
               onChange={(e) => patchForm({ title: e.target.value })}
             />
           </div>
+          ) : null}
           {showField('cover') ? (
             <div style={{ order: fieldRank('cover') }}>
               <RecruitCoverField
@@ -2092,21 +2151,6 @@ export default function PublishWizard() {
         </div>
         ) : null}
 
-        <label className="flex items-start gap-2 text-sm text-[var(--shell-text)]" style={{ order: 800 }}>
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={form.requireTalentInvoice === true}
-            onChange={(e) => patchForm({ requireTalentInvoice: e.target.checked })}
-          />
-          <span>
-            需要达人交票
-            <span className="mt-1 block text-xs text-[var(--shell-muted)]">
-              勾选后，达人完成该招募单可提交发票，你可在本单查看、单张下载或打包。
-            </span>
-          </span>
-        </label>
-
         {recruitMode !== 'ice' && recruitMode !== 'edit_ice' && (form.fulfillmentLoop || 'closed') === 'open' ? (
           <div style={{ order: 800 }}>
               <div className="mt-3">
@@ -2303,17 +2347,6 @@ export default function PublishWizard() {
           </div>
         ) : null}
 
-        {showField('apply') ? (
-        <div style={{ order: fieldRank('apply') }}>
-        <PubSelectRow
-          label={isSupplierPublish ? '团队报名必填信息' : '达人报名必填信息'}
-          value={display.applyFormDisplayText}
-          placeholder={display.applyFormPlaceholder}
-          onClick={() => openPicker('applyMenu')}
-        />
-        </div>
-        ) : null}
-
         {publishTemplateMode === 'custom'
           ? customPublishFields.map((row) => (
               <div key={row.id} className="space-y-2" style={{ order: fieldRank(row.id) }}>
@@ -2367,7 +2400,11 @@ export default function PublishWizard() {
           <style>{`@keyframes publish-add-plus{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(109,40,217,.4)}70%{transform:scale(1.18);box-shadow:0 0 0 8px rgba(109,40,217,0)}}`}</style>
           <button
             type="button"
-            className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl border-2 border-[#6d28d9] bg-white px-4 py-3 text-sm font-semibold text-[#6d28d9] transition-colors duration-200 hover:border-[#6d28d9] hover:bg-[#6d28d9] hover:text-white focus-visible:bg-[#6d28d9] focus-visible:text-white"
+            className={`group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl border-2 px-4 py-3 text-sm font-semibold transition-colors duration-200 ${
+              fieldEditorOpen
+                ? 'border-[#6d28d9] bg-white text-[#4c1d95]'
+                : 'border-[#6d28d9] bg-white text-[#4c1d95] hover:bg-[#6d28d9] hover:text-white focus-visible:bg-[#6d28d9] focus-visible:text-white'
+            }`}
             onClick={() => {
               if (fieldEditorOpen) {
                 setFieldEditorOpen(false)
@@ -2392,32 +2429,35 @@ export default function PublishWizard() {
             <div className="divide-y border border-[var(--shell-border)] rounded-lg">
               <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">可一次勾选多个。勾选的系统字段在保存后显示；自己新增的字段需要填写内容。长按左侧 ≡ 再拖动排序。</p>
               {renderFieldEditor(true)}
-              <div className="flex items-center gap-2 px-3 py-2">
-                <select
-                  className="rounded-lg panel-input border px-2 py-1.5 text-sm"
-                  value={customFieldFormat}
-                  onChange={(e) => setCustomFieldFormat(e.target.value as 'text' | 'image' | 'video')}
-                >
-                  <option value="text">文字</option>
-                  <option value="image">图片</option>
-                  <option value="video">视频</option>
-                </select>
-                <input
-                  className="flex-1 rounded-lg panel-input border px-3 py-1.5 text-sm"
-                  placeholder="新增字段，如到店时间"
-                  value={customFieldDraft}
-                  onChange={(e) => setCustomFieldDraft(e.target.value)}
-                />
+              <div className="space-y-3 px-3 py-3">
+                <div className="flex items-center gap-2">
+                  <select
+                    className="rounded-lg panel-input border px-2 py-1.5 text-sm"
+                    value={customFieldFormat}
+                    onChange={(e) => setCustomFieldFormat(e.target.value as 'text' | 'image' | 'video')}
+                  >
+                    <option value="text">文字</option>
+                    <option value="image">图片</option>
+                    <option value="video">视频</option>
+                  </select>
+                  <input
+                    className="flex-1 rounded-lg panel-input border px-3 py-1.5 text-sm"
+                    placeholder="字段名称，如到店时间"
+                    value={customFieldDraft}
+                    onChange={(e) => setCustomFieldDraft(e.target.value)}
+                  />
+                </div>
                 <button
                   type="button"
-                  className="shrink-0 text-sm font-medium text-violet-600"
+                  aria-label="新增字段"
+                  className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#6d28d9] text-3xl font-bold leading-none text-white shadow-md shadow-violet-500/30"
                   onClick={() => addCustomPublishField(customFieldDraft, customFieldFormat)}
                 >
-                  添加
+                  +
                 </button>
               </div>
               <div className="px-3 py-3">
-                <button type="button" className="w-full rounded-lg bg-violet-700 text-white text-sm py-2" onClick={saveFieldPick}>
+                <button type="button" className="w-full rounded-xl bg-[#6d28d9] py-3 text-base font-semibold text-white" onClick={saveFieldPick}>
                   保存字段
                 </button>
               </div>

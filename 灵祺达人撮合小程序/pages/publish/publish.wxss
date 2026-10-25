@@ -1371,6 +1371,63 @@
   z-index: 1;
   font-size: 30rpx;
   font-weight: 700;
+  color: #4c1d95;
+}
+
+.pub-add-field--open .pub-add-field__text {
+  color: #4c1d95;
+}
+
+.pub-add-custom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  margin: 24rpx auto;
+  border-radius: 50%;
+  background: #6d28d9;
+  color: #fff;
+  font-size: 64rpx;
+  font-weight: 700;
+  line-height: 88rpx;
+  text-align: center;
+  box-shadow: 0 10rpx 24rpx rgba(109, 40, 217, 0.35);
+}
+
+.pub-save-fields {
+  margin-top: 8rpx;
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #fff;
+  background: #6d28d9;
+  border-radius: 20rpx;
+}
+
+.pub-apply-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pub-apply-toggle {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #4c1d95;
+}
+
+.pub-apply-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-top: 12rpx;
+}
+
+.pub-apply-item {
+  font-size: 28rpx;
+  color: #1e1b4b;
 }
 
 @keyframes pub-add-plus {
