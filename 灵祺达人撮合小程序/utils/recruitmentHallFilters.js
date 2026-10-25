@@ -53,7 +53,7 @@ const PLATFORM_ICONS = {
   小红书: '/images/platforms/xiaohongshu.png',
   大众点评: '/images/platforms/dianping.png',
   快手: '/images/platforms/kuaishou-local.png',
-  微信视频号: '/images/platforms/wechat.png',
+  微信视频号: '/images/platforms/wechat-channels.png',
 }
 
 function normalizeHallPlatform(raw) {

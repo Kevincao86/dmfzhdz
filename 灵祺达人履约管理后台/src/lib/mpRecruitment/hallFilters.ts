@@ -61,7 +61,7 @@ const PLATFORM_ICON_URL: Record<string, string> = {
   小红书: '/platforms/xiaohongshu.png',
   大众点评: '/platforms/dianping.png',
   快手: '/platforms/kuaishou-local.png',
-  微信视频号: '/platforms/wechat.png',
+  微信视频号: '/platforms/wechat-channels.png',
 }
 
 export function platformIconClass(platform: unknown): string {
