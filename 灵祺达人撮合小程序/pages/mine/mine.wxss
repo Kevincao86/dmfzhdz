@@ -176,14 +176,14 @@
 
 .mine-vip-head {
   position: relative;
-  height: 140rpx;
+  height: 124rpx;
 }
 
 .mine-vip-rank {
   position: relative;
   z-index: 1;
-  height: 140rpx;
-  padding: 12rpx 50% 8rpx 24rpx;
+  height: 124rpx;
+  padding: 8rpx 54% 6rpx 24rpx;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -223,8 +223,8 @@
   z-index: 2;
   top: 0;
   right: 0;
-  width: 48%;
-  height: 140rpx;
+  width: 52%;
+  height: 124rpx;
   overflow: hidden;
 }
 
@@ -243,13 +243,14 @@
 .mine-vip-badge-copy {
   position: relative;
   z-index: 1;
-  height: 140rpx;
-  padding: 0 12rpx 0 72rpx;
+  height: 124rpx;
+  padding: 0 16rpx 0 24%;
   box-sizing: border-box;
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  gap: 10rpx;
 }
 
 .mine-vip-badge-left,
@@ -267,13 +268,13 @@
 .mine-vip-badge-right {
   align-items: center;
   flex-shrink: 0;
-  margin-left: 8rpx;
+  margin-left: 0;
 }
 
 .mine-vip-crown {
-  width: 36rpx;
-  height: 36rpx;
-  margin-bottom: 2rpx;
+  width: 52rpx;
+  height: 52rpx;
+  margin-bottom: 0;
   flex-shrink: 0;
 }
 
@@ -293,7 +294,7 @@
 
 .mine-vip-badge-foot {
   margin-top: 0;
-  max-width: 96rpx;
+  max-width: 88rpx;
   font-size: 18rpx;
   color: rgba(255, 255, 255, 0.88);
   line-height: 1.2;
