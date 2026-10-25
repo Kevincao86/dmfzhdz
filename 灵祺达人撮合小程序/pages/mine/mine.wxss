@@ -1157,6 +1157,7 @@
   max-height: 78vh;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .mine-more-sheet .id-sheet-head {
@@ -1164,14 +1165,15 @@
 }
 
 .mine-more-close {
-  width: 64rpx;
-  height: 64rpx;
+  width: 56rpx;
+  height: 56rpx;
   margin-left: 16rpx;
   flex-shrink: 0;
   border-radius: 50%;
   background: #ece8f4;
   border: 2rpx solid #d4cce6;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .mine-more-close--on {
@@ -1180,10 +1182,10 @@
 
 .mine-more-close-x {
   display: block;
-  width: 100%;
-  height: 60rpx;
-  font-size: 40rpx;
-  line-height: 56rpx;
+  width: 52rpx;
+  height: 52rpx;
+  font-size: 36rpx;
+  line-height: 48rpx;
   text-align: center;
   color: #1c1917;
 }
