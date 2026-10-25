@@ -13,6 +13,7 @@ export type PublishFormTemplate = {
   isTargeted: boolean
   fieldOn: Record<string, boolean>
   customFields: { id: string; label: string; format: 'text' | 'image' | 'video' }[]
+  fieldOrder?: string[]
 }
 
 function storageKey() {
@@ -43,6 +44,9 @@ function normalize(raw: unknown): PublishFormTemplate | null {
         }))
         .filter((item) => item.label)
     : []
+  const fieldOrder = Array.isArray(row.fieldOrder)
+    ? row.fieldOrder.map((key) => String(key || '').trim()).filter(Boolean).slice(0, 80)
+    : []
   return {
     id: String(row.id || `pft-${Date.now()}`),
     name,
@@ -53,6 +57,7 @@ function normalize(raw: unknown): PublishFormTemplate | null {
     isTargeted: !!row.isTargeted && row.recruitTarget !== 'shoot' && row.recruitTarget !== 'edit',
     fieldOn: row.fieldOn && typeof row.fieldOn === 'object' ? { ...row.fieldOn } : {},
     customFields,
+    fieldOrder: fieldOrder.length ? fieldOrder : undefined,
   }
 }
 

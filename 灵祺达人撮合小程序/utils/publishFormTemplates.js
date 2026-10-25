@@ -22,6 +22,9 @@ function normalize(raw) {
         }))
         .filter((item) => item.label)
     : []
+  const fieldOrder = Array.isArray(raw.fieldOrder)
+    ? raw.fieldOrder.map((key) => String(key || '').trim()).filter(Boolean).slice(0, 80)
+    : []
   const recruitTarget = raw.recruitTarget === 'shoot' || raw.recruitTarget === 'edit' ? raw.recruitTarget : 'talent'
   return {
     id: String(raw.id || `pft-${Date.now()}`),
@@ -33,6 +36,7 @@ function normalize(raw) {
     isTargeted: !!raw.isTargeted && recruitTarget === 'talent',
     fieldOn: raw.fieldOn && typeof raw.fieldOn === 'object' ? { ...raw.fieldOn } : {},
     customFields,
+    fieldOrder: fieldOrder.length ? fieldOrder : undefined,
   }
 }
 

@@ -261,13 +261,14 @@
         </view>
         <block wx:else>
           <view class="tpl-sheet">
-            <view class="tpl-row" wx:for="{{publishFieldCatalog}}" wx:key="key">
-              <text class="tpl-row__name">{{item.label}}</text>
-              <switch class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
+            <view class="tpl-row tpl-row--hint">
+              <text class="tpl-row__hint">按住 ≡ 上下拖动排序，表单会跟着排</text>
             </view>
-            <view class="tpl-row" wx:for="{{customPublishFields}}" wx:key="id">
-              <text class="tpl-row__name">{{item.label}} · {{item.formatLabel || '文字'}}</text>
-              <text class="tpl-row__del" data-id="{{item.id}}" bindtap="onRemoveCustomPublishField">删除</text>
+            <view class="tpl-row" wx:for="{{editorRows}}" wx:key="key">
+              <view class="tpl-row__handle" data-key="{{item.key}}" catchtouchstart="onFieldDragStart" catchtouchmove="onFieldDragMove" catchtouchend="onFieldDragEnd">≡</view>
+              <text class="tpl-row__name">{{item.kind === 'custom' ? item.label + ' · ' + item.formatLabel : item.label}}</text>
+              <switch wx:if="{{item.kind === 'sys'}}" class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
+              <text wx:else class="tpl-row__del" data-id="{{item.key}}" bindtap="onRemoveCustomPublishField">删除</text>
             </view>
           </view>
         </block>
@@ -353,19 +354,20 @@
               </view>
             </view>
             <block wx:if="{{fieldEditorOpen}}">
-              <view class="tpl-row" wx:for="{{publishFieldCatalog}}" wx:key="key">
-                <text class="tpl-row__name">{{item.label}}</text>
-                <switch class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
+              <view class="tpl-row tpl-row--hint">
+                <text class="tpl-row__hint">按住 ≡ 上下拖动排序，下方表单会跟着排</text>
               </view>
-              <view class="tpl-row" wx:for="{{customPublishFields}}" wx:key="id">
-                <text class="tpl-row__name">{{item.label}} · {{item.formatLabel || '文字'}}</text>
-                <text class="tpl-row__del" data-id="{{item.id}}" bindtap="onRemoveCustomPublishField">删除</text>
+              <view class="tpl-row" wx:for="{{editorRows}}" wx:key="key">
+                <view class="tpl-row__handle" data-key="{{item.key}}" catchtouchstart="onFieldDragStart" catchtouchmove="onFieldDragMove" catchtouchend="onFieldDragEnd">≡</view>
+                <text class="tpl-row__name">{{item.kind === 'custom' ? item.label + ' · ' + item.formatLabel : item.label}}</text>
+                <switch wx:if="{{item.kind === 'sys'}}" class="tpl-switch" checked="{{fieldOn[item.key]}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onTogglePublishField" />
+                <text wx:else class="tpl-row__del" data-id="{{item.key}}" bindtap="onRemoveCustomPublishField">删除</text>
               </view>
               <view class="pub-radio-opt" bindtap="onAddCustomFieldMenu">新增字段</view>
             </block>
           </view>
-          <view class="pub-form-card">
-          <view class="pub-field" id="field-cover" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.cover}}">
+          <view class="pub-form-card pub-field-stack">
+          <view class="pub-field" id="field-cover" style="order:{{fieldRank.cover}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.cover}}">
             <text class="pub-label">招募海报</text>
             <text class="pub-cover-hint">{{coverSourceHint}}</text>
             <view wx:if="{{coverPreviewUrl}}" class="pub-cover-preview-wrap" bindtap="onPreviewCoverImage">
@@ -388,7 +390,7 @@
               <button class="pub-cover-btn pub-cover-btn--ai" loading="{{posterAiBusy}}" disabled="{{posterAiBusy}}" bindtap="onCoverAiGenerate">开始生成 · {{posterAiPoints}}积分</button>
             </view>
           </view>
-          <view class="pub-field" id="field-delivery-window" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.delivery)}}">
+          <view class="pub-field" id="field-delivery-window" style="order:{{fieldRank.delivery}}" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.delivery)}}">
             <text class="pub-label">投放窗口 *</text>
             <view class="pub-window-row">
               <view
@@ -403,7 +405,7 @@
               </view>
             </view>
           </view>
-          <view class="pub-field" id="field-signup-deadline" wx:if="{{showSignupDeadline && !isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.deadline)}}">
+          <view class="pub-field" id="field-signup-deadline" style="order:{{fieldRank.deadline}}" wx:if="{{showSignupDeadline && !isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.deadline)}}">
             <text class="pub-label">招募报名截止时间 *</text>
             <view class="pub-deadline-row">
               <picker class="pub-deadline-pick" mode="date" value="{{signupDeadlineDate}}" start="{{todayDate}}" bindchange="onSignupDeadlineDate">
@@ -420,11 +422,11 @@
               </picker>
             </view>
           </view>
-          <view class="pub-field pub-field--hint" wx:if="{{!showSignupDeadline && !isTargetedRecruit}}">
+          <view class="pub-field pub-field--hint" style="order:{{fieldRank.deadline}}" wx:if="{{!showSignupDeadline && !isTargetedRecruit}}">
             <text class="pub-label">招募报名截止</text>
             <text class="pub-urgent-deadline-hint">急单大厅：发布后 24 小时内截止报名（无需填写）</text>
           </view>
-          <view class="pub-field" wx:if="{{isTargetedRecruit}}">
+          <view class="pub-field" style="order:800" wx:if="{{isTargetedRecruit}}">
             <text class="pub-label">邀约响应时间 *</text>
             <view class="pub-radio-pair pub-radio-pair--wrap">
               <view
@@ -437,13 +439,11 @@
             </view>
             <text class="pub-hint">达人须在此时间内接受或拒绝邀约；可随时补邀更多人</text>
           </view>
-          </view>
-          <view class="pub-form-card">
-          <view class="pub-field" id="field-title">
+          <view class="pub-field" id="field-title" style="order:-10">
             <text class="pub-label">招募标题 *</text>
             <input class="pub-input" placeholder="{{recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}}" value="{{form.title}}" data-key="title" bindinput="onFieldInput" />
           </view>
-          <block wx:if="{{recruitMode === 'live'}}">
+          <view wx:if="{{recruitMode === 'live'}}" style="order:800;width:100%">
             <view class="pub-field">
               <text class="pub-label">直播平台 *</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
@@ -536,8 +536,8 @@
                 maxlength="600"
               />
             </view>
-          </block>
-          <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish && recruitMode !== 'live' && !form.platform && (publishTemplateMode !== 'custom' || fieldOn.platform)}}">
+          </view>
+          <view class="pub-field" id="field-platform" style="order:800" wx:if="{{!isSupplierPublish && recruitMode !== 'live' && !form.platform && (publishTemplateMode !== 'custom' || fieldOn.platform)}}">
             <text class="pub-label">招募平台 *</text>
             <view class="pub-select" data-view="platform" bindtap="openPicker">
               <image wx:if="{{platformSelectIcon}}" class="pub-select__icon" src="{{platformSelectIcon}}" mode="aspectFit" />
@@ -545,14 +545,14 @@
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-city" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.city}}">
+          <view class="pub-field" id="field-city" style="order:{{fieldRank.city}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.city}}">
             <text class="pub-label">招募城市 *</text>
             <view class="pub-select" data-view="city" bindtap="openPicker">
               <text class="pub-select-text {{cityPlaceholder ? 'pub-select-text--ph' : ''}}">{{cityDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-merchant-location" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.location}}">
+          <view class="pub-field" id="field-merchant-location" style="order:{{fieldRank.location}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.location}}">
             <text class="pub-label">商家位置</text>
             <text class="pub-label-hint">选填；地图选点后可导航</text>
             <view class="pub-location-row">
@@ -566,7 +566,7 @@
             </view>
             <text wx:if="{{merchantLocationMapReady}}" class="pub-location-map-tag">已地图定位 · 达人端可一键导航</text>
           </view>
-          <view class="pub-field" id="field-tag" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.tags}}">
+          <view class="pub-field" id="field-tag" style="order:{{fieldRank.tags}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.tags}}">
             <text class="pub-label">{{isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}}</text>
             <text class="pub-label-hint">最多 2 个，不可重复</text>
             <view class="pub-select" data-view="tag" bindtap="openPicker">
@@ -574,7 +574,7 @@
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-fans" wx:if="{{!isSupplierPublish && (publishTemplateMode !== 'custom' || fieldOn.fans)}}">
+          <view class="pub-field" id="field-fans" style="order:{{fieldRank.fans}}" wx:if="{{!isSupplierPublish && (publishTemplateMode !== 'custom' || fieldOn.fans)}}">
             <text class="pub-label">达人粉丝要求 *</text>
             <view class="pub-radio-pair pub-radio-pair--fans">
               <view
@@ -598,7 +598,7 @@
               />
             </view>
           </view>
-          <block wx:if="{{isSupplierPublish && recruitTarget === 'shoot'}}">
+          <view wx:if="{{isSupplierPublish && recruitTarget === 'shoot'}}" style="order:800;width:100%">
             <view class="pub-field">
               <text class="pub-label">拍摄日期 *</text>
               <picker mode="date" value="{{form.shootDate}}" bindchange="onShootDatePick">
@@ -632,8 +632,8 @@
                 <view wx:for="{{equipmentReqGrid}}" wx:key="name" class="pub-radio-opt {{item.on ? 'pub-radio-opt--on' : ''}}" data-field="equipmentRequired" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
               </view>
             </view>
-          </block>
-          <block wx:if="{{isSupplierPublish && recruitTarget === 'edit'}}">
+          </view>
+          <view wx:if="{{isSupplierPublish && recruitTarget === 'edit'}}" style="order:800;width:100%">
             <view class="pub-field">
               <text class="pub-label">素材来源 *</text>
               <view class="pub-radio-pair">
@@ -688,26 +688,26 @@
               <text class="pub-label">参考片链接</text>
               <input class="pub-input" placeholder="选填" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
             </view>
-          </block>
-          <view class="pub-field" id="field-req-level" wx:if="{{showDouyinLevel && !isSupplierPublish && (publishTemplateMode !== 'custom' || fieldOn.level)}}">
+          </view>
+          <view class="pub-field" id="field-req-level" style="order:{{fieldRank.level}}" wx:if="{{showDouyinLevel && !isSupplierPublish && (publishTemplateMode !== 'custom' || fieldOn.level)}}">
             <text class="pub-label">达人带货等级 *</text>
             <view class="pub-select" data-view="reqLevel" bindtap="openPicker">
               <text class="pub-select-text">{{levelDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-fee" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.fee}}">
+          <view class="pub-field" id="field-fee" style="order:{{fieldRank.fee}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.fee}}">
             <text class="pub-label">费用模式 *</text>
             <view class="pub-select" data-view="fee" bindtap="openPicker">
               <text class="pub-select-text {{feePlaceholder ? 'pub-select-text--ph' : ''}}">{{feeTypeLabel}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-fee-panel" wx:if="{{form.feeTypeId === 'fixed'}}">
+          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{form.feeTypeId === 'fixed'}}">
             <text class="pub-label">一口价金额 *</text>
             <input class="pub-input" type="digit" placeholder="请填写，0 代表置换" value="{{form.fixedPrice}}" data-key="fixedPrice" bindinput="onFieldInput" />
           </view>
-          <view class="pub-fee-panel" wx:if="{{form.feeTypeId === 'self_quote'}}">
+          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{form.feeTypeId === 'self_quote'}}">
             <text class="pub-label">可接受报价区间 *</text>
             <view class="pub-range-row">
               <input class="pub-input pub-input--range" type="digit" placeholder="最低" value="{{form.selfQuoteMin}}" data-key="selfQuoteMin" bindinput="onFieldInput" />
@@ -716,7 +716,7 @@
             </view>
             <text class="pub-label-hint">如 0-2000，单位为元</text>
           </view>
-          <view class="pub-fee-panel" wx:if="{{form.feeTypeId === 'level_tier'}}">
+          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{form.feeTypeId === 'level_tier'}}">
             <text class="pub-fee-panel-title">请继续设置费用阶梯</text>
             <view class="pub-tier-card" id="field-tier-lv-{{tierIdx}}" wx:for="{{form.levelTiers}}" wx:key="id" wx:for-index="tierIdx">
               <view class="pub-tier-del" data-index="{{tierIdx}}" bindtap="onRemoveLevelTier">🗑</view>
@@ -743,7 +743,7 @@
             </view>
             <view class="pub-add-tier" bindtap="onAddLevelTier">+ 添加阶梯</view>
           </view>
-          <view class="pub-fee-panel" wx:if="{{form.feeTypeId === 'fans_tier'}}">
+          <view class="pub-fee-panel" style="order:{{fieldRank.fee}}" wx:if="{{form.feeTypeId === 'fans_tier'}}">
             <text class="pub-fee-panel-title">粉丝阶梯费用</text>
             <view class="pub-tier-card" id="field-tier-fans-{{tierIdx}}" wx:for="{{form.fansTiers}}" wx:key="id" wx:for-index="tierIdx">
               <view class="pub-tier-del" data-index="{{tierIdx}}" bindtap="onRemoveFansTier">🗑</view>
@@ -770,11 +770,11 @@
             </view>
             <view class="pub-add-tier" bindtap="onAddFansTier">+ 添加阶梯</view>
           </view>
-          <view class="pub-field">
+          <view class="pub-field" style="order:{{fieldRank.fee}}">
             <text class="pub-label">佣金 CPS（%）</text>
             <input class="pub-input" type="digit" placeholder="选填" value="{{form.cpsPercent}}" data-key="cpsPercent" bindinput="onFieldInput" />
           </view>
-          <view class="pub-linke-card" wx:if="{{!isSupplierPublish && (form.platform === '抖音' || !form.platform)}}">
+          <view class="pub-linke-card" style="order:800" wx:if="{{!isSupplierPublish && (form.platform === '抖音' || !form.platform)}}">
             <view class="pub-linke-head">
               <text class="pub-linke-title">抖音林客 · 挂接商家</text>
               <text class="pub-linke-tag">非必填</text>
@@ -839,11 +839,11 @@
               </block>
             </block>
           </view>
-          <view class="pub-field" id="field-recruit-count" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.count)}}">
+          <view class="pub-field" id="field-recruit-count" style="order:{{fieldRank.count}}" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.count)}}">
             <text class="pub-label">{{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}}</text>
             <input class="pub-input" type="number" placeholder="1" value="{{form.recruitCount}}" data-key="recruitCount" bindinput="onFieldInput" />
           </view>
-          <view class="pub-field" id="field-recruit-detail" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.detail}}">
+          <view class="pub-field" id="field-recruit-detail" style="order:{{fieldRank.detail}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.detail}}">
             <text class="pub-label">招募详情 *</text>
             <textarea
               class="pub-textarea"
@@ -855,7 +855,7 @@
               show-confirm-bar="{{false}}"
             />
           </view>
-          <view class="pub-field">
+          <view class="pub-field" style="order:800">
             <text class="pub-label">是否需要达人交票</text>
             <view class="pub-radio-pair">
               <view
@@ -871,7 +871,7 @@
             </view>
             <text class="pub-cover-hint">需要时，达人完成该招募单后可提交发票，你可在本单查看并下载。</text>
           </view>
-          <view class="pub-field" wx:if="{{recruitMode !== 'ice' && recruitMode !== 'edit_ice' && form.fulfillmentLoop === 'open'}}">
+          <view class="pub-field" style="order:800" wx:if="{{recruitMode !== 'ice' && recruitMode !== 'edit_ice' && form.fulfillmentLoop === 'open'}}">
             <view class="pub-field">
               <text class="pub-label">上传群二维码 *</text>
               <text class="pub-cover-hint">本单已选开环。审核通过后，达人在我的报名详情里扫码进群。</text>
@@ -886,7 +886,7 @@
               <image wx:if="{{form.groupQrImage}}" class="pub-cover-preview" src="{{form.groupQrImage}}" mode="aspectFit" bindtap="onPreviewOpenLoopGroupQr" />
             </view>
           </view>
-          <view class="pub-field" wx:if="{{recruitMode === 'ice' || recruitMode === 'edit_ice'}}">
+          <view class="pub-field" style="order:800" wx:if="{{recruitMode === 'ice' || recruitMode === 'edit_ice'}}">
             <text class="pub-label">云剪审核方式 *</text>
             <view class="pub-radio-pair">
               <view
@@ -914,9 +914,8 @@
               <image wx:if="{{form.editGroupQrImage}}" class="pub-cover-preview" src="{{form.editGroupQrImage}}" mode="aspectFit" bindtap="onPreviewEditGroupQr" />
             </view>
           </view>
-          <view class="pub-field" wx:if="{{publishTemplateMode === 'custom' && customPublishFields.length}}">
-            <text class="pub-label">自定义字段</text>
-            <view wx:for="{{customPublishFields}}" wx:key="id" class="pub-field">
+          <block wx:if="{{publishTemplateMode === 'custom'}}">
+            <view wx:for="{{customPublishFields}}" wx:key="id" class="pub-field" style="order:{{fieldRank[item.id]}}">
               <text class="pub-label">{{item.label}} · {{item.formatLabel || '文字'}}</text>
               <input wx:if="{{item.format !== 'image' && item.format !== 'video'}}" class="pub-input" placeholder="请填写" value="{{item.value}}" data-id="{{item.id}}" bindinput="onCustomPublishValue" />
               <block wx:elif="{{item.format === 'image'}}">
@@ -928,8 +927,8 @@
                 <video wx:if="{{item.value}}" class="pub-cover-preview" src="{{item.value}}" controls />
               </block>
             </view>
-          </view>
-          <view class="pub-field" id="field-apply-form" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.apply}}">
+          </block>
+          <view class="pub-field" id="field-apply-form" style="order:{{fieldRank.apply}}" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.apply}}">
             <text class="pub-label">{{isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}}</text>
             <view class="pub-select" data-view="applyForm" bindtap="openPicker">
               <text class="pub-select-text {{applyFormPlaceholder ? 'pub-select-text--ph' : ''}}">{{applyFormDisplayText}}</text>

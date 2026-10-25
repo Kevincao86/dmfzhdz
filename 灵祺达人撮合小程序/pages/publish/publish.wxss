@@ -164,6 +164,19 @@
   border: 1rpx solid var(--lq-chip-on-border);
 }
 
+.pub-field-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.pub-field-stack > .pub-field,
+.pub-field-stack > .pub-fee-panel,
+.pub-field-stack > .pub-linke-card,
+.pub-field-stack > view {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .pub-screen--form .pub-form-card .pub-field {
   padding: 20rpx 4rpx;
   background: transparent;
@@ -775,6 +788,27 @@
   padding: 0 8rpx 0 24rpx;
   box-sizing: border-box;
   border-bottom: 1rpx solid #f1eef8;
+}
+
+.tpl-row__handle {
+  flex-shrink: 0;
+  width: 56rpx;
+  margin-right: 8rpx;
+  color: #8b909a;
+  font-size: 36rpx;
+  line-height: 88rpx;
+  text-align: center;
+}
+
+.tpl-row--hint {
+  min-height: 64rpx;
+  justify-content: flex-start;
+}
+
+.tpl-row__hint {
+  font-size: 22rpx;
+  color: #8b909a;
+  line-height: 1.4;
 }
 
 .tpl-row__name {

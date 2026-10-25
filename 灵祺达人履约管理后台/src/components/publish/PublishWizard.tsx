@@ -82,6 +82,39 @@ import PageHero from '../ui/PageHero'
 
 const PUBLISH_EDIT_KEY = 'meoo_publish_edit_mp_id'
 
+const PUBLISH_FIELD_CATALOG = [
+  { key: 'delivery', label: '投放窗口' },
+  { key: 'deadline', label: '报名截止时间' },
+  { key: 'city', label: '招募城市' },
+  { key: 'location', label: '商家位置' },
+  { key: 'tags', label: '需求标签' },
+  { key: 'fans', label: '粉丝要求' },
+  { key: 'level', label: '带货等级' },
+  { key: 'fee', label: '费用模式' },
+  { key: 'count', label: '招募人数' },
+  { key: 'detail', label: '招募详情' },
+  { key: 'apply', label: '报名必填信息' },
+  { key: 'cover', label: '封面' },
+]
+
+const PUBLISH_FIELD_KEYS = PUBLISH_FIELD_CATALOG.map((item) => item.key)
+
+function mergePublishFieldOrder(saved: string[] | undefined, customIds: string[]) {
+  const known = new Set<string>([...PUBLISH_FIELD_KEYS, ...customIds.filter(Boolean)])
+  const next: string[] = []
+  for (const key of saved || []) {
+    const id = String(key || '').trim()
+    if (id && known.has(id) && !next.includes(id)) next.push(id)
+  }
+  if (!next.length) {
+    next.push(...PUBLISH_FIELD_KEYS)
+  } else {
+    for (const key of PUBLISH_FIELD_KEYS) if (!next.includes(key)) next.push(key)
+  }
+  for (const id of customIds) if (id && !next.includes(id)) next.push(id)
+  return next
+}
+
 function PubLabel({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
     <div className="mb-1">
@@ -159,6 +192,8 @@ export default function PublishWizard() {
   const [customPublishFields, setCustomPublishFields] = useState<
     { id: string; label: string; value: string; format: 'text' | 'image' | 'video' }[]
   >([])
+  const [fieldOrder, setFieldOrder] = useState<string[]>([...PUBLISH_FIELD_KEYS])
+  const dragFieldKey = useRef('')
   const [customFieldFormat, setCustomFieldFormat] = useState<'text' | 'image' | 'video'>('text')
   const [customFieldDraft, setCustomFieldDraft] = useState('')
   const [recruitChannel, setRecruitChannel] = useState('')
@@ -211,6 +246,10 @@ export default function PublishWizard() {
   const [editGroupQrUploading, setEditGroupQrUploading] = useState(false)
 
   const display = useMemo(() => computePublishDisplay(form, recruitMode), [form, recruitMode])
+  const orderedKeys = useMemo(
+    () => mergePublishFieldOrder(fieldOrder, customPublishFields.map((row) => row.id)),
+    [fieldOrder, customPublishFields],
+  )
   const isSupplierPublish = recruitTarget === 'shoot' || recruitTarget === 'edit'
   const filteredModes = useMemo(() => modesForTarget(recruitTarget || 'talent'), [recruitTarget])
 
@@ -297,18 +336,23 @@ export default function PublishWizard() {
     if (meta.publishFieldOn && typeof meta.publishFieldOn === 'object') {
       setFieldOn((prev) => ({ ...prev, ...(meta.publishFieldOn as Record<string, boolean>) }))
     }
-    if (Array.isArray(meta.customPublishFields)) {
-      setCustomPublishFields(
-        (meta.customPublishFields as { id?: string; label?: string; value?: string; format?: string }[])
+    const restoredCustom = Array.isArray(meta.customPublishFields)
+      ? (meta.customPublishFields as { id?: string; label?: string; value?: string; format?: string }[])
           .filter((row) => String(row?.label || '').trim())
           .map((row, i) => ({
             id: String(row.id || `c-${i}`),
             label: String(row.label || '').trim(),
             value: String(row.value || ''),
-            format: row.format === 'image' || row.format === 'video' ? row.format : 'text',
-          })),
-      )
-    }
+            format: (row.format === 'image' || row.format === 'video' ? row.format : 'text') as 'text' | 'image' | 'video',
+          }))
+      : []
+    if (Array.isArray(meta.customPublishFields)) setCustomPublishFields(restoredCustom)
+    setFieldOrder(
+      mergePublishFieldOrder(
+        Array.isArray(meta.fieldOrder) ? (meta.fieldOrder as unknown[]).map((key) => String(key || '')) : undefined,
+        restoredCustom.map((row) => row.id),
+      ),
+    )
     setRecruitChannel(isTargeted ? 'targeted' : 'open')
     setIsTargetedRecruit(isTargeted)
     setRecruitTarget(recruitTargetId)
@@ -433,6 +477,7 @@ export default function PublishWizard() {
         publishTemplateMode,
         publishFieldOn: fieldOn,
         customPublishFields,
+        fieldOrder: orderedKeys,
       })
       if (isEditMode && editMpId) {
         await updateMpRecruitmentOrder(order)
@@ -527,6 +572,7 @@ export default function PublishWizard() {
     const loop = mode.id === 'edit_ice' ? 'closed' : tpl.fulfillmentLoop
     setFieldOn((prev) => ({ ...prev, ...tpl.fieldOn }))
     setCustomPublishFields(tpl.customFields.map((row) => ({ ...row, value: '' })))
+    setFieldOrder(mergePublishFieldOrder(tpl.fieldOrder, tpl.customFields.map((row) => row.id)))
     setPublishTemplateMode(layoutIsCustom(tpl.fieldOn, tpl.customFields) ? 'custom' : 'system')
     setForm((prev) => {
       const base = emptyPublishForm(target)
@@ -847,21 +893,98 @@ export default function PublishWizard() {
   }
 
 
-  const publishFieldCatalog = [
-    { key: 'delivery', label: '投放窗口' },
-    { key: 'deadline', label: '报名截止时间' },
-    { key: 'city', label: '招募城市' },
-    { key: 'location', label: '商家位置' },
-    { key: 'tags', label: '需求标签' },
-    { key: 'fans', label: '粉丝要求' },
-    { key: 'level', label: '带货等级' },
-    { key: 'fee', label: '费用模式' },
-    { key: 'count', label: '招募人数' },
-    { key: 'detail', label: '招募详情' },
-    { key: 'apply', label: '报名必填信息' },
-    { key: 'cover', label: '封面' },
-  ]
   const showField = (key: string) => publishTemplateMode !== 'custom' || fieldOn[key] !== false
+  const fieldRank = (key: string) => {
+    const index = orderedKeys.indexOf(key)
+    return index < 0 ? 200 : index
+  }
+  const editorRows: { key: string; kind: 'sys' | 'custom'; label: string }[] = []
+  for (const key of orderedKeys) {
+    const sys = PUBLISH_FIELD_CATALOG.find((item) => item.key === key)
+    if (sys) {
+      editorRows.push({ key, kind: 'sys', label: sys.label })
+      continue
+    }
+    const row = customPublishFields.find((item) => item.id === key)
+    if (!row) continue
+    const formatLabel = row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字'
+    editorRows.push({ key, kind: 'custom', label: `${row.label} · ${formatLabel}` })
+  }
+  function addCustomPublishField(label: string, format: 'text' | 'image' | 'video') {
+    const name = label.trim()
+    if (!name) {
+      setErr('请填写字段名称')
+      return
+    }
+    const id = `c-${Date.now()}`
+    setCustomPublishFields((list) => list.concat([{ id, label: name, value: '', format }]))
+    setFieldOrder((order) => mergePublishFieldOrder(order, customPublishFields.map((row) => row.id).concat(id)))
+    setCustomFieldDraft('')
+    setPublishTemplateMode('custom')
+    setErr('')
+  }
+  function removeCustomPublishField(id: string) {
+    const list = customPublishFields.filter((row) => row.id !== id)
+    setCustomPublishFields(list)
+    setFieldOrder((order) => order.filter((key) => key !== id))
+    setPublishTemplateMode(layoutIsCustom(fieldOn, list) ? 'custom' : 'system')
+  }
+  function moveField(from: string, to: string) {
+    if (!from || !to || from === to) return
+    setFieldOrder(() => {
+      const list = orderedKeys.slice()
+      const fromIndex = list.indexOf(from)
+      const toIndex = list.indexOf(to)
+      if (fromIndex < 0 || toIndex < 0) return list
+      list.splice(fromIndex, 1)
+      list.splice(toIndex, 0, from)
+      return list
+    })
+  }
+  function renderFieldEditor() {
+    return editorRows.map((row) => (
+      <div
+        key={row.key}
+        draggable
+        onDragStart={(e) => {
+          dragFieldKey.current = row.key
+          e.dataTransfer.effectAllowed = 'move'
+          e.dataTransfer.setData('text/plain', row.key)
+        }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const from = dragFieldKey.current || e.dataTransfer.getData('text/plain')
+          if (from) moveField(from, row.key)
+          dragFieldKey.current = ''
+        }}
+        className="flex items-center gap-2 px-3 py-2.5 text-sm"
+      >
+        <span className="cursor-grab select-none px-1 text-base leading-none text-[#8B909A]" title="拖拽排序">
+          ≡
+        </span>
+        <span className="min-w-0 flex-1">{row.label}</span>
+        {row.kind === 'sys' ? (
+          <input
+            type="checkbox"
+            checked={fieldOn[row.key] !== false}
+            onChange={(e) => {
+              const next = { ...fieldOn, [row.key]: e.target.checked }
+              setFieldOn(next)
+              setPublishTemplateMode(layoutIsCustom(next, customPublishFields) ? 'custom' : 'system')
+            }}
+          />
+        ) : (
+          <button type="button" className="text-xs text-slate-400" onClick={() => removeCustomPublishField(row.key)}>
+            删除
+          </button>
+        )}
+      </div>
+    ))
+  }
 
   if (step === 'tpl' || step === 'tplCustom') {
     return (
@@ -888,24 +1011,8 @@ export default function PublishWizard() {
           </div>
         ) : (
           <div className="surface-card rounded-xl border divide-y">
-            {publishFieldCatalog.map((item) => (
-              <label key={item.key} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span>{item.label}</span>
-                <input
-                  type="checkbox"
-                  checked={fieldOn[item.key] !== false}
-                  onChange={(e) => setFieldOn((prev) => ({ ...prev, [item.key]: e.target.checked }))}
-                />
-              </label>
-            ))}
-            {customPublishFields.map((row) => (
-              <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span>
-                  {row.label} · {row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字'}
-                </span>
-                <button type="button" className="text-xs text-slate-400" onClick={() => setCustomPublishFields((list) => list.filter((x) => x.id !== row.id))}>删除</button>
-              </div>
-            ))}
+            <p className="px-4 py-2 text-xs text-slate-400">拖拽左侧 ≡ 排序，表单会跟着排</p>
+            {renderFieldEditor()}
             <div className="flex items-center gap-2 px-4 py-2.5">
               <select
                 className="rounded-lg panel-input border px-2 py-1.5 text-sm"
@@ -925,18 +1032,7 @@ export default function PublishWizard() {
               <button
                 type="button"
                 className="shrink-0 text-sm font-medium text-violet-600"
-                onClick={() => {
-                  const label = customFieldDraft.trim()
-                  if (!label) {
-                    setErr('请填写字段名称')
-                    return
-                  }
-                  setErr('')
-                  setCustomPublishFields((list) =>
-                    list.concat([{ id: `c-${Date.now()}`, label, value: '', format: customFieldFormat }]),
-                  )
-                  setCustomFieldDraft('')
-                }}
+                onClick={() => addCustomPublishField(customFieldDraft, customFieldFormat)}
               >
                 新增自定义字段
               </button>
@@ -1157,6 +1253,7 @@ export default function PublishWizard() {
                   fulfillmentLoop: form.fulfillmentLoop === 'open' ? 'open' : 'closed',
                   isTargeted: isTargetedRecruit,
                   fieldOn,
+                  fieldOrder: orderedKeys,
                   customFields: customPublishFields.map((row) => ({
                     id: row.id,
                     label: row.label,
@@ -1177,38 +1274,8 @@ export default function PublishWizard() {
           </div>
           {fieldEditorOpen ? (
             <div className="divide-y rounded-2xl border border-[#E4E6EB] bg-white sm:col-span-2 xl:col-span-4">
-              {publishFieldCatalog.map((item) => (
-                <label key={item.key} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                  <span>{item.label}</span>
-                  <input
-                    type="checkbox"
-                    checked={fieldOn[item.key] !== false}
-                    onChange={(e) => {
-                      const next = { ...fieldOn, [item.key]: e.target.checked }
-                      setFieldOn(next)
-                      setPublishTemplateMode(layoutIsCustom(next, customPublishFields) ? 'custom' : 'system')
-                    }}
-                  />
-                </label>
-              ))}
-              {customPublishFields.map((row) => (
-                <div key={row.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                  <span>
-                    {row.label} · {row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字'}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-xs text-slate-400"
-                    onClick={() => {
-                      const list = customPublishFields.filter((x) => x.id !== row.id)
-                      setCustomPublishFields(list)
-                      setPublishTemplateMode(layoutIsCustom(fieldOn, list) ? 'custom' : 'system')
-                    }}
-                  >
-                    删除
-                  </button>
-                </div>
-              ))}
+              <p className="px-3 py-2 text-xs text-[#8B909A]">拖拽左侧 ≡ 排序，下方表单会跟着排</p>
+              {renderFieldEditor()}
               <div className="flex items-center gap-2 px-3 py-2">
                 <select
                   className="rounded-lg panel-input border px-2 py-1.5 text-sm"
@@ -1228,20 +1295,7 @@ export default function PublishWizard() {
                 <button
                   type="button"
                   className="shrink-0 text-sm font-medium text-violet-600"
-                  onClick={() => {
-                    const label = customFieldDraft.trim()
-                    if (!label) {
-                      setErr('请填写字段名称')
-                      return
-                    }
-                    const list = customPublishFields.concat([
-                      { id: `c-${Date.now()}`, label, value: '', format: customFieldFormat },
-                    ])
-                    setCustomPublishFields(list)
-                    setCustomFieldDraft('')
-                    setPublishTemplateMode('custom')
-                    setErr('')
-                  }}
+                  onClick={() => addCustomPublishField(customFieldDraft, customFieldFormat)}
                 >
                   添加
                 </button>
@@ -1272,82 +1326,85 @@ export default function PublishWizard() {
             </div>
           ) : null}
         </div>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <div className="rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
-        {showField('cover') ? (
-        <RecruitCoverField
-          layout="stage"
-          platform={form.platform}
-          talentTags={form.talentTags}
-          coverImage={form.coverImage}
-          coverLibraryId={form.coverLibraryId}
-          recruitTitle={form.title}
-          region={buildRegionText(form)}
-          onChange={(patch) => patchForm(patch)}
-        />
-        ) : <div className="text-sm text-[#8B909A]">海报已在自定义字段里关闭</div>}
+        <div className="flex flex-col gap-4">
+          <div className="rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]" style={{ order: -10 }}>
+            <PubLabel>招募标题 *</PubLabel>
+            <input
+              className="mt-1 w-full rounded-xl border border-[#E4E6EB] bg-white px-3 py-2.5"
+              placeholder={recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}
+              value={form.title}
+              onChange={(e) => patchForm({ title: e.target.value })}
+            />
           </div>
-          <div className="space-y-3 rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
-        <div>
-          <PubLabel>招募标题 *</PubLabel>
-          <input
-            className="mt-1 w-full rounded-xl border border-[#E4E6EB] bg-white px-3 py-2.5"
-            placeholder={recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}
-            value={form.title}
-            onChange={(e) => patchForm({ title: e.target.value })}
-          />
-        </div>
-        {showField('city') ? (
-        <PubSelectRow
-          label="招募城市 *"
-          value={display.cityDisplayText}
-          placeholder={display.cityDisplayText === '请选择招募城市'}
-          onClick={() => openPicker('city')}
-        />
-        ) : null}
-        {!isTargetedRecruit && showField('delivery') ? (
-        <div>
-          <PubLabel>投放窗口 *</PubLabel>
-          <div className="mt-1 grid grid-cols-2 gap-2">
-            {DELIVERY_WINDOWS.map((w) => (
-              <button
-                key={w.id}
-                type="button"
-                className={`rounded-xl border px-3 py-2.5 text-left ${form.deliveryWindow === w.id ? 'border-[#14161C] bg-[#14161C] text-white' : 'border-[#E4E6EB] bg-white text-[#14161C]'}`}
-                onClick={() => {
-                  patchForm({
-                    deliveryWindow: w.id,
-                    signupDeadline: w.id === 'urgent' ? '' : form.signupDeadline,
-                  })
-                  if (w.id === 'urgent') {
-                    setSignupDeadlineDate('')
-                  }
-                }}
-              >
-                <div className="text-sm font-medium">{w.label}</div>
-                <div className={`mt-1 text-[10px] ${form.deliveryWindow === w.id ? 'text-white/70' : 'text-[#8B909A]'}`}>{w.sub}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-        ) : null}
-          </div>
-        </div>
+          {showField('cover') ? (
+            <div className="rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]" style={{ order: fieldRank('cover') }}>
+              <RecruitCoverField
+                layout="stage"
+                platform={form.platform}
+                talentTags={form.talentTags}
+                coverImage={form.coverImage}
+                coverLibraryId={form.coverLibraryId}
+                recruitTitle={form.title}
+                region={buildRegionText(form)}
+                onChange={(patch) => patchForm(patch)}
+              />
+            </div>
+          ) : null}
+          {showField('city') ? (
+            <div style={{ order: fieldRank('city') }}>
+              <PubSelectRow
+                label="招募城市 *"
+                value={display.cityDisplayText}
+                placeholder={display.cityDisplayText === '请选择招募城市'}
+                onClick={() => openPicker('city')}
+              />
+            </div>
+          ) : null}
+          {!isTargetedRecruit && showField('delivery') ? (
+            <div style={{ order: fieldRank('delivery') }}>
+              <PubLabel>投放窗口 *</PubLabel>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                {DELIVERY_WINDOWS.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    className={`rounded-xl border px-3 py-2.5 text-left ${form.deliveryWindow === w.id ? 'border-[#14161C] bg-[#14161C] text-white' : 'border-[#E4E6EB] bg-white text-[#14161C]'}`}
+                    onClick={() => {
+                      patchForm({
+                        deliveryWindow: w.id,
+                        signupDeadline: w.id === 'urgent' ? '' : form.signupDeadline,
+                      })
+                      if (w.id === 'urgent') {
+                        setSignupDeadlineDate('')
+                      }
+                    }}
+                  >
+                    <div className="text-sm font-medium">{w.label}</div>
+                    <div className={`mt-1 text-[10px] ${form.deliveryWindow === w.id ? 'text-white/70' : 'text-[#8B909A]'}`}>{w.sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
-        {!isTargetedRecruit && display.showSignupDeadline && showField('deadline') ? (
-          <PubSelectRow
-            label="招募报名截止时间 *"
-            value={deadlineDisplayText}
-            placeholder={!signupDeadlineDate}
-            onClick={() => setShowDeadlineSheet(true)}
-          />
-        ) : null}
-        {!isTargetedRecruit && !display.showSignupDeadline ? (
-          <p className="text-xs text-amber-500/90">急单大厅：发布后 24 小时内截止报名（无需填写）</p>
+        {!isTargetedRecruit ? (
+          <div className="space-y-2" style={{ order: fieldRank('deadline') }}>
+            {display.showSignupDeadline && showField('deadline') ? (
+              <PubSelectRow
+                label="招募报名截止时间 *"
+                value={deadlineDisplayText}
+                placeholder={!signupDeadlineDate}
+                onClick={() => setShowDeadlineSheet(true)}
+              />
+            ) : null}
+            {!display.showSignupDeadline ? (
+              <p className="text-xs text-amber-500/90">急单大厅：发布后 24 小时内截止报名（无需填写）</p>
+            ) : null}
+          </div>
         ) : null}
 
         {isTargetedRecruit ? (
-          <div>
+          <div style={{ order: 800 }}>
             <PubLabel hint="达人须在此时间内接受或拒绝邀约；可随时补邀更多人">邀约响应时间 *</PubLabel>
             <div className="flex flex-wrap gap-2 mt-1">
               {INVITE_HOUR_OPTIONS.map((opt) => (
@@ -1369,7 +1426,7 @@ export default function PublishWizard() {
         ) : null}
 
         {recruitMode === 'live' ? (
-          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3">
+          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3" style={{ order: 800 }}>
             <PubLabel>直播平台 *</PubLabel>
             <div className="flex flex-wrap gap-2">
               {LIVE_PLATFORMS.map((p) => (
@@ -1459,16 +1516,18 @@ export default function PublishWizard() {
         ) : null}
 
         {!isSupplierPublish && recruitMode !== 'live' && showField('platform') && !form.platform ? (
-          <PubSelectRow
-            label="招募平台 *"
-            value={display.platformDisplayText}
-            placeholder={!form.platform}
-            iconUrl={form.platform ? platformIconUrl(form.platform) : undefined}
-            onClick={() => openPicker('platform')}
-          />
+          <div style={{ order: 800 }}>
+            <PubSelectRow
+              label="招募平台 *"
+              value={display.platformDisplayText}
+              placeholder={!form.platform}
+              iconUrl={form.platform ? platformIconUrl(form.platform) : undefined}
+              onClick={() => openPicker('platform')}
+            />
+          </div>
         ) : null}
         {showField('location') ? (
-        <div>
+        <div style={{ order: fieldRank('location') }}>
           <PubLabel>商家位置</PubLabel>
           <p className="text-xs text-[var(--shell-muted)] mb-2">选填；Web 端暂仅文字，小程序端可地图选点导航</p>
           <input
@@ -1487,6 +1546,7 @@ export default function PublishWizard() {
         </div>
         ) : null}
         {showField('tags') ? (
+        <div style={{ order: fieldRank('tags') }}>
         <PubSelectRow
           label={isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}
           hint="最多 2 个，不可重复"
@@ -1494,10 +1554,11 @@ export default function PublishWizard() {
           placeholder={!form.talentTags.length}
           onClick={() => openPicker('tag')}
         />
+        </div>
         ) : null}
 
         {isSupplierPublish && recruitTarget === 'shoot' ? (
-          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3">
+          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3" style={{ order: 800 }}>
             <PubLabel>拍摄日期 *</PubLabel>
             <input type="date" className="w-full rounded-lg panel-input border px-3 py-2" value={form.shootDate} onChange={(e) => patchForm({ shootDate: e.target.value })} />
             <PubLabel>拍摄时段 *</PubLabel>
@@ -1523,7 +1584,7 @@ export default function PublishWizard() {
         ) : null}
 
         {isSupplierPublish && recruitTarget === 'edit' ? (
-          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3">
+          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3" style={{ order: 800 }}>
             <PubLabel>素材来源 *</PubLabel>
             <div className="flex flex-wrap gap-2">
               {MATERIAL_SOURCES.map((s) => (
@@ -1573,7 +1634,7 @@ export default function PublishWizard() {
         ) : null}
 
         {!isSupplierPublish && showField('fans') ? (
-        <div>
+        <div style={{ order: fieldRank('fans') }}>
           <PubLabel>达人粉丝要求 *</PubLabel>
           <div className="flex gap-2 mt-1">
             {(['unlimited', 'limit'] as const).map((mode) => (
@@ -1613,11 +1674,13 @@ export default function PublishWizard() {
         ) : null}
 
         {display.showDouyinLevel && !isSupplierPublish && showField('level') ? (
-          <PubSelectRow label="达人带货等级 *" value={display.levelDisplayText} onClick={() => openPicker('reqLevel')} />
+          <div style={{ order: fieldRank('level') }}>
+            <PubSelectRow label="达人带货等级 *" value={display.levelDisplayText} onClick={() => openPicker('reqLevel')} />
+          </div>
         ) : null}
 
         {showField('fee') ? (
-        <>
+        <div className="space-y-3" style={{ order: fieldRank('fee') }}>
         <PubSelectRow
           label="费用模式 *"
           value={display.feeTypeLabel}
@@ -1848,11 +1911,11 @@ export default function PublishWizard() {
             onChange={(e) => patchNumericField('cpsPercent', e.target.value)}
           />
         </div>
-        </>
+        </div>
         ) : null}
 
         {!isTargetedRecruit && showField('count') ? (
-        <div>
+        <div style={{ order: fieldRank('count') }}>
           <PubLabel>{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}</PubLabel>
           <input
             type="number"
@@ -1865,7 +1928,7 @@ export default function PublishWizard() {
         ) : null}
 
         {showField('detail') ? (
-        <div>
+        <div style={{ order: fieldRank('detail') }}>
           <PubLabel>招募详情 *</PubLabel>
           <textarea
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2 min-h-[120px]"
@@ -1877,7 +1940,7 @@ export default function PublishWizard() {
         </div>
         ) : null}
 
-        <label className="flex items-start gap-2 text-sm text-[var(--shell-text)]">
+        <label className="flex items-start gap-2 text-sm text-[var(--shell-text)]" style={{ order: 800 }}>
           <input
             type="checkbox"
             className="mt-1"
@@ -1893,7 +1956,7 @@ export default function PublishWizard() {
         </label>
 
         {recruitMode !== 'ice' && recruitMode !== 'edit_ice' && (form.fulfillmentLoop || 'closed') === 'open' ? (
-          <div>
+          <div style={{ order: 800 }}>
               <div className="mt-3">
                 <PubLabel hint="本单已选开环。审核通过后，达人在我的报名详情里扫码进群">上传群二维码 *</PubLabel>
                 <input
@@ -1955,7 +2018,7 @@ export default function PublishWizard() {
         ) : null}
 
         {recruitMode === 'ice' || recruitMode === 'edit_ice' ? (
-          <div>
+          <div style={{ order: 800 }}>
             <PubLabel>云剪审核方式 *</PubLabel>
             <div className="mt-2 flex flex-wrap gap-2">
               {ICE_VERIFY_MODES.map((m) => (
@@ -2091,18 +2154,19 @@ export default function PublishWizard() {
         ) : null}
 
         {showField('apply') ? (
+        <div style={{ order: fieldRank('apply') }}>
         <PubSelectRow
           label={isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}
           value={display.applyFormDisplayText}
           placeholder={display.applyFormPlaceholder}
           onClick={() => openPicker('applyMenu')}
         />
+        </div>
         ) : null}
 
-        {publishTemplateMode === 'custom' && customPublishFields.length ? (
-          <div className="space-y-2">
-            {customPublishFields.map((row) => (
-              <div key={row.id}>
+        {publishTemplateMode === 'custom'
+          ? customPublishFields.map((row) => (
+              <div key={row.id} className="space-y-2" style={{ order: fieldRank(row.id) }}>
                 <PubLabel>
                   {row.label} · {row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字'}
                 </PubLabel>
@@ -2146,9 +2210,10 @@ export default function PublishWizard() {
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        ) : null}
+            ))
+          : null}
+
+        </div>
 
         <PublishLinkeAttachSection
           platform={form.platform}

@@ -508,6 +508,7 @@ export function buildPublishOrder(
     publishTemplateMode?: 'system' | 'custom'
     publishFieldOn?: Record<string, boolean>
     customPublishFields?: { id: string; label: string; value: string; format?: 'text' | 'image' | 'video' }[]
+    fieldOrder?: string[]
   },
 ) {
   const mode = modeById(recruitModeId)
@@ -639,6 +640,7 @@ export function buildPublishOrder(
       publishTemplateMode: options?.publishTemplateMode === 'custom' ? 'custom' : 'system',
       publishFieldOn: options?.publishFieldOn || {},
       customPublishFields: options?.customPublishFields || [],
+      fieldOrder: Array.isArray(options?.fieldOrder) ? options.fieldOrder.filter(Boolean).slice(0, 80) : [],
       coverLibraryId: coverFields.coverLibraryId,
       coverImageSource: coverFields.coverImageSource,
       ...(coverFields.coverImageSource === 'library' && coverFields.coverImage

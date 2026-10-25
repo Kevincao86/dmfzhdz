@@ -284,6 +284,66 @@ function attachApplyFieldFormat(page) {
   }
 }
 
+const DEFAULT_PUBLISH_FIELD_ORDER = ['delivery', 'deadline', 'city', 'location', 'tags', 'fans', 'level', 'fee', 'count', 'detail', 'apply', 'cover']
+const PUBLISH_FIELD_LABELS = {
+  delivery: '投放窗口',
+  deadline: '报名截止时间',
+  city: '招募城市',
+  location: '商家位置',
+  tags: '需求标签',
+  fans: '粉丝要求',
+  level: '带货等级',
+  fee: '费用模式',
+  count: '招募人数',
+  detail: '招募详情',
+  apply: '报名必填信息',
+  cover: '封面',
+}
+
+function layoutFromOrder(order, customFields) {
+  const fields = Array.isArray(customFields) ? customFields : []
+  const ids = fields.map((row) => (row && row.id ? String(row.id) : '')).filter(Boolean)
+  const known = {}
+  DEFAULT_PUBLISH_FIELD_ORDER.forEach((key) => {
+    known[key] = true
+  })
+  ids.forEach((id) => {
+    known[id] = true
+  })
+  const next = []
+  ;(Array.isArray(order) ? order : []).forEach((key) => {
+    const id = String(key || '').trim()
+    if (id && known[id] && next.indexOf(id) < 0) next.push(id)
+  })
+  if (!next.length) DEFAULT_PUBLISH_FIELD_ORDER.forEach((key) => next.push(key))
+  else DEFAULT_PUBLISH_FIELD_ORDER.forEach((key) => {
+    if (next.indexOf(key) < 0) next.push(key)
+  })
+  ids.forEach((id) => {
+    if (next.indexOf(id) < 0) next.push(id)
+  })
+  const fieldRank = {}
+  next.forEach((key, index) => {
+    fieldRank[key] = index
+  })
+  const byId = {}
+  fields.forEach((row) => {
+    if (row && row.id) byId[row.id] = row
+  })
+  const editorRows = next
+    .map((key) => {
+      if (PUBLISH_FIELD_LABELS[key]) return { key, kind: 'sys', label: PUBLISH_FIELD_LABELS[key] }
+      const row = byId[key]
+      if (!row) return null
+      const formatLabel = row.formatLabel || (row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字')
+      return { key, kind: 'custom', label: row.label, formatLabel }
+    })
+    .filter(Boolean)
+  return { fieldOrder: next, fieldRank, editorRows }
+}
+
+const initialFieldLayout = layoutFromOrder(DEFAULT_PUBLISH_FIELD_ORDER, [])
+
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
@@ -339,6 +399,9 @@ Page({
       { key: 'cover', label: '封面' },
     ],
     customPublishFields: [],
+    fieldOrder: initialFieldLayout.fieldOrder,
+    fieldRank: initialFieldLayout.fieldRank,
+    editorRows: initialFieldLayout.editorRows,
     customFieldDraft: '',
     iceVerifyModes: publishOpts.ICE_VERIFY_MODES,
     form: emptyForm('talent'),
@@ -1087,16 +1150,24 @@ Page({
           meta.publishFieldOn && typeof meta.publishFieldOn === 'object'
             ? { ...this.data.fieldOn, ...meta.publishFieldOn }
             : this.data.fieldOn,
-        customPublishFields: Array.isArray(meta.customPublishFields)
-          ? meta.customPublishFields.map((row) => {
-              const format = row && (row.format === 'image' || row.format === 'video') ? row.format : 'text'
-              return {
-                ...row,
-                format,
-                formatLabel: format === 'image' ? '图片' : format === 'video' ? '视频' : '文字',
-              }
-            })
-          : [],
+        customPublishFields: (() => {
+          const rows = Array.isArray(meta.customPublishFields)
+            ? meta.customPublishFields.map((row) => {
+                const format = row && (row.format === 'image' || row.format === 'video') ? row.format : 'text'
+                return {
+                  ...row,
+                  format,
+                  formatLabel: format === 'image' ? '图片' : format === 'video' ? '视频' : '文字',
+                }
+              })
+            : []
+          const layout = layoutFromOrder(meta.fieldOrder, rows)
+          this._pendingFieldLayout = layout
+          return rows
+        })(),
+        fieldOrder: this._pendingFieldLayout.fieldOrder,
+        fieldRank: this._pendingFieldLayout.fieldRank,
+        editorRows: this._pendingFieldLayout.editorRows,
       }, () => this.syncDeliveryDeadlineFromParts())
       if (isSupplier) this.syncSupplierPublishGrids(restored.patch)
       this.syncDisplayFields()
@@ -1190,6 +1261,7 @@ Page({
       value: '',
       formatLabel: row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字',
     }))
+    const fieldLayout = layoutFromOrder(tpl.fieldOrder, customPublishFields)
     this.setData({
       step: 'form',
       recruitTarget: target.id,
@@ -1204,6 +1276,9 @@ Page({
       publishTemplateMode: this.layoutIsCustom(fieldOn, customPublishFields) ? 'custom' : 'system',
       fieldOn,
       customPublishFields,
+      fieldOrder: fieldLayout.fieldOrder,
+      fieldRank: fieldLayout.fieldRank,
+      editorRows: fieldLayout.editorRows,
       form,
       tagGrid: buildTagGrid(form.talentTags || []),
       publishFormTemplates: publishFormTemplates.listPublishFormTemplates(),
@@ -1351,6 +1426,7 @@ Page({
           fulfillmentLoop: this.data.form.fulfillmentLoop === 'open' ? 'open' : 'closed',
           isTargeted: !!this.data.isTargetedRecruit,
           fieldOn: this.data.fieldOn || {},
+          fieldOrder: this.data.fieldOrder || [],
           customFields: (this.data.customPublishFields || []).map((item) => ({
             id: item.id,
             label: item.label,
@@ -1603,7 +1679,7 @@ Page({
         const list = (this.data.customPublishFields || []).concat([
           { id: `c-${Date.now()}`, label, value: '', format, formatLabel },
         ])
-        this.setData({ customPublishFields: list, publishTemplateMode: 'custom' })
+        this.setData(Object.assign({ customPublishFields: list, publishTemplateMode: 'custom' }, layoutFromOrder(this.data.fieldOrder, list)))
       },
     })
   },
@@ -1616,15 +1692,46 @@ Page({
     const list = (this.data.customPublishFields || []).concat([
       { id: `c-${Date.now()}`, label, value: '', format: 'text', formatLabel: '文字' },
     ])
-    this.setData({ customPublishFields: list, customFieldDraft: '', publishTemplateMode: 'custom' })
+    this.setData(Object.assign({ customPublishFields: list, customFieldDraft: '', publishTemplateMode: 'custom' }, layoutFromOrder(this.data.fieldOrder, list)))
+  },
+  onFieldDragStart(e) {
+    const touch = e.touches && e.touches[0]
+    this._fieldDrag = {
+      key: e.currentTarget.dataset.key,
+      y: touch ? touch.clientY : 0,
+    }
+  },
+  onFieldDragMove(e) {
+    const drag = this._fieldDrag
+    if (!drag || !drag.key) return
+    const touch = e.touches && e.touches[0]
+    if (!touch) return
+    const dy = touch.clientY - drag.y
+    if (Math.abs(dy) < 36) return
+    const order = (this.data.fieldOrder || []).slice()
+    const index = order.indexOf(drag.key)
+    if (index < 0) return
+    const next = index + (dy > 0 ? 1 : -1)
+    if (next < 0 || next >= order.length) {
+      drag.y = touch.clientY
+      return
+    }
+    const moved = order[index]
+    order[index] = order[next]
+    order[next] = moved
+    drag.y = touch.clientY
+    this.setData(layoutFromOrder(order, this.data.customPublishFields))
+  },
+  onFieldDragEnd() {
+    this._fieldDrag = null
   },
   onRemoveCustomPublishField(e) {
     const id = e.currentTarget.dataset.id
     const list = (this.data.customPublishFields || []).filter((x) => x.id !== id)
-    this.setData({
+    this.setData(Object.assign({
       customPublishFields: list,
       publishTemplateMode: this.layoutIsCustom(this.data.fieldOn, list) ? 'custom' : 'system',
-    })
+    }, layoutFromOrder(this.data.fieldOrder, list)))
   },
   onCustomPublishValue(e) {
     const id = e.currentTarget.dataset.id
@@ -2493,6 +2600,7 @@ Page({
           publishTemplateMode: this.data.publishTemplateMode || 'system',
           publishFieldOn: this.data.fieldOn || {},
           customPublishFields: this.data.customPublishFields || [],
+          fieldOrder: this.data.fieldOrder || [],
           coverImage: coverFields.coverImage,
           coverLibraryId: coverFields.coverLibraryId,
           coverImageSource: coverFields.coverImageSource,
