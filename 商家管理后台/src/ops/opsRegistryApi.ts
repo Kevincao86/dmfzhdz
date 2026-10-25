@@ -332,6 +332,8 @@ export type RegistryVideoAi = {
   viduApiBase?: string
   minimaxVideoApiKey?: string
   minimaxGroupId?: string
+  /** doubao = 豆包（即梦 / 小云雀）；minimax_h3 = MiniMax H3 */
+  videoGenEngine?: 'doubao' | 'minimax_h3'
 }
 
 export type RegistryMpMembershipCheckoutRequest = {

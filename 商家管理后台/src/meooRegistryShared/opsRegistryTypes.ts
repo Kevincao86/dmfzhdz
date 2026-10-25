@@ -46,9 +46,11 @@ export type RegistryVideoAi = {
   viduApiToken?: string
   /** 如 https://api.vidu.cn ，留空用默认 */
   viduApiBase?: string
-  /** MiniMax 海螺视频 Key（可与对话 Key 不同） */
+  /** MiniMax 海螺视频 Key（可与对话 Key 不同）。切到 MiniMax H3 时用于成片。 */
   minimaxVideoApiKey?: string
   minimaxGroupId?: string
+  /** doubao = 豆包（即梦 / 小云雀）；minimax_h3 = MiniMax H3。留空等同 doubao。 */
+  videoGenEngine?: 'doubao' | 'minimax_h3'
 }
 
 /** 运营台可扩展的 AI 供应商目录项（磁盘仅存非内置条目，GET 网关会合并内置目录后再返回）。 */

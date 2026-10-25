@@ -102,4 +102,7 @@ export function applyRegistryVideoAiToMerchantEnv(
   fill('VIDU_API_BASE', vx.viduApiBase)
   fill('MINIMAX_VIDEO_API_KEY', vx.minimaxVideoApiKey)
   fill('MINIMAX_GROUP_ID', vx.minimaxGroupId)
+  if (vx.videoGenEngine === 'minimax_h3' || vx.videoGenEngine === 'doubao') {
+    setFromRegistry('MERCHANT_AI_VIDEO_GEN_ENGINE', vx.videoGenEngine)
+  }
 }

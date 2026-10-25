@@ -161,6 +161,7 @@ export default function OpsShortDramaPage() {
   const jimengOk = jimengOnBackup || jimengPrimaryOk
   const viduOk = configured(videoAi.viduApiToken)
   const minimaxOk = configured(videoAi.minimaxVideoApiKey)
+  const engineH3 = videoAi.videoGenEngine === 'minimax_h3'
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -243,6 +244,60 @@ export default function OpsShortDramaPage() {
       <p className="text-xs text-slate-600">
         更新时间：{updatedAt ? new Date(updatedAt).toLocaleString('zh-CN') : '—'}
       </p>
+
+      <section className="rounded-xl border border-cyan-900/60 bg-slate-900 p-5">
+        <h2 className="mb-1 text-sm font-semibold text-slate-200">视频生成模型</h2>
+        <p className="mb-4 text-xs leading-relaxed text-slate-500">
+          短视频和短剧成片走这里选中的模型。豆包包含即梦 / 小云雀；MiniMax H3 单条 4–15 秒，超过 15 秒按 15 秒生成。
+          动作模仿和数字人口播不走这个开关。选好后点右上角「保存」才生效。
+        </p>
+        <div className="grid gap-3 md:grid-cols-2">
+          {(
+            [
+              {
+                id: 'doubao' as const,
+                title: '豆包（即梦 / 小云雀）',
+                detail: '现有方舟 Seedance 与即梦视觉云成片',
+              },
+              {
+                id: 'minimax_h3' as const,
+                title: 'MiniMax H3',
+                detail: minimaxOk ? '使用下方 MiniMax 海螺视频 Key' : '还没填 MiniMax 视频 Key，保存后生成会失败',
+              },
+            ] as const
+          ).map((opt) => {
+            const active = opt.id === 'minimax_h3' ? engineH3 : !engineH3
+            return (
+              <div
+                key={opt.id}
+                className={cn(
+                  'rounded-lg border p-3',
+                  active ? 'border-cyan-800 bg-cyan-950/30' : 'border-slate-800',
+                )}
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <span className="text-sm font-medium text-slate-100">{opt.title}</span>
+                  {active ? (
+                    <span className="rounded-full border border-emerald-800/80 bg-emerald-950/50 px-2 py-0.5 text-[11px] text-emerald-200">
+                      当前模型
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!editing || loading || saving}
+                      onClick={() => setVideoAi((p) => ({ ...p, videoGenEngine: opt.id }))}
+                      className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      改用这个
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">{opt.detail}</p>
+              </div>
+            )
+          })}
+        </div>
+      </section>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
         <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-200">
@@ -443,9 +498,9 @@ export default function OpsShortDramaPage() {
       </section>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-        <h2 className="mb-1 text-sm font-semibold text-slate-200">Vidu · MiniMax 海螺（P1 凭据）</h2>
+        <h2 className="mb-1 text-sm font-semibold text-slate-200">Vidu · MiniMax H3</h2>
         <p className="mb-4 text-xs text-slate-500">
-          本页只保存 Token / Key。商家端生成网关下一期再接；未填则不下发。
+          上面切到 MiniMax H3 后，短视频和短剧成片使用这里的视频 Key（可与对话 Key 不同）。未填则生成直接失败，不会偷偷改回豆包。
         </p>
         <div className="grid gap-4 md:grid-cols-2">
           <div>

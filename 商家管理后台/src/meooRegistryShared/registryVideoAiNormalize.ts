@@ -37,5 +37,6 @@ export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {
     viduApiBase: slice('viduApiBase', 260),
     minimaxVideoApiKey: slice('minimaxVideoApiKey', 520),
     minimaxGroupId: slice('minimaxGroupId', 120),
+    videoGenEngine: slice('videoGenEngine', 32) === 'minimax_h3' ? 'minimax_h3' : slice('videoGenEngine', 32) === 'doubao' ? 'doubao' : undefined,
   }
 }

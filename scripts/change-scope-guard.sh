@@ -47,6 +47,7 @@ list_scopes() {
   ops_ark_models    运营台火山方舟模型拉取 + Seedance 目录（不含短剧菜单）
   ops_ai_routes     运营台 API 线路（主线路 + 两条备选，手动或自动）
   ops_short_drama   运营台「短剧AI制作」子菜单 + 即梦/Vidu/MiniMax 凭据（不含成片工坊）
+  video_model_switch 运营台切换成片模型：豆包（即梦/小云雀）或 MiniMax H3
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
   talent_account_bind  达人/星选账号绑定（微信抖音手机邮箱）与商单日历服务号提醒发送
@@ -409,6 +410,18 @@ opsRegistryTypes
 registryVideoAiNormalize
 opsRegistryApi
 registryVideoAiEnvMerge
+change-scope-guard
+PAT
+      ;;
+    video_model_switch)
+      cat <<'PAT'
+OpsShortDramaPage
+opsRegistryTypes
+registryVideoAiNormalize
+opsRegistryApi
+registryVideoAiEnvMerge
+minimaxH3VideoClient
+merchantVideoAiGateway
 change-scope-guard
 PAT
       ;;

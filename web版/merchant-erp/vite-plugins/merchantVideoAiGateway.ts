@@ -94,6 +94,12 @@ import {
   volcPostXiaoyunqueVideoTask,
 } from './volcXiaoyunqueClient.js'
 import {
+  isMinimaxH3TaskId,
+  minimaxH3CreateVideoTask,
+  minimaxH3GetVideoTask,
+  videoGenEngineIsMinimaxH3,
+} from './minimaxH3VideoClient.js'
+import {
   anyLongformPlannerConfigured,
   longformPlannerModelIds,
   longformPlannerVendorAvailability,
@@ -3330,6 +3336,32 @@ export async function handleMerchantAiVideoRoutes(input: {
         })
         return true
       }
+      if (videoGenEngineIsMinimaxH3(env)) {
+        const h3 = await minimaxH3CreateVideoTask(env, parsed)
+        if (h3.ok === true) {
+          voidRecordVideoAiUsage(
+            input.req,
+            rawEnv,
+            parsed,
+            'minimax_h3',
+            h3.modelUsed,
+            estimateVideoGenerationTokens({
+              durationSec: h3.durationSec,
+              promptChars: String(parsed.prompt ?? '').length,
+            }),
+          )
+          json(res, 200, {
+            ok: true,
+            taskId: h3.taskId,
+            provider: 'minimax_h3',
+            modelUsed: h3.modelUsed,
+            pipeline: 'minimax_h3',
+          })
+          return true
+        }
+        json(res, h3.status && h3.status >= 400 ? h3.status : 400, { ok: false, message: h3.msg })
+        return true
+      }
       const xyq = await volcPostXiaoyunqueVideoTask(env, parsed)
       if (xyq.ok === true) {
         const dur = parseVideoDurationFromFlags(
@@ -3415,6 +3447,32 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: s2v.msg })
       return true
     }
+    if (videoGenEngineIsMinimaxH3(env)) {
+      const h3 = await minimaxH3CreateVideoTask(env, parsed)
+      if (h3.ok === true) {
+        voidRecordVideoAiUsage(
+          input.req,
+          rawEnv,
+          parsed,
+          'minimax_h3',
+          h3.modelUsed,
+          estimateVideoGenerationTokens({
+            durationSec: h3.durationSec,
+            promptChars: String(parsed.prompt ?? '').length,
+          }),
+        )
+        json(res, 200, {
+          ok: true,
+          taskId: h3.taskId,
+          provider: 'minimax_h3',
+          modelUsed: h3.modelUsed,
+          pipeline: 'minimax_h3',
+        })
+        return true
+      }
+      json(res, h3.status && h3.status >= 400 ? h3.status : 400, { ok: false, message: h3.msg })
+      return true
+    }
     const r = await arkCreateVideoTask(env, parsed, input.viteRoot)
     if (r.ok === true) {
       const dur = parseVideoDurationFromFlags(
@@ -3447,6 +3505,15 @@ export async function handleMerchantAiVideoRoutes(input: {
     const taskIdSd = (searchParams.get('taskId') ?? '').trim()
     if (!taskIdSd) {
       json(res, 400, { ok: false, message: '缺少 query taskId。' })
+      return true
+    }
+    if (isMinimaxH3TaskId(taskIdSd)) {
+      const h3 = await minimaxH3GetVideoTask(env, taskIdSd)
+      if (h3.ok === true) {
+        json(res, 200, { ok: true, provider: 'minimax_h3', ...h3.state })
+        return true
+      }
+      json(res, h3.status && h3.status >= 400 ? h3.status : 502, { ok: false, message: h3.msg })
       return true
     }
     if (isMotionImitateTaskId(taskIdSd)) {
