@@ -31,6 +31,7 @@ export default function TemplatesPage() {
   const [editing, setEditing] = useState<PublishFormTemplate | null>(null)
   const [customDraft, setCustomDraft] = useState('')
   const [customFormat, setCustomFormat] = useState<'text' | 'image' | 'video'>('text')
+  const [notice, setNotice] = useState('')
   const activeId = getActiveTemplateId(kind)
   const activeFormId = getActivePublishFormTemplateId()
 
@@ -47,6 +48,12 @@ export default function TemplatesPage() {
       .then(() => refresh())
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(() => setNotice(''), 3200)
+    return () => window.clearTimeout(timer)
+  }, [notice])
 
   const kindHint =
     section === 'recruit'
@@ -77,6 +84,11 @@ export default function TemplatesPage() {
 
   return (
     <div className="page-content-shell page-content-shell--wide space-y-4">
+      {notice ? (
+        <div role="status" className="fixed bottom-6 left-1/2 z-50 max-w-lg -translate-x-1/2 rounded-xl bg-[#ecfdf5] px-4 py-3 text-sm font-medium text-[#065f46] shadow-lg">
+          {notice}
+        </div>
+      ) : null}
       <PageHero title="我的模版" subtitle="达人必填模版管报名项，商单招募模版管发单字段。" badge={kindHint}>
         {section === 'apply' ? (
           <Link to={`/templates/edit?kind=${kind}`} className="btn-mockup btn-mockup--primary">
@@ -196,10 +208,11 @@ export default function TemplatesPage() {
               <TemplateGridCard
                 key={t.id}
                 title={t.name}
-                meta={`${t.recruitTarget === 'shoot' ? '拍摄' : t.recruitTarget === 'edit' ? '剪辑' : '达人'} · ${t.recruitMode}${activeFormId === t.id ? ' · 当前默认' : ''}`}
+                meta={`${t.recruitTarget === 'shoot' ? '拍摄' : t.recruitTarget === 'edit' ? '剪辑' : '达人'} · ${t.recruitMode}${activeFormId === t.id ? ' · 使用中' : ''}`}
                 onUse={() => {
                   setActivePublishFormTemplateId(t.id)
                   refresh()
+                  setNotice(`已使用模版「${t.name}」。回到发布招募，点「添加字段」即可套用。`)
                 }}
                 onEdit={() => openRecruitEdit(t)}
                 onDelete={() => {
@@ -227,10 +240,11 @@ export default function TemplatesPage() {
             <TemplateGridCard
               key={t.id}
               title={t.name}
-              meta={`${t.fields.length} 个报名项${activeId === t.id ? ' · 当前默认' : ''}`}
+              meta={`${t.fields.length} 个报名项${activeId === t.id ? ' · 使用中' : ''}`}
               onUse={() => {
                 setActiveTemplateId(t.id, kind)
                 refresh()
+                setNotice(`已使用模版「${t.name}」。发招募时会套用这份报名项。`)
               }}
               onEdit={() => {
                 window.location.href = `/templates/edit?id=${encodeURIComponent(t.id)}&kind=${kind}`

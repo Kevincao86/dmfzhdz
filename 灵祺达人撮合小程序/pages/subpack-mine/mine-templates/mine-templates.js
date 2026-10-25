@@ -15,6 +15,7 @@ Page({
     editing: null,
     editFields: [],
     customDraft: '',
+    useHint: '',
   },
   refresh() {
     const kind = templates.normalizeTemplateKind(this.data.kind)
@@ -57,8 +58,10 @@ Page({
   onUseTemplate(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    const row = (this.data.rows || []).find((item) => item.id === id)
     templates.setActiveTemplateId(id, this.data.kind)
-    wx.showToast({ title: '已设为当前模版', icon: 'success' })
+    this.setData({ useHint: `已使用模版「${row && row.name ? row.name : '该模版'}」。发招募时会套用这份报名项。` })
+    wx.showToast({ title: '已使用该模版', icon: 'success' })
     this.refresh()
   },
   onDelete(e) {
@@ -78,8 +81,10 @@ Page({
   onUseFormTemplate(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    const row = (this.data.formTpls || []).find((item) => item.id === id)
     publishFormTemplates.setActivePublishFormTemplateId(id)
-    wx.showToast({ title: '已设为当前模版', icon: 'success' })
+    this.setData({ useHint: `已使用模版「${row && row.name ? row.name : '该模版'}」。发招募时点添加字段即可套用。` })
+    wx.showToast({ title: '已使用该模版', icon: 'success' })
     this.refresh()
   },
   onEditFormTemplate(e) {
