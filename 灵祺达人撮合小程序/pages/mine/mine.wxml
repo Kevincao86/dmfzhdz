@@ -230,7 +230,7 @@
     <view class="id-sheet mine-more-sheet">
       <view class="id-sheet-head">
         <text class="id-sheet-title">全部功能</text>
-        <view class="mine-more-close" hover-class="mine-more-close--on" bindtap="onCloseMore">
+        <view class="mine-more-close" hover-class="mine-more-close--on" catchtap="onCloseMore">
           <text class="mine-more-close-x">×</text>
         </view>
       </view>
