@@ -101,7 +101,9 @@
           data-key="{{item.key}}"
           bindtap="onMenuTap"
         >
-          <image class="mine-vip-icon" src="{{item.iconSrc}}" mode="aspectFit" />
+          <view class="mine-vip-icon-plate">
+            <image class="mine-vip-icon" src="{{item.iconSrc}}" mode="aspectFit" />
+          </view>
           <text class="mine-vip-label">{{item.label}}</text>
         </view>
       </view>
