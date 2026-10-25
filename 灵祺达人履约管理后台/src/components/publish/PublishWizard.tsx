@@ -66,6 +66,9 @@ import { readPrProfile } from '../../lib/mpSync/userProfile'
 import { canUseTargetedRecruit } from '../../lib/mpSync/mpTargetedRecruitAccess'
 import {
   getActivePublishFormTemplate,
+  listPublishFormTemplates,
+  savePublishFormTemplate,
+  setActivePublishFormTemplateId,
   type PublishFormTemplate,
 } from '../../lib/mpSync/publishFormTemplates'
 import { INVITE_HOUR_OPTIONS, RECRUIT_CHANNELS } from '../../lib/mpSync/mpTargetedRecruit'
@@ -270,6 +273,8 @@ export default function PublishWizard() {
   const [cityActiveProvince, setCityActiveProvince] = useState('')
   const [cityProvinceRows, setCityProvinceRows] = useState<{ name: string; active: boolean; whole?: boolean }[]>([])
   const [fieldEditorOpen, setFieldEditorOpen] = useState(false)
+  const [fieldChooserOpen, setFieldChooserOpen] = useState(false)
+  const [savedFormTemplates, setSavedFormTemplates] = useState<PublishFormTemplate[]>([])
   const [applyInfoOpen, setApplyInfoOpen] = useState(false)
   const [fieldPick, setFieldPick] = useState<Record<string, boolean>>({ ...DEFAULT_PUBLISH_FIELD_ON })
   const [cityCheckGrid, setCityCheckGrid] = useState<{ name: string; on: boolean }[]>([])
@@ -1226,7 +1231,48 @@ export default function PublishWizard() {
     })
     setPublishTemplateMode('custom')
     setFieldEditorOpen(false)
+    setFieldChooserOpen(false)
     setDraftHint('已保存字段')
+    setErr('')
+  }
+
+  function applyRecruitFields(tpl: PublishFormTemplate) {
+    const next = { ...DEFAULT_PUBLISH_FIELD_ON, ...tpl.fieldOn }
+    const custom = tpl.customFields.map((row) => ({ ...row, value: '' }))
+    setFieldOn(next)
+    setFieldPick(next)
+    setCustomPublishFields(custom)
+    setFieldOrder(mergePublishFieldOrder(tpl.fieldOrder, custom.map((row) => row.id)))
+    setPublishTemplateMode('custom')
+    setActivePublishFormTemplateId(tpl.id)
+    setFieldEditorOpen(false)
+    setFieldChooserOpen(false)
+    setDraftHint(`已使用模版「${tpl.name}」`)
+    setErr('')
+  }
+
+  function saveCurrentAsTemplate() {
+    const name = window.prompt('模版名称', '我的发单模版')
+    if (name == null) return
+    const trimmed = name.trim() || '我的发单模版'
+    const next = { ...DEFAULT_PUBLISH_FIELD_ON, ...fieldPick }
+    const row = savePublishFormTemplate({
+      name: trimmed,
+      recruitTarget,
+      recruitMode,
+      fulfillmentLoop: form.fulfillmentLoop === 'open' ? 'open' : 'closed',
+      isTargeted: isTargetedRecruit,
+      fieldOn: next,
+      fieldOrder: orderedKeys,
+      customFields: customPublishFields.map((item) => ({
+        id: item.id,
+        label: item.label,
+        format: item.format || 'text',
+      })),
+    })
+    setActivePublishFormTemplateId(row.id)
+    setSavedFormTemplates(listPublishFormTemplates())
+    setDraftHint('已存入我的模版')
     setErr('')
   }
 
@@ -2415,9 +2461,13 @@ export default function PublishWizard() {
             onClick={() => {
               if (fieldEditorOpen) {
                 setFieldEditorOpen(false)
+                setFieldChooserOpen(false)
                 return
               }
+              const saved = listPublishFormTemplates()
+              setSavedFormTemplates(saved)
               setFieldPick({ ...fieldOn })
+              setFieldChooserOpen(saved.length > 0)
               setFieldEditorOpen(true)
             }}
           >
@@ -2432,7 +2482,30 @@ export default function PublishWizard() {
             )}
             <span className="relative">{fieldEditorOpen ? '收起' : '添加字段'}</span>
           </button>
-          {fieldEditorOpen ? (
+          {fieldEditorOpen && fieldChooserOpen ? (
+            <div className="space-y-2 rounded-lg border border-[var(--shell-border)] p-3">
+              <p className="text-xs text-[var(--shell-muted)]">已有商单招募模版。可以直接选用，或重新勾选字段。</p>
+              {savedFormTemplates.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-lg border border-[var(--shell-border)] px-3 py-2 text-left text-sm"
+                  onClick={() => applyRecruitFields(tpl)}
+                >
+                  <span className="font-medium text-[var(--shell-text)]">{tpl.name}</span>
+                  <span className="text-xs text-[#6d28d9]">使用</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                className="w-full rounded-xl bg-[#6d28d9] py-3 text-base font-semibold text-white"
+                onClick={() => setFieldChooserOpen(false)}
+              >
+                新选择字段
+              </button>
+            </div>
+          ) : null}
+          {fieldEditorOpen && !fieldChooserOpen ? (
             <div className="divide-y border border-[var(--shell-border)] rounded-lg">
               <p className="px-3 py-2 text-xs text-[var(--shell-muted)]">可一次勾选多个。勾选的系统字段在保存后显示；自己新增的字段需要填写内容。长按左侧 ≡ 再拖动排序。</p>
               {renderFieldEditor(true)}
@@ -2463,9 +2536,16 @@ export default function PublishWizard() {
                   +
                 </button>
               </div>
-              <div className="px-3 py-3">
+              <div className="space-y-2 px-3 py-3">
                 <button type="button" className="w-full rounded-xl bg-[#6d28d9] py-3 text-base font-semibold text-white" onClick={saveFieldPick}>
                   保存字段
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-xl border-2 border-[#6d28d9] bg-white py-3 text-base font-semibold text-[#4c1d95]"
+                  onClick={saveCurrentAsTemplate}
+                >
+                  存入我的模版
                 </button>
               </div>
             </div>

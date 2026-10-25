@@ -8,6 +8,13 @@
   <block wx:else>
   <view class="card">
     <view class="tpl-kind-tabs">
+      <view class="tpl-kind-tab {{section === 'apply' ? 'tpl-kind-tab--active' : ''}}" data-section="apply" bindtap="onSectionTab">达人必填模版</view>
+      <view class="tpl-kind-tab {{section === 'recruit' ? 'tpl-kind-tab--active' : ''}}" data-section="recruit" bindtap="onSectionTab">商单招募模版</view>
+    </view>
+  </view>
+  <block wx:if="{{section === 'apply'}}">
+  <view class="card">
+    <view class="tpl-kind-tabs">
       <view
         wx:for="{{kindTabs}}"
         wx:key="id"
@@ -35,24 +42,47 @@
   <view wx:if="{{!rows.length}}" class="card">
     <text class="hint">暂无模版，点击上方按钮新建</text>
   </view>
-  <view class="card">
-    <text class="title-lg">发单表单</text>
-    <text class="hint">发招募时保存的字段设置。设为当前后，下次选好平台会自动套用。</text>
-  </view>
-  <view wx:for="{{formTpls}}" wx:key="id" class="card tpl-card">
-    <view class="tpl-head">
-      <text class="title-lg">{{item.name}}</text>
-      <text class="tpl-active-badge" wx:if="{{activeFormId === item.id}}">当前默认</text>
-    </view>
-    <text class="hint">{{item.recruitTarget === 'shoot' ? '拍摄' : item.recruitTarget === 'edit' ? '剪辑' : '达人'}} · {{item.recruitMode}}</text>
-    <view class="tpl-actions">
-      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseFormTemplate">使用</button>
-      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onDeleteFormTemplate">删除</button>
-    </view>
-  </view>
-  <view wx:if="{{!formTpls.length}}" class="card">
-    <text class="hint">暂无发单模版。在发招募表单里点「存入我的模版」。</text>
-  </view>
+  </block>
+  <block wx:else>
+    <block wx:if="{{editing}}">
+      <view class="card tpl-card">
+        <input class="tpl-edit-name" value="{{editing.name}}" bindinput="onEditName" placeholder="模版名称" />
+        <view class="tpl-edit-row" wx:for="{{editFields}}" wx:key="key">
+          <text>{{item.label}}</text>
+          <switch checked="{{item.on}}" color="#5b2dcc" data-key="{{item.key}}" bindchange="onToggleEditField" />
+        </view>
+        <view class="tpl-edit-row" wx:for="{{editing.customFields}}" wx:for-item="custom" wx:key="id">
+          <text>{{custom.label}}</text>
+          <text data-id="{{custom.id}}" bindtap="onRemoveEditCustom">删除</text>
+        </view>
+        <view class="tpl-edit-add">
+          <input class="tpl-edit-name" value="{{customDraft}}" bindinput="onCustomDraft" placeholder="新增字段名称" />
+          <text bindtap="onAddEditCustom">添加</text>
+        </view>
+        <view class="tpl-actions">
+          <button class="btn-primary" size="mini" bindtap="onSaveFormEdit">保存修改</button>
+          <button class="btn-secondary" size="mini" bindtap="onCancelFormEdit">取消</button>
+        </view>
+      </view>
+    </block>
+    <block wx:else>
+      <view wx:for="{{formTpls}}" wx:key="id" class="card tpl-card">
+        <view class="tpl-head">
+          <text class="title-lg">{{item.name}}</text>
+          <text class="tpl-active-badge" wx:if="{{activeFormId === item.id}}">当前默认</text>
+        </view>
+        <text class="hint">发招募时选用的字段</text>
+        <view class="tpl-actions">
+          <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseFormTemplate">使用</button>
+          <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onEditFormTemplate">编辑</button>
+          <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onDeleteFormTemplate">删除</button>
+        </view>
+      </view>
+      <view wx:if="{{!formTpls.length}}" class="card">
+        <text class="hint">暂无商单招募模版。在发招募里勾选字段后点「存入我的模版」。</text>
+      </view>
+    </block>
+  </block>
   </block>
   <site-icp-footer />
 </view>

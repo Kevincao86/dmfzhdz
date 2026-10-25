@@ -1,5 +1,20 @@
 const scope = require('./mpAccountLocalScope.js')
 
+const RECRUIT_TEMPLATE_FIELDS = [
+  { key: 'title', label: '招募标题' },
+  { key: 'delivery', label: '投放窗口' },
+  { key: 'deadline', label: '报名截止时间' },
+  { key: 'city', label: '招募城市' },
+  { key: 'location', label: '商家位置' },
+  { key: 'tags', label: '需求标签' },
+  { key: 'fans', label: '粉丝要求' },
+  { key: 'level', label: '带货等级' },
+  { key: 'fee', label: '费用模式' },
+  { key: 'count', label: '招募人数' },
+  { key: 'detail', label: '招募详情' },
+  { key: 'cover', label: '封面' },
+]
+
 const STORAGE_KEY = 'meoo_publish_form_templates_v1'
 const ACTIVE_KEY = 'meoo_active_publish_form_template_v1'
 
@@ -121,6 +136,7 @@ function applyPublishFormTemplatesFromSync(templates) {
 }
 
 module.exports = {
+  RECRUIT_TEMPLATE_FIELDS,
   listPublishFormTemplates,
   getPublishFormTemplateById,
   getActivePublishFormTemplateId,

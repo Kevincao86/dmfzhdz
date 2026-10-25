@@ -457,6 +457,8 @@ Page({
     provinceWhole: false,
     provinceScopeLabel: '全省',
     fieldEditorOpen: false,
+    fieldChooserOpen: false,
+    savedFormTemplates: [],
     applyInfoOpen: false,
     applyInfoRows: [],
     fieldPick: defaultPublishFieldOn(),
@@ -1452,10 +1454,44 @@ Page({
   },
   onToggleFieldEditor() {
     if (this.data.fieldEditorOpen) {
-      this.setData({ fieldEditorOpen: false })
+      this.setData({ fieldEditorOpen: false, fieldChooserOpen: false })
       return
     }
-    this.setData({ fieldEditorOpen: true, fieldPick: { ...(this.data.fieldOn || {}) } })
+    const saved = publishFormTemplates.listPublishFormTemplates()
+    this.setData({
+      fieldEditorOpen: true,
+      fieldChooserOpen: saved.length > 0,
+      savedFormTemplates: saved,
+      fieldPick: { ...(this.data.fieldOn || {}) },
+    })
+  },
+  onChooseNewFields() {
+    this.setData({ fieldChooserOpen: false, fieldPick: { ...(this.data.fieldOn || {}) } })
+  },
+  onPickSavedFormTemplate(e) {
+    const id = e.currentTarget.dataset.id
+    const tpl = publishFormTemplates.getPublishFormTemplateById(id)
+    if (!tpl) return
+    const fieldOn = { ...defaultPublishFieldOn(), ...(tpl.fieldOn || {}) }
+    const customPublishFields = (tpl.customFields || []).map((row) => ({
+      ...row,
+      value: '',
+      formatLabel: row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字',
+    }))
+    const layout = layoutFromOrder(tpl.fieldOrder, customPublishFields)
+    publishFormTemplates.setActivePublishFormTemplateId(tpl.id)
+    this.setData({
+      fieldOn,
+      fieldPick: { ...fieldOn },
+      customPublishFields,
+      fieldOrder: layout.fieldOrder,
+      fieldRank: layout.fieldRank,
+      editorRows: layout.editorRows,
+      publishTemplateMode: 'custom',
+      fieldEditorOpen: false,
+      fieldChooserOpen: false,
+    })
+    wx.showToast({ title: '已使用模版', icon: 'none' })
   },
   onToggleFieldPick(e) {
     const key = e.currentTarget.dataset.key
@@ -1481,13 +1517,14 @@ Page({
       success: (res) => {
         if (!res.confirm) return
         const name = String(res.content != null ? res.content : '我的发单模版').trim() || '我的发单模版'
+        const fieldOn = { ...defaultPublishFieldOn(), ...(this.data.fieldPick || this.data.fieldOn || {}) }
         const row = publishFormTemplates.savePublishFormTemplate({
           name,
           recruitTarget: this.data.recruitTarget || 'talent',
           recruitMode: this.data.recruitMode || 'visit',
           fulfillmentLoop: this.data.form.fulfillmentLoop === 'open' ? 'open' : 'closed',
           isTargeted: !!this.data.isTargetedRecruit,
-          fieldOn: this.data.fieldOn || {},
+          fieldOn,
           fieldOrder: this.data.fieldOrder || [],
           customFields: (this.data.customPublishFields || []).map((item) => ({
             id: item.id,

@@ -1406,6 +1406,28 @@
   border-radius: 20rpx;
 }
 
+.pub-save-tpl {
+  margin-top: 16rpx;
+  padding: 22rpx 0;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #4c1d95;
+  background: #fff;
+  border: 3rpx solid #6d28d9;
+  border-radius: 20rpx;
+}
+
+.pub-tpl-pick {
+  margin-top: 12rpx;
+  padding: 22rpx 24rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1e1b4b;
+  background: #f5f3ff;
+  border-radius: 16rpx;
+}
+
 .pub-apply-head {
   display: flex;
   align-items: center;
