@@ -880,6 +880,7 @@ PAT
       cat <<'PAT'
 PublishWizard
 PublishWizardSheets
+RecruitCoverField
 pages/publish/publish
 publishCityPicker
 publishOrder

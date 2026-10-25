@@ -414,7 +414,9 @@ Page({
     coverGallerySubKey: '',
     coverPlatformNames: [],
     coverTagNames: [],
-    coverSourceHint: '未选择时将使用对应平台默认封面',
+    coverSourceHint: '请点选一张海报。不选则发布时使用该平台默认海报。',
+    coverChoices: [],
+    recruitModeHint: '选择这次怎么合作。',
     showApplyTplPicker: false,
     customTemplateList: [],
     applyFormEditorMode: '',
@@ -722,25 +724,30 @@ Page({
           : '请选择报名截止时间',
       signupDeadlinePlaceholder: !urgentWin && !f.signupDeadline,
       merchantLocationMapReady: merchantLocation.hasMapCoords(f),
+      recruitModeHint: (RECRUIT_MODES.find((m) => m.id === this.data.recruitMode) || {}).sub || '选择这次怎么合作。',
     })
     this.syncCoverPreview()
   },
   syncCoverPreview() {
     const f = this.data.form || {}
     let preview = ''
-    let hint = '未选择时将使用对应平台默认封面'
+    let hint = '请点选一张海报。不选则发布时使用该平台默认海报。'
     if (String(f.coverImage || '').trim()) {
       preview = f.coverImage
-      hint = this.data.coverAiGenerated ? '已用 AI 生成封面' : '已上传自定义封面'
+      hint = this.data.coverAiGenerated ? '已用 AI 生成海报' : '已上传自定义海报'
     } else if (String(f.coverLibraryId || '').trim()) {
-      const hit = recruitCoverLib.findCoverById(f.coverLibraryId)
-      preview = hit ? hit.url : ''
-      hint = '已选图库封面'
-    } else {
-      const def = recruitCoverLib.resolveDefaultCover(f.platform, f.talentTags || [])
-      preview = def && def.url ? def.url : ''
+      hint = '已选这张海报'
     }
-    this.setData({ coverPreviewUrl: preview, coverSourceHint: hint })
+    const coverChoices = recruitCoverLib
+      .getSuggestedGalleryItems(f.platform, f.talentTags || [])
+      .slice(0, 6)
+    this.setData({ coverPreviewUrl: preview, coverSourceHint: hint, coverChoices })
+  },
+  onPickCoverChoice(e) {
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
+    if (!id) return
+    this.setData({ 'form.coverLibraryId': id, 'form.coverImage': '', coverAiGenerated: false })
+    this.syncCoverPreview()
   },
   async onCoverUpload() {
     try {

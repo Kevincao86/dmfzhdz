@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react'
 import {
   findCoverById,
   getGalleryItemsForTab,
+  getSuggestedGalleryItems,
   listCoverPlatformNames,
   listCoverTagNames,
-  resolveDefaultCover,
   type CoverGalleryTab,
   type CoverLibraryItem,
 } from '../../lib/mpSync/recruitCoverLibrary'
@@ -27,7 +27,7 @@ type Props = {
   onChange: (patch: { coverImage?: string; coverLibraryId?: string }) => void
 }
 
-function resolvePreview(platform: string, talentTags: string[], coverImage?: string, coverLibraryId?: string) {
+function resolvePreview(coverImage?: string, coverLibraryId?: string) {
   const upload = String(coverImage || '').trim()
   if (upload) return upload
   const libId = String(coverLibraryId || '').trim()
@@ -35,7 +35,7 @@ function resolvePreview(platform: string, talentTags: string[], coverImage?: str
     const hit = findCoverById(libId)
     if (hit?.url) return hit.url
   }
-  return resolveDefaultCover(platform, talentTags).url || ''
+  return ''
 }
 
 export default function RecruitCoverField({
@@ -59,8 +59,12 @@ export default function RecruitCoverField({
   const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const preview = useMemo(
-    () => resolvePreview(platform, talentTags, coverImage, coverLibraryId),
-    [platform, talentTags, coverImage, coverLibraryId],
+    () => resolvePreview(coverImage, coverLibraryId),
+    [coverImage, coverLibraryId],
+  )
+  const suggested = useMemo(
+    () => getSuggestedGalleryItems(platform, talentTags).slice(0, 6),
+    [platform, talentTags],
   )
 
   const platformNames = useMemo(() => listCoverPlatformNames(), [])
@@ -73,8 +77,8 @@ export default function RecruitCoverField({
 
   const sourceHint = (() => {
     if (String(coverImage || '').trim()) return fromAi ? '已用 AI 生成封面' : '已上传自定义封面'
-    if (String(coverLibraryId || '').trim()) return '已选图库封面'
-    return '未选择时将使用对应平台默认封面'
+    if (String(coverLibraryId || '').trim()) return '已选这张海报'
+    return '请点选一张海报。不选则发布时使用该平台默认海报。'
   })()
 
   const openGallery = () => {
@@ -152,12 +156,29 @@ export default function RecruitCoverField({
   return (
     <div className="pub-field">
       <div className="mb-1">
-        <span className="text-slate-300 text-sm font-medium">招募单封面图（选填）</span>
-        <p className="text-xs text-slate-500 mt-0.5">{sourceHint}</p>
+        <span className="form-field-label" style={{ marginBottom: 0 }}>招募海报</span>
+        <p className="text-xs text-[var(--shell-muted)] mt-0.5">{sourceHint}</p>
       </div>
 
-      <div className="rounded-lg panel-input border p-3">
-        <div className="flex flex-wrap justify-end gap-2">
+      <div className="rounded-lg border border-[var(--shell-border)] p-3">
+        {suggested.length ? (
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            {suggested.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`overflow-hidden rounded-lg border text-left ${
+                  coverLibraryId === item.id ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-[var(--shell-border)]'
+                }`}
+                onClick={() => onPickLibrary(item)}
+              >
+                <img src={item.url} alt={item.label} className="aspect-[5/4] w-full object-cover" />
+                <span className="block truncate px-1.5 py-1 text-[11px] text-[var(--shell-text)]">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
@@ -193,7 +214,7 @@ export default function RecruitCoverField({
             </button>
           )}
         </div>
-        {preview ? (
+        {preview && String(coverImage || '').trim() ? (
           <button
             type="button"
             className="mt-3 block w-full cursor-zoom-in"

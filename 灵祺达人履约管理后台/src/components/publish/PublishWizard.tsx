@@ -995,8 +995,16 @@ export default function PublishWizard() {
         aside={<TipsCard title="填写小贴士" items={PUBLISH_TIPS} />}
         main={
       <section className="pub-form-card space-y-4 text-sm">
-        <div className="rounded-xl border border-[var(--shell-border)] p-3 space-y-3">
-          <div className="text-xs text-[var(--shell-muted)]">平台 {form.platform || '未选'} · 可在表单里调整对象、模式和履约</div>
+        <div className="rounded-xl border border-[var(--shell-border)] p-4 space-y-4">
+          <div>
+            <div className="text-sm font-medium text-[var(--shell-text)]">招募对象</div>
+            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
+              {recruitTarget === 'shoot'
+                ? '找拍摄团队到店或拍产品。'
+                : recruitTarget === 'edit'
+                  ? '找剪辑团队做成片。'
+                  : '找达人做探店、品宣或直播。'}
+            </p>
           <div className="flex flex-wrap gap-2">
             {RECRUIT_TARGETS.map((t) => (
               <button
@@ -1045,6 +1053,12 @@ export default function PublishWizard() {
               </button>
             ))}
           </div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-[var(--shell-text)]">合作模式</div>
+            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
+              {filteredModes.find((m) => m.id === recruitMode)?.sub || '选择这次怎么合作。'}
+            </p>
           <div className="flex flex-wrap gap-2">
             {filteredModes.map((m) => (
               <button
@@ -1068,6 +1082,14 @@ export default function PublishWizard() {
               </button>
             ))}
           </div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-[var(--shell-text)]">履约方式</div>
+            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
+              {(form.fulfillmentLoop || 'closed') === 'open'
+                ? '发到微信群。确认达人后发群二维码，交片和结算在群里完成。发布时要上传群二维码。'
+                : '达人在平台报名并选择档期，成片上传后由你在平台审核。'}
+            </p>
           <div className="flex flex-wrap gap-2">
             {(
               [
@@ -1085,8 +1107,18 @@ export default function PublishWizard() {
                 {label}
               </button>
             ))}
-            {recruitTarget === 'talent'
-              ? (
+          </div>
+          </div>
+          {recruitTarget === 'talent' ? (
+            <div>
+              <div className="text-sm font-medium text-[var(--shell-text)]">招募方式</div>
+              <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
+                {isTargetedRecruit
+                  ? '只发给你指定的达人，对方接受后才进入履约。需会员开通。'
+                  : '公开在招募大厅报名，符合条件的达人都可以报。'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(
                   [
                     ['open', '普通招募'],
                     ['targeted', '定向邀约'],
@@ -1107,16 +1139,20 @@ export default function PublishWizard() {
                   >
                     {label}
                   </button>
-                ))
-              : null}
-          </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <div>
+            <div className="text-sm font-medium text-[var(--shell-text)]">表单字段</div>
+            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">可关掉不需要的项，或另加字段。存进我的模版后，下次选平台会自动套用。</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="text-sm text-violet-600" onClick={() => setFieldEditorOpen((v) => !v)}>
+            <button type="button" className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]" onClick={() => setFieldEditorOpen((v) => !v)}>
               {fieldEditorOpen ? '收起自定义字段' : '自定义字段'}
             </button>
             <button
               type="button"
-              className="text-sm text-violet-600"
+              className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]"
               onClick={() => {
                 const name = window.prompt('存入我的模版', '我的发单模版')
                 if (!name?.trim()) return
@@ -1140,9 +1176,10 @@ export default function PublishWizard() {
             >
               存入我的模版
             </button>
-            <button type="button" className="text-sm text-violet-600" onClick={() => setFormTplOpen((v) => !v)}>
+            <button type="button" className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]" onClick={() => setFormTplOpen((v) => !v)}>
               使用我的模版
             </button>
+          </div>
           </div>
           {fieldEditorOpen ? (
             <div className="divide-y border border-[var(--shell-border)] rounded-lg">
@@ -1241,6 +1278,17 @@ export default function PublishWizard() {
             </div>
           ) : null}
         </div>
+        {showField('cover') ? (
+        <RecruitCoverField
+          platform={form.platform}
+          talentTags={form.talentTags}
+          coverImage={form.coverImage}
+          coverLibraryId={form.coverLibraryId}
+          recruitTitle={form.title}
+          region={buildRegionText(form)}
+          onChange={(patch) => patchForm(patch)}
+        />
+        ) : null}
         {!isTargetedRecruit && showField('delivery') ? (
         <div>
           <PubLabel>投放窗口 *</PubLabel>
@@ -2100,18 +2148,6 @@ export default function PublishWizard() {
               </div>
             ))}
           </div>
-        ) : null}
-
-        {showField('cover') ? (
-        <RecruitCoverField
-          platform={form.platform}
-          talentTags={form.talentTags}
-          coverImage={form.coverImage}
-          coverLibraryId={form.coverLibraryId}
-          recruitTitle={form.title}
-          region={buildRegionText(form)}
-          onChange={(patch) => patchForm(patch)}
-        />
         ) : null}
 
         <PublishLinkeAttachSection

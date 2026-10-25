@@ -312,6 +312,7 @@
           <view class="pub-form-card">
             <view class="pub-field">
               <text class="pub-label">招募对象</text>
+              <text class="pub-label-hint">{{recruitTarget === 'shoot' ? '找拍摄团队到店或拍产品。' : (recruitTarget === 'edit' ? '找剪辑团队做成片。' : '找达人做探店、品宣或直播。')}}</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view
                   wx:for="{{recruitTargets}}"
@@ -323,7 +324,8 @@
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">招募模式</text>
+              <text class="pub-label">合作模式</text>
+              <text class="pub-label-hint">{{recruitModeHint}}</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view
                   wx:for="{{recruitModes}}"
@@ -336,6 +338,7 @@
             </view>
             <view class="pub-field">
               <text class="pub-label">履约方式</text>
+              <text class="pub-label-hint">{{form.fulfillmentLoop === 'open' ? '发到微信群。确认达人后发群二维码，交片和结算在群里完成。发布时要上传群二维码。' : '达人在平台报名并选择档期，成片上传后由你在平台审核。'}}</text>
               <view class="pub-radio-pair">
                 <view class="pub-radio-opt {{form.fulfillmentLoop !== 'open' ? 'pub-radio-opt--on' : ''}}" data-val="closed" bindtap="onFormPickLoop">闭环</view>
                 <view class="pub-radio-opt {{form.fulfillmentLoop === 'open' ? 'pub-radio-opt--on' : ''}}" data-val="open" bindtap="onFormPickLoop">开环</view>
@@ -343,6 +346,7 @@
             </view>
             <view class="pub-field" wx:if="{{recruitTarget === 'talent'}}">
               <text class="pub-label">招募方式</text>
+              <text class="pub-label-hint">{{isTargetedRecruit ? '只发给你指定的达人，对方接受后才进入履约。需会员开通。' : '公开在招募大厅报名，符合条件的达人都可以报。'}}</text>
               <view class="pub-radio-pair">
                 <view class="pub-radio-opt {{!isTargetedRecruit ? 'pub-radio-opt--on' : ''}}" data-id="open" bindtap="onFormPickChannel">普通招募</view>
                 <view class="pub-radio-opt {{isTargetedRecruit ? 'pub-radio-opt--on' : ''}}" data-id="targeted" bindtap="onFormPickChannel">定向邀约</view>
@@ -350,7 +354,7 @@
             </view>
             <view class="pub-field">
               <text class="pub-label">表单字段</text>
-              <text class="pub-hint">可关掉不需要的项，或新增字段。设置可存入我的模版，下次发单自动套用。</text>
+              <text class="pub-label-hint">可关掉不需要的项，或另加字段。存进我的模版后，下次选平台会自动套用。</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view class="pub-radio-opt" bindtap="onToggleFieldEditor">{{fieldEditorOpen ? '收起自定义' : '自定义字段'}}</view>
                 <view class="pub-radio-opt" bindtap="onSavePublishFormTemplate">存入我的模版</view>
@@ -370,6 +374,41 @@
             </block>
           </view>
           <view class="pub-form-card">
+          <view class="pub-field" id="field-cover" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.cover}}">
+            <text class="pub-label">招募海报</text>
+            <text class="pub-cover-hint">{{coverSourceHint}}</text>
+            <view wx:if="{{coverChoices.length}}" class="pub-cover-grid">
+              <view
+                wx:for="{{coverChoices}}"
+                wx:key="id"
+                class="pub-cover-cell {{form.coverLibraryId === item.id ? 'pub-cover-cell--on' : ''}}"
+                data-id="{{item.id}}"
+                bindtap="onPickCoverChoice"
+              >
+                <image class="pub-cover-cell-img" src="{{item.url}}" mode="aspectFill" />
+                <text class="pub-cover-cell-label">{{item.label}}</text>
+              </view>
+            </view>
+            <view wx:if="{{coverPreviewUrl && form.coverImage}}" class="pub-cover-preview-wrap" bindtap="onPreviewCoverImage">
+              <image class="pub-cover-preview" src="{{coverPreviewUrl}}" mode="aspectFill" />
+            </view>
+            <view class="pub-cover-actions">
+              <button class="pub-cover-btn" bindtap="onCoverUpload">上传图片</button>
+              <button class="pub-cover-btn" bindtap="openCoverGallery">从图库选择</button>
+              <button class="pub-cover-btn {{coverAiOpen ? 'pub-cover-btn--on' : ''}}" bindtap="onCoverAiToggle">AI生成</button>
+              <button wx:if="{{form.coverImage || form.coverLibraryId}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onCoverClear">清除</button>
+            </view>
+            <view wx:if="{{coverAiOpen}}" class="pub-cover-ai">
+              <text class="pub-cover-ai-hint">文字、要求和参考图均可选填 · {{posterAiPoints}}积分/张</text>
+              <textarea class="pub-textarea pub-cover-ai-input" value="{{posterAiPrompt}}" maxlength="300" placeholder="选填：封面文字、风格或场景要求" bindinput="onPosterAiPrompt" />
+              <view class="pub-cover-actions">
+                <button class="pub-cover-btn" bindtap="onPosterAiPickRef">{{posterAiRefPreview ? '已选参考图' : '选填参考图'}}</button>
+                <button wx:if="{{posterAiRefPreview}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onPosterAiClearRef">清除参考图</button>
+              </view>
+              <image wx:if="{{posterAiRefPreview}}" class="pub-cover-ai-ref" src="{{posterAiRefPreview}}" mode="aspectFill" bindtap="onPosterAiPickRef" />
+              <button class="pub-cover-btn pub-cover-btn--ai" loading="{{posterAiBusy}}" disabled="{{posterAiBusy}}" bindtap="onCoverAiGenerate">开始生成 · {{posterAiPoints}}积分</button>
+            </view>
+          </view>
           <view class="pub-field" id="field-delivery-window" wx:if="{{!isTargetedRecruit && (publishTemplateMode !== 'custom' || fieldOn.delivery)}}">
             <text class="pub-label">投放窗口 *</text>
             <view class="pub-window-row">
@@ -916,29 +955,6 @@
             <view class="pub-select" data-view="applyForm" bindtap="openPicker">
               <text class="pub-select-text {{applyFormPlaceholder ? 'pub-select-text--ph' : ''}}">{{applyFormDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
-            </view>
-          </view>
-          <view class="pub-field" id="field-cover" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.cover}}">
-            <text class="pub-label">招募单封面图（选填）</text>
-            <text class="pub-cover-hint">{{coverSourceHint}}</text>
-            <view wx:if="{{coverPreviewUrl}}" class="pub-cover-preview-wrap" bindtap="onPreviewCoverImage">
-              <image class="pub-cover-preview" src="{{coverPreviewUrl}}" mode="aspectFill" />
-            </view>
-            <view class="pub-cover-actions">
-              <button class="pub-cover-btn" bindtap="onCoverUpload">上传图片</button>
-              <button class="pub-cover-btn" bindtap="openCoverGallery">从图库选择</button>
-              <button class="pub-cover-btn {{coverAiOpen ? 'pub-cover-btn--on' : ''}}" bindtap="onCoverAiToggle">AI生成</button>
-              <button wx:if="{{form.coverImage || form.coverLibraryId}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onCoverClear">清除</button>
-            </view>
-            <view wx:if="{{coverAiOpen}}" class="pub-cover-ai">
-              <text class="pub-cover-ai-hint">文字、要求和参考图均可选填 · {{posterAiPoints}}积分/张</text>
-              <textarea class="pub-textarea pub-cover-ai-input" value="{{posterAiPrompt}}" maxlength="300" placeholder="选填：封面文字、风格或场景要求" bindinput="onPosterAiPrompt" />
-              <view class="pub-cover-actions">
-                <button class="pub-cover-btn" bindtap="onPosterAiPickRef">{{posterAiRefPreview ? '已选参考图' : '选填参考图'}}</button>
-                <button wx:if="{{posterAiRefPreview}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onPosterAiClearRef">清除参考图</button>
-              </view>
-              <image wx:if="{{posterAiRefPreview}}" class="pub-cover-ai-ref" src="{{posterAiRefPreview}}" mode="aspectFill" bindtap="onPosterAiPickRef" />
-              <button class="pub-cover-btn pub-cover-btn--ai" loading="{{posterAiBusy}}" disabled="{{posterAiBusy}}" bindtap="onCoverAiGenerate">开始生成 · {{posterAiPoints}}积分</button>
             </view>
           </view>
           </view>
