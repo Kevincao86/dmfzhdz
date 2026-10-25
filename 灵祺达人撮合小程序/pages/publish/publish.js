@@ -327,7 +327,6 @@ Page({
     publishFieldCatalog: [
       { key: 'delivery', label: '投放窗口' },
       { key: 'deadline', label: '报名截止时间' },
-      { key: 'platform', label: '招募平台' },
       { key: 'city', label: '招募城市' },
       { key: 'location', label: '商家位置' },
       { key: 'tags', label: '需求标签' },

@@ -854,7 +854,6 @@ export default function PublishWizard() {
   const publishFieldCatalog = [
     { key: 'delivery', label: '投放窗口' },
     { key: 'deadline', label: '报名截止时间' },
-    { key: 'platform', label: '招募平台' },
     { key: 'city', label: '招募城市' },
     { key: 'location', label: '商家位置' },
     { key: 'tags', label: '需求标签' },
@@ -986,7 +985,10 @@ export default function PublishWizard() {
             {isEditMode ? '编辑招募' : isTargetedRecruit ? '填写定向邀约' : '填写招募信息'}
           </h2>
           <p className="text-sm text-[var(--shell-muted)] mt-0.5">
-            {isTargetedRecruit ? '定向邀约' : `${recruitTargetLabel} · ${recruitModeLabel}`}
+            {(isTargetedRecruit
+              ? [form.platform, '定向邀约']
+              : [!isSupplierPublish ? form.platform : '', recruitTargetLabel, recruitModeLabel]
+            ).filter(Boolean).join(' · ')}
           </p>
         </div>
       </div>
@@ -1450,7 +1452,7 @@ export default function PublishWizard() {
           </div>
         ) : null}
 
-        {!isSupplierPublish && recruitMode !== 'live' && showField('platform') ? (
+        {!isSupplierPublish && recruitMode !== 'live' && showField('platform') && !form.platform ? (
           <PubSelectRow
             label="招募平台 *"
             value={display.platformDisplayText}

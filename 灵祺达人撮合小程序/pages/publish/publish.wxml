@@ -14,25 +14,15 @@
 </template>
 
 <template name="pubStepBarV2">
-  <view class="pub-steps-v2">
-    <view class="pub-steps-v2__line pub-steps-v2__line--a {{step === 'channel' || step === 'recruit' ? 'pub-steps-v2__line--on' : 'pub-steps-v2__line--done'}}" />
-    <view class="pub-steps-v2__line pub-steps-v2__line--b {{step === 'target' ? 'pub-steps-v2__line--on' : (step === 'mode' || step === 'form' || step === 'done' ? 'pub-steps-v2__line--done' : '')}}" />
-    <view class="pub-steps-v2__line pub-steps-v2__line--c {{step === 'mode' || step === 'form' ? 'pub-steps-v2__line--on' : (step === 'done' ? 'pub-steps-v2__line--done' : '')}}" />
-    <view class="pub-step-v2 {{step === 'channel' || step === 'recruit' ? 'pub-step-v2--on' : 'pub-step-v2--done'}}">
+  <view class="pub-steps-v2 pub-steps-v2--two">
+    <view class="pub-steps-v2__line pub-steps-v2__line--two {{step === 'platform' ? 'pub-steps-v2__line--on' : 'pub-steps-v2__line--done'}}" />
+    <view class="pub-step-v2 {{step === 'platform' ? 'pub-step-v2--on' : 'pub-step-v2--done'}}">
       <view class="pub-step-v2__num">1</view>
-      <text class="pub-step-v2__label">招募方式</text>
+      <text class="pub-step-v2__label">选择平台</text>
     </view>
-    <view class="pub-step-v2 {{step === 'target' ? 'pub-step-v2--on' : (step === 'mode' || step === 'form' || step === 'done' ? 'pub-step-v2--done' : '')}}">
+    <view class="pub-step-v2 {{step === 'form' ? 'pub-step-v2--on' : (step === 'done' ? 'pub-step-v2--done' : '')}}">
       <view class="pub-step-v2__num">2</view>
-      <text class="pub-step-v2__label">选择对象</text>
-    </view>
-    <view class="pub-step-v2 {{step === 'mode' || step === 'form' ? 'pub-step-v2--on' : (step === 'done' ? 'pub-step-v2--done' : '')}}">
-      <view class="pub-step-v2__num">3</view>
       <text class="pub-step-v2__label">填写信息</text>
-    </view>
-    <view class="pub-step-v2 {{step === 'done' ? 'pub-step-v2--on' : ''}}">
-      <view class="pub-step-v2__num">4</view>
-      <text class="pub-step-v2__label">确认发布</text>
     </view>
   </view>
 </template>
@@ -62,6 +52,7 @@
         <view class="pub-target-nav">
           <text class="pub-target-back" bindtap="onBackFromPlatform">‹</text>
         </view>
+        <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
       <view class="pub-target-main">
         <text class="pub-target-title">选择招募平台</text>
@@ -546,7 +537,7 @@
               />
             </view>
           </block>
-          <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish && recruitMode !== 'live' && (publishTemplateMode !== 'custom' || fieldOn.platform)}}">
+          <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish && recruitMode !== 'live' && !form.platform && (publishTemplateMode !== 'custom' || fieldOn.platform)}}">
             <text class="pub-label">招募平台 *</text>
             <view class="pub-select" data-view="platform" bindtap="openPicker">
               <image wx:if="{{platformSelectIcon}}" class="pub-select__icon" src="{{platformSelectIcon}}" mode="aspectFit" />

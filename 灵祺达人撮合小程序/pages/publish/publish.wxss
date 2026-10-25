@@ -233,6 +233,11 @@
   z-index: 0;
 }
 
+.pub-steps-v2__line--two {
+  left: 25%;
+  right: 25%;
+}
+
 .pub-steps-v2__line--a {
   left: 12%;
   right: 62%;
