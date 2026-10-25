@@ -182,10 +182,34 @@ function spotlightItems(identity) {
 }
 
 const QUICK_MENU_KEYS = {
-  talent: ['profile', 'applications', 'orderCalendar', 'favorites', 'talentCredit'],
-  shoot: ['profile', 'applications', 'orderCalendar', 'favorites', 'talentCredit'],
-  edit: ['profile', 'applications', 'orderCalendar', 'favorites', 'talentCredit'],
-  pr: ['prProfile', 'prOrders', 'orderCalendar', 'cooperation', 'talentWatchlist'],
+  talent: ['profile', 'applications', 'orderCalendar', 'favorites'],
+  shoot: ['profile', 'applications', 'orderCalendar', 'favorites'],
+  edit: ['profile', 'applications', 'orderCalendar', 'favorites'],
+  pr: ['prProfile', 'prOrders', 'orderCalendar', 'cooperation'],
+}
+
+const PLAN_LEVEL = { basic: '基础版', pro: '专业版', flagship: '旗舰版', enterprise: '企业版' }
+const PLAN_PROGRESS = { basic: 22, pro: 48, flagship: 74, enterprise: 100 }
+
+function membershipLevelShort(planId) {
+  return PLAN_LEVEL[String(planId || 'basic')] || '基础版'
+}
+
+function membershipBarProgress(planId) {
+  return PLAN_PROGRESS[String(planId || 'basic')] || 22
+}
+
+function membershipBarHint(planId, expiryLabel) {
+  const plan = String(planId || 'basic')
+  if (plan === 'basic') return '还差一档升级'
+  if (expiryLabel) return expiryLabel
+  if (plan === 'enterprise') return '已是最高档'
+  return '可继续升级'
+}
+
+function membershipCtaShort(planId) {
+  const plan = String(planId || 'basic')
+  return plan === 'basic' ? '去升级' : '去续费'
 }
 
 function workbenchGreeting(displayName) {
@@ -223,7 +247,7 @@ const BIZ_GROUP_DEFS = [
   {
     id: 'account',
     title: '账号与通知',
-    keys: ['accountBind', 'wechatOaBind', 'subscriptions', 'targetedInvites', 'prQuotes'],
+    keys: ['accountBind', 'wechatOaBind', 'subscriptions', 'targetedInvites', 'prQuotes', 'talentCredit'],
   },
   {
     id: 'deal',
@@ -460,10 +484,15 @@ Page({
     statCompletedLabel: '已完成',
     statRefreshing: false,
     statAppliedKey: 'applications',
+    statBoardTitle: '合作进展',
     profileVerified: false,
     membershipPlanLabel: '基础版（免费）',
+    membershipLevelLabel: '基础版',
+    membershipHint: '还差一档升级',
+    membershipProgress: 22,
     membershipExpiryLabel: '',
     membershipCtaLabel: '升级会员',
+    membershipCtaShort: '去升级',
     statusBarHeightPx: 32,
     accentSwatches: accentTheme.SWATCHES,
     themeVeilOn: false,
@@ -748,6 +777,10 @@ Page({
       mpMembershipUi.readMembershipExpiresAt(acct, identity, member, prProfile),
     )
     const membershipCtaLabel = mpMembershipUi.membershipCtaLabel(planId)
+    const membershipLevelLabel = membershipLevelShort(planId)
+    const membershipHint = membershipBarHint(planId, membershipExpiryLabel)
+    const membershipProgress = membershipBarProgress(planId)
+    const membershipCtaShortLabel = membershipCtaShort(planId)
     this.setData({
       identity,
       identityLabel: userProfile.identityLabel(identity),
@@ -768,13 +801,18 @@ Page({
       bizGroups,
       greeting: workbenchGreeting(displayName),
       statAppliedKey: identity === 'pr' ? 'prOrders' : 'applications',
+      statBoardTitle: identity === 'pr' ? '招募进展' : '合作进展',
       notifyBadge: 0,
       calendarTodoCount: this.data.calendarTodoCount || 0,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
       membershipPlanLabel,
+      membershipLevelLabel,
+      membershipHint,
+      membershipProgress,
       membershipExpiryLabel,
       membershipCtaLabel,
+      membershipCtaShort: membershipCtaShortLabel,
       ...stats,
     })
     if (identity === 'pr' && wxLoggedIn && this._mineStatsStale) void this.refreshPrStatsIfNeeded()

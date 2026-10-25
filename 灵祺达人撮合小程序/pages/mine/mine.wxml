@@ -73,16 +73,20 @@
     bindrefresherrefresh="onStatRefresh"
    enable-flex>
     <view class="mine-vip">
-      <view class="mine-vip-top">
-        <view class="mine-vip-copy">
-          <text class="mine-vip-role">{{identityLabel}}</text>
-          <text class="mine-vip-sub">{{greeting || displaySub}}</text>
+      <view class="mine-vip-bar" bindtap="onGoMembership" hover-class="mine-vip-bar--on">
+        <view class="mine-vip-main">
+          <text class="mine-vip-level">{{membershipLevelLabel}}</text>
+          <view class="mine-vip-track">
+            <view class="mine-vip-track-on" style="width: {{membershipProgress}}%;"></view>
+          </view>
+          <text class="mine-vip-hint">{{membershipHint}}</text>
         </view>
-        <view class="mine-vip-side" bindtap="onGoMembership" hover-class="mine-vip-side--on">
-          <text class="mine-vip-kicker">会员信息</text>
-          <text class="mine-vip-plan">{{membershipPlanLabel}}</text>
-          <text class="mine-vip-exp" wx:if="{{membershipExpiryLabel}}">{{membershipExpiryLabel}}</text>
-          <text class="mine-vip-cta">{{membershipCtaLabel}}</text>
+        <view class="mine-vip-task">
+          <text class="mine-vip-task-k">会员</text>
+          <text class="mine-vip-task-go">{{membershipCtaShort}}</text>
+        </view>
+        <view class="mine-vip-badge">
+          <text class="mine-vip-badge-txt">升</text>
         </view>
       </view>
       <view class="mine-vip-icons">
@@ -101,40 +105,27 @@
       </view>
     </view>
 
-    <view class="mine-accent-row">
-      <view
-        wx:for="{{accentSwatches}}"
-        wx:key="id"
-        class="mine-accent-hit {{(item.id === 'origin' ? !accentId : accentId === item.id) ? 'is-on' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onPickAccent"
-      >
-        <view
-          class="mine-accent-dot mine-accent-dot--{{item.id}}"
-          style="{{item.dotStyle}}"
-        ></view>
-        <text class="mine-accent-cap" wx:if="{{item.cap}}">{{item.cap}}</text>
-      </view>
-    </view>
-
-    <view class="wb-stats-card" wx:if="{{wxLoggedIn}}">
-      <view class="wb-stat-cell" bindtap="onMenuTap" data-key="{{statAppliedKey}}">
-        <text class="wb-stat-num">{{statApplied}}</text>
-        <text class="wb-stat-lbl">{{statAppliedLabel}}</text>
-      </view>
-      <view class="wb-stat-cell">
-        <text class="wb-stat-num">{{statInProgress}}</text>
-        <text class="wb-stat-lbl">{{statInProgressLabel}}</text>
-      </view>
-      <view class="wb-stat-cell">
-        <text class="wb-stat-num">{{statCompleted}}</text>
-        <text class="wb-stat-lbl">{{statCompletedLabel}}</text>
-      </view>
-    </view>
-
     <view class="wx-login-banner card--accent" wx:if="{{!wxLoggedIn}}">
       <text class="vip-text">使用微信昵称头像登录，即可发招募、报名与导出</text>
       <button class="vip-btn" bindtap="onGoLoginPage">微信登录</button>
+    </view>
+
+    <view class="wb-stats-card" wx:if="{{wxLoggedIn}}">
+      <text class="wb-stats-title">{{statBoardTitle}}</text>
+      <view class="wb-stats-row">
+        <view class="wb-stat-cell" bindtap="onMenuTap" data-key="{{statAppliedKey}}">
+          <text class="wb-stat-num">{{statApplied}}</text>
+          <text class="wb-stat-lbl">{{statAppliedLabel}}</text>
+        </view>
+        <view class="wb-stat-cell">
+          <text class="wb-stat-num">{{statInProgress}}</text>
+          <text class="wb-stat-lbl">{{statInProgressLabel}}</text>
+        </view>
+        <view class="wb-stat-cell">
+          <text class="wb-stat-num">{{statCompleted}}</text>
+          <text class="wb-stat-lbl">{{statCompletedLabel}}</text>
+        </view>
+      </view>
     </view>
 
     <view class="wb-section" wx:if="{{quickMenus.length}}">
@@ -154,7 +145,7 @@
         >
           <text class="wb-hot-tag" wx:if="{{item.hot}}">火热</text>
           <view class="wb-tile-icon">
-            <image class="wb-tile-img" src="{{item.iconSrc}}" mode="aspectFill" />
+            <image class="wb-tile-img" src="{{item.iconSrc}}" mode="aspectFit" />
             <text class="wb-menu-badge" wx:if="{{item.badge}}">{{item.badge}}</text>
           </view>
           <text class="wb-tile-label">{{item.label}}</text>
@@ -180,11 +171,27 @@
         >
           <text class="wb-hot-tag" wx:if="{{menu.hot}}">火热</text>
           <view class="wb-tile-icon">
-            <image class="wb-tile-img" src="{{menu.iconSrc}}" mode="aspectFill" />
+            <image class="wb-tile-img" src="{{menu.iconSrc}}" mode="aspectFit" />
             <text class="wb-menu-badge" wx:if="{{menu.badge}}">{{menu.badge}}</text>
           </view>
           <text class="wb-tile-label">{{menu.label}}</text>
         </view>
+      </view>
+    </view>
+
+    <view class="mine-accent-row">
+      <view
+        wx:for="{{accentSwatches}}"
+        wx:key="id"
+        class="mine-accent-hit {{(item.id === 'origin' ? !accentId : accentId === item.id) ? 'is-on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickAccent"
+      >
+        <view
+          class="mine-accent-dot mine-accent-dot--{{item.id}}"
+          style="{{item.dotStyle}}"
+        ></view>
+        <text class="mine-accent-cap" wx:if="{{item.cap}}">{{item.cap}}</text>
       </view>
     </view>
 
