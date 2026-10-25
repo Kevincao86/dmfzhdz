@@ -995,7 +995,7 @@ export default function PublishWizard() {
         aside={<TipsCard title="填写小贴士" items={PUBLISH_TIPS} />}
         main={
       <section className="pub-form-card space-y-4 text-sm">
-        <div className="rounded-xl border border-[var(--shell-border)] p-4 space-y-4">
+        <div className="rounded-xl border border-[var(--shell-border)] p-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
           <div>
             <div className="text-sm font-medium text-[var(--shell-text)]">招募对象</div>
             <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
@@ -1143,7 +1143,7 @@ export default function PublishWizard() {
               </div>
             </div>
           ) : null}
-          <div>
+          <div className="md:col-span-2">
             <div className="text-sm font-medium text-[var(--shell-text)]">表单字段</div>
             <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">可关掉不需要的项，或另加字段。存进我的模版后，下次选平台会自动套用。</p>
           <div className="flex flex-wrap gap-2">
