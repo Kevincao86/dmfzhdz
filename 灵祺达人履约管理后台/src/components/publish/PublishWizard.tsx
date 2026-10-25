@@ -77,20 +77,10 @@ import {
   BtnPrimary,
   BtnSecondary,
   StickyActionBar,
-  TipsCard,
-  TwoColumnLayout,
 } from '../ui/MockupLayouts'
 import PageHero from '../ui/PageHero'
 
 const PUBLISH_EDIT_KEY = 'meoo_publish_edit_mp_id'
-
-const PUBLISH_TIPS = [
-  { title: '标题简洁清晰', desc: '突出合作主题与品牌，便于达人快速理解。' },
-  { title: '选择合适的平台', desc: '按实际投放渠道选择，影响大厅推荐与匹配。' },
-  { title: '预算设置合理', desc: '填写真实预算区间，提升报名转化率。' },
-  { title: '封面吸引眼球', desc: '建议 1200×675，清晰展示产品或场景。' },
-  { title: '信息真实完整', desc: '需求、档期、交付说明写全，减少沟通成本。' },
-]
 
 function PubLabel({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
@@ -101,6 +91,12 @@ function PubLabel({ children, hint }: { children: ReactNode; hint?: string }) {
       {hint ? <p className="text-xs text-[var(--shell-muted)] mt-0.5">{hint}</p> : null}
     </div>
   )
+}
+
+function deckChoice(on: boolean, tone: 'ink' | 'hot' = 'ink') {
+  if (!on) return 'w-full rounded-full border border-[#E4E6EB] bg-white px-3 py-2.5 text-sm text-[#14161C]'
+  if (tone === 'hot') return 'w-full rounded-full bg-[#E10600] px-3 py-2.5 text-sm font-medium text-white'
+  return 'w-full rounded-full bg-[#14161C] px-3 py-2.5 text-sm font-medium text-white'
 }
 
 function PubSelectRow({
@@ -971,48 +967,58 @@ export default function PublishWizard() {
 
   return (
     <>
-    <div className="page-content-shell page-content-shell--wide space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="page-content-shell page-content-shell--wide">
+      <div className="space-y-4 rounded-[28px] bg-[#EEF1F4] p-4 md:p-5">
+      <div className="flex flex-wrap items-center gap-3 rounded-full bg-white px-3 py-2 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
         <button
           type="button"
-          className="text-[var(--shell-muted)] text-sm hover:text-[var(--shell-text)]"
+          className="text-sm text-[#14161C]"
           onClick={() => (isEditMode ? nav('/orders') : setStep('platform'))}
         >
           ‹ 返回
         </button>
-        <div>
-          <h2 className="text-xl font-bold text-[var(--shell-text)]">
-            {isEditMode ? '编辑招募' : isTargetedRecruit ? '填写定向邀约' : '填写招募信息'}
-          </h2>
-          <p className="text-sm text-[var(--shell-muted)] mt-0.5">
-            {(isTargetedRecruit
-              ? [form.platform, '定向邀约']
-              : [!isSupplierPublish ? form.platform : '', recruitTargetLabel, recruitModeLabel]
-            ).filter(Boolean).join(' · ')}
-          </p>
+        <div className="text-base font-semibold text-[#14161C]">
+          {isEditMode ? '编辑招募' : '填写招募'}
+        </div>
+        <button
+          type="button"
+          className="rounded-full bg-[#F3F4F6] px-3 py-1.5 text-sm text-[#14161C]"
+          onClick={() => setStep('platform')}
+        >
+          {isSupplierPublish ? '通用' : form.platform || '选平台'}
+        </button>
+        <div className="ml-auto flex items-center gap-2">
+          {!isEditMode ? (
+            <button
+              type="button"
+              disabled={submitting || savingDraft}
+              className="rounded-full border border-[#E4E6EB] bg-white px-4 py-2 text-sm text-[#14161C] disabled:opacity-60"
+              onClick={() => void onSaveDraft()}
+            >
+              {savingDraft ? '保存中…' : '保存草稿'}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            disabled={submitting || savingDraft}
+            className="rounded-full bg-[#14161C] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            onClick={() => void onSubmit()}
+          >
+            {submitting ? '提交中…' : isEditMode ? '保存修改' : '发布招募'}
+          </button>
         </div>
       </div>
 
-      <TwoColumnLayout
-        aside={<TipsCard title="填写小贴士" items={PUBLISH_TIPS} />}
-        main={
-      <section className="pub-form-card space-y-4 text-sm">
-        <div className="rounded-xl border border-[var(--shell-border)] p-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-          <div>
-            <div className="text-sm font-medium text-[var(--shell-text)]">招募对象</div>
-            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
-              {recruitTarget === 'shoot'
-                ? '找拍摄团队到店或拍产品。'
-                : recruitTarget === 'edit'
-                  ? '找剪辑团队做成片。'
-                  : '找达人做探店、品宣或直播。'}
-            </p>
-          <div className="flex flex-wrap gap-2">
+      <section className="space-y-4 text-sm">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="space-y-2 rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
+            <div className="text-sm font-medium text-[#14161C]">招募对象</div>
+          <div className="flex flex-col gap-2">
             {RECRUIT_TARGETS.map((t) => (
               <button
                 key={t.id}
                 type="button"
-                className={`px-3 py-1.5 rounded-full text-sm border ${recruitTarget === t.id ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                className={deckChoice(recruitTarget === t.id)}
                 onClick={() => {
                   const isSupplier = t.id === 'shoot' || t.id === 'edit'
                   if (isSupplier && isTargetedRecruit) {
@@ -1056,17 +1062,14 @@ export default function PublishWizard() {
             ))}
           </div>
           </div>
-          <div>
-            <div className="text-sm font-medium text-[var(--shell-text)]">合作模式</div>
-            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
-              {filteredModes.find((m) => m.id === recruitMode)?.sub || '选择这次怎么合作。'}
-            </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="space-y-2 rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
+            <div className="text-sm font-medium text-[#14161C]">合作模式</div>
+          <div className="flex flex-col gap-2">
             {filteredModes.map((m) => (
               <button
                 key={m.id}
                 type="button"
-                className={`px-3 py-1.5 rounded-full text-sm border ${recruitMode === m.id ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                className={deckChoice(recruitMode === m.id, 'hot')}
                 onClick={() => {
                   setRecruitMode(m.id)
                   setRecruitModeLabel(m.label)
@@ -1085,14 +1088,9 @@ export default function PublishWizard() {
             ))}
           </div>
           </div>
-          <div>
-            <div className="text-sm font-medium text-[var(--shell-text)]">履约方式</div>
-            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
-              {(form.fulfillmentLoop || 'closed') === 'open'
-                ? '发到微信群。确认达人后发群二维码，交片和结算在群里完成。发布时要上传群二维码。'
-                : '达人在平台报名并选择档期，成片上传后由你在平台审核。'}
-            </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="space-y-2 rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
+            <div className="text-sm font-medium text-[#14161C]">履约方式</div>
+          <div className="flex flex-col gap-2">
             {(
               [
                 ['closed', '闭环'],
@@ -1103,7 +1101,7 @@ export default function PublishWizard() {
                 key={id}
                 type="button"
                 disabled={recruitMode === 'edit_ice'}
-                className={`px-3 py-1.5 rounded-full text-sm border ${(form.fulfillmentLoop || 'closed') === id ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                className={deckChoice((form.fulfillmentLoop || 'closed') === id)}
                 onClick={() => setForm((prev) => ({ ...prev, fulfillmentLoop: id }))}
               >
                 {label}
@@ -1112,14 +1110,9 @@ export default function PublishWizard() {
           </div>
           </div>
           {recruitTarget === 'talent' ? (
-            <div>
-              <div className="text-sm font-medium text-[var(--shell-text)]">招募方式</div>
-              <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">
-                {isTargetedRecruit
-                  ? '只发给你指定的达人，对方接受后才进入履约。需会员开通。'
-                  : '公开在招募大厅报名，符合条件的达人都可以报。'}
-              </p>
-              <div className="flex flex-wrap gap-2">
+            <div className="space-y-2 rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
+              <div className="text-sm font-medium text-[#14161C]">招募方式</div>
+              <div className="flex flex-col gap-2">
                 {(
                   [
                     ['open', '普通招募'],
@@ -1129,7 +1122,7 @@ export default function PublishWizard() {
                   <button
                     key={id}
                     type="button"
-                    className={`px-3 py-1.5 rounded-full text-sm border ${(id === 'targeted' ? isTargetedRecruit : !isTargetedRecruit) ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                    className={deckChoice(id === 'targeted' ? isTargetedRecruit : !isTargetedRecruit)}
                     onClick={() => {
                       if (id === 'targeted' && !canUseTargetedRecruit()) {
                         window.alert('当前会员档位不含定向邀约，请升级会员或联系运营开通。')
@@ -1145,16 +1138,15 @@ export default function PublishWizard() {
               </div>
             </div>
           ) : null}
-          <div className="md:col-span-2">
-            <div className="text-sm font-medium text-[var(--shell-text)]">表单字段</div>
-            <p className="text-xs text-[var(--shell-muted)] mt-0.5 mb-2">可关掉不需要的项，或另加字段。存进我的模版后，下次选平台会自动套用。</p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]" onClick={() => setFieldEditorOpen((v) => !v)}>
+          <div className="sm:col-span-2 xl:col-span-4">
+            <div className="mb-2 text-sm font-medium text-[#14161C]">表单字段</div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <button type="button" className="rounded-2xl bg-white px-4 py-4 text-left text-sm shadow-[0_8px_24px_rgba(20,22,28,0.05)]" onClick={() => setFieldEditorOpen((v) => !v)}>
               {fieldEditorOpen ? '收起自定义字段' : '自定义字段'}
             </button>
             <button
               type="button"
-              className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]"
+              className="rounded-2xl bg-white px-4 py-4 text-left text-sm shadow-[0_8px_24px_rgba(20,22,28,0.05)]"
               onClick={() => {
                 const name = window.prompt('存入我的模版', '我的发单模版')
                 if (!name?.trim()) return
@@ -1178,13 +1170,13 @@ export default function PublishWizard() {
             >
               存入我的模版
             </button>
-            <button type="button" className="px-3 py-1.5 rounded-full text-sm border border-[var(--shell-border)]" onClick={() => setFormTplOpen((v) => !v)}>
+            <button type="button" className="rounded-2xl bg-white px-4 py-4 text-left text-sm shadow-[0_8px_24px_rgba(20,22,28,0.05)]" onClick={() => setFormTplOpen((v) => !v)}>
               使用我的模版
             </button>
           </div>
           </div>
           {fieldEditorOpen ? (
-            <div className="divide-y border border-[var(--shell-border)] rounded-lg">
+            <div className="divide-y rounded-2xl border border-[#E4E6EB] bg-white sm:col-span-2 xl:col-span-4">
               {publishFieldCatalog.map((item) => (
                 <label key={item.key} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                   <span>{item.label}</span>
@@ -1257,7 +1249,7 @@ export default function PublishWizard() {
             </div>
           ) : null}
           {formTplOpen ? (
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-2xl bg-white p-3 sm:col-span-2 xl:col-span-4">
               {listPublishFormTemplates().length ? (
                 listPublishFormTemplates().map((tpl) => (
                   <button
@@ -1280,8 +1272,11 @@ export default function PublishWizard() {
             </div>
           ) : null}
         </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div className="rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
         {showField('cover') ? (
         <RecruitCoverField
+          layout="stage"
           platform={form.platform}
           talentTags={form.talentTags}
           coverImage={form.coverImage}
@@ -1290,16 +1285,35 @@ export default function PublishWizard() {
           region={buildRegionText(form)}
           onChange={(patch) => patchForm(patch)}
         />
+        ) : <div className="text-sm text-[#8B909A]">海报已在自定义字段里关闭</div>}
+          </div>
+          <div className="space-y-3 rounded-2xl bg-white p-4 shadow-[0_8px_24px_rgba(20,22,28,0.05)]">
+        <div>
+          <PubLabel>招募标题 *</PubLabel>
+          <input
+            className="mt-1 w-full rounded-xl border border-[#E4E6EB] bg-white px-3 py-2.5"
+            placeholder={recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}
+            value={form.title}
+            onChange={(e) => patchForm({ title: e.target.value })}
+          />
+        </div>
+        {showField('city') ? (
+        <PubSelectRow
+          label="招募城市 *"
+          value={display.cityDisplayText}
+          placeholder={display.cityDisplayText === '请选择招募城市'}
+          onClick={() => openPicker('city')}
+        />
         ) : null}
         {!isTargetedRecruit && showField('delivery') ? (
         <div>
           <PubLabel>投放窗口 *</PubLabel>
-          <div className="grid grid-cols-2 gap-2 mt-1">
+          <div className="mt-1 grid grid-cols-2 gap-2">
             {DELIVERY_WINDOWS.map((w) => (
               <button
                 key={w.id}
                 type="button"
-                className={`p-3 rounded-lg text-left border ${form.deliveryWindow === w.id ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
+                className={`rounded-xl border px-3 py-2.5 text-left ${form.deliveryWindow === w.id ? 'border-[#14161C] bg-[#14161C] text-white' : 'border-[#E4E6EB] bg-white text-[#14161C]'}`}
                 onClick={() => {
                   patchForm({
                     deliveryWindow: w.id,
@@ -1310,13 +1324,15 @@ export default function PublishWizard() {
                   }
                 }}
               >
-                <div className="font-medium text-xs">{w.label}</div>
-                <div className="text-[10px] text-slate-500 mt-1">{w.sub}</div>
+                <div className="text-sm font-medium">{w.label}</div>
+                <div className={`mt-1 text-[10px] ${form.deliveryWindow === w.id ? 'text-white/70' : 'text-[#8B909A]'}`}>{w.sub}</div>
               </button>
             ))}
           </div>
         </div>
         ) : null}
+          </div>
+        </div>
 
         {!isTargetedRecruit && display.showSignupDeadline && showField('deadline') ? (
           <PubSelectRow
@@ -1351,16 +1367,6 @@ export default function PublishWizard() {
             </div>
           </div>
         ) : null}
-
-        <div>
-          <PubLabel>招募标题 *</PubLabel>
-          <input
-            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
-            placeholder={recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}
-            value={form.title}
-            onChange={(e) => patchForm({ title: e.target.value })}
-          />
-        </div>
 
         {recruitMode === 'live' ? (
           <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3">
@@ -1460,14 +1466,6 @@ export default function PublishWizard() {
             iconUrl={form.platform ? platformIconUrl(form.platform) : undefined}
             onClick={() => openPicker('platform')}
           />
-        ) : null}
-        {showField('city') ? (
-        <PubSelectRow
-          label="招募城市 *"
-          value={display.cityDisplayText}
-          placeholder={display.cityDisplayText === '请选择招募城市'}
-          onClick={() => openPicker('city')}
-        />
         ) : null}
         {showField('location') ? (
         <div>
@@ -2161,12 +2159,11 @@ export default function PublishWizard() {
         {err ? <p className="text-red-500 text-sm">{err}</p> : null}
         {draftHint ? <p className="text-emerald-600 text-sm">{draftHint}</p> : null}
       </section>
-        }
-      />
+      </div>
 
       <StickyActionBar
         left={
-          <BtnOutline onClick={() => (isEditMode ? nav('/orders') : setStep('mode'))}>取消</BtnOutline>
+          <BtnOutline onClick={() => (isEditMode ? nav('/orders') : setStep('platform'))}>取消</BtnOutline>
         }
         right={
           <>

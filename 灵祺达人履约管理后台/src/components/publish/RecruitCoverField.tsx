@@ -24,6 +24,7 @@ type Props = {
   recruitTitle?: string
   region?: string
   onChange: (patch: { coverImage?: string; coverLibraryId?: string }) => void
+  layout?: 'stack' | 'stage'
 }
 
 function resolvePreview(coverImage?: string, coverLibraryId?: string) {
@@ -45,6 +46,7 @@ export default function RecruitCoverField({
   recruitTitle,
   region,
   onChange,
+  layout = 'stack',
 }: Props) {
   const [galleryOpen, setGalleryOpen] = useState(false)
   const [galleryTab, setGalleryTab] = useState<CoverGalleryTab>('recommended')
@@ -148,51 +150,58 @@ export default function RecruitCoverField({
     else setGallerySubKey('')
   }
 
+  const stage = layout === 'stage'
   return (
-    <div className="pub-field">
-      <div className="mb-1">
-        <span className="form-field-label" style={{ marginBottom: 0 }}>招募海报</span>
-        <p className="text-xs text-[var(--shell-muted)] mt-0.5">{sourceHint}</p>
+    <div className={stage ? '' : 'pub-field'}>
+      <div className="mb-2">
+        <span className="text-sm font-medium text-[#14161C]">{stage ? '海报' : '招募海报'}</span>
+        {stage ? null : <p className="text-xs text-[var(--shell-muted)] mt-0.5">{sourceHint}</p>}
       </div>
 
-      <div className="rounded-lg border border-[var(--shell-border)] p-3">
-        <div className="flex flex-wrap gap-2">
+      <div className={stage ? 'flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#D5D8DE] bg-[#FAFBFC] p-4' : 'rounded-lg border border-[var(--shell-border)] p-3'}>
+        {stage && preview ? (
+          <button type="button" className="mb-3 block w-full cursor-zoom-in" title="点击查看大图" onClick={() => setLightboxOpen(true)}>
+            <img src={preview} alt="招募封面预览" className="mx-auto max-h-36 rounded-lg object-contain" />
+          </button>
+        ) : null}
+        {stage && !preview ? <div className="mb-3 text-sm text-[#8B909A]">上传海报</div> : null}
+        <div className={stage ? 'flex flex-wrap items-center justify-center gap-4 text-sm text-[#5C6370]' : 'flex flex-wrap gap-2'}>
           <button
             type="button"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+            className={stage ? 'hover:text-[#14161C]' : 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50'}
             onClick={() => void onUpload()}
           >
-            上传图片
+            {stage ? '上传' : '上传图片'}
           </button>
           <button
             type="button"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+            className={stage ? 'hover:text-[#14161C]' : 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50'}
             onClick={openGallery}
           >
-            从图库选择
+            {stage ? '图库' : '从图库选择'}
           </button>
           <button
             type="button"
-            className={`rounded-lg border px-3 py-1.5 text-xs ${
+            className={stage ? (aiOpen ? 'text-[#E10600]' : 'hover:text-[#14161C]') : `rounded-lg border px-3 py-1.5 text-xs ${
               aiOpen
                 ? 'border-violet-600 bg-violet-600 text-white'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
             }`}
             onClick={() => setAiOpen((v) => !v)}
           >
-            AI生成
+            {stage ? 'AI' : 'AI生成'}
           </button>
           {(coverImage || coverLibraryId) && (
             <button
               type="button"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+              className={stage ? 'text-[#8B909A] hover:text-[#14161C]' : 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50'}
               onClick={onClear}
             >
               清除
             </button>
           )}
         </div>
-        {preview ? (
+        {!stage && preview ? (
           <button
             type="button"
             className="mt-3 block w-full cursor-zoom-in"
