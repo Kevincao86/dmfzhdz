@@ -87,6 +87,15 @@ import {
 } from '@merchant/lib/platformDecorClient'
 import { isDecorVideoMedia, type RegistryPlatformDecorItem } from '@merchant/lib/platformDecorTypes'
 
+function pickProfileAvatar(...urls: unknown[]): string {
+  for (const url of urls) {
+    const value = String(url || '').trim()
+    if (!value || /\/logo\.png(?:\?|$)/i.test(value) || value.endsWith('logo.png')) continue
+    return value
+  }
+  return ''
+}
+
 export default function ProfilePage() {
   const acc = getAccount()
   const [displayRev, setDisplayRev] = useState(0)
@@ -107,7 +116,9 @@ export default function ProfilePage() {
   const edition = WORK_EDITION_LABEL[workId]
 
   const displayName = resolveShellDisplayName()
-  const avatar = isPr ? pr?.wxAvatarUrl || acc?.wxAvatarUrl || '' : acc?.wxAvatarUrl || ''
+  const avatar = isPr
+    ? pickProfileAvatar(pr?.wxAvatarUrl, pr?.companyLogoUrl, acc?.wxAvatarUrl)
+    : pickProfileAvatar(member?.wxAvatarUrl, acc?.wxAvatarUrl)
 
   const systemId = isPr
     ? acc?.lingqiPrId || pr?.lingqiPrId || '—'
