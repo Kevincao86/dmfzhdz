@@ -3,7 +3,6 @@
  * 平台 logo、等级、粉丝、价格、城市按招募单填入；中间不放装饰图标。
  */
 const posterCore = require('./recruitmentSharePosterCore.js')
-const prRecruitQr = require('./prRecruitQr.js')
 const hallFilters = require('./recruitmentHallFilters.js')
 const ossBase = require('./recruitCoverOssBase.js')
 const ossDisplay = require('./mpOssDisplayUrl.js')
@@ -114,31 +113,95 @@ function wrapCityLines(ctx, text, maxWidth) {
   return lines
 }
 
+function chipText(raw) {
+  const s = String(raw || '').trim()
+  if (!s || s === '不限' || s === '—' || s === '-') return ''
+  return s.slice(0, 8)
+}
+
+function displayCity(raw) {
+  const s = compactCity(raw)
+  if (!s || s === '全国') return '全国'
+  return s
+    .split(/[、,，]/)
+    .map((part) => part.trim().replace(/(市|省)$/g, ''))
+    .filter(Boolean)
+    .join('、') || s
+}
+
+function deadlineLabel(fields) {
+  const rows = fields && Array.isArray(fields.rows) ? fields.rows : []
+  const row = rows.find((item) => item && item.label === '报名截止')
+  const raw = String((row && row.value) || '').trim()
+  if (!raw || raw === '未设置' || raw === '—' || raw === '-') return ''
+  const matched = raw.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (matched) return `${Number(matched[2])}月${Number(matched[3])}日截止`
+  return raw.slice(0, 16)
+}
+
+function priceLabel(raw) {
+  const compact = compactPrice(raw)
+  if (compact) return compact.replace('-', '–')
+  const s = String(raw || '').trim()
+  if (/置换/.test(s)) return '置换'
+  if (/自报价/.test(s)) return '自报价'
+  return '面议'
+}
+
+function wrapTitle(ctx, text, maxWidth) {
+  const chars = Array.from(String(text || '达人招募').trim() || '达人招募')
+  const lines = []
+  let line = ''
+  let index = 0
+  while (index < chars.length && lines.length < 2) {
+    const next = line + chars[index]
+    if (line && ctx.measureText(next).width > maxWidth) {
+      lines.push(line)
+      line = ''
+      continue
+    }
+    line = next
+    index += 1
+  }
+  if (line && lines.length < 2) lines.push(line)
+  if (lines.length === 2 && index < chars.length) {
+    lines[1] = fitText(ctx, lines[1] + chars.slice(index).join(''), maxWidth)
+  }
+  return lines
+}
+
 function readCardFields(order) {
   const fields = posterCore.extractPosterFieldsFromOrder(order || {})
-  const platform = hallFilters.normalizeHallPlatform(fields.platform)
+  const tags = posterCore.extractPosterTagsFromOrder(order || {})
+  const platform = chipText(hallFilters.normalizeHallPlatform(fields.platform))
+  const typeLabel = chipText(tags.orderTypeLabel)
+  const category = chipText((tags.categoryTags && tags.categoryTags[0]) || '')
   return {
-    platform,
-    logo: hallFilters.platformIcon(platform),
-    slogan: SLOGAN,
-    level: formatLevel(fields.levelText),
+    title: String(fields.title || '').trim() || '达人招募',
+    platform: platform === '不限' ? '' : platform,
+    typeLabel,
+    category: category && category !== typeLabel ? category : '',
+    price: priceLabel(fields.feeTypeText),
+    city: displayCity(fields.cityText),
     fans: formatFans(fields.fansText),
-    price: compactPrice(fields.feeTypeText),
-    city: compactCity(fields.cityText),
+    deadline: deadlineLabel(fields),
+    brand: '灵祺星选',
   }
 }
 
-function cacheKey(order, view, brand) {
+function cacheKey(order, view) {
   return [
-    'oss-bg-20261010d',
+    'card-20261025a',
     String((order && order.id) || ''),
+    view.title,
     view.platform,
-    view.level,
-    view.fans,
+    view.typeLabel,
+    view.category,
     view.price,
     view.city,
-    brand && brand.name,
-    brand && brand.logoUrl,
+    view.fans,
+    view.deadline,
+    view.brand,
   ].join('|')
 }
 
@@ -217,169 +280,88 @@ function drawRoundedImage(ctx, img, x, y, size, radius) {
   ctx.restore()
 }
 
-function drawCard(ctx, view, bg, logo, brand) {
-  if (bg) drawCover(ctx, bg, CARD_W, CARD_H)
-  else {
-    ctx.fillStyle = '#F3E6D4'
-    ctx.fillRect(0, 0, CARD_W, CARD_H)
-  }
-
-  const card = [108, 64, 642, 536]
-  ctx.fillStyle = 'rgba(120, 86, 52, 0.16)'
-  roundRect(ctx, card[0] + 2, card[1] + 6, card[2] - card[0], card[3] - card[1], 24)
+function drawChip(ctx, text, x, y) {
+  ctx.font = '18px sans-serif'
+  const w = Math.ceil(ctx.measureText(text).width) + 24
+  ctx.fillStyle = '#f4ebe3'
+  roundRect(ctx, x, y, w, 36, 18)
   ctx.fill()
-  ctx.fillStyle = '#FFFCF8'
-  roundRect(ctx, card[0], card[1], card[2] - card[0], card[3] - card[1], 24)
+  ctx.fillStyle = '#6a4a38'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, x + w / 2, y + 18)
+  return w
+}
+
+function drawCard(ctx, view) {
+  ctx.fillStyle = '#f6efe6'
+  ctx.fillRect(0, 0, CARD_W, CARD_H)
+  const glow = ctx.createRadialGradient(140, 0, 10, 140, 40, 220)
+  glow.addColorStop(0, 'rgba(255,214,170,0.55)')
+  glow.addColorStop(1, 'rgba(255,214,170,0)')
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, CARD_W, CARD_H)
+
+  const pad = 22
+  const sheet = [pad, pad, CARD_W - pad, CARD_H - pad]
+  ctx.fillStyle = '#fffdfb'
+  roundRect(ctx, sheet[0], sheet[1], sheet[2] - sheet[0], sheet[3] - sheet[1], 28)
   ctx.fill()
 
-  ctx.strokeStyle = '#C4A27A'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.arc(card[0] + 22, card[1] + 22, 11, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.arc(card[2] - 22, card[1] + 22, 11, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.arc(card[0] + 20, card[3] - 22, 8, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.arc(card[2] - 20, card[3] - 22, 8, 0, Math.PI * 2)
-  ctx.stroke()
-
-  const logoSize = 48
-  const logoX = card[0] + 36
-  const logoY = card[1] + 22
-  const brandName = brand && brand.name ? String(brand.name).trim() : ''
-  const brandLogo = brand && brand.logo
+  const innerL = sheet[0] + 30
+  const innerR = sheet[2] - 30
+  const chipY = sheet[1] + 26
+  const chips = [view.platform, view.typeLabel, view.category].filter(Boolean)
+  let chipX = innerL
+  chips.forEach((text) => {
+    if (chipX > innerR - 180) return
+    chipX += drawChip(ctx, text, chipX, chipY) + 10
+  })
+  ctx.font = '18px sans-serif'
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
-  ctx.fillStyle = '#7A482A'
-  ctx.font = 'bold 17px sans-serif'
-  if (brandName || brandLogo) {
-    const size = 44
-    if (brandLogo) drawRoundedImage(ctx, brandLogo, logoX, logoY, size, 10)
-    else {
-      ctx.fillStyle = '#F3E8FF'
-      roundRect(ctx, logoX, logoY, size, size, 10)
-      ctx.fill()
-      ctx.fillStyle = '#6D28D9'
-      ctx.font = 'bold 20px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText(brandName.slice(0, 1) || 'P', logoX + size / 2, logoY + size / 2)
-    }
-    ctx.font = 'bold 17px sans-serif'
-    ctx.textAlign = 'right'
-    ctx.fillStyle = '#7A482A'
-    const sloganText = fitText(ctx, view.slogan, 150)
-    const sloganW = ctx.measureText(sloganText).width
-    const sloganRight = card[2] - 28
-    ctx.fillText(sloganText, sloganRight, logoY + size / 2)
-    let nameRight = sloganRight - sloganW - 16
-    if (logo) {
-      const pSize = 28
-      const pX = nameRight - pSize
-      ctx.drawImage(logo, pX, logoY + (size - pSize) / 2, pSize, pSize)
-      nameRight = pX - 12
-    }
-    const nameX = logoX + size + 12
-    ctx.textAlign = 'left'
-    ctx.fillStyle = '#221C18'
-    ctx.font = 'bold 22px sans-serif'
-    if (brandName && nameRight > nameX + 24) {
-      ctx.fillText(fitText(ctx, brandName, nameRight - nameX), nameX, logoY + size / 2)
-    }
-  } else {
-    if (logo) ctx.drawImage(logo, logoX, logoY, logoSize, logoSize)
-    ctx.textAlign = 'right'
-    ctx.textBaseline = 'middle'
-    ctx.fillStyle = '#7A482A'
-    ctx.font = 'bold 17px sans-serif'
-    const sloganMax = card[2] - 28 - (logoX + logoSize + 16)
-    ctx.fillText(fitText(ctx, view.slogan, sloganMax), card[2] - 28, logoY + logoSize / 2)
-  }
+  ctx.fillStyle = '#a08b7a'
+  ctx.fillText(fitText(ctx, view.brand || '灵祺星选', 150), innerR, chipY + 18)
 
-  const panel = [card[0] + 20, card[1] + 96, card[2] - 20, card[1] + 250]
-  ctx.fillStyle = '#F8F3EC'
-  roundRect(ctx, panel[0], panel[1], panel[2] - panel[0], panel[3] - panel[1], 16)
-  ctx.fill()
-
-  const cols = [
-    { label: '达人等级', value: view.level, color: '#221C18' },
-    { label: '达人粉丝', value: view.fans, color: '#221C18' },
-    { label: '价格', value: view.price, color: '#E23A2E' },
-  ]
-  const pw = panel[2] - panel[0]
-  const colW = pw / 3
-  ctx.textAlign = 'center'
-  cols.forEach((col, i) => {
-    const cx = panel[0] + colW * (i + 0.5)
-    ctx.fillStyle = '#9A9086'
-    ctx.font = '13px sans-serif'
-    ctx.fillText(col.label, cx, panel[1] + 36)
-    if (col.value) {
-      ctx.fillStyle = col.color
-      ctx.font = 'bold 26px sans-serif'
-      ctx.fillText(fitText(ctx, col.value, colW - 16), cx, panel[1] + 84)
-    }
-    if (i) {
-      ctx.strokeStyle = '#E8DCCE'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(panel[0] + colW * i, panel[1] + 28)
-      ctx.lineTo(panel[0] + colW * i, panel[3] - 28)
-      ctx.stroke()
-    }
-  })
-
-  const bh = 52
-  const bx1 = card[0] + 26
-  const bx2 = card[2] - 26
-  const by2 = card[3] - 18
-  const by1 = by2 - bh
-  const mid = (card[0] + card[2]) / 2
-
-  const cityMaxW = card[2] - card[0] - 56
-  const cityTop = panel[3] + 8
-  const cityBottom = by1 - 10
-  let citySize = 16
-  let cityLines = []
-  let cityLineH = 22
-  while (citySize >= 12) {
-    ctx.font = `bold ${citySize}px sans-serif`
-    cityLines = wrapCityLines(ctx, view.city, cityMaxW)
-    cityLineH = citySize + 6
-    const blockH = 16 + cityLines.length * cityLineH
-    if (blockH <= cityBottom - cityTop || citySize === 12) break
-    citySize -= 1
-  }
-  const cityBlockH = 16 + Math.max(cityLines.length, 1) * cityLineH
-  let cityLabelY = cityBottom - cityBlockH
-  if (cityLabelY < cityTop) cityLabelY = cityTop
-  ctx.textAlign = 'center'
+  const titleTop = chipY + 64
+  ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillStyle = '#9A9086'
-  ctx.font = '12px sans-serif'
-  ctx.fillText('城市', mid, cityLabelY)
-  ctx.fillStyle = '#221C18'
-  ctx.font = `bold ${citySize}px sans-serif`
-  cityLines.forEach((line, index) => {
-    const y = cityLabelY + 16 + index * cityLineH
-    if (y > cityBottom) return
-    ctx.fillText(line, mid, y)
+  ctx.fillStyle = '#221c18'
+  ctx.font = 'bold 42px sans-serif'
+  const titleLines = wrapTitle(ctx, view.title, innerR - innerL)
+  titleLines.forEach((line, index) => {
+    ctx.fillText(line, innerL, titleTop + index * 54)
   })
 
-  const grad = ctx.createLinearGradient(bx1, 0, bx2, 0)
-  grad.addColorStop(0, '#FF6038')
-  grad.addColorStop(1, '#FF3A2E')
+  const ctaH = 64
+  const ctaY = sheet[3] - 26 - ctaH
+  const priceY = ctaY - 36
+  ctx.textAlign = 'left'
+  ctx.fillStyle = '#e23a2e'
+  ctx.font = 'bold 56px sans-serif'
+  ctx.fillText(fitText(ctx, view.price || '面议', 280), innerL, priceY)
+
+  ctx.textAlign = 'right'
+  ctx.fillStyle = '#221c18'
+  ctx.font = 'bold 32px sans-serif'
+  ctx.fillText(fitText(ctx, view.city || '全国', 240), innerR, priceY - 16)
+  const sub = [view.fans ? `粉丝 ${view.fans}` : '', view.deadline].filter(Boolean).join(' · ')
+  if (sub) {
+    ctx.fillStyle = '#8d7b6e'
+    ctx.font = '20px sans-serif'
+    ctx.fillText(fitText(ctx, sub, 320), innerR, priceY + 22)
+  }
+
+  const grad = ctx.createLinearGradient(innerL, 0, innerR, 0)
+  grad.addColorStop(0, '#ff6038')
+  grad.addColorStop(1, '#ff3a2e')
   ctx.fillStyle = grad
-  roundRect(ctx, bx1, by1, bx2 - bx1, bh, bh / 2)
+  roundRect(ctx, innerL, ctaY, innerR - innerL, ctaH, ctaH / 2)
   ctx.fill()
   ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 20px sans-serif'
-  ctx.fillText('立即报名', (bx1 + bx2) / 2, by1 + bh / 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 26px sans-serif'
+  ctx.fillText('立即报名', (innerL + innerR) / 2, ctaY + ctaH / 2)
 }
 
 function exportCanvas(canvas) {
@@ -404,10 +386,9 @@ function exportCanvas(canvas) {
   })
 }
 
-function buildShareCardPath(order, reg) {
+function buildShareCardPath(order) {
   const view = readCardFields(order)
-  const brand = prRecruitQr.resolveSharePrBrand(order, reg)
-  const key = cacheKey(order, view, brand)
+  const key = cacheKey(order, view)
   if (cache[key]) return Promise.resolve(cache[key])
   if (inflight[key]) return inflight[key]
   let canvas
@@ -417,9 +398,9 @@ function buildShareCardPath(order, reg) {
     return Promise.reject(err)
   }
   const ctx = canvas.getContext('2d')
-  const job = Promise.all([loadBackground(canvas), loadImage(canvas, view.logo), loadImage(canvas, brand.logoUrl)])
-    .then(([bg, logo, brandLogo]) => {
-      drawCard(ctx, view, bg, logo, { name: brand.name, logo: brandLogo })
+  const job = Promise.resolve()
+    .then(() => {
+      drawCard(ctx, view)
       return exportCanvas(canvas)
     })
     .then((path) => {

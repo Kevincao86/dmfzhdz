@@ -107,6 +107,7 @@ list_scopes() {
   xingxuan_reg_email     星选网页与达人小程序注册页：切换邮箱注册（身份一并写入）
   mp_share_card_title    达人/商家微信小程序分享卡片：title 不含小程序昵称（微信会自动加「昵称｜」）
   mp_recruit_share_card  达人小程序招募详情分享：海报封面 / 招募封面
+  xingxuan_share_cover   星选分享小程序卡片：先选海报或封面；封面为标题/价格/城市卡片
   login_alt_methods      商家 ERP + 星选 Web 登录页：下方图标登录方式（不含小程序）
   baidu_site_verify      商家 cs：百度站长文件验证（根目录 html + HTTP 不跳转）
   xingxuan_hall_ux       星选网页+微信小程序：大厅按身份、身份切换、推荐大厅说明、培训报名
@@ -1559,6 +1560,14 @@ PAT
 灵祺达人撮合小程序/images/share/talent-lift-poster.jpg
 灵祺达人撮合小程序/pages/subpack-core/detail/detail
 灵祺达人撮合小程序/components/launch-splash/
+change-scope-guard
+PAT
+      ;;
+    xingxuan_share_cover)
+      cat <<'PAT'
+灵祺达人撮合小程序/utils/recruitShareCard.js
+灵祺达人履约管理后台/src/components/mp/RecruitmentShareSheet.tsx
+灵祺达人履约管理后台/src/lib/mpSync/recruitmentShareCard.ts
 change-scope-guard
 PAT
       ;;

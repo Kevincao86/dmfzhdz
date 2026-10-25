@@ -11,7 +11,9 @@ import {
   resolvePosterThemeColor,
 } from '../../lib/mpSync/recruitmentSharePoster'
 import { fetchMpApplyShortLink, fetchMpApplyWxacode, fetchMpWxPcShareTicket } from '../../lib/mpApi'
+import { uploadContentImage } from '../../lib/mpContentUpload'
 import { resolveOrderCoverUrl } from '../../lib/mpSync/recruitCoverLibrary'
+import { buildRecruitmentShareCardDataUrl } from '../../lib/mpSync/recruitmentShareCard'
 
 type Tab = 'poster' | 'code' | 'web'
 type WebMode = 'link' | 'text' | 'qr' | 'short'
@@ -213,8 +215,9 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   const [codeUrl, setCodeUrl] = useState('')
   const [codeErr, setCodeErr] = useState('')
   const [qrUrl, setQrUrl] = useState('')
-  const [wxBusy, setWxBusy] = useState<'' | 'chat' | 'timeline'>('')
+  const [wxBusy, setWxBusy] = useState<'' | 'chat' | 'timeline' | 'poster' | 'cover'>('')
   const [wxHint, setWxHint] = useState('')
+  const [cardPick, setCardPick] = useState(false)
 
   useEffect(() => {
     void loadWxOpenSdk().catch(() => {})
@@ -329,11 +332,68 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     setCopied(ok)
   }
 
-  async function onWechatShare(scene: 'chat' | 'timeline') {
+  function posterThemeOpts() {
+    const theme = FESTIVALS.find((item) => item.id === themeId)
+    if (!theme) return undefined
+    return {
+      accentColor: theme.accent,
+      accentLight: theme.paper,
+      themeLabel: theme.label,
+      blessing: theme.blessing,
+      festivalUrl: `${FESTIVAL_CDN}/festival-${theme.id}.jpg?v=${FESTIVAL_VER}`,
+      blessingUrl: `${FESTIVAL_CDN}/blessing-${theme.id}.jpg?v=blessing20261019c`,
+    }
+  }
+
+  async function jpegFileUnderLimit(dataUrl: string, name: string): Promise<File> {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('图片生成失败'))
+      el.src = dataUrl
+    })
+    let width = img.naturalWidth || img.width || 750
+    let height = img.naturalHeight || img.height || 600
+    let quality = 0.82
+    let blob: Blob | null = null
+    for (let i = 0; i < 8; i += 1) {
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(width))
+      canvas.height = Math.max(1, Math.round(height))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) break
+      ctx.fillStyle = '#fffdfb'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', quality))
+      if (blob && blob.size <= 120 * 1024) break
+      if (quality > 0.46) quality -= 0.12
+      else {
+        width *= 0.82
+        height *= 0.82
+        quality = 0.72
+      }
+    }
+    if (!blob) throw new Error('图片生成失败')
+    return new File([blob], name, { type: 'image/jpeg' })
+  }
+
+  async function onWechatShare(scene: 'chat' | 'timeline', kind?: 'poster' | 'cover') {
     if (!orderId || wxBusy) return
-    setWxBusy(scene)
-    setWxHint(scene === 'timeline' ? '正在打开微信朋友圈…' : '正在打开微信…')
+    setWxBusy(kind || scene)
+    setWxHint(kind === 'poster' ? '正在生成海报…' : kind === 'cover' ? '正在生成封面…' : scene === 'timeline' ? '正在打开微信朋友圈…' : '正在打开微信…')
     try {
+      let thumb = httpsThumb(order)
+      if (kind === 'cover') {
+        const dataUrl = await buildRecruitmentShareCardDataUrl(order)
+        thumb = await uploadContentImage(await jpegFileUnderLimit(dataUrl, `share-cover-${orderId}.jpg`))
+      } else if (kind === 'poster') {
+        const dataUrl = posterUrl.startsWith('data:image')
+          ? posterUrl
+          : (await buildRecruitmentSharePosterDataUrl(order, posterStyleIndex, posterThemeOpts())).dataUrl
+        thumb = await uploadContentImage(await jpegFileUnderLimit(dataUrl, `share-poster-${orderId}.jpg`))
+      }
+      setWxHint(scene === 'timeline' ? '正在打开微信朋友圈…' : '正在打开微信…')
       const [ticket, sdk] = await Promise.all([fetchMpWxPcShareTicket(orderId), loadWxOpenSdk()])
       const share = sdk.shareMiniProgram
       if (typeof share !== 'function') throw new Error('微信分享组件没有分享能力，请刷新页面后再试')
@@ -342,7 +402,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
         appid: ticket.appid,
         userName: ticket.userName,
         txt: cardTitle,
-        thumburl: httpsThumb(order),
+        thumburl: thumb,
         path: ticket.path.replace(/^\//, ''),
         scene,
         ticket: ticket.ticket,
@@ -401,26 +461,63 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={Boolean(wxBusy)}
-            className="rounded-xl bg-[#07c160] px-2 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-            onClick={() => void onWechatShare('chat')}
-          >
-            {wxBusy === 'chat' ? '正在打开微信…' : '分享小程序卡片'}
-          </button>
-          <button
-            type="button"
-            disabled={Boolean(wxBusy)}
-            className="rounded-xl border border-[#07c160] px-2 py-2.5 text-sm font-medium text-[#07c160] disabled:opacity-50"
-            onClick={() => void onWechatShare('timeline')}
-          >
-            {wxBusy === 'timeline' ? '正在打开微信…' : '分享到朋友圈'}
-          </button>
-        </div>
+        {cardPick ? (
+          <div className="mt-4">
+            <p className="text-sm font-medium text-[var(--shell-text)]">选择微信卡片封面</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={Boolean(wxBusy)}
+                className="rounded-xl bg-[#07c160] px-2 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+                onClick={() => void onWechatShare('chat', 'poster')}
+              >
+                {wxBusy === 'poster' ? '正在生成海报…' : '分享海报'}
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(wxBusy)}
+                className="rounded-xl border border-[#07c160] px-2 py-2.5 text-sm font-medium text-[#07c160] disabled:opacity-50"
+                onClick={() => void onWechatShare('chat', 'cover')}
+              >
+                {wxBusy === 'cover' ? '正在生成封面…' : '分享封面'}
+              </button>
+            </div>
+            <button
+              type="button"
+              className="mt-2 text-xs text-[var(--shell-muted)]"
+              onClick={() => setCardPick(false)}
+            >
+              返回
+            </button>
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={Boolean(wxBusy)}
+              className="rounded-xl bg-[#07c160] px-2 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              onClick={() => {
+                setWxHint('')
+                setCardPick(true)
+              }}
+            >
+              分享小程序卡片
+            </button>
+            <button
+              type="button"
+              disabled={Boolean(wxBusy)}
+              className="rounded-xl border border-[#07c160] px-2 py-2.5 text-sm font-medium text-[#07c160] disabled:opacity-50"
+              onClick={() => void onWechatShare('timeline')}
+            >
+              {wxBusy === 'timeline' ? '正在打开微信…' : '分享到朋友圈'}
+            </button>
+          </div>
+        )}
         <p className="mt-2 text-[11px] text-slate-500">
-          {wxHint || '分享小程序卡片会发到微信好友或群，对方点开就是这张招募。电脑需已登录并解锁微信。'}
+          {wxHint ||
+            (cardPick
+              ? '海报是竖版分享图，封面是带标题、价格和城市的卡片。对方点开都是这张招募。'
+              : '分享小程序卡片会先选择海报或封面。电脑需已登录并解锁微信。')}
         </p>
 
         <div className="mt-4 flex gap-1 border-b border-[var(--shell-border)]">
