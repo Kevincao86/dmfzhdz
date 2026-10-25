@@ -25,7 +25,7 @@ const PLATFORMS = [
   { id: 'xiaohongshu', name: '小红书', icon: '/platforms/xiaohongshu.png' },
   { id: 'kuaishou', name: '快手', icon: '/platforms/kuaishou-local.png' },
   { id: 'dianping', name: '大众点评', icon: '/platforms/dianping.png' },
-  { id: 'weixin_video', name: '微信视频号', icon: '/platforms/wechat.png' },
+  { id: 'weixin_video', name: '微信视频号', icon: '/platforms/wechat-channels.png' },
 ] as const
 
 function letterOf(name: string) {

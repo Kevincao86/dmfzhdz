@@ -22,7 +22,7 @@ Page({
       { id: 'xhs', label: '小红书', logo: '/images/platforms/xiaohongshu.png', open: true },
       { id: 'kuaishou', label: '快手', logo: '/images/platforms/kuaishou-local.png', open: false },
       { id: 'dianping', label: '大众点评', logo: '/images/platforms/dianping.png', open: false },
-      { id: 'channels', label: '视频号', logo: '/images/platforms/wechat.png', open: false },
+      { id: 'channels', label: '视频号', logo: '/images/platforms/wechat-channels.png', open: false },
     ],
     pointsPerCheck: 5,
     xhsPointsPerCheck: 22,

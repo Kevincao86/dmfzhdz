@@ -27,7 +27,7 @@ const PLATFORM_LOGO: Record<string, string> = {
   xiaohongshu: '/platforms/xiaohongshu.png',
   kuaishou: '/platforms/kuaishou-local.png',
   dianping: '/platforms/dianping.png',
-  weixin_video: '/platforms/wechat.png',
+  weixin_video: '/platforms/wechat-channels.png',
 }
 
 let profileEnvelopeScrollLocks = 0

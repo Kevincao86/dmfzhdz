@@ -7,7 +7,7 @@ const TALENT_PLATFORMS = [
   { id: 'xiaohongshu', name: '小红书', icon: '/images/platforms/xiaohongshu.png' },
   { id: 'kuaishou', name: '快手', icon: '/images/platforms/kuaishou-local.png' },
   { id: 'dianping', name: '大众点评', icon: '/images/platforms/dianping.png' },
-  { id: 'weixin_video', name: '微信视频号', icon: '/images/platforms/wechat.png' },
+  { id: 'weixin_video', name: '微信视频号', icon: '/images/platforms/wechat-channels.png' },
 ]
 
 const NAME_TO_ID = {

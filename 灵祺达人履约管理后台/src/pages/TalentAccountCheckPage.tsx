@@ -11,7 +11,7 @@ const PLATFORMS = [
   { id: 'xhs', label: '小红书', logo: '/platforms/xiaohongshu.png', open: true },
   { id: 'kuaishou', label: '快手', logo: '/platforms/kuaishou-local.png', open: false },
   { id: 'dianping', label: '大众点评', logo: '/platforms/dianping.png', open: false },
-  { id: 'channels', label: '视频号', logo: '/platforms/wechat.png', open: false },
+  { id: 'channels', label: '视频号', logo: '/platforms/wechat-channels.png', open: false },
 ] as const
 
 function promptUpgrade(navigate: (path: string) => void, message?: string) {
