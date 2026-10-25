@@ -414,8 +414,7 @@ Page({
     coverGallerySubKey: '',
     coverPlatformNames: [],
     coverTagNames: [],
-    coverSourceHint: '请点选一张海报。不选则发布时使用该平台默认海报。',
-    coverChoices: [],
+    coverSourceHint: '上传、从图库选择或 AI 生成后才会显示。不选则发布时使用该平台默认海报。',
     recruitModeHint: '选择这次怎么合作。',
     showApplyTplPicker: false,
     customTemplateList: [],
@@ -731,23 +730,16 @@ Page({
   syncCoverPreview() {
     const f = this.data.form || {}
     let preview = ''
-    let hint = '请点选一张海报。不选则发布时使用该平台默认海报。'
+    let hint = '上传、从图库选择或 AI 生成后才会显示。不选则发布时使用该平台默认海报。'
     if (String(f.coverImage || '').trim()) {
       preview = f.coverImage
       hint = this.data.coverAiGenerated ? '已用 AI 生成海报' : '已上传自定义海报'
     } else if (String(f.coverLibraryId || '').trim()) {
+      const hit = recruitCoverLib.findCoverById(f.coverLibraryId)
+      preview = hit ? hit.url : ''
       hint = '已选这张海报'
     }
-    const coverChoices = recruitCoverLib
-      .getSuggestedGalleryItems(f.platform, f.talentTags || [])
-      .slice(0, 6)
-    this.setData({ coverPreviewUrl: preview, coverSourceHint: hint, coverChoices })
-  },
-  onPickCoverChoice(e) {
-    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
-    if (!id) return
-    this.setData({ 'form.coverLibraryId': id, 'form.coverImage': '', coverAiGenerated: false })
-    this.syncCoverPreview()
+    this.setData({ coverPreviewUrl: preview, coverSourceHint: hint })
   },
   async onCoverUpload() {
     try {

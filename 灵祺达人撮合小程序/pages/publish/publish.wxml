@@ -377,19 +377,7 @@
           <view class="pub-field" id="field-cover" wx:if="{{publishTemplateMode !== 'custom' || fieldOn.cover}}">
             <text class="pub-label">招募海报</text>
             <text class="pub-cover-hint">{{coverSourceHint}}</text>
-            <view wx:if="{{coverChoices.length}}" class="pub-cover-grid">
-              <view
-                wx:for="{{coverChoices}}"
-                wx:key="id"
-                class="pub-cover-cell {{form.coverLibraryId === item.id ? 'pub-cover-cell--on' : ''}}"
-                data-id="{{item.id}}"
-                bindtap="onPickCoverChoice"
-              >
-                <image class="pub-cover-cell-img" src="{{item.url}}" mode="aspectFill" />
-                <text class="pub-cover-cell-label">{{item.label}}</text>
-              </view>
-            </view>
-            <view wx:if="{{coverPreviewUrl && form.coverImage}}" class="pub-cover-preview-wrap" bindtap="onPreviewCoverImage">
+            <view wx:if="{{coverPreviewUrl}}" class="pub-cover-preview-wrap" bindtap="onPreviewCoverImage">
               <image class="pub-cover-preview" src="{{coverPreviewUrl}}" mode="aspectFill" />
             </view>
             <view class="pub-cover-actions">

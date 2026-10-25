@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import {
   findCoverById,
   getGalleryItemsForTab,
-  getSuggestedGalleryItems,
   listCoverPlatformNames,
   listCoverTagNames,
   type CoverGalleryTab,
@@ -62,10 +61,6 @@ export default function RecruitCoverField({
     () => resolvePreview(coverImage, coverLibraryId),
     [coverImage, coverLibraryId],
   )
-  const suggested = useMemo(
-    () => getSuggestedGalleryItems(platform, talentTags).slice(0, 6),
-    [platform, talentTags],
-  )
 
   const platformNames = useMemo(() => listCoverPlatformNames(), [])
   const tagNames = useMemo(() => listCoverTagNames(), [])
@@ -78,7 +73,7 @@ export default function RecruitCoverField({
   const sourceHint = (() => {
     if (String(coverImage || '').trim()) return fromAi ? '已用 AI 生成封面' : '已上传自定义封面'
     if (String(coverLibraryId || '').trim()) return '已选这张海报'
-    return '请点选一张海报。不选则发布时使用该平台默认海报。'
+    return '上传、从图库选择或 AI 生成后才会显示。不选则发布时使用该平台默认海报。'
   })()
 
   const openGallery = () => {
@@ -161,23 +156,6 @@ export default function RecruitCoverField({
       </div>
 
       <div className="rounded-lg border border-[var(--shell-border)] p-3">
-        {suggested.length ? (
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            {suggested.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`overflow-hidden rounded-lg border text-left ${
-                  coverLibraryId === item.id ? 'border-violet-500 ring-2 ring-violet-500/30' : 'border-[var(--shell-border)]'
-                }`}
-                onClick={() => onPickLibrary(item)}
-              >
-                <img src={item.url} alt={item.label} className="aspect-[5/4] w-full object-cover" />
-                <span className="block truncate px-1.5 py-1 text-[11px] text-[var(--shell-text)]">{item.label}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -214,7 +192,7 @@ export default function RecruitCoverField({
             </button>
           )}
         </div>
-        {preview && String(coverImage || '').trim() ? (
+        {preview ? (
           <button
             type="button"
             className="mt-3 block w-full cursor-zoom-in"
