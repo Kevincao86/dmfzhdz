@@ -355,14 +355,12 @@
                 <text class="pub-apply-toggle">{{applyInfoOpen ? '收起' : '展开'}}</text>
               </view>
               <block wx:if="{{applyInfoOpen}}">
+                <text class="pub-apply-note">达人报名时要填这些内容。</text>
                 <view wx:if="{{applyInfoRows.length}}" class="pub-apply-list">
-                  <text wx:for="{{applyInfoRows}}" wx:key="id" class="pub-apply-item">{{item.label}}</text>
+                  <text wx:for="{{applyInfoRows}}" wx:key="id" class="pub-apply-item">{{item.label}}<text wx:if="{{!item.required}}" class="pub-apply-opt">选填</text></text>
                 </view>
                 <text wx:else class="pub-cover-hint">还没有报名必填项</text>
-                <view class="pub-select" data-view="applyForm" bindtap="openPicker">
-                  <text class="pub-select-text">配置报名项</text>
-                  <text class="pub-select-arrow">›</text>
-                </view>
+                <text class="pub-apply-config" data-view="applyForm" bindtap="openPicker">配置报名项</text>
               </block>
               <text wx:else class="pub-cover-hint">{{applyFormDisplayText}}</text>
             </view>

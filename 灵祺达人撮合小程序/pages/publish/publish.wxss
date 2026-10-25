@@ -1418,16 +1418,46 @@
   color: #4c1d95;
 }
 
+.pub-apply-note {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
 .pub-apply-list {
   display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-  margin-top: 12rpx;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 16rpx;
 }
 
 .pub-apply-item {
-  font-size: 28rpx;
-  color: #1e1b4b;
+  padding: 8rpx 18rpx;
+  font-size: 24rpx;
+  line-height: 1.4;
+  font-weight: 500;
+  color: #4c1d95;
+  background: #f5f3ff;
+  border-radius: 999rpx;
+}
+
+.pub-apply-opt {
+  margin-left: 8rpx;
+  font-size: 20rpx;
+  font-weight: 400;
+  color: #8b7cb8;
+}
+
+.pub-apply-config {
+  display: inline-block;
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #6d28d9;
 }
 
 @keyframes pub-add-plus {

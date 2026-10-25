@@ -1493,19 +1493,26 @@ export default function PublishWizard() {
               <span className="text-[#4c1d95]">{applyInfoOpen ? '收起' : '展开'}</span>
             </button>
             {applyInfoOpen ? (
-              <div className="mt-3 space-y-2">
+              <div className="mt-2">
+                <p className="text-xs leading-5 text-[var(--shell-muted)]">达人报名时要填这些内容。</p>
                 {(form.applyFormFields || []).length ? (
-                  <ul className="space-y-1 text-sm text-[var(--shell-text)]">
+                  <ul className="mt-2 flex flex-wrap gap-2">
                     {(form.applyFormFields || []).map((field) => (
-                      <li key={field.id}>{resolveFieldLabel(field, form.platform)}</li>
+                      <li
+                        key={field.id}
+                        className="rounded-full bg-[#f5f3ff] px-2.5 py-1 text-xs font-medium leading-5 text-[#4c1d95]"
+                      >
+                        {resolveFieldLabel(field, form.platform)}
+                        {field.required === false ? <span className="ml-1 font-normal text-[#8b7cb8]">选填</span> : null}
+                      </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-xs text-[var(--shell-muted)]">还没有报名必填项</p>
+                  <p className="mt-2 text-xs text-[var(--shell-muted)]">还没有报名必填项</p>
                 )}
                 <button
                   type="button"
-                  className="text-sm font-medium text-[#6d28d9]"
+                  className="mt-2 text-xs font-medium text-[#6d28d9]"
                   onClick={() => openPicker('applyMenu')}
                 >
                   配置报名项

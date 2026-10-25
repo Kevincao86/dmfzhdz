@@ -789,6 +789,7 @@ Page({
     const applyInfoRows = af.map((field, index) => ({
       id: field && field.id ? String(field.id) : String(index),
       label: applyTemplates.resolveFieldLabel(field, f.platform),
+      required: !(field && field.required === false),
     }))
     this.setData({
       applyFormDisplayText,
