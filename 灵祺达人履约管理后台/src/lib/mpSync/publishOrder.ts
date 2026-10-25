@@ -339,15 +339,36 @@ export type PublishTemplateGate = {
 
 export function validatePublishForm(
   f: PublishForm,
-  _recruitMode = '',
-  _recruitTarget = 'talent',
+  recruitMode = '',
+  recruitTarget = 'talent',
   _isTargetedRecruit = false,
-  _gate?: PublishTemplateGate,
+  gate?: PublishTemplateGate,
 ): string | null {
-  void _recruitMode
-  void _recruitTarget
   void _isTargetedRecruit
-  void _gate
+  const on = (key: string) => gate?.fieldOn?.[key] === true
+  if (recruitTarget === 'shoot') {
+    if (on('shootDate') && !String(f.shootDate || '').trim()) return '请选择拍摄日期'
+    if (on('shootTime') && (!String(f.shootTimeStart || '').trim() || !String(f.shootTimeEnd || '').trim())) {
+      return '请填写拍摄时段'
+    }
+    if (on('shootLocation') && !String(f.shootLocation || '').trim()) return '请填写拍摄地点'
+    if (on('deliverables') && !(f.deliverables || []).length) return '请选择成片交付'
+  }
+  if (recruitTarget === 'edit') {
+    if (on('materialSource') && !String(f.materialSource || '').trim()) return '请选择素材来源'
+    if (
+      on('materialUrl') &&
+      recruitMode !== 'edit_ice' &&
+      f.materialSource === 'PR提供链接' &&
+      !String(f.materialUrl || '').trim()
+    ) {
+      return '请填写素材链接'
+    }
+    if (on('aspectRatio') && !String(f.aspectRatio || '').trim()) return '请选择成片画幅'
+    if (on('targetDuration') && !String(f.targetDuration || '').trim()) return '请选择目标时长'
+    if (on('editStyle') && !(f.styleTags || []).length) return '请选择剪辑风格'
+    if (on('deliveryDeadline') && !String(f.deliveryDeadline || '').trim()) return '请选择交付截止时间'
+  }
   const lk = f.linkeAttach
   if (lk?.enabled) {
     if (!lk.clientId) return '挂接林客时请选择客户商家'

@@ -21,6 +21,7 @@ export type MpClientStatePayload = {
   applyFormTemplates?: Record<string, unknown>[]
   publishFormTemplates?: Record<string, unknown>[]
   activePublishFormTemplateId?: string
+  activePublishFormTemplateIds?: Record<string, string>
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
   orderFavoriteIds?: string[]
@@ -287,6 +288,7 @@ export function emptyClientStatePayload(): MpClientStatePayload {
     applyFormTemplates: [],
     publishFormTemplates: [],
     activePublishFormTemplateId: '',
+    activePublishFormTemplateIds: {},
     activeApplyTemplateIds: {},
     talentFavoriteIds: [],
     orderFavoriteIds: [],
@@ -373,6 +375,7 @@ export function mergeClientStatePayload(
       MAX_TEMPLATES,
     ),
     activePublishFormTemplateId: String(c.activePublishFormTemplateId || s.activePublishFormTemplateId || '').trim(),
+    activePublishFormTemplateIds: mergeActiveTemplateIds(s.activePublishFormTemplateIds, c.activePublishFormTemplateIds),
     activeApplyTemplateIds: mergeActiveTemplateIds(
       s.activeApplyTemplateIds as Record<string, string> | undefined,
       c.activeApplyTemplateIds as Record<string, string> | undefined,

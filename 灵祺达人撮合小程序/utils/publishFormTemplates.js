@@ -15,6 +15,62 @@ const RECRUIT_TEMPLATE_FIELDS = [
   { key: 'cover', label: '封面' },
 ]
 
+const SHOOT_RECRUIT_FIELDS = [
+  { key: 'shootDate', label: '拍摄日期' },
+  { key: 'shootTime', label: '拍摄时段' },
+  { key: 'shootLocation', label: '拍摄地点' },
+  { key: 'deliverables', label: '成片交付' },
+  { key: 'equipment', label: '设备要求' },
+]
+
+const EDIT_RECRUIT_FIELDS = [
+  { key: 'materialSource', label: '素材来源' },
+  { key: 'materialUrl', label: '素材链接' },
+  { key: 'aspectRatio', label: '成片画幅' },
+  { key: 'targetDuration', label: '目标时长' },
+  { key: 'editStyle', label: '剪辑风格' },
+  { key: 'packageTags', label: '包装要求' },
+  { key: 'referenceUrl', label: '参考片链接' },
+  { key: 'deliveryDeadline', label: '交付截止时间' },
+]
+
+function normalizeRecruitTarget(raw) {
+  return raw === 'shoot' || raw === 'edit' ? raw : 'talent'
+}
+
+function recruitTemplateFields(target) {
+  const key = normalizeRecruitTarget(target)
+  if (key === 'shoot') return SHOOT_RECRUIT_FIELDS
+  if (key === 'edit') return EDIT_RECRUIT_FIELDS
+  return RECRUIT_TEMPLATE_FIELDS
+}
+
+function emptyRecruitFieldOn(target) {
+  if (normalizeRecruitTarget(target) !== 'talent') {
+    const on = {}
+    recruitTemplateFields(target).forEach((field) => {
+      on[field.key] = false
+    })
+    return on
+  }
+  return {
+    title: false,
+    delivery: false,
+    deadline: false,
+    platform: false,
+    city: false,
+    location: false,
+    tags: false,
+    fans: false,
+    level: false,
+    fee: false,
+    count: false,
+    detail: false,
+    apply: false,
+    cover: false,
+  }
+}
+
 const STORAGE_KEY = 'meoo_publish_form_templates_v1'
 const ACTIVE_KEY = 'meoo_active_publish_form_template_v1'
 
@@ -55,6 +111,11 @@ function normalize(raw) {
   }
 }
 
+function listPublishFormTemplatesFor(target) {
+  const key = normalizeRecruitTarget(target)
+  return listPublishFormTemplates().filter((row) => normalizeRecruitTarget(row.recruitTarget) === key)
+}
+
 function listPublishFormTemplates() {
   try {
     const raw = wx.getStorageSync(scope.scopedStorageKey(STORAGE_KEY))
@@ -83,25 +144,79 @@ function getPublishFormTemplateById(id) {
   return listPublishFormTemplates().find((row) => row.id === id) || null
 }
 
-function getActivePublishFormTemplateId() {
-  try {
-    return String(wx.getStorageSync(scope.scopedStorageKey(ACTIVE_KEY)) || '').trim()
-  } catch (_) {
-    return ''
-  }
+function emptyActiveIds() {
+  return { talent: '', shoot: '', edit: '' }
 }
 
-function getActivePublishFormTemplate() {
-  const id = getActivePublishFormTemplateId()
-  return id ? getPublishFormTemplateById(id) : null
+function readActiveIds() {
+  let raw = ''
+  try {
+    raw = wx.getStorageSync(scope.scopedStorageKey(ACTIVE_KEY))
+  } catch (_) {
+    return emptyActiveIds()
+  }
+  if (!raw) return emptyActiveIds()
+  if (typeof raw === 'object') {
+    return {
+      talent: String(raw.talent || '').trim(),
+      shoot: String(raw.shoot || '').trim(),
+      edit: String(raw.edit || '').trim(),
+    }
+  }
+  const text = String(raw).trim()
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text)
+      return {
+        talent: String(parsed.talent || '').trim(),
+        shoot: String(parsed.shoot || '').trim(),
+        edit: String(parsed.edit || '').trim(),
+      }
+    } catch (_) {
+      return emptyActiveIds()
+    }
+  }
+  return { talent: text, shoot: '', edit: '' }
+}
+
+function writeActiveIds(map, silent) {
+  wx.setStorageSync(scope.scopedStorageKey(ACTIVE_KEY), JSON.stringify(map))
+  if (!silent) notify()
+}
+
+function getActivePublishFormTemplateIds() {
+  return readActiveIds()
+}
+
+function getActivePublishFormTemplateId(target) {
+  return readActiveIds()[normalizeRecruitTarget(target)] || ''
+}
+
+function getActivePublishFormTemplate(target) {
+  const key = normalizeRecruitTarget(target)
+  const id = getActivePublishFormTemplateId(key)
+  const row = id ? getPublishFormTemplateById(id) : null
+  if (!row || normalizeRecruitTarget(row.recruitTarget) !== key) return null
+  return row
 }
 
 function setActivePublishFormTemplateId(id, opts) {
   const next = String(id || '').trim()
-  const key = scope.scopedStorageKey(ACTIVE_KEY)
-  if (next) wx.setStorageSync(key, next)
-  else wx.removeStorageSync(key)
-  if (!(opts && opts.silent)) notify()
+  const row = next ? getPublishFormTemplateById(next) : null
+  const target = normalizeRecruitTarget((opts && opts.recruitTarget) || (row && row.recruitTarget))
+  const map = readActiveIds()
+  map[target] = next
+  writeActiveIds(map, !!(opts && opts.silent))
+}
+
+function applyActivePublishFormTemplateIds(raw, opts) {
+  if (!raw || typeof raw !== 'object') return
+  const map = readActiveIds()
+  ;['talent', 'shoot', 'edit'].forEach((key) => {
+    const id = String(raw[key] || '').trim()
+    if (id) map[key] = id
+  })
+  writeActiveIds(map, !!(opts && opts.silent))
 }
 
 function savePublishFormTemplate(input) {
@@ -118,8 +233,10 @@ function savePublishFormTemplate(input) {
 }
 
 function deletePublishFormTemplate(id) {
+  const row = getPublishFormTemplateById(id)
   writeAll(listPublishFormTemplates().filter((item) => item.id !== id))
-  if (getActivePublishFormTemplateId() === id) setActivePublishFormTemplateId('')
+  const target = normalizeRecruitTarget(row && row.recruitTarget)
+  if (getActivePublishFormTemplateId(target) === id) setActivePublishFormTemplateId('', { recruitTarget: target })
 }
 
 function applyPublishFormTemplatesFromSync(templates) {
@@ -137,11 +254,19 @@ function applyPublishFormTemplatesFromSync(templates) {
 
 module.exports = {
   RECRUIT_TEMPLATE_FIELDS,
+  SHOOT_RECRUIT_FIELDS,
+  EDIT_RECRUIT_FIELDS,
+  normalizeRecruitTarget,
+  recruitTemplateFields,
+  emptyRecruitFieldOn,
   listPublishFormTemplates,
+  listPublishFormTemplatesFor,
   getPublishFormTemplateById,
   getActivePublishFormTemplateId,
+  getActivePublishFormTemplateIds,
   getActivePublishFormTemplate,
   setActivePublishFormTemplateId,
+  applyActivePublishFormTemplateIds,
   savePublishFormTemplate,
   deletePublishFormTemplate,
   applyPublishFormTemplatesFromSync,

@@ -21,8 +21,10 @@ import { applyHandledMapFromSync, exportHandledMapForSync } from './mpSync/inbox
 import { applyGroupQrCacheFromSync, exportGroupQrCacheForSync } from './mpSync/mpGroupQr'
 import { applyTalentEvalsFromSync, exportTalentEvalsForSync } from './talentLocalLifeEval'
 import {
+  applyActivePublishFormTemplateIds,
   applyPublishFormTemplatesFromSync,
   getActivePublishFormTemplateId,
+  getActivePublishFormTemplateIds,
   listPublishFormTemplates,
   setActivePublishFormTemplateId,
 } from './mpSync/publishFormTemplates'
@@ -45,6 +47,7 @@ export type MpClientStatePayload = {
   applyFormTemplates?: Record<string, unknown>[]
   publishFormTemplates?: Record<string, unknown>[]
   activePublishFormTemplateId?: string
+  activePublishFormTemplateIds?: { talent?: string; shoot?: string; edit?: string }
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
   orderFavoriteIds?: string[]
@@ -97,7 +100,8 @@ export function collectLocalClientState(): MpClientStatePayload {
     publishWizardDrafts: listPublishDrafts() as unknown as Record<string, unknown>[],
     applyFormTemplates: listCustomTemplates() as unknown as Record<string, unknown>[],
     publishFormTemplates: listPublishFormTemplates() as unknown as Record<string, unknown>[],
-    activePublishFormTemplateId: getActivePublishFormTemplateId(),
+    activePublishFormTemplateId: getActivePublishFormTemplateId('talent'),
+    activePublishFormTemplateIds: getActivePublishFormTemplateIds(),
     activeApplyTemplateIds: readActiveApplyTemplateIds(),
     talentFavoriteIds: readFavoriteIds(),
     orderFavoriteIds: [...readOrderFavoriteIds()],
@@ -265,7 +269,10 @@ export function applyRemoteClientState(
     applyPublishFormTemplatesFromSync(state.publishFormTemplates)
   }
   if (!publishTplStale && state.activePublishFormTemplateId) {
-    setActivePublishFormTemplateId(String(state.activePublishFormTemplateId), { silent: true })
+    setActivePublishFormTemplateId(String(state.activePublishFormTemplateId), { silent: true, recruitTarget: 'talent' })
+  }
+  if (!publishTplStale && state.activePublishFormTemplateIds) {
+    applyActivePublishFormTemplateIds(state.activePublishFormTemplateIds, { silent: true })
   }
   if (Array.isArray(state.applyFormTemplates) || state.activeApplyTemplateIds) {
     applyTemplatesFromSync(

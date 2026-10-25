@@ -18,6 +18,64 @@ export const RECRUIT_TEMPLATE_FIELDS: { key: string; label: string }[] = [
   { key: 'cover', label: '封面' },
 ]
 
+export const SHOOT_RECRUIT_FIELDS: { key: string; label: string }[] = [
+  { key: 'shootDate', label: '拍摄日期' },
+  { key: 'shootTime', label: '拍摄时段' },
+  { key: 'shootLocation', label: '拍摄地点' },
+  { key: 'deliverables', label: '成片交付' },
+  { key: 'equipment', label: '设备要求' },
+]
+
+export const EDIT_RECRUIT_FIELDS: { key: string; label: string }[] = [
+  { key: 'materialSource', label: '素材来源' },
+  { key: 'materialUrl', label: '素材链接' },
+  { key: 'aspectRatio', label: '成片画幅' },
+  { key: 'targetDuration', label: '目标时长' },
+  { key: 'editStyle', label: '剪辑风格' },
+  { key: 'packageTags', label: '包装要求' },
+  { key: 'referenceUrl', label: '参考片链接' },
+  { key: 'deliveryDeadline', label: '交付截止时间' },
+]
+
+export type RecruitTemplateTarget = 'talent' | 'shoot' | 'edit'
+
+export function normalizeRecruitTarget(raw: unknown): RecruitTemplateTarget {
+  return raw === 'shoot' || raw === 'edit' ? raw : 'talent'
+}
+
+export function recruitTemplateFields(target: unknown) {
+  const key = normalizeRecruitTarget(target)
+  if (key === 'shoot') return SHOOT_RECRUIT_FIELDS
+  if (key === 'edit') return EDIT_RECRUIT_FIELDS
+  return RECRUIT_TEMPLATE_FIELDS
+}
+
+export function emptyRecruitFieldOn(target: unknown): Record<string, boolean> {
+  if (normalizeRecruitTarget(target) !== 'talent') {
+    const on: Record<string, boolean> = {}
+    for (const field of recruitTemplateFields(target)) on[field.key] = false
+    return on
+  }
+  return {
+    title: false,
+    delivery: false,
+    deadline: false,
+    platform: false,
+    city: false,
+    location: false,
+    tags: false,
+    fans: false,
+    level: false,
+    fee: false,
+    count: false,
+    detail: false,
+    apply: false,
+    cover: false,
+  }
+}
+
+export type ActivePublishTemplateIds = Record<RecruitTemplateTarget, string>
+
 export type PublishFormTemplate = {
   id: string
   name: string
@@ -76,6 +134,11 @@ function normalize(raw: unknown): PublishFormTemplate | null {
   }
 }
 
+export function listPublishFormTemplatesFor(target: unknown): PublishFormTemplate[] {
+  const key = normalizeRecruitTarget(target)
+  return listPublishFormTemplates().filter((row) => normalizeRecruitTarget(row.recruitTarget) === key)
+}
+
 export function listPublishFormTemplates(): PublishFormTemplate[] {
   try {
     const raw = localStorage.getItem(storageKey())
@@ -103,24 +166,67 @@ export function getPublishFormTemplateById(id: string) {
   return listPublishFormTemplates().find((row) => row.id === id) || null
 }
 
-export function getActivePublishFormTemplateId() {
+function emptyActiveIds(): ActivePublishTemplateIds {
+  return { talent: '', shoot: '', edit: '' }
+}
+
+function readActiveIds(): ActivePublishTemplateIds {
   try {
-    return String(localStorage.getItem(activeKey()) || '').trim()
+    const raw = String(localStorage.getItem(activeKey()) || '').trim()
+    if (!raw) return emptyActiveIds()
+    if (raw.startsWith('{')) {
+      const parsed = JSON.parse(raw) as Partial<ActivePublishTemplateIds>
+      return {
+        talent: String(parsed.talent || '').trim(),
+        shoot: String(parsed.shoot || '').trim(),
+        edit: String(parsed.edit || '').trim(),
+      }
+    }
+    return { talent: raw, shoot: '', edit: '' }
   } catch {
-    return ''
+    return emptyActiveIds()
   }
 }
 
-export function getActivePublishFormTemplate() {
-  const id = getActivePublishFormTemplateId()
-  return id ? getPublishFormTemplateById(id) : null
+function writeActiveIds(map: ActivePublishTemplateIds, silent?: boolean) {
+  localStorage.setItem(activeKey(), JSON.stringify(map))
+  if (!silent) notify()
 }
 
-export function setActivePublishFormTemplateId(id: string, opts?: { silent?: boolean }) {
+export function getActivePublishFormTemplateIds(): ActivePublishTemplateIds {
+  return readActiveIds()
+}
+
+export function getActivePublishFormTemplateId(target: unknown = 'talent') {
+  return readActiveIds()[normalizeRecruitTarget(target)] || ''
+}
+
+export function getActivePublishFormTemplate(target: unknown = 'talent') {
+  const key = normalizeRecruitTarget(target)
+  const id = getActivePublishFormTemplateId(key)
+  const row = id ? getPublishFormTemplateById(id) : null
+  if (!row || normalizeRecruitTarget(row.recruitTarget) !== key) return null
+  return row
+}
+
+export function setActivePublishFormTemplateId(id: string, opts?: { silent?: boolean; recruitTarget?: string }) {
   const next = String(id || '').trim()
-  if (next) localStorage.setItem(activeKey(), next)
-  else localStorage.removeItem(activeKey())
-  if (!opts?.silent) notify()
+  const row = next ? getPublishFormTemplateById(next) : null
+  const target = normalizeRecruitTarget(opts?.recruitTarget || row?.recruitTarget)
+  const map = readActiveIds()
+  map[target] = next
+  writeActiveIds(map, opts?.silent)
+}
+
+export function applyActivePublishFormTemplateIds(raw: unknown, opts?: { silent?: boolean }) {
+  if (!raw || typeof raw !== 'object') return
+  const incoming = raw as Partial<ActivePublishTemplateIds>
+  const map = readActiveIds()
+  for (const key of ['talent', 'shoot', 'edit'] as const) {
+    const id = String(incoming[key] || '').trim()
+    if (id) map[key] = id
+  }
+  writeActiveIds(map, opts?.silent)
 }
 
 export function savePublishFormTemplate(input: Omit<PublishFormTemplate, 'id' | 'updatedAt'> & { id?: string }) {
@@ -137,8 +243,10 @@ export function savePublishFormTemplate(input: Omit<PublishFormTemplate, 'id' | 
 }
 
 export function deletePublishFormTemplate(id: string) {
+  const row = getPublishFormTemplateById(id)
   writeAll(listPublishFormTemplates().filter((item) => item.id !== id))
-  if (getActivePublishFormTemplateId() === id) setActivePublishFormTemplateId('')
+  const target = normalizeRecruitTarget(row?.recruitTarget)
+  if (getActivePublishFormTemplateId(target) === id) setActivePublishFormTemplateId('', { recruitTarget: target })
 }
 
 export function applyPublishFormTemplatesFromSync(templates: unknown) {

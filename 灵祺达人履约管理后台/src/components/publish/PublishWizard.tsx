@@ -65,8 +65,10 @@ import {
 import { readPrProfile } from '../../lib/mpSync/userProfile'
 import { canUseTargetedRecruit } from '../../lib/mpSync/mpTargetedRecruitAccess'
 import {
+  emptyRecruitFieldOn,
   getActivePublishFormTemplate,
   listPublishFormTemplates,
+  recruitTemplateFields,
   savePublishFormTemplate,
   setActivePublishFormTemplateId,
   type PublishFormTemplate,
@@ -147,20 +149,25 @@ function allPublishFieldsOn(): Record<string, boolean> {
   }
 }
 
-function mergePublishFieldOrder(saved: string[] | undefined, customIds: string[]) {
-  const known = new Set<string>([...PUBLISH_FIELD_KEYS, ...customIds.filter(Boolean)])
+function mergePublishFieldOrder(saved: string[] | undefined, customIds: string[], baseKeys: string[] = PUBLISH_FIELD_KEYS) {
+  const known = new Set<string>([...baseKeys, ...customIds.filter(Boolean)])
   const next: string[] = []
   for (const key of saved || []) {
     const id = String(key || '').trim()
     if (id && known.has(id) && !next.includes(id)) next.push(id)
   }
   if (!next.length) {
-    next.push(...PUBLISH_FIELD_KEYS)
+    next.push(...baseKeys)
   } else {
-    for (const key of PUBLISH_FIELD_KEYS) if (!next.includes(key)) next.push(key)
+    for (const key of baseKeys) if (!next.includes(key)) next.push(key)
   }
   for (const id of customIds) if (id && !next.includes(id)) next.push(id)
   return next
+}
+
+function fieldKeysForTarget(target: string) {
+  if (target === 'shoot' || target === 'edit') return recruitTemplateFields(target).map((item) => item.key)
+  return PUBLISH_FIELD_KEYS
 }
 
 function PubLabel({ children, hint }: { children: ReactNode; hint?: string }) {
@@ -991,9 +998,17 @@ export default function PublishWizard() {
     const index = orderedKeys.indexOf(key)
     return index < 0 ? 200 : index
   }
+  const activeCatalog = recruitTarget === 'shoot' || recruitTarget === 'edit'
+    ? recruitTemplateFields(recruitTarget)
+    : PUBLISH_FIELD_CATALOG
+  const editorOrder = mergePublishFieldOrder(
+    orderedKeys,
+    customPublishFields.map((row) => row.id),
+    fieldKeysForTarget(recruitTarget),
+  )
   const editorRows: { key: string; kind: 'sys' | 'custom'; label: string }[] = []
-  for (const key of orderedKeys) {
-    const sys = PUBLISH_FIELD_CATALOG.find((item) => item.key === key)
+  for (const key of editorOrder) {
+    const sys = activeCatalog.find((item) => item.key === key)
     if (sys) {
       editorRows.push({ key, kind: 'sys', label: sys.label })
       continue
@@ -1226,7 +1241,7 @@ export default function PublishWizard() {
   }
   function saveFieldPick() {
     setFieldOn({
-      ...DEFAULT_PUBLISH_FIELD_ON,
+      ...emptyRecruitFieldOn(recruitTarget),
       ...fieldPick,
     })
     setPublishTemplateMode('custom')
@@ -1237,14 +1252,14 @@ export default function PublishWizard() {
   }
 
   function applyRecruitFields(tpl: PublishFormTemplate) {
-    const next = { ...DEFAULT_PUBLISH_FIELD_ON, ...tpl.fieldOn }
+    const next = { ...emptyRecruitFieldOn(tpl.recruitTarget || recruitTarget), ...tpl.fieldOn }
     const custom = tpl.customFields.map((row) => ({ ...row, value: '' }))
     setFieldOn(next)
     setFieldPick(next)
     setCustomPublishFields(custom)
-    setFieldOrder(mergePublishFieldOrder(tpl.fieldOrder, custom.map((row) => row.id)))
+    setFieldOrder(mergePublishFieldOrder(tpl.fieldOrder, custom.map((row) => row.id), fieldKeysForTarget(tpl.recruitTarget || recruitTarget)))
     setPublishTemplateMode('custom')
-    setActivePublishFormTemplateId(tpl.id)
+    setActivePublishFormTemplateId(tpl.id, { recruitTarget: tpl.recruitTarget || recruitTarget })
     setFieldEditorOpen(false)
     setFieldChooserOpen(false)
     setDraftHint(`已使用模版「${tpl.name}」`)
@@ -1255,7 +1270,7 @@ export default function PublishWizard() {
     const name = window.prompt('模版名称', '我的发单模版')
     if (name == null) return
     const trimmed = name.trim() || '我的发单模版'
-    const next = { ...DEFAULT_PUBLISH_FIELD_ON, ...fieldPick }
+    const next = { ...emptyRecruitFieldOn(recruitTarget), ...fieldPick }
     const row = savePublishFormTemplate({
       name: trimmed,
       recruitTarget,
@@ -1270,8 +1285,8 @@ export default function PublishWizard() {
         format: item.format || 'text',
       })),
     })
-    setActivePublishFormTemplateId(row.id)
-    setSavedFormTemplates(listPublishFormTemplates())
+    setActivePublishFormTemplateId(row.id, { recruitTarget })
+    setSavedFormTemplates(listPublishFormTemplates().filter((item) => (item.recruitTarget || 'talent') === (recruitTarget === 'shoot' || recruitTarget === 'edit' ? recruitTarget : 'talent')))
     setDraftHint('已存入我的模版')
     setErr('')
   }
@@ -1407,6 +1422,13 @@ export default function PublishWizard() {
                   setRecruitTargetLabel(t.label)
                   setRecruitMode(mode.id)
                   setRecruitModeLabel(mode.label)
+                  const blank = emptyRecruitFieldOn(t.id)
+                  setFieldOn(blank)
+                  setFieldPick(blank)
+                  setCustomPublishFields([])
+                  setFieldOrder(fieldKeysForTarget(t.id))
+                  setFieldEditorOpen(false)
+                  setFieldChooserOpen(false)
                   setForm((prev) => {
                     const next = emptyPublishForm(t.id)
                     return {
@@ -1821,23 +1843,39 @@ export default function PublishWizard() {
         </div>
         ) : null}
 
-        {isSupplierPublish && recruitTarget === 'shoot' ? (
-          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3" style={{ order: 800 }}>
+        {recruitTarget === 'shoot' && showField('shootDate') ? (
+          <div style={{ order: fieldRank('shootDate') }}>
             <PubLabel>拍摄日期</PubLabel>
             <input type="date" className="w-full rounded-lg panel-input border px-3 py-2" value={form.shootDate} onChange={(e) => patchForm({ shootDate: e.target.value })} />
+          </div>
+        ) : null}
+        {recruitTarget === 'shoot' && showField('shootTime') ? (
+          <div style={{ order: fieldRank('shootTime') }}>
             <PubLabel>拍摄时段</PubLabel>
             <div className="flex gap-2">
               <input type="time" className="flex-1 rounded-lg panel-input border px-3 py-2" value={form.shootTimeStart} onChange={(e) => patchForm({ shootTimeStart: e.target.value })} />
               <input type="time" className="flex-1 rounded-lg panel-input border px-3 py-2" value={form.shootTimeEnd} onChange={(e) => patchForm({ shootTimeEnd: e.target.value })} />
             </div>
+          </div>
+        ) : null}
+        {recruitTarget === 'shoot' && showField('shootLocation') ? (
+          <div style={{ order: fieldRank('shootLocation') }}>
             <PubLabel>拍摄地点</PubLabel>
             <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.shootLocation} onChange={(e) => patchForm({ shootLocation: e.target.value })} />
+          </div>
+        ) : null}
+        {recruitTarget === 'shoot' && showField('deliverables') ? (
+          <div style={{ order: fieldRank('deliverables') }}>
             <PubLabel>成片交付</PubLabel>
             <div className="flex flex-wrap gap-2">
               {DELIVERABLES.map((d) => (
                 <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.deliverables.includes(d) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ deliverables: toggleMultiTagList(form.deliverables, d) })}>{d}</button>
               ))}
             </div>
+          </div>
+        ) : null}
+        {recruitTarget === 'shoot' && showField('equipment') ? (
+          <div style={{ order: fieldRank('equipment') }}>
             <PubLabel>设备要求</PubLabel>
             <div className="flex flex-wrap gap-2">
               {SHOOT_EQUIPMENT.map((d) => (
@@ -1847,34 +1885,54 @@ export default function PublishWizard() {
           </div>
         ) : null}
 
-        {isSupplierPublish && recruitTarget === 'edit' ? (
-          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3" style={{ order: 800 }}>
+        {recruitTarget === 'edit' && showField('materialSource') ? (
+          <div style={{ order: fieldRank('materialSource') }}>
             <PubLabel>素材来源</PubLabel>
             <div className="flex flex-wrap gap-2">
               {MATERIAL_SOURCES.map((s) => (
                 <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.materialSource === s ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ materialSource: s })}>{s}</button>
               ))}
             </div>
+          </div>
+        ) : null}
+        {recruitTarget === 'edit' && showField('materialUrl') ? (
+          <div style={{ order: fieldRank('materialUrl') }}>
             <PubLabel>素材链接</PubLabel>
             <input className="w-full rounded-lg panel-input border px-3 py-2" placeholder="网盘/链接（选填）" value={form.materialUrl} onChange={(e) => patchForm({ materialUrl: e.target.value })} />
+          </div>
+        ) : null}
+        {recruitTarget === 'edit' && showField('aspectRatio') ? (
+          <div style={{ order: fieldRank('aspectRatio') }}>
             <PubLabel>成片画幅</PubLabel>
             <div className="flex flex-wrap gap-2">
               {ASPECT_RATIOS.map((a) => (
                 <button key={a} type="button" className={`px-2 py-1 rounded text-xs ${form.aspectRatio === a ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ aspectRatio: a })}>{a}</button>
               ))}
             </div>
+          </div>
+        ) : null}
+        {recruitTarget === 'edit' && showField('targetDuration') ? (
+          <div style={{ order: fieldRank('targetDuration') }}>
             <PubLabel>目标时长</PubLabel>
             <div className="flex flex-wrap gap-2">
               {TARGET_DURATIONS.map((d) => (
                 <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.targetDuration === d ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ targetDuration: d })}>{d}</button>
               ))}
             </div>
+          </div>
+        ) : null}
+        {recruitTarget === 'edit' && showField('editStyle') ? (
+          <div style={{ order: fieldRank('editStyle') }}>
             <PubLabel>剪辑风格</PubLabel>
             <div className="flex flex-wrap gap-2">
               {EDIT_STYLES.map((s) => (
                 <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.styleTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ styleTags: toggleSingleTagList(form.styleTags, s) })}>{s}</button>
               ))}
             </div>
+          </div>
+        ) : null}
+        {recruitTarget === 'edit' && showField('packageTags') ? (
+          <div style={{ order: fieldRank('packageTags') }}>
             <PubLabel>包装要求</PubLabel>
             <p className="text-xs text-slate-500 mb-1">可多选，选填</p>
             <div className="flex flex-wrap gap-2">
@@ -1882,12 +1940,16 @@ export default function PublishWizard() {
                 <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.packageTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ packageTags: toggleMultiTagList(form.packageTags, s) })}>{s}</button>
               ))}
             </div>
-            {recruitMode !== 'edit_ice' ? (
-              <>
-                <PubLabel>参考片链接</PubLabel>
-                <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.referenceUrl} onChange={(e) => patchForm({ referenceUrl: e.target.value })} />
-              </>
-            ) : null}
+          </div>
+        ) : null}
+        {recruitTarget === 'edit' && showField('referenceUrl') && recruitMode !== 'edit_ice' ? (
+          <div style={{ order: fieldRank('referenceUrl') }}>
+            <PubLabel>参考片链接</PubLabel>
+            <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.referenceUrl} onChange={(e) => patchForm({ referenceUrl: e.target.value })} />
+          </div>
+        ) : null}
+        {recruitTarget === 'edit' && showField('deliveryDeadline') ? (
+          <div style={{ order: fieldRank('deliveryDeadline') }}>
             <PubSelectRow
               label="交付截止时间"
               value={deliveryDeadlineDisplayText}
@@ -2464,24 +2526,28 @@ export default function PublishWizard() {
                 setFieldChooserOpen(false)
                 return
               }
+              const forTarget = (rows: ReturnType<typeof listPublishFormTemplates>) => {
+                const key = recruitTarget === 'shoot' || recruitTarget === 'edit' ? recruitTarget : 'talent'
+                return rows.filter((item) => (item.recruitTarget || 'talent') === key)
+              }
               const openChooser = (saved: ReturnType<typeof listPublishFormTemplates>) => {
                 setSavedFormTemplates(saved)
                 setFieldPick({ ...fieldOn })
                 setFieldChooserOpen(saved.length > 0)
                 setFieldEditorOpen(true)
               }
-              const saved = listPublishFormTemplates()
+              const saved = forTarget(listPublishFormTemplates())
               if (saved.length) {
                 openChooser(saved)
                 void import('../../lib/mpAccountClientSync')
                   .then((m) => m.syncClientStateWithServer())
-                  .then(() => setSavedFormTemplates(listPublishFormTemplates()))
+                  .then(() => setSavedFormTemplates(forTarget(listPublishFormTemplates())))
                   .catch(() => {})
               } else {
                 void import('../../lib/mpAccountClientSync')
                   .then((m) => m.syncClientStateWithServer())
                   .catch(() => null)
-                  .then(() => openChooser(listPublishFormTemplates()))
+                  .then(() => openChooser(forTarget(listPublishFormTemplates())))
               }
             }}
           >

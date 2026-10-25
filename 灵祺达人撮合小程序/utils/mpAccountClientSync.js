@@ -79,7 +79,8 @@ function collectLocalState() {
     publishWizardDrafts: readList(draftsKey),
     applyFormTemplates: applyTemplates.listAllTemplates(),
     publishFormTemplates: publishFormTemplates.listPublishFormTemplates(),
-    activePublishFormTemplateId: publishFormTemplates.getActivePublishFormTemplateId(),
+    activePublishFormTemplateId: publishFormTemplates.getActivePublishFormTemplateId('talent'),
+    activePublishFormTemplateIds: publishFormTemplates.getActivePublishFormTemplateIds(),
     activeApplyTemplateIds: applyTemplates.readActiveApplyTemplateIds(),
     talentFavoriteIds: [...talentFavorites.readIdSet()],
     orderFavoriteIds: [...orderFavorites.readIdSet()],
@@ -265,7 +266,10 @@ function applyRemoteState(state, epochAtStart) {
     publishFormTemplates.applyPublishFormTemplatesFromSync(state.publishFormTemplates)
   }
   if (!publishTplStale && state.activePublishFormTemplateId) {
-    publishFormTemplates.setActivePublishFormTemplateId(String(state.activePublishFormTemplateId), { silent: true })
+    publishFormTemplates.setActivePublishFormTemplateId(String(state.activePublishFormTemplateId), { silent: true, recruitTarget: 'talent' })
+  }
+  if (!publishTplStale && state.activePublishFormTemplateIds) {
+    publishFormTemplates.applyActivePublishFormTemplateIds(state.activePublishFormTemplateIds, { silent: true })
   }
   if (Array.isArray(state.applyFormTemplates) || state.activeApplyTemplateIds) {
     applyTemplates.applyTemplatesFromSync(state.applyFormTemplates, state.activeApplyTemplateIds)

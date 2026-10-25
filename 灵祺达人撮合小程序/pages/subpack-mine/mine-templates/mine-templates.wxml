@@ -47,6 +47,19 @@
   </view>
   </block>
   <block wx:else>
+    <view class="card">
+      <view class="tpl-kind-tabs">
+        <view
+          wx:for="{{kindTabs}}"
+          wx:key="id"
+          class="tpl-kind-tab {{recruitKind === item.id ? 'tpl-kind-tab--active' : ''}}"
+          data-kind="{{item.id}}"
+          bindtap="onRecruitKindTab"
+        >
+          {{item.label}}
+        </view>
+      </view>
+    </view>
     <view wx:if="{{!editing}}" class="card">
       <button class="btn-primary tpl-create-btn" bindtap="onCreateFormTemplate">+ 新建商单模版</button>
     </view>
@@ -85,7 +98,7 @@
         </view>
       </view>
       <view wx:if="{{!formTpls.length}}" class="card">
-        <text class="hint">暂无商单招募模版。点上方「新建商单模版」勾选字段后保存，发招募时点「添加字段」即可套用。</text>
+        <text class="hint">这一身份还没有商单模版。点上方「新建商单模版」勾选字段后保存，发招募时点「添加字段」即可套用。</text>
       </view>
     </block>
   </block>

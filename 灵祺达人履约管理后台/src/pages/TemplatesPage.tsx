@@ -13,7 +13,7 @@ import {
   deletePublishFormTemplate,
   getActivePublishFormTemplateId,
   listPublishFormTemplates,
-  RECRUIT_TEMPLATE_FIELDS,
+  recruitTemplateFields,
   savePublishFormTemplate,
   setActivePublishFormTemplateId,
   type PublishFormTemplate,
@@ -65,6 +65,7 @@ export default function TemplatesPage() {
 
   const [section, setSection] = useState<'apply' | 'recruit'>('apply')
   const [kind, setKind] = useState<TemplateKind>('talent')
+  const [recruitKind, setRecruitKind] = useState<TemplateKind>('talent')
   const [rows, setRows] = useState(() => listCustomTemplates())
   const [formTpls, setFormTpls] = useState(() => listPublishFormTemplates())
   const [editing, setEditing] = useState<PublishFormTemplate | null>(null)
@@ -72,7 +73,8 @@ export default function TemplatesPage() {
   const [customFormat, setCustomFormat] = useState<'text' | 'image' | 'video'>('text')
   const [notice, setNotice] = useState('')
   const activeId = getActiveTemplateId(kind)
-  const activeFormId = getActivePublishFormTemplateId()
+  const activeFormId = getActivePublishFormTemplateId(recruitKind)
+  const visibleFormTpls = formTpls.filter((row) => (row.recruitTarget || 'talent') === recruitKind)
 
   const filtered = useMemo(() => listCustomTemplates(kind), [rows, kind])
 
@@ -96,7 +98,11 @@ export default function TemplatesPage() {
 
   const kindHint =
     section === 'recruit'
-      ? '商单招募模版'
+      ? recruitKind === 'shoot'
+        ? '拍摄商单模版'
+        : recruitKind === 'edit'
+          ? '剪辑商单模版'
+          : '达人商单模版'
       : kind === 'talent'
         ? '达人必填模版'
         : kind === 'shoot'
@@ -108,7 +114,7 @@ export default function TemplatesPage() {
       id: `pft-${Date.now()}`,
       name: '',
       updatedAt: new Date().toISOString(),
-      recruitTarget: 'talent',
+      recruitTarget: recruitKind,
       recruitMode: 'visit',
       fulfillmentLoop: 'closed',
       isTargeted: false,
@@ -134,7 +140,7 @@ export default function TemplatesPage() {
     const creating = !formTpls.some((row) => row.id === editing.id)
     const name = editing.name.trim() || '我的发单模版'
     const row = savePublishFormTemplate({ ...editing, name })
-    if (creating) setActivePublishFormTemplateId(row.id)
+    if (creating) setActivePublishFormTemplateId(row.id, { recruitTarget: row.recruitTarget })
     setEditing(null)
     refresh()
     if (creating) setNotice(`已新建模版「${name}」。创建商单时点「添加字段」即可套用。`)
@@ -187,7 +193,17 @@ export default function TemplatesPage() {
         onChange={(id) => setKind(id as TemplateKind)}
         tabs={TEMPLATE_KINDS.map((k) => ({ id: k.id, label: k.label }))}
       />
-      ) : null}
+      ) : (
+      <StatusTabBar
+        sub
+        active={recruitKind}
+        onChange={(id) => {
+          setRecruitKind(id as TemplateKind)
+          setEditing(null)
+        }}
+        tabs={TEMPLATE_KINDS.map((k) => ({ id: k.id, label: k.label }))}
+      />
+      )}
 
       {section === 'apply' ? (
         <Link
@@ -220,7 +236,7 @@ export default function TemplatesPage() {
               />
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {RECRUIT_TEMPLATE_FIELDS.map((field) => (
+              {recruitTemplateFields(editing.recruitTarget).map((field) => (
                 <label key={field.key} className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -290,18 +306,18 @@ export default function TemplatesPage() {
               </button>
             </div>
           </section>
-        ) : !formTpls.length ? (
-          <EmptyState title="暂无商单招募模版" desc="点上方「新建商单模版」，勾选发单字段后保存。创建商单时点「添加字段」即可套用。" />
+        ) : !visibleFormTpls.length ? (
+          <EmptyState title={`暂无${recruitKind === 'shoot' ? '拍摄' : recruitKind === 'edit' ? '剪辑' : '达人'}商单模版`} desc="点上方「新建商单模版」，勾选这一身份的发单字段后保存。创建商单时点「添加字段」即可套用。" />
         ) : (
           <div className="template-grid">
-            {formTpls.map((t) => (
+            {visibleFormTpls.map((t) => (
               <TemplateCard
                 key={t.id}
                 title={t.name}
                 inUse={activeFormId === t.id}
                 meta={`${t.recruitTarget === 'shoot' ? '拍摄' : t.recruitTarget === 'edit' ? '剪辑' : '达人'} · ${t.recruitMode}${activeFormId === t.id ? ' · 使用中' : ''}`}
                 onUse={() => {
-                  setActivePublishFormTemplateId(t.id)
+                  setActivePublishFormTemplateId(t.id, { recruitTarget: t.recruitTarget })
                   refresh()
                   setNotice(`已使用模版「${t.name}」。回到发布招募，点「添加字段」即可套用。`)
                 }}

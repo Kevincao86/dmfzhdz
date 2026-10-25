@@ -6,6 +6,7 @@ Page({
   data: {
     section: 'apply',
     kind: 'talent',
+    recruitKind: 'talent',
     kindTabs: templates.TEMPLATE_KINDS,
     rows: [],
     activeId: '',
@@ -19,11 +20,12 @@ Page({
   },
   refresh() {
     const kind = templates.normalizeTemplateKind(this.data.kind)
+    const recruitKind = publishFormTemplates.normalizeRecruitTarget(this.data.recruitKind)
     this.setData({
       rows: templates.listCustomTemplates(kind),
       activeId: templates.getActiveTemplateId(kind),
-      formTpls: publishFormTemplates.listPublishFormTemplates(),
-      activeFormId: publishFormTemplates.getActivePublishFormTemplateId(),
+      formTpls: publishFormTemplates.listPublishFormTemplatesFor(recruitKind),
+      activeFormId: publishFormTemplates.getActivePublishFormTemplateId(recruitKind),
     })
   },
   async onShow() {
@@ -45,6 +47,11 @@ Page({
     const kind = e.currentTarget.dataset.kind
     if (!kind) return
     this.setData({ kind }, () => this.refresh())
+  },
+  onRecruitKindTab(e) {
+    const recruitKind = e.currentTarget.dataset.kind
+    if (!recruitKind) return
+    this.setData({ recruitKind, editing: null }, () => this.refresh())
   },
   onAdd() {
     const kind = templates.normalizeTemplateKind(this.data.kind)
@@ -85,7 +92,7 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     const row = (this.data.formTpls || []).find((item) => item.id === id)
-    publishFormTemplates.setActivePublishFormTemplateId(id)
+    publishFormTemplates.setActivePublishFormTemplateId(id, { recruitTarget: row && row.recruitTarget })
     this.setData({ useHint: `已使用模版「${row && row.name ? row.name : '该模版'}」。发招募时点添加字段即可套用。` })
     wx.showToast({ title: '已使用该模版', icon: 'success' })
     this.refresh()
@@ -95,14 +102,14 @@ Page({
       editing: {
         id: '',
         name: '',
-        recruitTarget: 'talent',
+        recruitTarget: publishFormTemplates.normalizeRecruitTarget(this.data.recruitKind),
         recruitMode: 'visit',
         fulfillmentLoop: 'closed',
         isTargeted: false,
         fieldOrder: [],
         customFields: [],
       },
-      editFields: publishFormTemplates.RECRUIT_TEMPLATE_FIELDS.map((field) => ({
+      editFields: publishFormTemplates.recruitTemplateFields(this.data.recruitKind).map((field) => ({
         key: field.key,
         label: field.label,
         on: false,
@@ -125,7 +132,7 @@ Page({
         fieldOrder: tpl.fieldOrder || [],
         customFields: (tpl.customFields || []).map((row) => ({ ...row })),
       },
-      editFields: publishFormTemplates.RECRUIT_TEMPLATE_FIELDS.map((field) => ({
+      editFields: publishFormTemplates.recruitTemplateFields(tpl.recruitTarget).map((field) => ({
         key: field.key,
         label: field.label,
         on: fieldOn[field.key] === true,
@@ -188,7 +195,7 @@ Page({
       fieldOrder: editing.fieldOrder,
       customFields: editing.customFields || [],
     })
-    if (creating && row && row.id) publishFormTemplates.setActivePublishFormTemplateId(row.id)
+    if (creating && row && row.id) publishFormTemplates.setActivePublishFormTemplateId(row.id, { recruitTarget: row.recruitTarget })
     this.setData({
       editing: null,
       useHint: creating ? `已新建模版「${name}」。发招募时点添加字段即可套用。` : '',

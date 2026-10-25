@@ -301,11 +301,31 @@ const PUBLISH_FIELD_LABELS = {
   cover: '封面',
 }
 
-function layoutFromOrder(order, customFields) {
+function baseOrderFor(target) {
+  if (target === 'shoot' || target === 'edit') {
+    return publishFormTemplates.recruitTemplateFields(target).map((field) => field.key)
+  }
+  return DEFAULT_PUBLISH_FIELD_ORDER
+}
+
+function labelsFor(target) {
+  if (target === 'shoot' || target === 'edit') {
+    const labels = {}
+    publishFormTemplates.recruitTemplateFields(target).forEach((field) => {
+      labels[field.key] = field.label
+    })
+    return labels
+  }
+  return PUBLISH_FIELD_LABELS
+}
+
+function layoutFromOrder(order, customFields, target) {
   const fields = Array.isArray(customFields) ? customFields : []
   const ids = fields.map((row) => (row && row.id ? String(row.id) : '')).filter(Boolean)
+  const base = baseOrderFor(target)
+  const labels = labelsFor(target)
   const known = {}
-  DEFAULT_PUBLISH_FIELD_ORDER.forEach((key) => {
+  base.forEach((key) => {
     known[key] = true
   })
   ids.forEach((id) => {
@@ -316,8 +336,8 @@ function layoutFromOrder(order, customFields) {
     const id = String(key || '').trim()
     if (id && known[id] && next.indexOf(id) < 0) next.push(id)
   })
-  if (!next.length) DEFAULT_PUBLISH_FIELD_ORDER.forEach((key) => next.push(key))
-  else DEFAULT_PUBLISH_FIELD_ORDER.forEach((key) => {
+  if (!next.length) base.forEach((key) => next.push(key))
+  else base.forEach((key) => {
     if (next.indexOf(key) < 0) next.push(key)
   })
   ids.forEach((id) => {
@@ -333,7 +353,7 @@ function layoutFromOrder(order, customFields) {
   })
   const editorRows = next
     .map((key) => {
-      if (PUBLISH_FIELD_LABELS[key]) return { key, kind: 'sys', label: PUBLISH_FIELD_LABELS[key] }
+      if (labels[key]) return { key, kind: 'sys', label: labels[key] }
       const row = byId[key]
       if (!row) return null
       const formatLabel = row.formatLabel || (row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字')
@@ -343,23 +363,8 @@ function layoutFromOrder(order, customFields) {
   return { fieldOrder: next, fieldRank, editorRows }
 }
 
-function defaultPublishFieldOn() {
-  return {
-    title: false,
-    delivery: false,
-    deadline: false,
-    platform: false,
-    city: false,
-    location: false,
-    tags: false,
-    fans: false,
-    level: false,
-    fee: false,
-    count: false,
-    detail: false,
-    apply: false,
-    cover: false,
-  }
+function defaultPublishFieldOn(target) {
+  return publishFormTemplates.emptyRecruitFieldOn(target)
 }
 
 function allPublishFieldOn() {
@@ -370,9 +375,9 @@ function allPublishFieldOn() {
   return on
 }
 
-function fieldOnFromSaved(saved) {
-  const fieldOn = { ...defaultPublishFieldOn(), ...(saved || {}) }
-  if (!saved || saved.title == null) fieldOn.title = true
+function fieldOnFromSaved(saved, target) {
+  const fieldOn = { ...defaultPublishFieldOn(target), ...(saved || {}) }
+  if (target !== 'shoot' && target !== 'edit' && (!saved || saved.title == null)) fieldOn.title = true
   return fieldOn
 }
 
@@ -1183,7 +1188,7 @@ Page({
         publishTemplateMode: meta.publishTemplateMode === 'custom' || (meta.publishFieldOn && typeof meta.publishFieldOn === 'object') ? 'custom' : 'system',
         fieldOn:
           meta.publishFieldOn && typeof meta.publishFieldOn === 'object'
-            ? fieldOnFromSaved(meta.publishFieldOn)
+            ? fieldOnFromSaved(meta.publishFieldOn, recruitTargetId)
             : allPublishFieldOn(),
         customPublishFields: (() => {
           const rows = Array.isArray(meta.customPublishFields)
@@ -1196,7 +1201,7 @@ Page({
                 }
               })
             : []
-          const layout = layoutFromOrder(meta.fieldOrder, rows)
+          const layout = layoutFromOrder(meta.fieldOrder, rows, recruitTargetId)
           this._pendingFieldLayout = layout
           return rows
         })(),
@@ -1291,7 +1296,7 @@ Page({
       form.applyFormFields = livePublishForm.defaultLiveApplyFields()
       form.applyFormTemplateName = '直播达人报名默认项'
     }
-    const fieldOn = resetFields ? defaultPublishFieldOn() : { ...this.data.fieldOn, ...(tpl.fieldOn || {}) }
+    const fieldOn = resetFields ? defaultPublishFieldOn(target.id) : { ...defaultPublishFieldOn(target.id), ...(tpl.fieldOn || {}) }
     const customPublishFields = resetFields
       ? []
       : (tpl.customFields || []).map((row) => ({
@@ -1299,7 +1304,7 @@ Page({
           value: '',
           formatLabel: row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字',
         }))
-    const fieldLayout = layoutFromOrder(tpl.fieldOrder, customPublishFields)
+    const fieldLayout = layoutFromOrder(tpl.fieldOrder, customPublishFields, target.id)
     this.setData({
       step: 'form',
       recruitTarget: target.id,
@@ -1313,7 +1318,7 @@ Page({
       isSupplierPublish: isSupplier,
       publishTemplateMode: resetFields || this.layoutIsCustom(fieldOn, customPublishFields) ? 'custom' : 'system',
       fieldOn,
-      fieldPick: resetFields ? defaultPublishFieldOn() : { ...fieldOn },
+      fieldPick: resetFields ? defaultPublishFieldOn(target.id) : { ...fieldOn },
       fieldEditorOpen: false,
       customPublishFields,
       fieldOrder: fieldLayout.fieldOrder,
@@ -1403,6 +1408,8 @@ Page({
       form.applyFormFields = livePublishForm.defaultLiveApplyFields()
       form.applyFormTemplateName = '直播达人报名默认项'
     }
+    const blank = defaultPublishFieldOn(target.id)
+    const layout = layoutFromOrder(baseOrderFor(target.id), [], target.id)
     this.setData({
       recruitTarget: target.id,
       recruitTargetLabel: target.label,
@@ -1412,6 +1419,14 @@ Page({
       isSupplierPublish: isSupplier,
       isTargetedRecruit: isSupplier ? false : this.data.isTargetedRecruit,
       recruitChannel: isSupplier ? 'open' : this.data.recruitChannel,
+      fieldOn: blank,
+      fieldPick: { ...blank },
+      customPublishFields: [],
+      fieldEditorOpen: false,
+      fieldChooserOpen: false,
+      fieldOrder: layout.fieldOrder,
+      fieldRank: layout.fieldRank,
+      editorRows: layout.editorRows,
       form,
       tagGrid: buildTagGrid(form.talentTags || []),
     }, () => {
@@ -1457,12 +1472,13 @@ Page({
       this.setData({ fieldEditorOpen: false, fieldChooserOpen: false })
       return
     }
-    let saved = publishFormTemplates.listPublishFormTemplates()
+    const target = this.data.recruitTarget || 'talent'
+    let saved = publishFormTemplates.listPublishFormTemplatesFor(target)
     if (!saved.length) {
       try {
         await require('../../utils/mpAccountClientSync.js').flushClientStateSync()
       } catch (_) {}
-      saved = publishFormTemplates.listPublishFormTemplates()
+      saved = publishFormTemplates.listPublishFormTemplatesFor(target)
     }
     this.setData({
       fieldEditorOpen: true,
@@ -1478,14 +1494,15 @@ Page({
     const id = e.currentTarget.dataset.id
     const tpl = publishFormTemplates.getPublishFormTemplateById(id)
     if (!tpl) return
-    const fieldOn = { ...defaultPublishFieldOn(), ...(tpl.fieldOn || {}) }
+    const target = tpl.recruitTarget || this.data.recruitTarget || 'talent'
+    const fieldOn = { ...defaultPublishFieldOn(target), ...(tpl.fieldOn || {}) }
     const customPublishFields = (tpl.customFields || []).map((row) => ({
       ...row,
       value: '',
       formatLabel: row.format === 'image' ? '图片' : row.format === 'video' ? '视频' : '文字',
     }))
-    const layout = layoutFromOrder(tpl.fieldOrder, customPublishFields)
-    publishFormTemplates.setActivePublishFormTemplateId(tpl.id)
+    const layout = layoutFromOrder(tpl.fieldOrder, customPublishFields, target)
+    publishFormTemplates.setActivePublishFormTemplateId(tpl.id, { recruitTarget: target })
     this.setData({
       fieldOn,
       fieldPick: { ...fieldOn },
@@ -1507,7 +1524,7 @@ Page({
   },
   onSaveFieldPick() {
     const fieldOn = {
-      ...defaultPublishFieldOn(),
+      ...defaultPublishFieldOn(this.data.recruitTarget),
       ...(this.data.fieldPick || {}),
     }
     this.setData({ fieldOn, fieldEditorOpen: false, publishTemplateMode: 'custom' })
@@ -1523,7 +1540,7 @@ Page({
       success: (res) => {
         if (!res.confirm) return
         const name = String(res.content != null ? res.content : '我的发单模版').trim() || '我的发单模版'
-        const fieldOn = { ...defaultPublishFieldOn(), ...(this.data.fieldPick || this.data.fieldOn || {}) }
+        const fieldOn = { ...defaultPublishFieldOn(this.data.recruitTarget), ...(this.data.fieldPick || this.data.fieldOn || {}) }
         const row = publishFormTemplates.savePublishFormTemplate({
           name,
           recruitTarget: this.data.recruitTarget || 'talent',
@@ -1538,14 +1555,14 @@ Page({
             format: item.format || 'text',
           })),
         })
-        if (row) publishFormTemplates.setActivePublishFormTemplateId(row.id)
+        if (row) publishFormTemplates.setActivePublishFormTemplateId(row.id, { recruitTarget: this.data.recruitTarget })
         this.setData({ publishFormTemplates: publishFormTemplates.listPublishFormTemplates() })
         wx.showToast({ title: '已存入我的模版', icon: 'success' })
       },
     })
   },
   onUsePublishFormTemplate() {
-    const list = publishFormTemplates.listPublishFormTemplates()
+    const list = publishFormTemplates.listPublishFormTemplatesFor(this.data.recruitTarget || 'talent')
     if (!list.length) {
       wx.showToast({ title: '还没有发单模版', icon: 'none' })
       return
@@ -1555,7 +1572,7 @@ Page({
       success: (res) => {
         const tpl = list[res.tapIndex]
         if (!tpl) return
-        publishFormTemplates.setActivePublishFormTemplateId(tpl.id)
+        publishFormTemplates.setActivePublishFormTemplateId(tpl.id, { recruitTarget: tpl.recruitTarget })
         this.applyPublishTemplate(tpl, this.data.form.platform, true)
       },
     })
@@ -1782,7 +1799,7 @@ Page({
         const list = (this.data.customPublishFields || []).concat([
           { id: `c-${Date.now()}`, label, value: '', format, formatLabel },
         ])
-        this.setData(Object.assign({ customPublishFields: list, publishTemplateMode: 'custom' }, layoutFromOrder(this.data.fieldOrder, list)))
+        this.setData(Object.assign({ customPublishFields: list, publishTemplateMode: 'custom' }, layoutFromOrder(this.data.fieldOrder, list, this.data.recruitTarget)))
       },
     })
   },
@@ -1795,7 +1812,7 @@ Page({
     const list = (this.data.customPublishFields || []).concat([
       { id: `c-${Date.now()}`, label, value: '', format: 'text', formatLabel: '文字' },
     ])
-    this.setData(Object.assign({ customPublishFields: list, customFieldDraft: '', publishTemplateMode: 'custom' }, layoutFromOrder(this.data.fieldOrder, list)))
+    this.setData(Object.assign({ customPublishFields: list, customFieldDraft: '', publishTemplateMode: 'custom' }, layoutFromOrder(this.data.fieldOrder, list, this.data.recruitTarget)))
   },
   onFieldDragStart(e) {
     const touch = e.touches && e.touches[0]
@@ -1902,7 +1919,7 @@ Page({
       return
     }
     order.splice(drag.target, 0, item)
-    this.setData(Object.assign(clear, layoutFromOrder(order, this.data.customPublishFields)))
+    this.setData(Object.assign(clear, layoutFromOrder(order, this.data.customPublishFields, this.data.recruitTarget)))
   },
   onRemoveCustomPublishField(e) {
     const id = e.currentTarget.dataset.id
@@ -1910,7 +1927,7 @@ Page({
     this.setData(Object.assign({
       customPublishFields: list,
       publishTemplateMode: this.layoutIsCustom(this.data.fieldOn, list) ? 'custom' : 'system',
-    }, layoutFromOrder(this.data.fieldOrder, list)))
+    }, layoutFromOrder(this.data.fieldOrder, list, this.data.recruitTarget)))
   },
   onCustomPublishValue(e) {
     const id = e.currentTarget.dataset.id
@@ -2394,6 +2411,24 @@ Page({
   },
   validate() {
     const f = this.data.form
+    const on = (key) => this.data.fieldOn && this.data.fieldOn[key] === true
+    const target = this.data.recruitTarget || 'talent'
+    if (target === 'shoot') {
+      if (on('shootDate') && !String(f.shootDate || '').trim()) return '请选择拍摄日期'
+      if (on('shootTime') && (!String(f.shootTimeStart || '').trim() || !String(f.shootTimeEnd || '').trim())) return '请填写拍摄时段'
+      if (on('shootLocation') && !String(f.shootLocation || '').trim()) return '请填写拍摄地点'
+      if (on('deliverables') && !(f.deliverables || []).length) return '请选择成片交付'
+    }
+    if (target === 'edit') {
+      if (on('materialSource') && !String(f.materialSource || '').trim()) return '请选择素材来源'
+      if (on('materialUrl') && this.data.recruitMode !== 'edit_ice' && f.materialSource === 'PR提供链接' && !String(f.materialUrl || '').trim()) {
+        return '请填写素材链接'
+      }
+      if (on('aspectRatio') && !String(f.aspectRatio || '').trim()) return '请选择成片画幅'
+      if (on('targetDuration') && !String(f.targetDuration || '').trim()) return '请选择目标时长'
+      if (on('editStyle') && !(f.styleTags || []).length) return '请选择剪辑风格'
+      if (on('deliveryDeadline') && !String(f.deliveryDeadline || this.data.deliveryDeadlineDate || '').trim()) return '请选交付截止'
+    }
     const lk = f.linkeAttach
     if (lk && lk.enabled) {
       if (!lk.clientId) return '挂接林客时请选择客户商家'
