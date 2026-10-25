@@ -87,7 +87,7 @@ export function listPublishFormTemplates(): PublishFormTemplate[] {
   }
 }
 
-function writeAll(list: PublishFormTemplate[]) {
+function writeAll(list: PublishFormTemplate[], opts?: { silent?: boolean }) {
   const next = JSON.stringify(list.slice(0, 30))
   const key = storageKey()
   try {
@@ -96,7 +96,7 @@ function writeAll(list: PublishFormTemplate[]) {
     /* ignore quota / private mode */
   }
   localStorage.setItem(key, next)
-  notify()
+  if (!opts?.silent) notify()
 }
 
 export function getPublishFormTemplateById(id: string) {
@@ -116,11 +116,11 @@ export function getActivePublishFormTemplate() {
   return id ? getPublishFormTemplateById(id) : null
 }
 
-export function setActivePublishFormTemplateId(id: string) {
+export function setActivePublishFormTemplateId(id: string, opts?: { silent?: boolean }) {
   const next = String(id || '').trim()
   if (next) localStorage.setItem(activeKey(), next)
   else localStorage.removeItem(activeKey())
-  notify()
+  if (!opts?.silent) notify()
 }
 
 export function savePublishFormTemplate(input: Omit<PublishFormTemplate, 'id' | 'updatedAt'> & { id?: string }) {
@@ -151,5 +151,5 @@ export function applyPublishFormTemplatesFromSync(templates: unknown) {
     if (!prev || row.updatedAt > prev.updatedAt) map.set(row.id, row)
   }
   const merged = [...map.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 30)
-  writeAll(merged)
+  writeAll(merged, { silent: true })
 }

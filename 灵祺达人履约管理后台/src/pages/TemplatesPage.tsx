@@ -103,6 +103,22 @@ export default function TemplatesPage() {
           ? '拍摄团队报名项'
           : '剪辑团队报名项'
 
+  function startNewRecruit() {
+    setEditing({
+      id: `pft-${Date.now()}`,
+      name: '',
+      updatedAt: new Date().toISOString(),
+      recruitTarget: 'talent',
+      recruitMode: 'visit',
+      fulfillmentLoop: 'closed',
+      isTargeted: false,
+      fieldOn: {},
+      customFields: [],
+    })
+    setCustomDraft('')
+    setCustomFormat('text')
+  }
+
   function openRecruitEdit(tpl: PublishFormTemplate) {
     setEditing({
       ...tpl,
@@ -115,10 +131,13 @@ export default function TemplatesPage() {
 
   function saveRecruitEdit() {
     if (!editing) return
+    const creating = !formTpls.some((row) => row.id === editing.id)
     const name = editing.name.trim() || '我的发单模版'
-    savePublishFormTemplate({ ...editing, name })
+    const row = savePublishFormTemplate({ ...editing, name })
+    if (creating) setActivePublishFormTemplateId(row.id)
     setEditing(null)
     refresh()
+    if (creating) setNotice(`已新建模版「${name}」。创建商单时点「添加字段」即可套用。`)
   }
 
   return (
@@ -130,10 +149,23 @@ export default function TemplatesPage() {
       ) : null}
       <PageHero title="我的模版" subtitle="达人必填模版管报名项，商单招募模版管发单字段。" badge={kindHint}>
         {section === 'apply' ? (
-          <Link to={`/templates/edit?kind=${kind}`} className="btn-mockup btn-mockup--primary">
-            新建模版
+          <Link
+            to={`/templates/edit?kind=${kind}`}
+            className="inline-flex items-center rounded-xl px-5 py-2.5 text-base font-bold shadow-lg"
+            style={{ background: '#ffffff', color: '#4c1d95' }}
+          >
+            + 新建模版
           </Link>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            className="inline-flex items-center rounded-xl px-5 py-2.5 text-base font-bold shadow-lg"
+            style={{ background: '#ffffff', color: '#4c1d95' }}
+            onClick={startNewRecruit}
+          >
+            + 新建商单模版
+          </button>
+        )}
       </PageHero>
 
       <StatusTabBar
@@ -155,6 +187,25 @@ export default function TemplatesPage() {
         onChange={(id) => setKind(id as TemplateKind)}
         tabs={TEMPLATE_KINDS.map((k) => ({ id: k.id, label: k.label }))}
       />
+      ) : null}
+
+      {section === 'apply' ? (
+        <Link
+          to={`/templates/edit?kind=${kind}`}
+          className="inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-base font-bold"
+          style={{ background: '#6d28d9', color: '#ffffff' }}
+        >
+          + 新建模版
+        </Link>
+      ) : !editing ? (
+        <button
+          type="button"
+          className="inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-base font-bold"
+          style={{ background: '#6d28d9', color: '#ffffff' }}
+          onClick={startNewRecruit}
+        >
+          + 新建商单模版
+        </button>
       ) : null}
 
       {section === 'recruit' ? (
@@ -232,7 +283,7 @@ export default function TemplatesPage() {
             </div>
             <div className="flex gap-2">
               <button type="button" className="btn-mockup btn-mockup--primary" onClick={saveRecruitEdit}>
-                保存修改
+                {formTpls.some((row) => row.id === editing.id) ? '保存修改' : '保存模版'}
               </button>
               <button type="button" className="btn-mockup" onClick={() => setEditing(null)}>
                 取消
@@ -240,7 +291,7 @@ export default function TemplatesPage() {
             </div>
           </section>
         ) : !formTpls.length ? (
-          <EmptyState title="暂无商单招募模版" desc="在发布招募里勾选字段后，点「存入我的模版」" />
+          <EmptyState title="暂无商单招募模版" desc="点上方「新建商单模版」，勾选发单字段后保存。创建商单时点「添加字段」即可套用。" />
         ) : (
           <div className="template-grid">
             {formTpls.map((t) => (

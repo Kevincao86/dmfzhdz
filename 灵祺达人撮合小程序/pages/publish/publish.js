@@ -1452,12 +1452,18 @@ Page({
   onToggleApplyInfo() {
     this.setData({ applyInfoOpen: !this.data.applyInfoOpen })
   },
-  onToggleFieldEditor() {
+  async onToggleFieldEditor() {
     if (this.data.fieldEditorOpen) {
       this.setData({ fieldEditorOpen: false, fieldChooserOpen: false })
       return
     }
-    const saved = publishFormTemplates.listPublishFormTemplates()
+    let saved = publishFormTemplates.listPublishFormTemplates()
+    if (!saved.length) {
+      try {
+        await require('../../utils/mpAccountClientSync.js').flushClientStateSync()
+      } catch (_) {}
+      saved = publishFormTemplates.listPublishFormTemplates()
+    }
     this.setData({
       fieldEditorOpen: true,
       fieldChooserOpen: saved.length > 0,

@@ -20,6 +20,7 @@ export type MpClientStatePayload = {
   publishWizardDrafts?: Record<string, unknown>[]
   applyFormTemplates?: Record<string, unknown>[]
   publishFormTemplates?: Record<string, unknown>[]
+  activePublishFormTemplateId?: string
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
   orderFavoriteIds?: string[]
@@ -285,6 +286,7 @@ export function emptyClientStatePayload(): MpClientStatePayload {
     publishWizardDrafts: [],
     applyFormTemplates: [],
     publishFormTemplates: [],
+    activePublishFormTemplateId: '',
     activeApplyTemplateIds: {},
     talentFavoriteIds: [],
     orderFavoriteIds: [],
@@ -370,6 +372,7 @@ export function mergeClientStatePayload(
       (r) => parseTime(r.updatedAt || r.savedAt || r.id),
       MAX_TEMPLATES,
     ),
+    activePublishFormTemplateId: String(c.activePublishFormTemplateId || s.activePublishFormTemplateId || '').trim(),
     activeApplyTemplateIds: mergeActiveTemplateIds(
       s.activeApplyTemplateIds as Record<string, string> | undefined,
       c.activeApplyTemplateIds as Record<string, string> | undefined,

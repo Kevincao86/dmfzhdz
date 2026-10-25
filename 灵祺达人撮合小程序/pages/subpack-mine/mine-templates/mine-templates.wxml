@@ -47,6 +47,9 @@
   </view>
   </block>
   <block wx:else>
+    <view wx:if="{{!editing}}" class="card">
+      <button class="btn-primary tpl-create-btn" bindtap="onCreateFormTemplate">+ 新建商单模版</button>
+    </view>
     <block wx:if="{{editing}}">
       <view class="card tpl-card">
         <input class="tpl-edit-name" value="{{editing.name}}" bindinput="onEditName" placeholder="模版名称" />
@@ -63,7 +66,7 @@
           <text bindtap="onAddEditCustom">添加</text>
         </view>
         <view class="tpl-actions">
-          <button class="btn-primary" size="mini" bindtap="onSaveFormEdit">保存修改</button>
+          <button class="btn-primary" size="mini" bindtap="onSaveFormEdit">{{editing.id ? '保存修改' : '保存模版'}}</button>
           <button class="btn-secondary" size="mini" bindtap="onCancelFormEdit">取消</button>
         </view>
       </view>
@@ -82,7 +85,7 @@
         </view>
       </view>
       <view wx:if="{{!formTpls.length}}" class="card">
-        <text class="hint">暂无商单招募模版。在发招募里勾选字段后点「存入我的模版」。</text>
+        <text class="hint">暂无商单招募模版。点上方「新建商单模版」勾选字段后保存，发招募时点「添加字段」即可套用。</text>
       </view>
     </block>
   </block>

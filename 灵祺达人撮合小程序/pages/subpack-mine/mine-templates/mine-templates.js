@@ -32,6 +32,9 @@ Page({
       this.setData({ rows: [], activeId: '', formTpls: [], activeFormId: '' })
       return
     }
+    try {
+      await require('../../../utils/mpAccountClientSync.js').flushClientStateSync()
+    } catch (_) {}
     this.refresh()
   },
   onSectionTab(e) {
@@ -86,6 +89,26 @@ Page({
     this.setData({ useHint: `已使用模版「${row && row.name ? row.name : '该模版'}」。发招募时点添加字段即可套用。` })
     wx.showToast({ title: '已使用该模版', icon: 'success' })
     this.refresh()
+  },
+  onCreateFormTemplate() {
+    this.setData({
+      editing: {
+        id: '',
+        name: '',
+        recruitTarget: 'talent',
+        recruitMode: 'visit',
+        fulfillmentLoop: 'closed',
+        isTargeted: false,
+        fieldOrder: [],
+        customFields: [],
+      },
+      editFields: publishFormTemplates.RECRUIT_TEMPLATE_FIELDS.map((field) => ({
+        key: field.key,
+        label: field.label,
+        on: false,
+      })),
+      customDraft: '',
+    })
   },
   onEditFormTemplate(e) {
     const tpl = publishFormTemplates.getPublishFormTemplateById(e.currentTarget.dataset.id)
@@ -152,9 +175,11 @@ Page({
     ;(this.data.editFields || []).forEach((field) => {
       fieldOn[field.key] = !!field.on
     })
-    publishFormTemplates.savePublishFormTemplate({
+    const creating = !editing.id
+    const name = String(editing.name || '').trim() || '我的发单模版'
+    const row = publishFormTemplates.savePublishFormTemplate({
       id: editing.id,
-      name: String(editing.name || '').trim() || '我的发单模版',
+      name,
       recruitTarget: editing.recruitTarget,
       recruitMode: editing.recruitMode,
       fulfillmentLoop: editing.fulfillmentLoop,
@@ -163,9 +188,13 @@ Page({
       fieldOrder: editing.fieldOrder,
       customFields: editing.customFields || [],
     })
-    this.setData({ editing: null })
+    if (creating && row && row.id) publishFormTemplates.setActivePublishFormTemplateId(row.id)
+    this.setData({
+      editing: null,
+      useHint: creating ? `已新建模版「${name}」。发招募时点添加字段即可套用。` : '',
+    })
     this.refresh()
-    wx.showToast({ title: '已保存', icon: 'success' })
+    wx.showToast({ title: creating ? '已新建模版' : '已保存', icon: 'success' })
   },
   onCancelFormEdit() {
     this.setData({ editing: null })

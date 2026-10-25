@@ -20,7 +20,12 @@ import { applyOrderFavoriteIdsFromSync, readOrderFavoriteIds } from './mpSync/or
 import { applyHandledMapFromSync, exportHandledMapForSync } from './mpSync/inboxNoticeState'
 import { applyGroupQrCacheFromSync, exportGroupQrCacheForSync } from './mpSync/mpGroupQr'
 import { applyTalentEvalsFromSync, exportTalentEvalsForSync } from './talentLocalLifeEval'
-import { applyPublishFormTemplatesFromSync, listPublishFormTemplates } from './mpSync/publishFormTemplates'
+import {
+  applyPublishFormTemplatesFromSync,
+  getActivePublishFormTemplateId,
+  listPublishFormTemplates,
+  setActivePublishFormTemplateId,
+} from './mpSync/publishFormTemplates'
 
 const MSG_KEY = 'meoo_talent_messages_v1'
 const NOTIFY_KEY = 'meoo_talent_notifications_v1'
@@ -39,6 +44,7 @@ export type MpClientStatePayload = {
   publishWizardDrafts?: Record<string, unknown>[]
   applyFormTemplates?: Record<string, unknown>[]
   publishFormTemplates?: Record<string, unknown>[]
+  activePublishFormTemplateId?: string
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
   orderFavoriteIds?: string[]
@@ -91,6 +97,7 @@ export function collectLocalClientState(): MpClientStatePayload {
     publishWizardDrafts: listPublishDrafts() as unknown as Record<string, unknown>[],
     applyFormTemplates: listCustomTemplates() as unknown as Record<string, unknown>[],
     publishFormTemplates: listPublishFormTemplates() as unknown as Record<string, unknown>[],
+    activePublishFormTemplateId: getActivePublishFormTemplateId(),
     activeApplyTemplateIds: readActiveApplyTemplateIds(),
     talentFavoriteIds: readFavoriteIds(),
     orderFavoriteIds: [...readOrderFavoriteIds()],
@@ -252,15 +259,19 @@ export function applyRemoteClientState(
   if (Array.isArray(state.publishWizardDrafts)) {
     writeJson(draftsKey, state.publishWizardDrafts.slice(0, 20))
   }
+  // 先落商单模版。报名模版写入会立刻再排队同步并抬高 epoch，放在后面会把这次响应里的商单模版当成过期丢掉。
+  const publishTplStale = epochAtStart != null && epochAtStart !== localEpoch
+  if (!publishTplStale && Array.isArray(state.publishFormTemplates)) {
+    applyPublishFormTemplatesFromSync(state.publishFormTemplates)
+  }
+  if (!publishTplStale && state.activePublishFormTemplateId) {
+    setActivePublishFormTemplateId(String(state.activePublishFormTemplateId), { silent: true })
+  }
   if (Array.isArray(state.applyFormTemplates) || state.activeApplyTemplateIds) {
     applyTemplatesFromSync(
       state.applyFormTemplates as Parameters<typeof applyTemplatesFromSync>[0],
       state.activeApplyTemplateIds,
     )
-  }
-  const publishTplStale = epochAtStart != null && epochAtStart !== localEpoch
-  if (!publishTplStale && Array.isArray(state.publishFormTemplates)) {
-    applyPublishFormTemplatesFromSync(state.publishFormTemplates)
   }
   if (Array.isArray(state.talentFavoriteIds)) {
     applyFavoriteIdsFromSync(state.talentFavoriteIds)

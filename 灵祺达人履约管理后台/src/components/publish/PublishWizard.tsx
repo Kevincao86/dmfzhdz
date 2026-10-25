@@ -2464,11 +2464,25 @@ export default function PublishWizard() {
                 setFieldChooserOpen(false)
                 return
               }
+              const openChooser = (saved: ReturnType<typeof listPublishFormTemplates>) => {
+                setSavedFormTemplates(saved)
+                setFieldPick({ ...fieldOn })
+                setFieldChooserOpen(saved.length > 0)
+                setFieldEditorOpen(true)
+              }
               const saved = listPublishFormTemplates()
-              setSavedFormTemplates(saved)
-              setFieldPick({ ...fieldOn })
-              setFieldChooserOpen(saved.length > 0)
-              setFieldEditorOpen(true)
+              if (saved.length) {
+                openChooser(saved)
+                void import('../../lib/mpAccountClientSync')
+                  .then((m) => m.syncClientStateWithServer())
+                  .then(() => setSavedFormTemplates(listPublishFormTemplates()))
+                  .catch(() => {})
+              } else {
+                void import('../../lib/mpAccountClientSync')
+                  .then((m) => m.syncClientStateWithServer())
+                  .catch(() => null)
+                  .then(() => openChooser(listPublishFormTemplates()))
+              }
             }}
           >
             {fieldEditorOpen ? null : (

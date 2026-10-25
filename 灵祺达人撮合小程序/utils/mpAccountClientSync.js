@@ -79,6 +79,7 @@ function collectLocalState() {
     publishWizardDrafts: readList(draftsKey),
     applyFormTemplates: applyTemplates.listAllTemplates(),
     publishFormTemplates: publishFormTemplates.listPublishFormTemplates(),
+    activePublishFormTemplateId: publishFormTemplates.getActivePublishFormTemplateId(),
     activeApplyTemplateIds: applyTemplates.readActiveApplyTemplateIds(),
     talentFavoriteIds: [...talentFavorites.readIdSet()],
     orderFavoriteIds: [...orderFavorites.readIdSet()],
@@ -258,12 +259,16 @@ function applyRemoteState(state, epochAtStart) {
   if (Array.isArray(state.publishWizardDrafts)) {
     writeJson(draftsKey, state.publishWizardDrafts.slice(0, 20))
   }
-  if (Array.isArray(state.applyFormTemplates) || state.activeApplyTemplateIds) {
-    applyTemplates.applyTemplatesFromSync(state.applyFormTemplates, state.activeApplyTemplateIds)
-  }
+  // 先落商单模版。报名模版写入会立刻再排队同步并抬高 epoch，放在后面会把这次响应里的商单模版当成过期丢掉。
   const publishTplStale = epochAtStart != null && epochAtStart !== localEpoch
   if (!publishTplStale && Array.isArray(state.publishFormTemplates)) {
     publishFormTemplates.applyPublishFormTemplatesFromSync(state.publishFormTemplates)
+  }
+  if (!publishTplStale && state.activePublishFormTemplateId) {
+    publishFormTemplates.setActivePublishFormTemplateId(String(state.activePublishFormTemplateId), { silent: true })
+  }
+  if (Array.isArray(state.applyFormTemplates) || state.activeApplyTemplateIds) {
+    applyTemplates.applyTemplatesFromSync(state.applyFormTemplates, state.activeApplyTemplateIds)
   }
   if (Array.isArray(state.talentFavoriteIds)) {
     talentFavorites.applyFavoriteIdsFromSync(state.talentFavoriteIds)

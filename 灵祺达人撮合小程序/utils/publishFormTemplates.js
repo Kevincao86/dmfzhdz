@@ -66,7 +66,7 @@ function listPublishFormTemplates() {
   }
 }
 
-function writeAll(list) {
+function writeAll(list, opts) {
   const next = JSON.stringify((list || []).slice(0, 30))
   const key = scope.scopedStorageKey(STORAGE_KEY)
   let prev = ''
@@ -76,7 +76,7 @@ function writeAll(list) {
   } catch (_) {}
   if (prev === next) return
   wx.setStorageSync(key, next)
-  notify()
+  if (!(opts && opts.silent)) notify()
 }
 
 function getPublishFormTemplateById(id) {
@@ -96,12 +96,12 @@ function getActivePublishFormTemplate() {
   return id ? getPublishFormTemplateById(id) : null
 }
 
-function setActivePublishFormTemplateId(id) {
+function setActivePublishFormTemplateId(id, opts) {
   const next = String(id || '').trim()
   const key = scope.scopedStorageKey(ACTIVE_KEY)
   if (next) wx.setStorageSync(key, next)
   else wx.removeStorageSync(key)
-  notify()
+  if (!(opts && opts.silent)) notify()
 }
 
 function savePublishFormTemplate(input) {
@@ -132,7 +132,7 @@ function applyPublishFormTemplatesFromSync(templates) {
     if (!prev || String(row.updatedAt) > String(prev.updatedAt)) map.set(row.id, row)
   }
   const merged = [...map.values()].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))).slice(0, 30)
-  writeAll(merged)
+  writeAll(merged, { silent: true })
 }
 
 module.exports = {

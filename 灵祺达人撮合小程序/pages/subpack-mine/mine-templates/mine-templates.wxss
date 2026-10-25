@@ -64,3 +64,13 @@
   gap: 16rpx;
   margin-top: 20rpx;
 }
+
+.tpl-create-btn {
+  width: 100%;
+  margin: 0;
+  background: #6d28d9;
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+  border-radius: 16rpx;
+}
