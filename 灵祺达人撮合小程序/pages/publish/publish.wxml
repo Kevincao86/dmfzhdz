@@ -65,7 +65,6 @@
       </view>
       <view class="pub-target-main">
         <text class="pub-target-title">选择招募平台</text>
-        <text class="pub-target-sub">选好后直接填写。字段可以自定义，并存入我的模版。</text>
         <view class="pub-mode-list pub-mode-list--target">
           <view
             wx:for="{{platformRows}}"
@@ -74,9 +73,9 @@
             data-name="{{item.name}}"
             bindtap="onSelectPlatform"
           >
+            <image class="pub-mode-logo" src="{{item.icon}}" mode="aspectFit" />
             <view class="pub-mode-copy">
               <text class="pub-mode-name">{{item.name}}</text>
-              <text class="pub-mode-sub">进入发单表单</text>
             </view>
             <text class="pub-mode-arrow">›</text>
           </view>

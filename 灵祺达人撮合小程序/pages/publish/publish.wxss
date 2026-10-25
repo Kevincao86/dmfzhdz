@@ -365,6 +365,14 @@
   border: 1rpx solid rgba(91, 45, 204, 0.12);
 }
 
+.pub-mode-logo {
+  flex-shrink: 0;
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
+  background: #fff;
+}
+
 .pub-line {
   position: relative;
   width: 28rpx;

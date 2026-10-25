@@ -633,17 +633,21 @@ export default function PublishWizard() {
   if (step === 'platform') {
     return (
       <div className="page-content-shell page-content-shell--narrow space-y-5">
-        <PageHero title="发布招募" subtitle="选择招募平台后直接填写" badge="选平台" />
+        <PageHero title="发布招募" badge="选平台" />
         <div className="grid gap-3">
           {PLATFORMS.map((name) => (
             <button
               key={name}
               type="button"
-              className="choice-card w-full text-left surface-card rounded-xl border p-5 hover-panel"
+              className="choice-card w-full text-left surface-card rounded-xl border px-5 py-4 hover-panel flex items-center gap-4"
               onClick={() => onPickPlatform(name)}
             >
+              <img
+                src={platformIconUrl(name)}
+                alt=""
+                className="w-11 h-11 rounded-xl object-contain shrink-0 bg-white"
+              />
               <div className="font-semibold text-lg text-[var(--shell-text)]">{name}</div>
-              <div className="text-sm text-[var(--shell-muted)] mt-1.5">进入发单表单，字段可自定义并存入我的模版</div>
             </button>
           ))}
         </div>
