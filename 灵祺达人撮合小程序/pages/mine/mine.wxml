@@ -82,7 +82,6 @@
           <text class="mine-vip-hint">{{workRankHint}}</text>
         </view>
         <view class="mine-vip-badge" bindtap="onGoMembership" hover-class="mine-vip-badge--on">
-          <image class="mine-vip-badge-bg" src="/images/mine-line/vip-badge.png" mode="scaleToFill" />
           <view class="mine-vip-badge-copy">
             <view class="mine-vip-badge-left">
               <text class="mine-vip-badge-k">会员信息</text>
