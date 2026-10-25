@@ -172,30 +172,68 @@ function drawShareCard(ctx: CanvasRenderingContext2D, view: CardView) {
   ctx.fillStyle = '#a08b7a'
   ctx.fillText(fitText(ctx, view.brand, 150), innerR, chipY + 18)
 
-  const titleTop = chipY + 64
-  ctx.textAlign = 'left'
-  ctx.fillStyle = '#221c18'
-  ctx.font = 'bold 42px "PingFang SC", "Microsoft YaHei", sans-serif'
-  wrapTitle(ctx, view.title, innerR - innerL).forEach((line, index) => {
-    ctx.fillText(line, innerL, titleTop + index * 54)
-  })
-
+  const font = '"PingFang SC", "Microsoft YaHei", sans-serif'
   const ctaH = 64
   const ctaY = bottom - 26 - ctaH
-  const priceY = ctaY - 36
+  const bandTop = chipY + 56
+  const bandBottom = ctaY - 22
+  ctx.font = `bold 44px ${font}`
+  const titleLines = wrapTitle(ctx, view.title, innerR - innerL)
+  const titleH = Math.max(titleLines.length, 1) * 54
+  const stripH = view.deadline ? 148 : 108
+  const groupH = titleH + 18 + stripH
+  let groupTop = bandTop + Math.max(0, (bandBottom - bandTop - groupH) / 2)
+  if (groupTop + groupH > bandBottom) groupTop = Math.max(bandTop, bandBottom - groupH)
+
   ctx.textAlign = 'left'
-  ctx.fillStyle = '#e23a2e'
-  ctx.font = 'bold 56px "PingFang SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText(fitText(ctx, view.price || '面议', 280), innerL, priceY)
-  ctx.textAlign = 'right'
+  ctx.textBaseline = 'middle'
   ctx.fillStyle = '#221c18'
-  ctx.font = 'bold 32px "PingFang SC", "Microsoft YaHei", sans-serif'
-  ctx.fillText(fitText(ctx, view.city || '全国', 240), innerR, priceY - 16)
-  const sub = [view.fans ? `粉丝 ${view.fans}` : '', view.deadline].filter(Boolean).join(' · ')
-  if (sub) {
+  ctx.font = `bold 44px ${font}`
+  titleLines.forEach((line, index) => {
+    ctx.fillText(line, innerL, groupTop + 22 + index * 54)
+  })
+
+  const stripY = groupTop + titleH + 18
+  const stripW = innerR - innerL
+  ctx.fillStyle = '#f7f1ea'
+  roundRect(ctx, innerL, stripY, stripW, stripH, 20)
+  ctx.fill()
+
+  const factTop = stripY
+  const factH = view.deadline ? stripH - 52 : stripH
+  const cols = [
+    { text: view.price || '面议', color: '#e23a2e', size: 40 },
+    { text: view.city || '全国', color: '#221c18', size: 32 },
+  ]
+  const colW = stripW / cols.length
+  cols.forEach((col, index) => {
+    const cx = innerL + colW * (index + 0.5)
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = col.color
+    ctx.font = `bold ${col.size}px ${font}`
+    ctx.fillText(fitText(ctx, col.text, colW - 28), cx, factTop + factH / 2)
+    if (index) {
+      ctx.strokeStyle = '#eadfd3'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(innerL + colW * index, factTop + 22)
+      ctx.lineTo(innerL + colW * index, factTop + factH - 22)
+      ctx.stroke()
+    }
+  })
+  if (view.deadline) {
+    ctx.strokeStyle = '#eadfd3'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(innerL + 22, stripY + factH)
+    ctx.lineTo(innerR - 22, stripY + factH)
+    ctx.stroke()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
     ctx.fillStyle = '#8d7b6e'
-    ctx.font = '20px "PingFang SC", "Microsoft YaHei", sans-serif'
-    ctx.fillText(fitText(ctx, sub, 320), innerR, priceY + 22)
+    ctx.font = `22px ${font}`
+    ctx.fillText(fitText(ctx, view.deadline, stripW - 40), innerL + stripW / 2, stripY + factH + 26)
   }
 
   const grad = ctx.createLinearGradient(innerL, 0, innerR, 0)
