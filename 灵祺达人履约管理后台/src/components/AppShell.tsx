@@ -24,7 +24,7 @@ const MENU_GUIDE_COPY: Record<string, string> = {
   转发工具: '把报名表转给达人填写，回收后在这里查看结果。',
   我的模版: '保存常用招募或报名模版，下次发单或报名时直接套用。',
   培训课程: '查看可报名的课程。讲师可以在这里发布和结算自己的课程。',
-  我的订单: '查看会员开通和积分充值的支付记录。',
+  AI视频审核: '用 AI 审视频和文稿，支持单条和批量。',
   消息: '「私信」用来一对一沟通，「群聊」用来跟进合作群。点进会话即可回复。',
   增值服务: '这里是 AI 创作工坊，可使用短视频、数字人、视觉工坊和云剪。',
   我的: '先完成账号绑定。这里还有 AI 视频审核和我的推广。',
@@ -46,7 +46,7 @@ export default function AppShell() {
   const role = getActiveRole()
   const workId = getWorkIdentity()
   const NAV = navItemsForRole(role, account)
-  const orderIdx = NAV.findIndex((item) => item.to === '/profile/my-orders')
+  const orderIdx = NAV.findIndex((item) => item.to === '/profile/ai-review')
   const useMoreMenu = orderIdx >= 5 && orderIdx < NAV.length - 1
   const primaryNav = useMoreMenu ? NAV.slice(0, orderIdx + 1) : NAV
   const moreNav = useMoreMenu ? NAV.slice(orderIdx + 1) : []
@@ -78,7 +78,7 @@ export default function AppShell() {
   useEffect(() => {
     if (!guideLabel) return
     const items = navItemsForRole(role, getAccount())
-    const orderIdx = items.findIndex((item) => item.to === '/profile/my-orders')
+    const orderIdx = items.findIndex((item) => item.to === '/profile/ai-review')
     const useMore = orderIdx >= 5 && orderIdx < items.length - 1
     const more = useMore ? items.slice(orderIdx + 1) : []
     if (more.some((item) => item.label === guideLabel)) setMoreOpen(true)

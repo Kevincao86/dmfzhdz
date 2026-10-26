@@ -9,7 +9,7 @@ import {
   Sparkles,
   User,
   ClipboardList,
-  Receipt,
+  ShieldCheck,
   CalendarDays,
   GraduationCap,
   Search,
@@ -26,7 +26,7 @@ export type ShellNavItem = {
 
 function commonWithAddons(_role: MpAccountRole, account?: MpAccount | null): ShellNavItem[] {
   const items: ShellNavItem[] = [
-    { to: '/profile/my-orders', label: '我的订单', icon: Receipt },
+    { to: '/profile/ai-review', label: 'AI视频审核', icon: ShieldCheck },
     { to: '/messages', label: '消息', icon: MessageSquare },
   ]
   if (shouldShowAddonsNav(account)) {
@@ -111,7 +111,7 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
     '/profile/supplier': '团队资料',
     '/profile/ai-review/script-rules': '平台文稿审核规则',
     '/profile/ai-review/platform-rules': '平台视频审核规则',
-    '/profile/ai-review': 'AI审核',
+    '/profile/ai-review': 'AI视频审核',
     '/addons/ai-review/script-rules': '平台文稿审核规则',
     '/addons/ai-review/platform-rules': '平台视频审核规则',
     '/addons': '增值服务',

@@ -48,6 +48,7 @@ list_scopes() {
   ops_ai_routes     运营台 API 线路（主线路 + 两条备选，手动或自动）
   ops_short_drama   运营台「短剧AI制作」子菜单 + 即梦/Vidu/MiniMax 凭据（不含成片工坊）
   video_model_switch 运营台切换成片模型：豆包（即梦/小云雀）或 MiniMax H3
+  xingxuan_nav_video_review 星选顶栏「我的订单」换成「AI视频审核」
   recommend_hall    推荐大厅全部达人池（慎用，见 recommend-all-talents-lock）
   mp_auth           小程序登录/会话
   talent_account_bind  达人/星选账号绑定（微信抖音手机邮箱）与商单日历服务号提醒发送
@@ -422,6 +423,13 @@ opsRegistryApi
 registryVideoAiEnvMerge
 minimaxH3VideoClient
 merchantVideoAiGateway
+change-scope-guard
+PAT
+      ;;
+    xingxuan_nav_video_review)
+      cat <<'PAT'
+shellNavConfig
+灵祺达人履约管理后台/src/components/AppShell.tsx
 change-scope-guard
 PAT
       ;;
