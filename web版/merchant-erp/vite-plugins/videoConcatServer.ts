@@ -13,6 +13,13 @@ import {
 
 const MAX_SEGMENT_BYTES = 80 * 1024 * 1024
 const MAX_SEGMENTS = 12
+/** 有声叠化拼接：5 分钟成片按 15 秒一段，最多 20 段 */
+const MAX_SEGMENTS_KEEP_AUDIO = 20
+
+type AudioJoinOpts = VideoConcatNormalizeOpts & {
+  keepAudio?: boolean
+  xfadeSec?: number
+}
 
 export function bufferLooksLikeVideo(buf: Buffer): boolean {
   if (buf.length < 1024) return false
@@ -414,9 +421,119 @@ export async function extractComplianceSampleFramesFromUrl(
   return extractComplianceSampleFramesFromBuffer(fetched.buffer)
 }
 
+function clampXfadeSec(raw: number | undefined, durations: number[]): number {
+  const shortest = Math.min(...durations)
+  const asked = Number.isFinite(raw) && (raw ?? 0) > 0 ? Number(raw) : 0.4
+  return Math.max(0.12, Math.min(asked, 0.8, shortest / 3))
+}
+
+/** 有声衔接：统一画面和音轨后做短叠化；叠化失败则退回按序硬接，仍保留声音 */
+function joinClipsKeepAudio(
+  ffmpeg: string,
+  tmpDir: string,
+  localFiles: string[],
+  opts: AudioJoinOpts,
+): { ok: true; buffer: Buffer } | { ok: false; message: string } {
+  const vf = resolveConcatNormalizeFilter(opts)
+  const normalized: string[] = []
+  for (let i = 0; i < localFiles.length; i++) {
+    const src = localFiles[i]!
+    const dest = path.join(tmpDir, `a${i}.mp4`)
+    const withAudio = ['-y', '-i', src]
+    if (vf) withAudio.push('-vf', vf)
+    withAudio.push(
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-ar', '44100', '-ac', '2', '-b:a', '128k',
+      '-movflags', '+faststart', dest,
+    )
+    let encoded = runFfmpeg(ffmpeg, withAudio)
+    const audioOk =
+      encoded.ok && fs.existsSync(dest) && fs.statSync(dest).size > 1024 && probeMediaHasAudio(dest)
+    if (!audioOk) {
+      try {
+        fs.unlinkSync(dest)
+      } catch {
+        /* 无声源片改补静音轨 */
+      }
+      const silent = ['-y', '-i', src, '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100']
+      if (vf) silent.push('-vf', vf)
+      silent.push(
+        '-map', '0:v:0', '-map', '1:a:0',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
+        '-c:a', 'aac', '-ar', '44100', '-ac', '2', '-b:a', '128k',
+        '-shortest', '-movflags', '+faststart', dest,
+      )
+      encoded = runFfmpeg(ffmpeg, silent)
+    }
+    if (!encoded.ok || !fs.existsSync(dest) || fs.statSync(dest).size <= 1024) {
+      return { ok: false, message: `第 ${i + 1} 段无法保留声音转码：${encoded.stderr.slice(-400)}` }
+    }
+    normalized.push(dest)
+  }
+
+  const durations: number[] = []
+  for (let i = 0; i < normalized.length; i++) {
+    const dur = probeVideoDurationSec(ffmpeg, normalized[i]!)
+    if (dur == null) return { ok: false, message: `第 ${i + 1} 段时长无法读取` }
+    durations.push(dur)
+  }
+
+  const fade = clampXfadeSec(opts.xfadeSec, durations)
+  const filters: string[] = []
+  let acc = durations[0]!
+  let vPrev = '0:v'
+  let aPrev = '0:a'
+  for (let i = 1; i < normalized.length; i++) {
+    const offset = Math.max(0, acc - fade - 0.05)
+    const vOut = i === normalized.length - 1 ? 'vout' : `vx${i}`
+    const aOut = i === normalized.length - 1 ? 'aout' : `ax${i}`
+    filters.push(
+      `[${vPrev}][${i}:v]xfade=transition=fade:duration=${fade.toFixed(3)}:offset=${offset.toFixed(3)}[${vOut}]`,
+    )
+    filters.push(`[${aPrev}][${i}:a]acrossfade=d=${fade.toFixed(3)}[${aOut}]`)
+    vPrev = vOut
+    aPrev = aOut
+    acc = acc + durations[i]! - fade
+  }
+
+  const outPath = path.join(tmpDir, 'out.mp4')
+  const xfadeArgs = ['-y']
+  for (const file of normalized) xfadeArgs.push('-i', file)
+  xfadeArgs.push(
+    '-filter_complex', filters.join(';'),
+    '-map', '[vout]', '-map', '[aout]',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart', outPath,
+  )
+  const faded = runFfmpeg(ffmpeg, xfadeArgs)
+  if (faded.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
+    return { ok: true, buffer: fs.readFileSync(outPath) }
+  }
+
+  const listPath = path.join(tmpDir, 'list-audio.txt')
+  fs.writeFileSync(
+    listPath,
+    normalized.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n'),
+    'utf8',
+  )
+  try {
+    fs.unlinkSync(outPath)
+  } catch {
+    /* 叠化失败后改硬接 */
+  }
+  const copied = runFfmpeg(ffmpeg, [
+    '-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', '-movflags', '+faststart', outPath,
+  ])
+  if (copied.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
+    return { ok: true, buffer: fs.readFileSync(outPath) }
+  }
+  return { ok: false, message: (faded.stderr || copied.stderr || '有声拼接失败').slice(-600) }
+}
+
 export async function concatRemoteMp4Urls(
   urls: string[],
-  opts?: VideoConcatNormalizeOpts,
+  opts?: AudioJoinOpts,
 ): Promise<
   | { ok: true; buffer: Buffer }
   | { ok: false; message: string }
@@ -425,8 +542,9 @@ export async function concatRemoteMp4Urls(
   if (list.length < 2) {
     return { ok: false, message: '至少需要 2 个有效视频 URL。' }
   }
-  if (list.length > MAX_SEGMENTS) {
-    return { ok: false, message: `单次最多拼接 ${MAX_SEGMENTS} 段。` }
+  const segmentCap = opts?.keepAudio ? MAX_SEGMENTS_KEEP_AUDIO : MAX_SEGMENTS
+  if (list.length > segmentCap) {
+    return { ok: false, message: `单次最多拼接 ${segmentCap} 段。` }
   }
 
   const ffmpeg = resolveFfmpegBin()
@@ -452,6 +570,10 @@ export async function concatRemoteMp4Urls(
       const fp = path.join(tmpDir, `s${i}.bin`)
       fs.writeFileSync(fp, buf)
       localFiles.push(fp)
+    }
+
+    if (opts?.keepAudio) {
+      return joinClipsKeepAudio(ffmpeg, tmpDir, localFiles, opts)
     }
 
     const normalized: string[] = []

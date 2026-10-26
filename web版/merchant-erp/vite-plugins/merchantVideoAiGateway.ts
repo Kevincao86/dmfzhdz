@@ -2430,6 +2430,8 @@ export async function handleMerchantAiVideoRoutes(input: {
       xiaoyunqueConfigured,
       xiaoyunqueUsable,
       xiaoyunqueProbeDetail,
+      videoGenEngine:
+        String(env.MERCHANT_AI_VIDEO_GEN_ENGINE ?? '').trim() === 'minimax_h3' ? 'minimax_h3' : 'doubao',
       arkVideoModels: arkOpts,
       arkDiscoveredVideoModels,
       arkKeyConfigured: arkKeyOk,
@@ -2831,6 +2833,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '缺少至少 2 个有效视频 URL。' })
       return true
     }
+    const xfadeRaw = Number(parsed.xfadeSec)
     const merged = await concatRemoteMp4Urls(urls, {
       ratio: typeof parsed.ratio === 'string' ? parsed.ratio : undefined,
       fps:
@@ -2839,6 +2842,8 @@ export async function handleMerchantAiVideoRoutes(input: {
           : typeof parsed.fps === 'string'
             ? parsed.fps
             : undefined,
+      keepAudio: parsed.keepAudio === true,
+      xfadeSec: Number.isFinite(xfadeRaw) ? xfadeRaw : undefined,
     })
     if (!merged.ok) {
       json(res, 502, { ok: false, message: merged.message })

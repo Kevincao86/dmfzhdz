@@ -144,7 +144,21 @@ export async function handleVideoConcatUrlsDirect(req: VercelRequest, res: Verce
     return
   }
 
-  const merged = await concatRemoteMp4Urls(urls)
+  const keepAudio = parsed.keepAudio === true
+  const ratio = typeof parsed.ratio === 'string' && parsed.ratio.trim() ? parsed.ratio : undefined
+  const fps = typeof parsed.fps === 'number' || typeof parsed.fps === 'string' ? parsed.fps : undefined
+  const xfadeRaw = Number(parsed.xfadeSec)
+  const merged = await concatRemoteMp4Urls(
+    urls,
+    keepAudio
+      ? {
+          ratio,
+          fps,
+          keepAudio: true,
+          xfadeSec: Number.isFinite(xfadeRaw) ? xfadeRaw : undefined,
+        }
+      : undefined,
+  )
   if (!merged.ok) {
     sendMerchantJson(res, 502, { ok: false, message: merged.message })
     return

@@ -301,6 +301,8 @@ export type VideoAiBackendConfig = {
   /** 账号已开通小云雀 req_key（需 xiaoyunque_probe=1） */
   xiaoyunqueUsable?: boolean
   xiaoyunqueProbeDetail?: string
+  /** 成片模型。minimax_h3 时超过 15 秒走分段衔接，最长 5 分钟 */
+  videoGenEngine?: 'doubao' | 'minimax_h3'
   arkKeyConfigured: boolean
   arkVideoModels: { label: string; endpointId: string }[]
   iceConfigured?: boolean
@@ -779,7 +781,7 @@ export async function postShortVideoNarrationExtract(body: {
 /** 服务端 ffmpeg 拼接多段远程 MP4（浏览器 wasm 失败时兜底） */
 export async function concatVideoUrlsOnServer(
   urls: string[],
-  opts?: { ratio?: string; fps?: number | string },
+  opts?: { ratio?: string; fps?: number | string; keepAudio?: boolean; xfadeSec?: number },
 ): Promise<Blob> {
   const paths = [
     '/api/meoo-merchant-ai-video-concat-urls',
@@ -788,6 +790,8 @@ export async function concatVideoUrlsOnServer(
   const body: Record<string, unknown> = { urls }
   if (opts?.ratio) body.ratio = opts.ratio
   if (opts?.fps != null) body.fps = opts.fps
+  if (opts?.keepAudio) body.keepAudio = true
+  if (opts?.xfadeSec != null) body.xfadeSec = opts.xfadeSec
   for (const p of paths) {
     const res = await fetchVideoPostBinary(p, body, VIDEO_CONCAT_TIMEOUT_MS)
     if (!res) continue
@@ -1853,7 +1857,7 @@ export async function runXiaoyunqueVideoJob(opts: {
   onProgress?: (text: string) => void
   persist?: Pick<PendingCloudVideoJob, 'billId' | 'title' | 'kind'>
 }): Promise<
-  | { ok: true; videoUrl: string; modelUsed?: string | null }
+  | { ok: true; videoUrl: string; modelUsed?: string | null; provider?: string }
   | { ok: false; message: string; cloudPending?: boolean }
 > {
   const durationSec = Math.min(900, Math.max(5, Math.round(opts.durationSec)))
@@ -1884,20 +1888,21 @@ export async function runXiaoyunqueVideoJob(opts: {
   })
   if (!start.ok) return { ok: false, message: formatVideoAiUserError(start.message) }
   const usedModel = String(start.modelUsed || '')
-  const usedNorefText = /pippit_iv2v_v20_cvtob(?!_with_vinput)/i.test(usedModel)
+  const usedH3 = start.provider === 'minimax_h3' || usedModel === 'MiniMax-H3'
+  const usedNorefText = !usedH3 && /pippit_iv2v_v20_cvtob(?!_with_vinput)/i.test(usedModel)
   if (usedNorefText) {
     return {
       ok: false,
       message: '成片走了无参考文生，已丢弃。角色图必须进片，请再试。',
     }
   }
-  if (/jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)) {
+  if (!usedH3 && /jimeng_ti2v|jimeng_i2v|jimeng_vgfm_i2v/i.test(usedModel)) {
     return {
       ok: false,
       message: '当前图生是无声首帧微动，短剧需要有声对白，已丢弃。请确认有声短剧接口可用后再试。',
     }
   }
-  const usedPhoto = /with_vinput/i.test(usedModel)
+  const usedPhoto = usedH3 || /with_vinput/i.test(usedModel)
   if (!usedPhoto) {
     return {
       ok: false,
@@ -1939,7 +1944,12 @@ export async function runXiaoyunqueVideoJob(opts: {
     return { ok: false, message: formatVideoAiUserError(poll.message) }
   }
   clearPendingCloudVideoJob(start.taskId)
-  return { ok: true, videoUrl: poll.videoUrl, modelUsed: start.modelUsed ?? 'xiaoyunque' }
+  return {
+    ok: true,
+    videoUrl: poll.videoUrl,
+    modelUsed: start.modelUsed ?? 'xiaoyunque',
+    provider: start.provider,
+  }
 }
 
 export async function pollPendingCloudVideoJob(opts?: {

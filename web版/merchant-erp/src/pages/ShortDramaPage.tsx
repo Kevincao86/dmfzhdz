@@ -309,6 +309,8 @@ const SEGMENT_UNIT_SEC = 15
 const PREVIEW_SEC = 5
 /** 产品目标：最长 15 分钟（900 秒），与商家长片预期对齐 */
 const MAX_DRAMA_TOTAL_SEC = 900
+/** MiniMax H3 单段 15 秒，有声衔接最多 20 段 */
+const H3_MAX_DRAMA_SEC = 300
 
 const DURATION_OPTIONS: DurationOpt[] = [
   { sec: 8, label: '8 秒', hint: '单段直出' },
@@ -1847,6 +1849,7 @@ function buildDramaXiaoyunquePrompt(opts: {
   story: string
   hasSceneRefs?: boolean
   actionPlaybook?: string
+  continueFromPrev?: boolean
 }): string {
   const names = (opts.castNames ?? []).map((n) => n.trim()).filter(Boolean)
   const multi = names.length >= 2
@@ -1865,10 +1868,16 @@ function buildDramaXiaoyunquePrompt(opts: {
       : '【故事配景】没有上传参考画面。若第1张是角色定妆或对照条，只取脸和衣服，场景、道具和灯光按一句话故事重搭。若第1张已是上一段成片尾帧，就沿用该画面里的场景继续演，保持同一空间。',
     opts.actionPlaybook?.trim() || '',
     opts.story.trim(),
-    '请按一句话故事多镜编排成片。必须有中文对白人声和环境声，禁止无声片、禁止只配字幕不发声。竖屏 9:16。前 3 秒必须冲突或反转。必须按对白钩子演戏，禁止改成一个人在走廊走路。不要字幕水印 Logo。',
+    opts.continueFromPrev
+      ? '从上一段最后一帧接着演。开头保持同一张脸、同一空间和同一光线，再进入本段动作。禁止重开片头，禁止换脸换景。必须有中文对白人声和环境声。竖屏 9:16。不要字幕水印 Logo。'
+      : '请按一句话故事多镜编排成片。必须有中文对白人声和环境声，禁止无声片、禁止只配字幕不发声。竖屏 9:16。前 3 秒必须冲突或反转。必须按对白钩子演戏，禁止改成一个人在走廊走路。不要字幕水印 Logo。',
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+function isH3VideoResult(modelUsed: string | null | undefined, provider?: string | null): boolean {
+  return provider === 'minimax_h3' || modelUsed === 'MiniMax-H3'
 }
 
 function isDramaPhotoAwareVideoModel(modelUsed: string | null | undefined): boolean {
@@ -2316,6 +2325,9 @@ function dramaJimengPhotoReady(cfg: VideoAiBackendConfig | null): boolean {
 
 function dramaXiaoyunqueHint(cfg: VideoAiBackendConfig | null, cfgLoaded: boolean): string {
   if (!cfgLoaded) return ''
+  if (cfg?.videoGenEngine === 'minimax_h3') {
+    return ' 当前超过 15 秒会按 15 秒一段衔接，最长 5 分钟。段与段有短叠化，成片会略短于所选时长。'
+  }
   if (dramaXiaoyunqueReady(cfg)) {
     return ' 当前：参考画面可以不传。传了就按参考背景出片；不传就按已确认的故事匹配场景。角色形象仍须确认，不能只凭文案出片。'
   }
@@ -2771,9 +2783,18 @@ export default function ShortDramaPage({
     if (!durationSelected) return '请先选择成片时长'
     return null
   }, [hookSelected, durationSelected, hookLabel, formulaId, sceneId])
+  const h3Engine = cfg?.videoGenEngine === 'minimax_h3'
+  const durationChoices = useMemo(() => {
+    const rows = h3Engine ? DURATION_OPTIONS.filter((o) => o.sec <= H3_MAX_DRAMA_SEC) : DURATION_OPTIONS
+    if (!h3Engine) return rows
+    return rows.map((o) => (o.sec > SEGMENT_UNIT_SEC ? { ...o, hint: '先试镜 · 分段衔接' } : o))
+  }, [h3Engine])
   const longPlan = useMemo(
-    () => planLongformSegmentDurations(Math.min(MAX_DRAMA_TOTAL_SEC, Math.max(5, durationSec))),
-    [durationSec],
+    () =>
+      planLongformSegmentDurations(
+        Math.min(h3Engine ? H3_MAX_DRAMA_SEC : MAX_DRAMA_TOTAL_SEC, Math.max(5, durationSec)),
+      ),
+    [durationSec, h3Engine],
   )
   const showPreviewGate = needsPreviewGate(durationSec)
 
@@ -2792,6 +2813,12 @@ export default function ShortDramaPage({
     setTrialUrl(null)
     setTrialReady(false)
   }, [trialUrl])
+
+  useEffect(() => {
+    if (!h3Engine || durationSec <= H3_MAX_DRAMA_SEC) return
+    setDurationSec(0)
+    clearTrial()
+  }, [h3Engine, durationSec, clearTrial])
 
   const generateAiStory = async () => {
     if (storyWriteGate) {
@@ -3819,6 +3846,7 @@ export default function ShortDramaPage({
     durationSec: number
     images_base64?: string[]
     beat?: string
+    continueFromPrev?: boolean
     seedance_image_mode?: 'auto' | 'first_last' | 'reference' | 'first_only'
     persist?: { billId?: string; title?: string; kind?: 'clip' | 'trial' | 'full' }
     onProgress?: (t: string) => void
@@ -3847,8 +3875,9 @@ export default function ShortDramaPage({
       castNames,
       identity,
       story: [opts.prompt, fusionPromptNote].filter(Boolean).join('\n'),
-      hasSceneRefs: sceneLocked,
+      hasSceneRefs: sceneLocked && !opts.continueFromPrev,
       actionPlaybook,
+      continueFromPrev: opts.continueFromPrev,
     })
     const clipSec = Math.max(5, opts.durationSec)
     const xyq = await runXiaoyunqueVideoJob({
@@ -3861,7 +3890,7 @@ export default function ShortDramaPage({
       onProgress: opts.onProgress,
       persist: opts.persist,
     })
-    if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
+    if (xyq.ok && (isDramaPhotoAwareVideoModel(xyq.modelUsed) || isH3VideoResult(xyq.modelUsed, xyq.provider))) {
       return { ok: true as const, videoUrl: xyq.videoUrl, modelUsed: xyq.modelUsed, engineUsed: 'seedance' as const }
     }
     return {
@@ -4030,7 +4059,18 @@ export default function ShortDramaPage({
   }, [])
 
   const generateFullLongform = async (billId: string) => {
-    const total = Math.min(MAX_DRAMA_TOTAL_SEC, durationSec)
+    let freshCfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> = null
+    try {
+      freshCfg = await fetchVideoAiConfig()
+    } catch {
+      freshCfg = null
+    }
+    if (freshCfg && mountedRef.current) setCfg(freshCfg)
+    const useH3 = (freshCfg?.videoGenEngine ?? cfg?.videoGenEngine) === 'minimax_h3'
+    if (useH3 && durationSec > H3_MAX_DRAMA_SEC) {
+      throw new Error('当前成片最长 5 分钟，请改选时长后再生成全片。')
+    }
+    const total = Math.min(useH3 ? H3_MAX_DRAMA_SEC : MAX_DRAMA_TOTAL_SEC, durationSec)
     const fusionImgs = await prepareDramaModelImages()
     const leadName = buildDramaStoryCastBrief(cast, roles).leadName
     const identity = buildDramaIdentityLock(cast, roles)
@@ -4053,44 +4093,48 @@ export default function ShortDramaPage({
       hasSceneRefs: sceneLocked,
       actionPlaybook,
     })
-    setProgress(
-      sceneLocked
-        ? `有声短剧全片（按参考背景出片，约 ${total} 秒，提交后在云端生成）…`
-        : `有声短剧全片（按故事匹配场景，约 ${total} 秒，提交后在云端生成）…`,
-    )
-    const xyq = await runXiaoyunqueVideoJob({
-      prompt: xyqPrompt,
-      durationSec: total,
-      aspectRatio: '9:16',
-      images_base64: fusionImgs,
-      shouldCancel: () => cancelRef.current,
-      onProgress: (t) => {
-        if (mountedRef.current) setProgress(t)
-      },
-      persist: {
-        billId,
-        title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
-        kind: 'full',
-      },
-    })
-    if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
-      await finishAsWork({
-        billId,
-        videoUrlOrBlob: xyq.videoUrl,
-        title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
+    if (!useH3) {
+      setProgress(
+        sceneLocked
+          ? `有声短剧全片（按参考背景出片，约 ${total} 秒，提交后在云端生成）…`
+          : `有声短剧全片（按故事匹配场景，约 ${total} 秒，提交后在云端生成）…`,
+      )
+      const xyq = await runXiaoyunqueVideoJob({
+        prompt: xyqPrompt,
         durationSec: total,
-        modelUsed: xyq.modelUsed ?? 'xiaoyunque',
+        aspectRatio: '9:16',
+        images_base64: fusionImgs,
+        shouldCancel: () => cancelRef.current,
+        onProgress: (t) => {
+          if (mountedRef.current) setProgress(t)
+        },
+        persist: {
+          billId,
+          title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
+          kind: 'full',
+        },
       })
-      return
+      if (xyq.ok && isDramaPhotoAwareVideoModel(xyq.modelUsed)) {
+        await finishAsWork({
+          billId,
+          videoUrlOrBlob: xyq.videoUrl,
+          title: shop.storeName.trim() || story.trim().slice(0, 18) || scene.name,
+          durationSec: total,
+          modelUsed: xyq.modelUsed ?? 'xiaoyunque',
+        })
+        return
+      }
+      if (!xyq.ok && xyq.cloudPending) {
+        setErr(null)
+        setHint(formatVideoAiUserError(xyq.message))
+        return
+      }
+      setProgress(
+        `全片未出，改分段图生（仍锁定角色${refItems.length > 0 ? '和参考背景' : '，按故事配景'}）…（${formatVideoAiUserError(xyq.ok ? '成片未带上参考图' : xyq.message).slice(0, 80)}）`,
+      )
+    } else {
+      setProgress(`全片分成 ${planLongformSegmentDurations(total).length} 段衔接，每段约 15 秒…`)
     }
-    if (!xyq.ok && xyq.cloudPending) {
-      setErr(null)
-      setHint(formatVideoAiUserError(xyq.message))
-      return
-    }
-    setProgress(
-      `全片未出，改分段图生（仍锁定角色${refItems.length > 0 ? '和参考背景' : '，按故事配景'}）…（${formatVideoAiUserError(xyq.ok ? '成片未带上参考图' : xyq.message).slice(0, 80)}）`,
-    )
 
     const plan = planLongformSegmentDurations(total)
     const beats = expandBeats(formula, plan.length)
@@ -4103,7 +4147,13 @@ export default function ShortDramaPage({
       const segDur = plan[i]!
       setProgress(`全片 ${i + 1}/${plan.length} · ${segDur} 秒生成中`)
       let images: string[] | undefined
-      if (i > 0 && prevUrl) {
+      if (useH3 && i > 0) {
+        if (!prevUrl) throw new Error('上一段成片地址缺失，无法衔接。')
+        setProgress(`全片 ${i + 1}/${plan.length} · 截取上一段尾帧衔接`)
+        const frame = await postVideoLastFrameFromUrl(prevUrl, { frame: 'last', timeoutMs: 20_000 })
+        if (!frame.ok) throw new Error(frame.message || '上一段尾帧截取失败，已停止衔接。')
+        images = [`data:image/jpeg;base64,${frame.pureBase64}`]
+      } else if (i > 0 && prevUrl) {
         setProgress(`全片 ${i + 1}/${plan.length} · 截取上一段尾帧衔接`)
         const frame = await postVideoLastFrameFromUrl(prevUrl, { frame: 'last', timeoutMs: 20_000 })
         images = await prepareDramaModelImages(frame.ok ? frame.pureBase64 : undefined)
@@ -4126,6 +4176,7 @@ export default function ShortDramaPage({
         prompt,
         beat: beats[i]!,
         durationSec: segDur,
+        continueFromPrev: useH3 && i > 0,
         images_base64: images,
         onProgress: (t) => {
           if (mountedRef.current) setProgress(`全片 ${i + 1}/${plan.length} · ${t}`)
@@ -4144,8 +4195,13 @@ export default function ShortDramaPage({
       lastModel = r.modelUsed ?? lastModel
     }
 
-    setProgress(`正在云端无缝拼接 ${segmentUrls.length} 段…`)
-    const blob = await concatVideoUrlsOnServer(segmentUrls, { ratio: '9:16', fps: 24 })
+    setProgress(`正在云端衔接 ${segmentUrls.length} 段…`)
+    const blob = await concatVideoUrlsOnServer(segmentUrls, {
+      ratio: '9:16',
+      fps: 24,
+      keepAudio: useH3,
+      xfadeSec: useH3 ? 0.4 : undefined,
+    })
     await finishAsWork({
       billId,
       videoUrlOrBlob: blob,
@@ -4754,7 +4810,7 @@ export default function ShortDramaPage({
                   }}
                 >
                   <option value="">请选择成片时长</option>
-                  {DURATION_OPTIONS.map((o) => (
+                  {durationChoices.map((o) => (
                     <option key={o.sec} value={o.sec}>
                       {o.label}（{o.hint}）
                     </option>
@@ -5555,7 +5611,7 @@ export default function ShortDramaPage({
                       Math.max(1, Math.ceil(durationSec)) * MP_POINTS_SHORTVIDEO_PER_SEC
                     } 积分`
                   : ''}
-                。15 分钟成本很高，请先确认试镜。
+                。{h3Engine ? '5 分钟会分成 20 段依次生成，请先确认试镜。' : '15 分钟成本很高，请先确认试镜。'}
               </p>
               {works.length ? (
                 <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
