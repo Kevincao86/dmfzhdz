@@ -834,6 +834,9 @@ Page({
       identity,
     )
     menus = injectMyCoursesMenu(menus)
+    const keptTodo = Number(this.data.calendarTodoCount)
+    const todoCount = Number.isFinite(keptTodo) && keptTodo > 0 ? Math.round(keptTodo) : 0
+    menus = patchMenusCalendarMeta(menus, identity, todoCount)
     const { quickMenus, spotlightMenus, bizMenus, bizGroups, moreGroups, morePreview } =
       splitWorkbenchMenus(menus, identity)
     const planId = mpMembershipUi.readMembershipPlanId(acct, identity, member, prProfile)
@@ -869,7 +872,7 @@ Page({
       statAppliedKey: identity === 'pr' ? 'prOrders' : 'applications',
       statBoardTitle: identity === 'pr' ? '招募进展' : '合作进展',
       notifyBadge: 0,
-      calendarTodoCount: this.data.calendarTodoCount || 0,
+      calendarTodoCount: todoCount,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
       membershipPlanLabel,
@@ -923,12 +926,17 @@ Page({
     if (!auth.isLoggedIn() || !api.hasApi()) return
     const identity = userProfile.readIdentity()
     if (!identityTypes.isWorkIdentity(identity)) return
+    const seq = (this._calendarBadgeSeq || 0) + 1
+    this._calendarBadgeSeq = seq
     try {
       const isPr = identity === 'pr'
       const reg = await appRegistrySync.fetchRegistryAndReconcileApplications(
         isPr ? { includePrOwned: true } : { includeLocalContext: true },
       )
+      if (seq !== this._calendarBadgeSeq || userProfile.readIdentity() !== identity) return
       const orders = (reg && reg.mpRecruitmentOrders) || []
+      const kept = Number(this.data.calendarTodoCount) || 0
+      if (!orders.length && kept > 0) return
       let events
       if (isPr) {
         const account = auth.readAccount()
@@ -948,6 +956,7 @@ Page({
         })
       }
       const count = orderCalendar.countActiveTodos(events)
+      if (seq !== this._calendarBadgeSeq || userProfile.readIdentity() !== identity) return
       const menus = patchMenusCalendarMeta(this.data.menus, identity, count)
       const quickMenus = patchMenusCalendarMeta(this.data.quickMenus, identity, count)
       const bizMenus = patchMenusCalendarMeta(this.data.bizMenus, identity, count)
