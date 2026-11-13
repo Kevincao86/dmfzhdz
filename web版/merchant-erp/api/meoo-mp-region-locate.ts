@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const china = require('../../../灵祺达人撮合小程序/utils/chinaRegion.js') as {
+const china = require('../../../灵奇达人撮合小程序/utils/chinaRegion.js') as {
   resolveRegionNames: (p: string, c: string) => { province: string; city: string } | null
 }
 
@@ -49,7 +49,7 @@ function decodePconlineJson(raw: ArrayBuffer): { pro?: string; city?: string } |
 }
 
 function locateByCoordsLocal(lat: number, lng: number) {
-  const nearest = require('../../../灵祺达人撮合小程序/utils/chinaNearestCity.js') as {
+  const nearest = require('../../../灵奇达人撮合小程序/utils/chinaNearestCity.js') as {
     resolveNearestCity: (lat: number, lng: number) => { province: string; city: string } | null
   }
   const hit = nearest.resolveNearestCity(lat, lng)

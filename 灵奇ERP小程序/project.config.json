@@ -1,0 +1,47 @@
+{
+  "miniprogramRoot": "./",
+  "compileType": "miniprogram",
+  "appid": "wxdf5f53fb6b14ace9",
+  "projectname": "灵奇ERP小程序",
+  "libVersion": "3.16.0",
+  "setting": {
+    "es6": true,
+    "minified": true,
+    "postcss": false,
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "urlCheck": false,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "enhance": false,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [
+      {
+        "value": "docs/**",
+        "type": "glob"
+      },
+      {
+        "value": "scripts/**",
+        "type": "glob"
+      }
+    ],
+    "include": []
+  },
+  "editorSetting": {}
+}

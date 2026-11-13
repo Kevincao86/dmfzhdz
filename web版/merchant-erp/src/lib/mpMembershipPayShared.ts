@@ -186,7 +186,7 @@ export function buildMembershipCheckoutBase(
   }
 
   const billingLabel = billing === 'yearly' ? '年付' : '月付'
-  const description = `灵祺星选${plan.name}${billingLabel}`
+  const description = `灵奇星选${plan.name}${billingLabel}`
 
   const prev = data.mpMembershipCheckoutRequests ?? []
   data.mpMembershipCheckoutRequests = [checkout, ...prev].slice(0, 500)

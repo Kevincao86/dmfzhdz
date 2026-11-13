@@ -1,5 +1,5 @@
 /**
- * 商家 ERP 微信小程序（灵祺ERP小程序）AppID/Secret 与 code2session。
+ * 商家 ERP 微信小程序（灵奇ERP小程序）AppID/Secret 与 code2session。
  * 与达人撮合小程序 MP_WECHAT_* 分离，避免互相覆盖。
  */
 import { createHash } from 'node:crypto'

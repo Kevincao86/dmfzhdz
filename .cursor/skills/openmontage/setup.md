@@ -61,7 +61,7 @@ python -c "from tools.tool_registry import registry; registry.discover(); print(
 test -d remotion-composer/node_modules && echo remotion ok
 ```
 
-或打开 Cursor 说：「用 OpenMontage 做一条 30 秒产品解说，主题是灵祺达人撮合」。
+或打开 Cursor 说：「用 OpenMontage 做一条 30 秒产品解说，主题是灵奇达人撮合」。
 
 `make setup` 末尾的 HyperFrames `npx` 预热可跳过（网络慢时常挂起）；Remotion + Python 工具链就绪即可先出片。
 

@@ -25,7 +25,7 @@ export default function Layout() {
     <div className="mx-auto flex min-h-screen max-w-6xl gap-6 px-4 py-6 md:px-6">
       <aside className="hidden w-56 shrink-0 flex-col rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 md:flex">
         <div className="mb-6">
-          <p className="font-[DM_Sans] text-lg font-bold tracking-tight text-white">灵祺 · 区域服务商</p>
+          <p className="font-[DM_Sans] text-lg font-bold tracking-tight text-white">灵奇 · 区域服务商</p>
           <p className="mt-1 text-xs text-[var(--muted)]">{session?.companyName || session?.phone}</p>
         </div>
         <nav className="flex flex-1 flex-col gap-1">

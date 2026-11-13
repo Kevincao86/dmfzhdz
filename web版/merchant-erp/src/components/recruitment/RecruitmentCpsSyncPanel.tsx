@@ -445,7 +445,7 @@ export default function RecruitmentCpsSyncPanel({
             </tbody>
           </table>
           <p className="border-t border-gray-100 px-3 py-2 text-[10px] text-gray-500">
-            金额单位为抖音接口返回值（一般为分），仅供运营参考，不与灵祺打款自动联动。
+            金额单位为抖音接口返回值（一般为分），仅供运营参考，不与灵奇打款自动联动。
           </p>
         </div>
       ) : null}

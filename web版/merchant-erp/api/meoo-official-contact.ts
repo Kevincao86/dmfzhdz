@@ -90,7 +90,7 @@ function channelWebhook(channel: ContactChannel): { url: string; secret: string;
     return {
       url: (process.env.MEOO_FEISHU_WEBHOOK_LINGQI ?? '').trim(),
       secret: (process.env.MEOO_FEISHU_WEBHOOK_LINGQI_SECRET ?? '').trim(),
-      title: '【灵祺官网咨询】',
+      title: '【灵奇官网咨询】',
     }
   }
   return {
@@ -256,7 +256,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         channel,
         message:
           channel === 'lingqi'
-            ? '灵祺官网咨询飞书未配置：请在轻量 meoo-auth-api 环境设置 MEOO_FEISHU_WEBHOOK_LINGQI（可选 MEOO_FEISHU_WEBHOOK_LINGQI_SECRET）'
+            ? '灵奇官网咨询飞书未配置：请在轻量 meoo-auth-api 环境设置 MEOO_FEISHU_WEBHOOK_LINGQI（可选 MEOO_FEISHU_WEBHOOK_LINGQI_SECRET）'
             : '墨典官网咨询飞书未配置：请在轻量 meoo-auth-api 环境设置 MEOO_FEISHU_WEBHOOK_OFFICIAL（可选 MEOO_FEISHU_WEBHOOK_OFFICIAL_SECRET），或 FEISHU_OFFICIAL_APP_ID + FEISHU_OFFICIAL_APP_SECRET + FEISHU_OFFICIAL_RECEIVE_ID',
       })
       return

@@ -265,7 +265,7 @@ export function buildSimpleNavItems(fullNav: NavItem[]): NavItem[] {
   const items: NavItem[] = [
     { path: '/home', label: '今天', icon: Home },
     { path: '/health-analysis', label: '健康分析', icon: HeartPulse },
-    { path: '/ai-agent', label: '问灵祺', icon: Bot },
+    { path: '/ai-agent', label: '问灵奇', icon: Bot },
     { path: '/store/info', label: '我的店', icon: Store },
     { path: '/products', label: '上架套餐', icon: Package },
     { path: '/recruitment', label: '找人拍探店', icon: UserPlus },

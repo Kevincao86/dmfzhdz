@@ -6,7 +6,7 @@ import { vendorTierAutoPickerKey } from '../../lib/vendorModelPool.js'
 
 /**
  * 智能体模型下拉：文生图专用 key（`img::…`）。
- * - `img::v::…`：灵祺内置万相 / 豆包 / MiniMax（`/api/meoo-ai-agent-image`）。
+ * - `img::v::…`：灵奇内置万相 / 豆包 / MiniMax（`/api/meoo-ai-agent-image`）。
  * - `img::m::家族::模型 id`：TokenMix 中继「图像生成」接口（须配置 TOKENMIX_API_KEY）。
  */
 export type ParsedAgentImagePicker =

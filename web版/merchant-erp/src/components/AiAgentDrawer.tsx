@@ -105,7 +105,7 @@ export default function AiAgentDrawer() {
                   </div>
                   <div className="min-w-0">
                     <h2 id="meoo-ai-agent-title" className="truncate text-base font-semibold tracking-tight">
-                      灵祺 AI 助手
+                      灵奇 AI 助手
                     </h2>
                     <p className="text-xs text-white/80">可咨询问题，也可生成任务方案</p>
                   </div>
@@ -232,7 +232,7 @@ export function AiAgentFloatingButton() {
       type="button"
       onClick={() => openDrawer()}
       className={cn('erp-side-tab erp-side-tab-stack', drawerOpen && 'brightness-110')}
-      aria-label="打开灵祺 AI 助手"
+      aria-label="打开灵奇 AI 助手"
       title="AI 助手"
     >
       <span className="erp-side-tab-latin">AI</span>

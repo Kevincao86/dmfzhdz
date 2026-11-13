@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 灵祺达人履约管理后台：构建 dist + 安装 Nginx（替代 Vercel 履约项目）
+# 灵奇达人履约管理后台：构建 dist + 安装 Nginx（替代 Vercel 履约项目）
 #
 # 机器：履约 Web 在 ECS（8.160.173.236）；API 在轻量（139.196.42.5 / mofangdianai.com）
 #
@@ -17,7 +17,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=ecs-resolve-admin-home.sh
 source "$ROOT/scripts/ecs-resolve-admin-home.sh"
 
-FUL="$ROOT/灵祺达人履约管理后台"
+FUL="$ROOT/灵奇达人履约管理后台"
 ERP="$ROOT/web版/merchant-erp"
 ENV_PROD="$FUL/.env.production"
 ENV_EXAMPLE="$FUL/.env.production.example"

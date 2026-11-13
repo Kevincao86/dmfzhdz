@@ -108,7 +108,7 @@ export function XingxuanPartnerShell() {
   }
 
   return (
-    <ModulePage title="星选达人招募" subtitle="内嵌灵祺星选 PR 工作台；菜单与星选平台 PR 版一致">
+    <ModulePage title="星选达人招募" subtitle="内嵌灵奇星选 PR 工作台；菜单与星选平台 PR 版一致">
       <nav className="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-3" aria-label="星选达人招募">
         {XINGXUAN_PARTNER_NAV.map((item) => (
           <NavLink

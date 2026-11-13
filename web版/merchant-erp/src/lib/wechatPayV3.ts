@@ -97,7 +97,7 @@ export function withWechatPayAppId(cfg: WechatPayConfig, appId: string): WechatP
 /**
  * 是否启用 ERP 小程序 JSAPI。
  * 默认关闭：当前商户号仅关联星选 AppID（实测 APPID_MCHID_NOT_MATCH），
- * 在微信商户平台绑定灵祺ERP AppID 后设 WECHAT_PAY_ERP_JSAPI=1 再开。
+ * 在微信商户平台绑定灵奇ERP AppID 后设 WECHAT_PAY_ERP_JSAPI=1 再开。
  */
 export function erpWechatJsapiEnabled(): boolean {
   const v = String(process.env.WECHAT_PAY_ERP_JSAPI || '').trim().toLowerCase()

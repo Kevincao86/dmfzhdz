@@ -95,7 +95,7 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
     label: '人',
     entries: [
       { kind: 'leaf', to: '/customers', label: '客户管理', icon: Building2, permission: 'customers' },
-      { kind: 'leaf', to: '/talent-library', label: '灵祺达人库', icon: Library, permission: 'talent_library' },
+      { kind: 'leaf', to: '/talent-library', label: '灵奇达人库', icon: Library, permission: 'talent_library' },
       { kind: 'leaf', to: '/shoot-team-library', label: '拍摄团队', icon: Camera, permission: 'shoot_team_library' },
       { kind: 'leaf', to: '/edit-team-library', label: '剪辑团队', icon: Clapperboard, permission: 'edit_team_library' },
       { kind: 'leaf', to: '/pr-library', label: 'PR 用户库', icon: Users, permission: 'pr_library' },

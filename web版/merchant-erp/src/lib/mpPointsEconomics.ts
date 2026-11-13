@@ -22,7 +22,7 @@ export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 104
 /** 即梦动作模仿 2.0：成本约 ¥0.50/秒，内部上浮 30% → 65 积分/秒（前端不展示加价说明） */
 export const MP_POINTS_MOTION_IMITATE_PER_SEC = 65
 
-/** 灵祺 AI 云剪（ICE 普通合成）：一口价 80 积分/条（≤60 秒）；API≈¥0.80/条 */
+/** 灵奇 AI 云剪（ICE 普通合成）：一口价 80 积分/条（≤60 秒）；API≈¥0.80/条 */
 export const MP_POINTS_CLOUD_EDIT_FLAT_PER_CLIP = 80
 export const MP_POINTS_CLOUD_EDIT_MAX_SEC = 60
 
@@ -224,7 +224,7 @@ export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
   mix_material_analyze: 'AI 混剪素材分析',
   shortvideo: '短视频 AI 处理',
   imitate: '模仿视频',
-  cloud_edit: '灵祺 AI 云剪',
+  cloud_edit: '灵奇 AI 云剪',
   cloud_edit_smart: '智能一键成片',
   digital_human: '数字人口播',
   visual_studio_copy: 'AI 视觉工坊文案',

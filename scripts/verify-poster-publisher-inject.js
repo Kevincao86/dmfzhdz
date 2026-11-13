@@ -3,8 +3,8 @@
  * 分享海报发单方名称：100 轮 + 多场景（registry 同步 / 注入 / 误杀防护）
  */
 const path = require('path')
-const prRecruitQr = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/prRecruitQr.js'))
-const ops = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/opsRegistryTalentMp.js'))
+const prRecruitQr = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/prRecruitQr.js'))
+const ops = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/opsRegistryTalentMp.js'))
 
 const ORDER_ID = 'MP-RO-178099398735'
 const PR_USER = {
@@ -88,7 +88,7 @@ runCase('customerName 与 PR 名相同仍应出海报', () => {
 })
 
 runCase('标题与 PR 名相同（测试·温州市）仍应出海报', () => {
-  const prPub = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/prRegistryPublisherName.js'))
+  const prPub = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/prRegistryPublisherName.js'))
   const TEST_USER = {
     id: 'MPR-1781249000001',
     accountType: 'company',
@@ -111,7 +111,7 @@ runCase('标题与 PR 名相同（测试·温州市）仍应出海报', () => {
 })
 
 runCase('无发单方名称仍可生成海报字段', () => {
-  const core = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/recruitmentSharePosterCore.js'))
+  const core = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/recruitmentSharePosterCore.js'))
   const bare = prRecruitQr.stripPublisherSnapshotFromOrder(baseOrder())
   const fields = core.extractPosterFieldsFromOrder(bare)
   assert(fields.inviterName === '', `inviter should be empty: ${fields.inviterName}`)
@@ -119,7 +119,7 @@ runCase('无发单方名称仍可生成海报字段', () => {
 })
 
 runCase('extractPosterFields 有 PR 名时仍可读', () => {
-  const core = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/recruitmentSharePosterCore.js'))
+  const core = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/recruitmentSharePosterCore.js'))
   const bare = prRecruitQr.stripPublisherSnapshotFromOrder(baseOrder())
   const injected = prRecruitQr.injectPublisherDisplayIntoOrder(bare, {
     displayName: '文长',
@@ -138,10 +138,10 @@ for (let i = 0; i < 100; i += 1) {
     const injected = prRecruitQr.injectPublisherDisplayIntoOrder(bare, hit)
     const name = prRecruitQr.resolvePosterInviterName(injected)
     assert(name === '文长', name)
-    const core = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/recruitmentSharePosterCore.js'))
+    const core = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/recruitmentSharePosterCore.js'))
     const fields = core.extractPosterFieldsFromOrder(injected)
     assert(fields.inviterName === '文长', fields.inviterName)
-    assert(!fields.inviterName.includes('灵祺星选'), 'placeholder')
+    assert(!fields.inviterName.includes('灵奇星选'), 'placeholder')
   })
 }
 

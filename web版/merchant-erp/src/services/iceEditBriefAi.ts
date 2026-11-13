@@ -77,7 +77,7 @@ export async function generateIceEditBriefAi(
     '【字幕文案】',
     '（本段写上屏短句，每条 4-20 字，可用「」括起，与图片/镜头顺序对应；可含 Slogan）',
     `全片总时长约 ${ctx.clipEndSec} 秒；画幅 ${ctx.aspectLabel}；特效 ${ctx.preset}。`,
-    '字幕文案与剪辑指令中禁止出现灵祺、灵祺AI、云剪、智能ERP 等产品或平台名称。',
+    '字幕文案与剪辑指令中禁止出现灵奇、灵奇AI、云剪、智能ERP 等产品或平台名称。',
     '只输出上述两段正文，不要 Markdown、不要 JSON、不要解释。',
     '',
     buildMaterialSummary(ctx),

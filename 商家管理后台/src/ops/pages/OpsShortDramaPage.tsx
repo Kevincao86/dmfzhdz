@@ -574,7 +574,7 @@ export default function OpsShortDramaPage() {
       </section>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-        <p className="mb-3 text-xs font-medium text-cyan-400/90">灵祺AI云剪 · ICE</p>
+        <p className="mb-3 text-xs font-medium text-cyan-400/90">灵奇AI云剪 · ICE</p>
         <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
           智能媒体服务云剪辑。密钥仅存服务端与注册表。
         </p>

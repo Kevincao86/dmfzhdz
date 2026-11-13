@@ -36,10 +36,10 @@ Agent **必须**：
 
 ## 典型共享文件（一动即高风险）
 
-- `灵祺达人撮合小程序/utils/ecs.js`
-- `灵祺达人撮合小程序/utils/api.js`
-- `灵祺达人撮合小程序/utils/cloudEcs.js`
-- `灵祺达人撮合小程序/cloudfunctions/mpErpProxy/`
+- `灵奇达人撮合小程序/utils/ecs.js`
+- `灵奇达人撮合小程序/utils/api.js`
+- `灵奇达人撮合小程序/utils/cloudEcs.js`
+- `灵奇达人撮合小程序/cloudfunctions/mpErpProxy/`
 - `web版/merchant-erp/scripts/ecs-auth-api-server.ts`
 
 ## 示例

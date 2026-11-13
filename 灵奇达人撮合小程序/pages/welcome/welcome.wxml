@@ -1,0 +1,51 @@
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} welcome-page foot-col" style="{{lqPageStyle}}{{navBandStyle}}">
+  <launch-splash />
+  <view class="welcome-head">
+    <image class="welcome-head__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+    <text class="welcome-head__title">灵奇星选</text>
+    <text class="welcome-head__sub">选身份　|　找商单　|　去履约</text>
+  </view>
+
+  <view class="welcome-grid">
+    <view
+      wx:for="{{identityOptions}}"
+      wx:key="id"
+      class="welcome-tile welcome-tile--{{item.id}} {{pickedId === item.id ? 'welcome-tile--on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onSelectIdentity"
+      hover-class="welcome-tile--hover"
+    >
+      <text class="welcome-tile__mark">{{item.mark}}</text>
+      <text class="welcome-tile__label">{{item.label}}</text>
+      <text class="welcome-tile__sub">{{item.sub}}</text>
+    </view>
+  </view>
+
+  <view
+    class="welcome-enter {{pickedId ? 'welcome-enter--on' : ''}}"
+    bindtap="onEnterIdentity"
+  >{{pickedId ? '进入工作台' : '请先选择身份'}}</view>
+
+  <view class="welcome-cluster">
+    <view class="welcome-cluster__glow welcome-cluster__glow--a" />
+    <view class="welcome-cluster__glow welcome-cluster__glow--b" />
+    <view
+      wx:for="{{platformLogos}}"
+      wx:key="id"
+      class="welcome-glass welcome-glass--{{index}}"
+    >
+      <image class="welcome-glass__icon" src="{{item.icon}}" mode="aspectFit" />
+    </view>
+  </view>
+
+  <view
+    class="welcome-vortex {{transitionOn ? 'welcome-vortex--on' : ''}}"
+    wx:if="{{transitionOn}}"
+    aria-hidden="true"
+  >
+    <view class="welcome-vortex__spin" style="background: {{transitionColor}};" />
+    <view class="welcome-vortex__burst" style="background: {{transitionColor}};" />
+  </view>
+  <site-icp-footer />
+</view>

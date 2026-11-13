@@ -1,5 +1,5 @@
 ---
-description: 灵祺达人撮合小程序仅走 ECS，禁止 Supabase 云与 Vercel
+description: 灵奇达人撮合小程序仅走 ECS，禁止 Supabase 云与 Vercel
 alwaysApply: true
 ---
 

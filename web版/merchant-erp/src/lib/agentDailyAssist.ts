@@ -64,7 +64,7 @@ export function instantCasualGreetingReply(text: string): string | null {
   const t = text.trim().replace(/[!！。~～\s]+$/u, '')
   if (!t || t.length > 24) return null
   if (/^(你好|您好|hi|hello|嗨|在吗|在么|早上好|下午好|晚上好)$/i.test(t)) {
-    return '你好！我是灵祺 AI 助手，有什么可以帮你的？'
+    return '你好！我是灵奇 AI 助手，有什么可以帮你的？'
   }
   return null
 }

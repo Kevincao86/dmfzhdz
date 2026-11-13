@@ -1,0 +1,741 @@
+import { useEffect, useState } from 'react'
+import {
+  ClipboardList,
+  Users,
+  FolderOpen,
+  TrendingUp,
+  Info,
+  ChevronRight,
+  MessageCircle,
+  Handshake,
+  CircleCheck,
+  UserCheck,
+  CalendarDays,
+  GraduationCap,
+  ShieldCheck,
+  Wallet,
+  CircleHelp,
+  Send,
+} from 'lucide-react'
+import AiTokenUsagePanel from '../../components/AiTokenUsagePanel'
+import { fetchMpRegistry, clearMpRegistryCache, fetchTraining } from '../../lib/mpApi'
+import { buildHallDashboardStats, emptyHallDashboardStats, type HallDashboardStats } from '../../lib/mpRecruitment/hallDashboard'
+import { Link } from 'react-router-dom'
+import { getWorkIdentity, type MpWorkIdentity } from '../../lib/mpWorkIdentity'
+import { getActiveRole } from '../../lib/mpSession'
+import { resolveShellDisplayName } from '../../lib/shellDisplayName'
+import { readApplications, type ApplicationLocal } from '../../lib/mpSync/applicationsStore'
+import { readMember } from '../../lib/mpSync/talentMember'
+import { resolveOrderCoverUrl } from '../../lib/mpSync/recruitCoverLibrary'
+import { loadAllOrderRows, mapMpOrderRow } from '../../lib/mpRecruitment/orderCard'
+import { orderVisibleToWorkIdentity } from '../../lib/mpRecruitment/roleHallFilters'
+import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
+import { resolveTalentApplicationProgress } from '../../lib/mpRecruitment/talentApplicationStatus'
+import { findMyApplicant } from '../../lib/mpSync/talentContactPrGate'
+import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
+import type { MpRegistry } from '../../lib/mpRecruitment/types'
+
+function pctDelta(current: number, prev: number): string | null {
+  if (prev <= 0 && current <= 0) return null
+  if (prev <= 0) return '+100%'
+  const pct = ((current - prev) / prev) * 100
+  const sign = pct >= 0 ? '+' : ''
+  return `${sign}${pct.toFixed(1)}%`
+}
+
+const PR_STAT_CARDS = [
+  { key: 'total' as const, label: '撮合单总量', icon: ClipboardList, tone: 'blue', to: '/orders' },
+  { key: 'recruiting' as const, label: '招募中', icon: Users, tone: 'green', to: '/hall?tab=hall' },
+  { key: 'collecting' as const, label: '收集中', icon: FolderOpen, tone: 'orange', to: '/orders' },
+  { key: 'todayNew' as const, label: '今日新增', icon: TrendingUp, tone: 'purple', to: '/hall?tab=hall' },
+]
+
+const DYNAMIC_LINKS: Record<string, string> = {
+  待处理报名: '/orders',
+  待沟通: '/messages',
+  待确认合作: '/orders',
+  异常单据: '/orders',
+  已完成单据: '/orders',
+}
+
+const DYNAMIC_ICONS = {
+  blue: UserCheck,
+  green: MessageCircle,
+  orange: Handshake,
+  purple: CircleCheck,
+}
+
+function platformDynamicLabel(label: string): string {
+  return label === '异常单据' ? '已完成单据' : label
+}
+
+function TrendBarChart({ items }: { items: { label: string; count: number }[] }) {
+  const max = Math.max(...items.map((i) => i.count), 1)
+  return (
+    <div className="dash-bar-chart">
+      {items.map((item) => (
+        <div key={item.label} className="dash-bar-chart__col">
+          <div className="dash-bar-chart__bar-wrap">
+            <div
+              className="dash-bar-chart__bar"
+              style={{ height: `${Math.max((item.count / max) * 100, item.count ? 8 : 0)}%` }}
+            />
+          </div>
+          <span className="dash-bar-chart__label">{item.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function StatusDonut({ stats }: { stats: HallDashboardStats }) {
+  const segments = [
+    { label: '招募中', count: stats.recruiting, color: '#3b82f6' },
+    { label: '收集中', count: stats.collecting, color: '#10b981' },
+    { label: '已结束', count: stats.ended, color: '#f59e0b' },
+  ].filter((s) => s.count > 0)
+  const total = stats.total || 1
+  let offset = 0
+  const gradient = segments
+    .map((s) => {
+      const pct = (s.count / total) * 100
+      const seg = `${s.color} ${offset}% ${offset + pct}%`
+      offset += pct
+      return seg
+    })
+    .join(', ')
+
+  return (
+    <div className="dash-donut-wrap">
+      <div className="dash-donut" style={{ background: segments.length ? `conic-gradient(${gradient})` : '#e2e8f0' }}>
+        <div className="dash-donut__center">
+          <span className="dash-donut__total">{stats.total}</span>
+          <span className="dash-donut__sub">撮合单总量</span>
+        </div>
+      </div>
+      <ul className="dash-donut__legend">
+        {segments.map((s) => (
+          <li key={s.label}>
+            <span className="dash-donut__dot" style={{ background: s.color }} />
+            <span className="dash-donut__name">{s.label}</span>
+            <span className="dash-donut__meta">
+              {s.count} · {Math.round((s.count / total) * 1000) / 10}%
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function CategoryBars({ items, total }: { items: { category: string; count: number }[]; total: number }) {
+  const max = Math.max(...items.map((i) => i.count), 1)
+  return (
+    <ul className="dash-hbar-list">
+      {items.length ? (
+        items.map((c) => (
+          <li key={c.category} className="dash-hbar-row">
+            <span className="dash-hbar-row__label">{c.category}</span>
+            <div className="dash-hbar-row__track">
+              <div className="dash-hbar-row__fill" style={{ width: `${Math.max((c.count / max) * 100, c.count ? 6 : 0)}%` }} />
+            </div>
+            <span className="dash-hbar-row__pct">{total > 0 ? `${Math.round((c.count / total) * 100)}%` : '0%'}</span>
+          </li>
+        ))
+      ) : (
+        <li className="text-sm text-[var(--shell-muted)] py-6 text-center">暂无品类数据</li>
+      )}
+    </ul>
+  )
+}
+
+function MiniSparkline({ items }: { items: { count: number }[] }) {
+  const data = items.length ? items : [{ count: 0 }]
+  const max = Math.max(...data.map((d) => d.count), 1)
+  const w = 72
+  const h = 36
+  const step = w / Math.max(data.length - 1, 1)
+  const points = data
+    .map((d, i) => {
+      const x = i * step
+      const y = h - (d.count / max) * (h - 6) - 3
+      return `${x},${y}`
+    })
+    .join(' ')
+  return (
+    <svg className="talent-home__sparkline" viewBox={`0 0 ${w} ${h}`} aria-hidden>
+      <polyline fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  )
+}
+
+const PLATFORM_ANNOUNCEMENTS = [
+  { title: '星选平台全新升级 AI 智能匹配', date: '05-28', latest: true },
+  { title: '六月达人招募活动火热进行中', date: '05-25' },
+  { title: '平台服务协议更新通知', date: '05-20' },
+]
+
+type HomeCourse = {
+  id: string
+  title: string
+  poster: string
+  mode: string
+  city: string
+  whenText: string
+  fee: string
+  hostName: string
+}
+
+function todayText() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function isUpcomingCourse(whenText: string) {
+  const dates = String(whenText || '').match(/\d{4}-\d{2}-\d{2}/g) || []
+  const start = dates[0] || ''
+  if (!start) return true
+  return start >= todayText()
+}
+
+function cityKey(raw: string) {
+  return String(raw || '').replace(/市$/, '').trim()
+}
+
+function courseMatchesCity(city: string, userCity: string) {
+  const key = cityKey(userCity)
+  if (!key) return true
+  const raw = String(city || '')
+  if (!raw) return false
+  if (raw.includes('全国')) return true
+  return raw.split(/[、,，/\s]+/).some((part) => {
+    const p = cityKey(part)
+    return p && (p === key || p.includes(key) || key.includes(p))
+  })
+}
+
+function pickHomeCourses(raw: unknown, userCity: string): HomeCourse[] {
+  const list = Array.isArray(raw) ? raw : []
+  const key = cityKey(userCity)
+  const rows = list
+    .map((item) => {
+      const row = item as Record<string, unknown>
+      return {
+        id: String(row.id || ''),
+        title: String(row.title || '培训课程'),
+        poster: String(row.poster || ''),
+        mode: row.mode === 'offline' ? 'offline' : 'online',
+        city: String(row.city || ''),
+        whenText: String(row.whenText || ''),
+        fee: String(row.fee || ''),
+        hostName: String(row.hostName || ''),
+      }
+    })
+    .filter((row) => row.id && isUpcomingCourse(row.whenText))
+    .filter((row) => (row.mode === 'online' ? true : !key ? row.city.includes('全国') || !row.city : courseMatchesCity(row.city, key)))
+  rows.sort((a, b) => {
+    const aLocal = a.mode === 'offline' && key && courseMatchesCity(a.city, key) && !a.city.includes('全国') ? 0 : 1
+    const bLocal = b.mode === 'offline' && key && courseMatchesCity(b.city, key) && !b.city.includes('全国') ? 0 : 1
+    return aLocal - bLocal
+  })
+  return rows.slice(0, 4)
+}
+
+function countPendingApplications(reg: MpRegistry): number {
+  const apps = readApplications()
+  if (!apps.length) return 0
+  const orders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+  let pending = 0
+  for (const app of apps) {
+    const mp = orders.find((o) => String(o?.id) === app.mpOrderId) as Record<string, unknown> | undefined
+    if (!mp) {
+      pending += 1
+      continue
+    }
+    const me = findMyApplicant(mp, app.mpOrderId)
+    const progress = resolveTalentApplicationProgress(mp, me as Record<string, unknown> | null, app.mpOrderId)
+    if (progress.id !== 'completed') pending += 1
+  }
+  return pending
+}
+
+function applicationSortMs(appliedAt?: string): number {
+  const t = Date.parse(String(appliedAt || '').trim())
+  return Number.isFinite(t) ? t : 0
+}
+
+type RecentApplicationItem = {
+  mpOrderId: string
+  title: string
+  coverUrl?: string
+  tags: string[]
+  progressLabel: string
+  appliedAt?: string
+}
+
+function enrichRecentApplication(
+  app: ApplicationLocal,
+  mp: Record<string, unknown> | undefined,
+  reg: MpRegistry,
+): RecentApplicationItem {
+  const fallback: RecentApplicationItem = {
+    mpOrderId: app.mpOrderId,
+    title: app.title || '报名商单',
+    tags: app.platform ? [app.platform] : [],
+    progressLabel: '已报名',
+    appliedAt: app.appliedAt,
+  }
+  if (!mp) return fallback
+  const row = mapMpOrderRow(mp, reg)
+  const me = findMyApplicant(mp, app.mpOrderId)
+  const progress = resolveTalentApplicationProgress(mp, me as Record<string, unknown> | null, app.mpOrderId)
+  return {
+    mpOrderId: app.mpOrderId,
+    title: app.title || row.title,
+    coverUrl: resolveOrderCoverUrl(mp),
+    tags: orderTagChips(row),
+    progressLabel: progress.label,
+    appliedAt: app.appliedAt,
+  }
+}
+
+function formatAppliedAtShort(raw?: string): string {
+  const t = String(raw || '').trim()
+  if (!t) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.replace('T', ' ').slice(0, 16)
+  return t
+}
+
+function orderTagChips(row: RecruitmentOrderRow): string[] {
+  const tags: string[] = []
+  if (row.isIce) tags.push('云剪')
+  else if (row.platform) tags.push(row.platform)
+  if (row.category) tags.push(row.category)
+  if (row.fansRequirement && row.fansRequirement !== '不限') tags.push(row.fansRequirement)
+  else if (row.categoryTagsText) tags.push(row.categoryTagsText.split(/[·、,，]/)[0]?.trim() || '')
+  return tags.filter(Boolean).slice(0, 3)
+}
+
+function TrainingAdBar() {
+  const [ads, setAds] = useState<{ id: string; title: string; poster: string }[]>([])
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    let alive = true
+    fetchTraining()
+      .then((data) => {
+        if (!alive) return
+        const list = (Array.isArray(data.courses) ? data.courses : [])
+          .filter((c) => c && String((c as { poster?: string }).poster || '').startsWith('data:image/'))
+          .slice(0, 6)
+          .map((c) => {
+            const row = c as { id?: string; title?: string; poster?: string }
+            return { id: String(row.id || ''), title: String(row.title || '培训课程'), poster: String(row.poster || '') }
+          })
+        setAds(list)
+      })
+      .catch(() => {
+        if (alive) setAds([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+  useEffect(() => {
+    if (ads.length < 2) return
+    const timer = window.setInterval(() => setIndex((n) => (n + 1) % ads.length), 4000)
+    return () => window.clearInterval(timer)
+  }, [ads.length])
+  if (!ads.length) return null
+  const ad = ads[index] || ads[0]
+  return (
+    <Link to={ad.id ? `/training?course=${encodeURIComponent(ad.id)}` : '/training'} className="talent-home__ad">
+      <img src={ad.poster} alt={ad.title} />
+    </Link>
+  )
+}
+
+function TalentHomeDashboard({
+  stats,
+  loading,
+  err,
+  onRetry,
+  workId,
+  refreshKey,
+}: {
+  stats: HallDashboardStats
+  loading: boolean
+  err: string
+  onRetry: () => void
+  workId: MpWorkIdentity
+  refreshKey: number
+}) {
+  const displayName = resolveShellDisplayName()
+  const profileLink = workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'
+  const [homeCourses, setHomeCourses] = useState<HomeCourse[]>([])
+  const [matchCount, setMatchCount] = useState(0)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [appsLoading, setAppsLoading] = useState(true)
+
+  const todayTrend = pctDelta(stats.todayNew, stats.yesterdayNew)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setAppsLoading(true)
+      try {
+        const member = readMember()
+        const reg = await fetchMpRegistry()
+        if (!alive) return
+        setPendingCount(countPendingApplications(reg))
+        const all = loadAllOrderRows(reg)
+        const rows = all.filter((r) => orderVisibleToWorkIdentity(r, workId) && r.statusLabel === '招募中')
+        let enriched = rows
+        if (member && rows.length) {
+          enriched = await recruitmentAi.enrichOrderMatches(rows, member, { workIdentity: workId })
+        } else if (rows.length) {
+          enriched = await recruitmentAi.enrichOrderTags(rows, member?.city || member?.province || '')
+          enriched = enriched.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
+        }
+        if (!alive) return
+        const matched = enriched.filter((r) => (r.matchScore || 0) >= 55 || r.aiMatch)
+        setMatchCount(matched.length)
+
+        const training = await fetchTraining().catch(() => null)
+        if (!alive) return
+        setHomeCourses(pickHomeCourses(training && training.courses, String(member?.city || '')))
+      } catch {
+        if (!alive) return
+        setMatchCount(0)
+        setHomeCourses([])
+      } finally {
+        if (alive) setAppsLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [workId, refreshKey])
+
+  const shortcuts = [
+    { to: '/hall?tab=hall', label: '报名', icon: Send },
+    { to: '/orders/calendar', label: '商单日历', icon: CalendarDays },
+    { to: '/training', label: '课程', icon: GraduationCap },
+    { to: '/profile/ai-review', label: 'AI视频审核', icon: ShieldCheck },
+    { to: '/profile/wallet', label: '钱包', icon: Wallet },
+    { to: '/help', label: '帮助', icon: CircleHelp },
+  ]
+
+  return (
+    <div className="talent-home talent-home--desk">
+      {loading ? <p className="talent-home__hint">加载数据中…</p> : null}
+      {err ? (
+        <p className="talent-home__err">
+          {err}
+          <button type="button" className="talent-home__retry" onClick={onRetry}>刷新重试</button>
+        </p>
+      ) : null}
+
+      <header className="talent-home__greet">
+        <h2 className="talent-home__welcome-title">你好，{displayName}</h2>
+        <p className="talent-home__welcome-sub">欢迎回到灵奇星选</p>
+      </header>
+
+      <div className="talent-home__stat-row">
+        <Link to="/hall?tab=hall" className="talent-home__stat-card talent-home__stat-card--purple no-underline">
+          <div className="talent-home__stat-body">
+            <span className="talent-home__stat-label">今日新单数</span>
+            <span className="talent-home__stat-value">{stats.todayNew.toLocaleString('zh-CN')}</span>
+            {todayTrend ? (
+              <span className={`talent-home__stat-trend ${todayTrend.startsWith('-') ? 'down' : 'up'}`}>
+                较昨日 {todayTrend.startsWith('-') ? '' : '↑'}{todayTrend.replace(/^\+/, '')}
+              </span>
+            ) : (
+              <span className="talent-home__stat-trend muted">实时统计</span>
+            )}
+          </div>
+          <MiniSparkline items={stats.dailyTrend} />
+        </Link>
+
+        <Link to="/hall?tab=recommend" className="talent-home__stat-card talent-home__stat-card--blue no-underline">
+          <div className="talent-home__stat-body">
+            <span className="talent-home__stat-label">匹配推荐</span>
+            <span className="talent-home__stat-value">{matchCount.toLocaleString('zh-CN')}</span>
+            <span className="talent-home__stat-sub">
+              {matchCount > 0 ? `有 ${matchCount} 个订单适合你` : '完善资料获取智能匹配'}
+            </span>
+          </div>
+          <ChevronRight size={20} className="talent-home__stat-chev" aria-hidden />
+        </Link>
+
+        <Link to="/orders" className="talent-home__stat-card talent-home__stat-card--orange no-underline">
+          <div className="talent-home__stat-body">
+            <span className="talent-home__stat-label">待处理报名</span>
+            <span className="talent-home__stat-value">{pendingCount.toLocaleString('zh-CN')}</span>
+            <span className="talent-home__stat-sub">尽快处理，提升合作率</span>
+          </div>
+          <ChevronRight size={20} className="talent-home__stat-chev" aria-hidden />
+        </Link>
+      </div>
+
+      <div className="talent-home__desk">
+        <section className="talent-home__panel talent-home__announce">
+          <h3 className="talent-home__panel-title">平台公告</h3>
+          <ul className="talent-home__announce-list">
+            {PLATFORM_ANNOUNCEMENTS.map((item) => (
+              <li key={item.title}>
+                <Link to="/help" className="talent-home__announce-item no-underline">
+                  <span className="talent-home__announce-date">{item.date}</span>
+                  <span className="talent-home__announce-text">{item.title}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link to="/help" className="talent-home__announce-more">查看全部公告</Link>
+        </section>
+
+        <section className="talent-home__panel">
+          <h3 className="talent-home__panel-title">快捷入口</h3>
+          <div className="talent-home__icon-grid">
+            {shortcuts.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link key={item.label} to={item.to} className="talent-home__icon-tile no-underline">
+                  <Icon size={22} strokeWidth={1.6} aria-hidden />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      </div>
+
+      <AiTokenUsagePanel layout="ledger" />
+
+      <section className="talent-home__panel talent-home__courses">
+          <h3 className="talent-home__panel-title">课程培训推荐</h3>
+          {appsLoading ? (
+            <p className="talent-home__hint">课程加载中…</p>
+          ) : homeCourses.length ? (
+            <ul className="talent-home__order-list">
+              {homeCourses.map((item) => (
+                <li key={item.id}>
+                  <div className="talent-home__order-row">
+                    <div className="talent-home__order-cover">
+                      {item.poster ? <img src={item.poster} alt="" /> : <span>课</span>}
+                    </div>
+                    <div className="talent-home__order-body">
+                      <h4 className="talent-home__order-title">{item.title}</h4>
+                      <div className="talent-home__order-tags">
+                        <span className="talent-home__order-tag">{item.mode === 'offline' ? '线下' : '线上'}</span>
+                        {item.city ? <span className="talent-home__order-tag">{item.city}</span> : null}
+                        {item.hostName ? <span className="talent-home__order-tag">{item.hostName}</span> : null}
+                      </div>
+                      {item.whenText ? <p className="talent-home__order-applied">{item.whenText}</p> : null}
+                    </div>
+                    <span className="talent-home__order-status">{item.fee ? `¥${item.fee}` : '待定'}</span>
+                    <Link
+                      to={`/training?course=${encodeURIComponent(item.id)}`}
+                      className="talent-home__order-apply talent-home__order-apply--outline"
+                    >
+                      查看详情
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="talent-home__order-empty">
+              <p>暂无同城或线上的即将开课</p>
+              <Link to="/training" className="talent-home__order-empty-link">查看全部培训</Link>
+            </div>
+          )}
+        </section>
+
+      <div className="talent-home__foot-actions">
+        <Link to="/help" className="talent-home__btn talent-home__btn--outline">新手引导</Link>
+        <Link to={profileLink} className="talent-home__btn talent-home__btn--outline">完善资料</Link>
+      </div>
+      <TrainingAdBar />
+    </div>
+  )
+}
+
+function PrHomeDashboard({ stats, loading, err, onRetry }: {
+  stats: HallDashboardStats
+  loading: boolean
+  err: string
+  onRetry: () => void
+}) {
+  return (
+    <div className="dash-home">
+      {loading ? <p className="dash-home__hint">加载数据中…</p> : null}
+      {err ? (
+        <p className="dash-home__err">
+          {err}
+          <button type="button" className="dash-home__retry" onClick={onRetry}>刷新重试</button>
+        </p>
+      ) : null}
+
+      <TrainingAdBar />
+
+      <div className="dash-stat-grid">
+            {PR_STAT_CARDS.map((c) => {
+              const Icon = c.icon
+              const value = stats[c.key] as number
+              let trend: string | null = null
+              if (c.key === 'todayNew') trend = pctDelta(stats.todayNew, stats.yesterdayNew)
+              return (
+                <Link
+                  key={c.key}
+                  to={c.to}
+                  className={`dash-stat-card dash-stat-card--${c.tone} no-underline`}
+                >
+                  <div className="dash-stat-card__body">
+                    <div className="dash-stat-card__title">
+                      {c.label}
+                      <Info size={14} className="dash-stat-card__info" aria-hidden />
+                    </div>
+                    <div className="dash-stat-card__value">{value.toLocaleString('zh-CN')}</div>
+                    {trend ? (
+                      <div className={`dash-stat-card__trend ${trend.startsWith('-') ? 'down' : 'up'}`}>
+                        较昨日 {trend} {trend.startsWith('-') ? '↓' : '↑'}
+                      </div>
+                    ) : (
+                      <div className="dash-stat-card__trend muted">实时统计</div>
+                    )}
+                  </div>
+                  <div className={`dash-stat-card__icon dash-stat-card__icon--${c.tone}`}>
+                    <Icon size={22} strokeWidth={2} />
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+
+          <div className="dash-chart-grid">
+            <div className="dash-panel">
+              <div className="dash-panel__head">
+                <h3 className="dash-panel__title">平台撮合单趋势</h3>
+                <span className="dash-panel__chip">近7天</span>
+              </div>
+              <TrendBarChart items={stats.dailyTrend} />
+            </div>
+
+            <div className="dash-panel">
+              <div className="dash-panel__head">
+                <h3 className="dash-panel__title">招募状态分布</h3>
+              </div>
+              <StatusDonut stats={stats} />
+            </div>
+
+            <div className="dash-panel">
+              <div className="dash-panel__head">
+                <h3 className="dash-panel__title">行业类目分布</h3>
+                <span className="dash-panel__chip">全部</span>
+              </div>
+              <CategoryBars items={stats.categoryCounts} total={stats.total} />
+            </div>
+          </div>
+
+          <AiTokenUsagePanel />
+
+          <section className="dash-dynamics">
+            <h3 className="dash-dynamics__title">平台动态</h3>
+            <div className="dash-dynamics-grid">
+              {stats.dynamicCards.map((card) => {
+                const label = platformDynamicLabel(card.label)
+                const Icon = DYNAMIC_ICONS[card.tone]
+                const to = DYNAMIC_LINKS[label] || DYNAMIC_LINKS[card.label] || '/orders'
+                return (
+                  <Link
+                    key={card.label}
+                    to={to}
+                    className={`dash-dynamic-card dash-dynamic-card--${card.tone} no-underline`}
+                  >
+                    <div className={`dash-dynamic-card__icon dash-dynamic-card__icon--${card.tone}`}>
+                      <Icon size={20} strokeWidth={2} />
+                    </div>
+                    <div className="dash-dynamic-card__body">
+                      <div className="dash-dynamic-card__label">{label}</div>
+                      <div className="dash-dynamic-card__row">
+                        <span className="dash-dynamic-card__value">{card.count}</span>
+                        {card.delta !== 0 ? (
+                          <span className={`dash-dynamic-card__delta ${card.delta < 0 ? 'down' : 'up'}`}>
+                            今日 {card.delta > 0 ? '+' : ''}{card.delta}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <ChevronRight size={18} className="dash-dynamic-card__chev" aria-hidden />
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
+    </div>
+  )
+}
+
+export default function HallHomeDashboard() {
+  const role = getActiveRole()
+  const workId = getWorkIdentity()
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  const [stats, setStats] = useState<HallDashboardStats | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      setErr('')
+      try {
+        const reg = await fetchMpRegistry()
+        if (!alive) return
+        const identity = role === 'pr' ? 'pr' : workId
+        const next = buildHallDashboardStats(reg, identity)
+        setStats(next)
+        const mpCount = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders.length : 0
+        if (mpCount === 0 && next.total === 0) {
+          setErr('暂未拉取到招募单数据，请刷新重试')
+        }
+      } catch (e) {
+        if (!alive) return
+        setErr(e instanceof Error ? e.message : '加载失败')
+        setStats(emptyHallDashboardStats())
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [role, workId, refreshKey])
+
+  function retryLoad() {
+    clearMpRegistryCache()
+    setRefreshKey((k) => k + 1)
+  }
+
+  if (role === 'pr') {
+    return (
+      <PrHomeDashboard
+        stats={stats ?? emptyHallDashboardStats()}
+        loading={loading}
+        err={err}
+        onRetry={retryLoad}
+      />
+    )
+  }
+
+  return (
+    <TalentHomeDashboard
+      stats={stats ?? emptyHallDashboardStats()}
+      loading={loading}
+      err={err}
+      onRetry={retryLoad}
+      workId={workId}
+      refreshKey={refreshKey}
+    />
+  )
+}

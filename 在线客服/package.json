@@ -2,7 +2,7 @@
   "name": "lingqi-online-support",
   "private": true,
   "version": "0.1.0",
-  "description": "灵祺独立在线客服台 · 与飞书双通道写入 support_relay",
+  "description": "灵奇独立在线客服台 · 与飞书双通道写入 support_relay",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5182",

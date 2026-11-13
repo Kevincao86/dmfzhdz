@@ -1,0 +1,2165 @@
+const api = require('../../../utils/api.js')
+const ops = require('../../../utils/opsRegistryTalentMp.js')
+const display = require('../../../utils/recruitmentDisplay.js')
+const userProfile = require('../../../utils/userProfile.js')
+const auth = require('../../../utils/auth.js')
+const applicationsStore = require('../../../utils/applicationsStore.js')
+const chat = require('../../../utils/talentChat.js')
+const contactGate = require('../../../utils/talentContactPrGate.js')
+const iceOrderStats = require('../../../utils/iceOrderStats.js')
+const iceOrderDetect = require('../../../utils/iceOrderDetect.js')
+const iceGroupQr = require('../../../utils/iceGroupQr.js')
+const mpGroupQr = require('../../../utils/mpGroupQr.js')
+const xingxuanRecruitLoop = require('../../../utils/xingxuanRecruitLoop.js')
+const editDeliverLinks = require('../../../utils/editDeliverLinks.js')
+const talentAppStatus = require('../../../utils/talentApplicationStatus.js')
+const applicantListExtras = require('../../../utils/applicantListExtras.js')
+const visitScheduleRuntime = require('../../../utils/visitScheduleRuntime.js')
+const { parseIceSlotTotalFromMp, resolveApplicantCountFromMp } = require('../../../utils/mpRecruitCount.js')
+const recruitApplyGate = require('../../../utils/recruitApplyGate.js')
+const memberProfileApplyGate = require('../../../utils/memberProfileApplyGate.js')
+const memberStore = require('../../../utils/talentMember.js')
+const prPublishedOrders = require('../../../utils/prPublishedOrders.js')
+const applyTemplates = require('../../../utils/applyFormTemplates.js')
+const appRegistrySync = require('../../../utils/applicationsRegistrySync.js')
+const guestRoutes = require('../../../utils/mpGuestRoutes.js')
+const sharePoster = require('../../../utils/recruitmentSharePoster.js')
+const prRecruitQr = require('../../../utils/prRecruitQr.js')
+const orderFavorites = require('../../../utils/orderFavorites.js')
+const publishLinkUtil = require('../../../utils/recruitmentPublishLink.js')
+const videoUpload = require('../../../utils/recruitmentVideoUpload.js')
+const subpageNav = require('../../../utils/subpageNav.js')
+const mpTargetedRecruit = require('../../../utils/mpTargetedRecruit.js')
+const mpTargetedRecruitApi = require('../../../utils/mpTargetedRecruitApi.js')
+const participant = require('../../../utils/participant.js')
+const openLoopReminderSync = require('../../../utils/openLoopReminderSync.js')
+
+function isGenericErpTaskLine(line) {
+  return /商家通过 ERP 发起招募|达人报名后由商家在 ERP 反选|商家 ERP 普通招募/.test(String(line || ''))
+}
+
+/** 智能体/商家单的招募正文在 Brief 或主推里；「Brief:」整段不能丢掉 */
+function collectTalentRecruitLines(mp, view) {
+  const raw = [mp && mp.recruitmentInfo, mp && mp.merchantRequirements, view && view.recruitmentInfo]
+    .filter(Boolean)
+    .join('\n')
+  const lines = []
+  const seen = new Set()
+  const push = (s) => {
+    const t = String(s || '').replace(/\s+/g, ' ').trim()
+    if (!t || t === '—' || t === '详见招募信息' || seen.has(t)) return
+    if (isGenericErpTaskLine(t)) return
+    seen.add(t)
+    lines.push(t)
+  }
+  for (const part of raw.split(/[\n\r；;]+/)) {
+    let t = String(part || '').trim()
+    if (!t) continue
+    const brief = t.match(/^(?:模式|Brief|brief)[:：]\s*(.+)$/i)
+    if (brief) {
+      push(brief[1])
+      continue
+    }
+    if (/^(预算金额|预算|桌数|商家订单|ERP|MO-|策略|档位|分配|达人佣金|费用模式)[:：]/i.test(t)) continue
+    if (/^预算/i.test(t) && /[¥￥\d]/.test(t)) continue
+    const main = t.match(/主推[:：]\s*([^；;]+)/)
+    const tags = t.match(/标签[:：]\s*([^；;]+)/)
+    if (main || tags || /^【智能体/.test(t)) {
+      if (main) push(`主推：${main[1].trim()}`)
+      if (tags && tags[1].trim() && tags[1].trim() !== '—') push(`标签：${tags[1].trim()}`)
+      continue
+    }
+    if (/^(平台|城市)[:：]/.test(t)) continue
+    push(t)
+  }
+  return lines
+}
+
+function padTimeHm(raw) {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return ''
+  return `${String(m[1]).padStart(2, '0')}:${m[2]}`
+}
+
+function parseVisitTimeRange(slot) {
+  const s = String(slot || '').trim()
+  const m = s.match(/(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})/)
+  if (m) {
+    return { start: padTimeHm(m[1]) || '09:00', end: padTimeHm(m[2]) || '12:00' }
+  }
+  return { start: '09:00', end: '12:00' }
+}
+
+function buildVisitTimeRange(start, end) {
+  const s = padTimeHm(start)
+  const e = padTimeHm(end)
+  if (!s || !e) return ''
+  return `${s}-${e}`
+}
+
+function visitTimeMinutes(raw) {
+  const t = padTimeHm(raw)
+  if (!t) return -1
+  const p = t.split(':')
+  return Number(p[0]) * 60 + Number(p[1])
+}
+
+function normalizeVisitDateKey(raw) {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+  if (!m) return ''
+  const pad = (n) => String(Number(n)).padStart(2, '0')
+  return `${m[1]}-${pad(m[2])}-${pad(m[3])}`
+}
+
+function normalizeSlotCompareKey(raw) {
+  const parsed = parseVisitTimeRange(raw)
+  const ranged = buildVisitTimeRange(parsed.start, parsed.end)
+  return ranged || String(raw || '').trim().replace(/\s+/g, ' ')
+}
+
+function formatDetailTime(ms) {
+  const n = Number(ms) || 0
+  if (!n) return ''
+  const d = new Date(n)
+  const pad = (v) => String(v).padStart(2, '0')
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function collectLevelTiers(text) {
+  const out = []
+  const re = /(\d+)\s*级\s*(\d+(?:\.\d+)?)/g
+  const s = String(text || '')
+  let m
+  while ((m = re.exec(s))) {
+    const level = Number(m[1])
+    const yuan = Number(m[2])
+    if (level >= 1 && level <= 8 && yuan > 0) out.push({ level, yuan })
+  }
+  return out
+}
+
+function formatLiftSales(yuan) {
+  const n = Math.round(Number(yuan) || 0)
+  if (n >= 10000) {
+    const wan = n / 10000
+    const text = wan >= 100 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, '')
+    return '¥' + text + '万'
+  }
+  return '¥' + String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+/** 与达人分析页同一套曝光/带货估算，按本单等级和金额出预计增量。 */
+function estimateOrderTalentLift(priceText, lines) {
+  let tiers = collectLevelTiers(priceText)
+  if (!tiers.length) {
+    const arr = lines || []
+    tiers = []
+    for (let i = 0; i < arr.length; i += 1) {
+      const part = collectLevelTiers(arr[i])
+      for (let j = 0; j < part.length; j += 1) tiers.push(part[j])
+    }
+  }
+  let level = 4
+  let yuan = 100
+  if (tiers.length) {
+    const sorted = tiers.slice().sort((a, b) => a.level - b.level)
+    const pick = sorted[Math.floor((sorted.length - 1) / 2)]
+    level = pick.level
+    yuan = pick.yuan
+  } else {
+    const money = String(priceText || '').replace(/,/g, '').match(/(\d+(?:\.\d+)?)/)
+    const n = money ? Number(money[1]) : 0
+    if (n >= 20 && n <= 20000) yuan = n
+  }
+  const fansByLevel = [0, 3000, 6000, 12000, 20000, 35000, 70000, 140000, 250000]
+  const scoreByLevel = [0, 48, 54, 58, 62, 66, 70, 74, 78]
+  const fans = fansByLevel[level] || 20000
+  const score = scoreByLevel[level] || 62
+  const exposurePct = Math.min(60, Math.max(8, Math.round((100 - Math.min(92, score)) * 1.5)))
+  const orders = Math.max(1, Math.round(fans * (exposurePct / 100) * 0.002))
+  const salesYuan = Math.min(5000000, Math.max(500, Math.round(orders * yuan)))
+  return {
+    liftExposureText: '+' + exposurePct + '%',
+    liftSalesText: formatLiftSales(salesYuan),
+  }
+}
+
+function formatDetailDate(ms) {
+  const n = Number(ms) || 0
+  if (!n) return ''
+  const d = new Date(n)
+  const pad = (v) => String(v).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function buildDetailDisplayFields(view, mp, opts) {
+  const mpOrderStatus = require('../../../utils/mpOrderStatus.js')
+  const publishedMs = Number(opts.publishedMs) || 0
+  const deadlineMs = Number(opts.deadlineMs) || 0
+  const isIce = !!opts.isIce
+  const start = formatDetailTime(publishedMs)
+  const end = formatDetailTime(deadlineMs)
+  let signupTimeRange = '长期招募'
+  if (start && end) signupTimeRange = `${start} – ${end}`
+  else if (end) signupTimeRange = `截止 ${end}`
+  const recruitCap = parseIceSlotTotalFromMp(mp)
+  let applicantCount = resolveApplicantCountFromMp(mp)
+  if (isIce) {
+    const progress = iceOrderStats.countIceClaimedSlots(mp, recruitCap)
+    applicantCount = progress.claimed
+  }
+  const recruitCountText = isIce ? `${recruitCap} 位` : `${recruitCap} 人`
+  const applicantCountText = isIce
+    ? `${Math.min(applicantCount, recruitCap > 0 ? recruitCap : applicantCount)} 位`
+    : `${applicantCount} 人`
+  const signupProgressText = iceOrderStats.buildHallSignupCountText(mp, applicantCount, recruitCap)
+  let locationText = view && view.region && view.region !== '—' ? view.region : '不限地点'
+  if (view && view.isFormRelay) locationText += ' · 线上报名'
+  else if (isIce) locationText += ' · 云剪任务'
+  else locationText += ' · 线下探店'
+  const benefitsText =
+    (view && view.budgetText && view.budgetText !== '面议' ? view.budgetText : '') ||
+    '高额提成 · 流量扶持 · 专业培训'
+  const tags = []
+  if (view && view.category && view.category !== '—') tags.push(view.category)
+  const titleText = String((view && view.title) || '')
+  if (/探店|实探|门店/.test(titleText) && !tags.includes('探店')) tags.push('探店')
+  if (view && view.region && view.region !== '—') {
+    if (display.isUnlimitedRecruitmentRegion(view.region)) {
+      if (!tags.includes('全国')) tags.push('全国')
+    } else {
+      const city = String(view.region).split(/[·\s/]/)[0].trim()
+      if (city && !tags.includes(city)) tags.push(city)
+    }
+  }
+  let detailCityText = '全国'
+  if (view && view.region && view.region !== '—') {
+    detailCityText = display.isUnlimitedRecruitmentRegion(view.region)
+      ? '全国'
+      : String(view.region).split(/[·\s/]/)[0].trim() || view.region
+  }
+  const detailPlatformText =
+    view && view.platform && view.platform !== '—' ? view.platform : '不限'
+  const detailPriceText = view && view.budgetText ? view.budgetText : '面议'
+  const detailDeadlineText = formatDetailDate(deadlineMs) || '长期有效'
+  const detailRecruitQuotaText = mpTargetedRecruit.isTargetedOrder(mp)
+    ? (() => {
+        const stats = mpTargetedRecruit.inviteStats(mp)
+        return stats.invited > 0 ? `同意 ${stats.accepted}/${stats.invited}` : `${stats.accepted}/${recruitCap > 0 ? recruitCap : 1}`
+      })()
+    : recruitCap > 0
+      ? `${Math.min(applicantCount, recruitCap)}/${recruitCap}`
+      : `${applicantCount}`
+  const signupProgressTextTargeted = mpTargetedRecruit.isTargetedOrder(mp)
+    ? mpTargetedRecruit.buildInviteProgressLabel(mp)
+    : signupProgressText
+  const effectiveStatus = mpOrderStatus.resolveEffectiveMpStatus(
+    mp && mp.status,
+    deadlineMs,
+    Date.now(),
+  )
+  const detailStatusLabel = mpOrderStatus.statusLabel(effectiveStatus) || '招募中'
+  const recruitLines = collectTalentRecruitLines(mp, view)
+  const taskOnly = (view && Array.isArray(view.taskDetailLines) ? view.taskDetailLines : []).filter(
+    (line) => !isGenericErpTaskLine(line),
+  )
+  const taskSeen = new Set(recruitLines)
+  for (const line of taskOnly) {
+    const t = String(line || '').trim()
+    if (!t || taskSeen.has(t)) continue
+    taskSeen.add(t)
+    recruitLines.push(t)
+  }
+  const taskDetailLines = recruitLines.length
+    ? recruitLines
+    : view && Array.isArray(view.taskDetailLines)
+      ? view.taskDetailLines
+      : []
+  let coverImage = ''
+  try {
+    const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
+    coverImage = mp ? recruitCoverLib.resolveOrderCoverUrl(mp) || '' : ''
+  } catch (_) {}
+  return {
+    signupTimeRange,
+    recruitCountText,
+    applicantCountText,
+    signupProgressText: signupProgressTextTargeted,
+    locationText,
+    benefitsText,
+    detailCategoryTags: tags.slice(0, 4),
+    detailPriceText,
+    detailDeadlineText,
+    detailRecruitQuotaText,
+    detailCityText,
+    detailPlatformText,
+    detailStatusLabel,
+    taskDetailLines,
+    coverImage,
+    merchantLocationDisplay: (view && view.merchantLocationDisplay) || '',
+    merchantLocationNav: (view && view.merchantLocationNav) || null,
+    ...estimateOrderTalentLift(detailPriceText, taskDetailLines),
+  }
+}
+
+function settleFieldsFromApplicant(applicant) {
+  const openLoop = require('../../../utils/openLoopSettlement.js')
+  const on = !!(applicant && applicant.orderSettleRemindOn === true)
+  const presetRaw = String((applicant && applicant.orderSettleRemindPreset) || '')
+  const preset = presetRaw === '15' || presetRaw === '30' || presetRaw === 'custom' ? presetRaw : '7'
+  const dateKey = String((applicant && applicant.orderSettleRemindDate) || '')
+  const timeRaw = String((applicant && applicant.orderSettleRemindTime) || '10:00')
+  const timeLabel = /^([01]\d|2[0-3]):[0-5]\d$/.test(timeRaw) ? timeRaw : '10:00'
+  const day = on ? openLoop.orderSettleMonthDay(dateKey) : ''
+  return {
+    settleRemindOn: on,
+    settleRemindPreset: preset,
+    settleRemindDate: dateKey,
+    settleRemindTime: timeLabel,
+    settleRemindLabel: day ? `${day} ${timeLabel}` : '',
+    settleRemindMin: openLoop.orderSettleDateKey(0),
+    settleRemindBusy: false,
+  }
+}
+
+Page({
+  data: {
+    subNavTitle: '招募详情',
+    subNavBandStyle: '',
+    subNavInnerStyle: '',
+    shareEntry: false,
+    liftExposureText: '',
+    liftSalesText: '',
+    id: '',
+    loading: true,
+    err: '',
+    view: null,
+    applied: false,
+    isOpenLoop: false,
+    openLoop: null,
+    openLoopApplicantId: '',
+    isPr: false,
+    settleRemindOn: false,
+    settleRemindPreset: '7',
+    settleRemindDate: '',
+    settleRemindTime: '10:00',
+    settleRemindLabel: '',
+    settleRemindMin: '',
+    settleRemindBusy: false,
+    fromApply: false,
+    applicationApproved: false,
+    openLoopGroupQr: '',
+    isIce: false,
+    iceApplicantId: '',
+    assignedVideoUrl: '',
+    assignedVideoLabel: '',
+    douyinUrl: '',
+    iceSubmitting: false,
+    iceVerified: false,
+    icePendingConfirm: false,
+    iceRejected: false,
+    canReclaimIce: false,
+    iceConfirming: false,
+    iceVerifyMode: 'ai',
+    icePendingPrReview: false,
+    iceLinkRejected: false,
+    iceAiFailedNote: '',
+    iceSubmitLabel: '提交链接 · AI 核查',
+    iceStatusHint: '',
+    iceStep3Hint: '发布抖音并回传链接，AI 核查通过后自动完成',
+    isEditIce: false,
+    isPackIce: false,
+    iceSlotTotal: 0,
+    orderClaimedSlots: 0,
+    claimedSlotCount: 1,
+    editDeliverSubmittedCount: 0,
+    iceConfirmed: false,
+    editGroupQrImage: '',
+    deliverText: '',
+    deliverParsedCount: 0,
+    editDeliverSubmitting: false,
+    iceSlotsFull: false,
+    visitApplicantId: '',
+    visitDisplayLabel: '',
+    visitHint: '',
+    showVisitConfirmBtn: false,
+    showAssignConfirmBtn: false,
+    showCheckInBtn: false,
+    checkInReady: false,
+    visitBusy: false,
+    visitPlanDate: '',
+    visitPlanStart: '',
+    hasLockedPlanDates: false,
+    visitPlanDateLabels: [],
+    visitPlanDateIdx: 0,
+    visitPlanSlotOptions: [],
+    visitPlanSlotIdx: 0,
+    visitStartTime: '09:00',
+    visitEndTime: '12:00',
+    visitScheduleSubmitted: false,
+    visitSubmittedText: '',
+    visitApplicantId: '',
+    canSubmitVisitPublishLink: false,
+    canViewVideo: false,
+    visitVideoUrl: '',
+    visitPublishPhase: '',
+    visitPublishUrl: '',
+    visitPublishPlaceholder: '粘贴平台作品分享链接',
+    visitPublishSubmitting: false,
+    visitPublishHint: '',
+    showEditVisitBtn: false,
+    visitScheduleRevised: false,
+    editVisitMode: '',
+    applyTemplateId: '',
+    chatEnabled: false,
+    prChatMeta: null,
+    contacting: false,
+    isPr: false,
+    canContactPr: false,
+    contactPrPending: false,
+    readOnlyEnded: false,
+    mpOrder: null,
+    shareCoverPath: '',
+    deadlineMs: 0,
+    publishedMs: 0,
+    signupCountdownText: '—',
+    signupCountdownTone: 'unknown',
+    signupClosed: false,
+    prQrImage: '',
+    prQrScanUrl: '',
+    prCertVisible: false,
+    prCertLines: [],
+    prCertScanUrl: '',
+    showShareMenu: false,
+    showSharePosterSheet: false,
+    sharePosterPath: '',
+    sharePosterLoading: false,
+    sharePosterErr: '',
+    sharePosterStyleIndex: 0,
+    sharePosterStyleLabel: '',
+    sharePosterAccentColor: '#7c3aed',
+    isFavorited: false,
+    coverImage: '',
+    signupTimeRange: '',
+    recruitCountText: '',
+    applicantCountText: '',
+    signupProgressText: '',
+    locationText: '',
+    benefitsText: '',
+    detailCategoryTags: [],
+    detailPriceText: '',
+    detailDeadlineText: '',
+    detailRecruitQuotaText: '',
+    detailCityText: '',
+    detailPlatformText: '',
+    detailStatusLabel: '',
+    taskDetailLines: [],
+    merchantLocationDisplay: '',
+    merchantLocationNav: null,
+    coverImage: '',
+    showTargetedInviteActions: false,
+    targetedInviteStatus: '',
+    targetedInviteStatusLabel: '',
+    targetedInviteBusy: false,
+  },
+  resolveTalentMemberId() {
+    const acct = auth.readAccount()
+    return String((acct && acct.registryMemberId) || participant.resolveTalentMemberId() || '').trim()
+  },
+  resolveTargetedInviteState(mp) {
+    if (!mp || !mpTargetedRecruit.isTargetedOrder(mp)) {
+      return { showTargetedInviteActions: false, targetedInviteStatus: '', targetedInviteStatusLabel: '' }
+    }
+    const invite = mpTargetedRecruit.findInviteForMember(mp, this.resolveTalentMemberId())
+    if (!invite) {
+      return { showTargetedInviteActions: false, targetedInviteStatus: '', targetedInviteStatusLabel: '' }
+    }
+    const status = String(invite.status || '')
+    return {
+      showTargetedInviteActions: status === 'pending',
+      targetedInviteStatus: status,
+      targetedInviteStatusLabel: mpTargetedRecruit.statusLabel(status),
+    }
+  },
+  onSubNavBack: subpageNav.onSubNavBack,
+  onGoHome() {
+    wx.switchTab({ url: '/pages/index/index' })
+  },
+  onOpenTalentEval() {
+    wx.navigateTo({ url: '/pages/subpack-mine/mine-local-life-eval/mine-local-life-eval' })
+  },
+  onToggleFavorite() {
+    const id = this.data.id
+    if (!id) return
+    if (!auth.isLoggedIn()) {
+      guestRoutes.redirectToLogin(`/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}`)
+      return
+    }
+    const on = orderFavorites.toggleFavorite(id)
+    this.setData({ isFavorited: on })
+    wx.showToast({ title: on ? '已收藏' : '已取消收藏', icon: 'none' })
+  },
+  syncFavoriteState() {
+    const id = this.data.id
+    if (id) this.setData({ isFavorited: orderFavorites.isFavorite(id) })
+  },
+  onLoad(options) {
+    subpageNav.setupSubpageNav(this, '招募详情')
+    const shareEntry = getCurrentPages().length <= 1 || !!(options && options.scene)
+    let id = options && options.id ? decodeURIComponent(options.id) : ''
+    if (!id && options && options.scene) {
+      const scene = decodeURIComponent(String(options.scene))
+      const m = scene.match(/^id=(.+)$/)
+      id = m ? decodeURIComponent(m[1]) : scene
+    }
+    const applied = options && options.applied === '1'
+    this._fromApply = !!(options && options.from === 'apply')
+    this._pendingOpenFormRelay = options && String(options.openFormRelay || '') === '1'
+    this.setData({ id, applied, fromApply: this._fromApply, shareEntry })
+    if (id) this.loadOrder(id)
+    else this.setData({ loading: false, err: '缺少招募单号' })
+  },
+  onShow() {
+    require('../../../utils/pageIdentityChrome.js').syncPageIdentity(this)
+    const id = this.data.id
+    if (id) this.setData({ isFavorited: orderFavorites.isFavorite(id) })
+    const mpShare = require('../../../utils/mpShare.js')
+    mpShare.enableShareMenu()
+    this.setData({ isPr: userProfile.readIdentity() === 'pr' })
+    if (this.data.mpOrder && !this.data.isPr) {
+      this.syncIceApplicantFromStorage()
+    }
+    if (this.data.id && wx.onCopyUrl) {
+      const id = this.data.id
+      wx.onCopyUrl(() => ({ query: `id=${encodeURIComponent(id)}` }))
+    }
+    this.startSignupCountdownTimer()
+  },
+  onHide() {
+    this.stopSignupCountdownTimer()
+  },
+  onUnload() {
+    this.stopSignupCountdownTimer()
+    if (wx.offCopyUrl) wx.offCopyUrl()
+  },
+  startSignupCountdownTimer() {
+    this.stopSignupCountdownTimer()
+    this.refreshSignupCountdown()
+    if (!this.data.deadlineMs) return
+    this._signupCountdownTimer = setInterval(() => {
+      this.refreshSignupCountdown()
+    }, 1000)
+  },
+  stopSignupCountdownTimer() {
+    if (this._signupCountdownTimer) {
+      clearInterval(this._signupCountdownTimer)
+      this._signupCountdownTimer = null
+    }
+  },
+  refreshSignupCountdown() {
+    this.syncSignupState()
+  },
+  syncSignupState() {
+    const mp = this.data.mpOrder
+    const deadlineMs = Number(this.data.deadlineMs) || 0
+    const publishedMs = Number(this.data.publishedMs) || 0
+    const listFilters = require('../../../utils/recruitmentListFilters.js')
+    const mpOrderStatus = require('../../../utils/mpOrderStatus.js')
+    const now = Date.now()
+    const text = deadlineMs
+      ? listFilters.formatSignupCountdownText(deadlineMs, now)
+      : '截止日期待定'
+    const tone = listFilters.resolveSignupCountdownTone(deadlineMs, publishedMs, now)
+    const effectiveStatus = mp
+      ? mpOrderStatus.resolveEffectiveMpStatus(mp.status, deadlineMs, now)
+      : 'closed'
+    const recruiting = mpOrderStatus.isMpOrderRecruiting(effectiveStatus)
+    const deadlineEnded = deadlineMs > 0 && now >= deadlineMs
+    const signupClosed = Boolean(this.data.readOnlyEnded || !recruiting || deadlineEnded)
+    const patch = {
+      signupCountdownText: text,
+      signupCountdownTone: tone,
+      signupClosed,
+    }
+    if (deadlineEnded) this.stopSignupCountdownTimer()
+    this.setData(patch)
+  },
+  renderPrQrImage() {
+    const mp = this.data.mpOrder
+    if (!mp) return
+    const prRecruitQr = require('../../../utils/prRecruitQr.js')
+    const scanUrl = prRecruitQr.buildPrQrScanUrl(mp)
+    if (!scanUrl) return
+    this.setData({ prQrScanUrl: scanUrl })
+    setTimeout(() => {
+      prRecruitQr.renderPrQrImage(this, scanUrl).then((path) => {
+        if (path) this.setData({ prQrImage: path })
+      })
+    }, 120)
+  },
+  onLongPressPrQr() {
+    this._prQrLongPressAt = Date.now()
+    void this.showPrCertModal()
+  },
+  async showPrCertModal() {
+    const mp = this.data.mpOrder
+    const prRecruitQr = require('../../../utils/prRecruitQr.js')
+    const ops = require('../../../utils/opsRegistryTalentMp.js')
+    let reg = ops.mergeRegWithPrUsers(this._orderReg || {})
+    if (mp && (!Array.isArray(reg.mpPrUsers) || !reg.mpPrUsers.length)) {
+      try {
+        const extra = await ops.fetchRegistryForPoster(this.data.id)
+        if (extra && Array.isArray(extra.mpPrUsers) && extra.mpPrUsers.length) {
+          reg = ops.mergeRegWithPrUsers({ ...(reg || {}), mpPrUsers: extra.mpPrUsers })
+          this._orderReg = reg
+        }
+      } catch (_) {}
+    }
+    let publisherDisplay = this._publisherDisplay
+    if (mp) {
+      publisherDisplay = prRecruitQr.resolvePublisherDisplaySync(mp, reg, publisherDisplay)
+      const syncName = String((publisherDisplay && publisherDisplay.displayName) || '').trim()
+      const syncNameBad =
+        !syncName || /^1\d{10}$/.test(syncName) || syncName === '招募方' || syncName === '灵奇星选'
+      if (syncNameBad) {
+        try {
+          const hit = await ops.fetchPublisherDisplayForOrder(this.data.id, mp, reg)
+          if (hit && (hit.displayName || hit.prUser)) publisherDisplay = hit
+        } catch (_) {}
+      }
+      if (publisherDisplay && (publisherDisplay.displayName || publisherDisplay.prUser)) {
+        this._publisherDisplay = publisherDisplay
+      }
+    }
+    const certLines = mp
+      ? prRecruitQr.buildPrInfoLines(mp, {
+          publisherDisplay,
+          reg,
+        })
+      : []
+    const scanUrl = String(this.data.prQrScanUrl || '').trim()
+    if (certLines.length) {
+      this.setData({
+        prCertVisible: true,
+        prCertLines: certLines,
+        prCertScanUrl: scanUrl,
+      })
+      return
+    }
+    if (scanUrl) {
+      wx.navigateTo({
+        url: `/pages/web-link/web-link?url=${encodeURIComponent(scanUrl)}&embed=1&title=${encodeURIComponent('招募方认证')}`,
+      })
+      return
+    }
+    wx.showToast({ title: '认证信息暂不可用', icon: 'none' })
+  },
+  onClosePrCert() {
+    this.setData({ prCertVisible: false, prCertLines: [], prCertScanUrl: '' })
+  },
+  onCopyPrCertLink() {
+    const scanUrl = String(this.data.prCertScanUrl || '').trim()
+    if (!scanUrl) return
+    wx.setClipboardData({
+      data: scanUrl,
+      success: () => wx.showToast({ title: '认证链接已复制', icon: 'success' }),
+    })
+  },
+  onPreviewPrQr() {
+    if (this._prQrLongPressAt && Date.now() - this._prQrLongPressAt < 600) return
+    const url = String(this.data.prQrImage || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  syncIceApplicantFromStorage() {
+    try {
+      const raw = wx.getStorageSync(iceOrderStats.iceApplicantStorageKey(this.data.id))
+      if (raw) this.setData({ iceApplicantId: String(raw) })
+    } catch {
+      /* ignore */
+    }
+  },
+  onShareAppMessage(res) {
+    const mpShare = require('../../../utils/mpShare.js')
+    const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
+    const recruitShareCover = require('../../../utils/recruitShareCover.js')
+    const recruitShareCard = require('../../../utils/recruitShareCard.js')
+    mpShare.enableShareMenu()
+    const v = this.data.view
+    const mp = this.data.mpOrder
+    const share = {
+      title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
+      path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(this.data.id)}`,
+    }
+    if (mp && recruitShareCard.readShareCoverKind(res) === 'recruit') {
+      return {
+        title: share.title,
+        path: share.path,
+        promise: recruitShareCard.buildShareCardPath(mp, this._orderReg).then((imageUrl) => {
+          if (imageUrl) return Object.assign({}, share, { imageUrl })
+          const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+          const wrapped = recruitShareCover.attachShareCoverPromise(share, coverUrl)
+          if (wrapped && typeof wrapped.promise === 'object' && wrapped.promise) return wrapped.promise
+          return wrapped || share
+        }),
+      }
+    }
+    if (mp) {
+      const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+      return recruitShareCover.attachShareCoverPromise(share, coverUrl)
+    }
+    const ready = String(this.data.shareCoverPath || '').trim()
+    if (recruitShareCover.isLocalSharePath(ready) && !recruitShareCover.isUserDataSharePath(ready)) {
+      share.imageUrl = ready
+    } else {
+      return mpShare.defaultShare(share.path, { title: share.title })
+    }
+    return share
+  },
+  onShareTap() {
+    this.setData({ showShareMenu: !this.data.showShareMenu })
+  },
+  onShareMenuClose() {
+    if (this.data.showShareMenu) this.setData({ showShareMenu: false })
+  },
+  onOpenShareStudio(e) {
+    const order = this.data.mpOrder
+    if (!order) {
+      wx.showToast({ title: '订单加载中', icon: 'none' })
+      return
+    }
+    const detail = (e && e.detail) || {}
+    this.setData({ showShareMenu: false })
+    require('../../../utils/recruitShareHub.js').openStudio(order, detail.tab || 'poster', detail.mode || 'link')
+  },
+  onSharePickPoster() {
+    if (!this.data.mpOrder) {
+      wx.showToast({ title: '订单加载中', icon: 'none' })
+      return
+    }
+    this.setData({
+      showShareMenu: false,
+      showSharePosterSheet: true,
+      sharePosterPath: '',
+      sharePosterErr: '',
+      sharePosterLoading: false,
+      sharePosterStyleIndex: 0,
+    })
+    this.ensureSharePoster()
+  },
+  onCloseSharePosterSheet() {
+    this.setData({
+      showSharePosterSheet: false,
+      sharePosterPath: '',
+      sharePosterLoading: false,
+      sharePosterErr: '',
+    })
+  },
+  async ensureSharePoster() {
+    const order = this.data.mpOrder
+    if (!order || this.data.sharePosterPath || this.data.sharePosterLoading) return
+    const styleIndex = this.data.sharePosterStyleIndex || 0
+    const orderId = String(this.data.id || order.id || '').trim()
+    const fullOrder = orderId ? { ...order, id: orderId } : order
+    this.setData({
+      sharePosterLoading: true,
+      sharePosterErr: '',
+      sharePosterPath: '',
+      sharePosterStyleLabel: '',
+      sharePosterAccentColor: '#7c3aed',
+    })
+    sharePoster
+      .buildRecruitmentSharePosterPath(fullOrder, styleIndex, { reg: this._orderReg })
+      .then((path) => {
+        const design = sharePoster.resolvePosterDesign(order, styleIndex)
+        this.setData({
+          sharePosterPath: path,
+          sharePosterLoading: false,
+          sharePosterStyleLabel: design.styleLabel || '',
+          sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
+        })
+      })
+      .catch((err) => {
+        const raw = String((err && err.message) || err || '海报生成失败')
+        const msg =
+          raw === 'publisher_name_unavailable'
+            ? '未读取到发单方名称，请稍后重试'
+            : raw === 'wxacode_unavailable'
+              ? '小程序码生成失败，请稍后重试'
+              : raw.slice(0, 40)
+        this.setData({
+          sharePosterLoading: false,
+          sharePosterErr: msg,
+        })
+      })
+  },
+  async onSwitchSharePosterStyle() {
+    const order = this.data.mpOrder
+    if (!order || this.data.sharePosterLoading) return
+    const nextIndex = sharePoster.normalizePosterStyleIndex((this.data.sharePosterStyleIndex || 0) + 1)
+    const orderId = String(this.data.id || order.id || '').trim()
+    const fullOrder = orderId ? { ...order, id: orderId } : order
+    this.setData({
+      sharePosterStyleIndex: nextIndex,
+      sharePosterStyleLabel: '',
+      sharePosterAccentColor: '#7c3aed',
+      sharePosterPath: '',
+      sharePosterLoading: true,
+      sharePosterErr: '',
+    })
+    sharePoster
+      .buildRecruitmentSharePosterPath(fullOrder, nextIndex, { reg: this._orderReg })
+      .then((path) => {
+        const design = sharePoster.resolvePosterDesign(order, nextIndex)
+        this.setData({
+          sharePosterPath: path,
+          sharePosterLoading: false,
+          sharePosterStyleLabel: design.styleLabel || '',
+          sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
+        })
+      })
+      .catch((err) => {
+        const raw = String((err && err.message) || err || '海报生成失败')
+        const msg =
+          raw === 'publisher_name_unavailable'
+            ? '未读取到发单方名称，请稍后重试'
+            : raw === 'wxacode_unavailable'
+              ? '小程序码生成失败，请稍后重试'
+              : raw.slice(0, 40)
+        this.setData({
+          sharePosterLoading: false,
+          sharePosterErr: msg,
+        })
+      })
+  },
+  onSaveSharePoster() {
+    const path = this.data.sharePosterPath
+    if (!path) return
+    wx.showLoading({ title: '保存中', mask: true })
+    sharePoster
+      .savePosterToAlbum(path)
+      .then(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '已保存到相册', icon: 'success' })
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        wx.showToast({
+          title: String((err && err.message) || err || '保存失败').slice(0, 24),
+          icon: 'none',
+        })
+      })
+  },
+  noopShareSheetTap() {},
+  onShareTimeline() {
+    const mpShare = require('../../../utils/mpShare.js')
+    const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
+    const recruitShareCover = require('../../../utils/recruitShareCover.js')
+    const v = this.data.view
+    const mp = this.data.mpOrder
+    const id = this.data.id
+    if (!id) return mpShare.defaultTimelineShare()
+    const base = {
+      title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
+      query: `id=${encodeURIComponent(id)}`,
+    }
+    if (!mp) return base
+    const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+    return recruitShareCover.attachShareCoverPromise(base, coverUrl)
+  },
+  async loadOrder(id) {
+    if (!api.hasApi()) {
+      this.setData({ loading: false, err: '暂时连不上，请稍后再试' })
+      return
+    }
+    this.setData({ loading: true, err: '' })
+    const listFilters = require('../../../utils/recruitmentListFilters.js')
+    try {
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeOnly: true })
+      this._orderReg = reg
+      if (!Array.isArray(reg.mpPrUsers) || !reg.mpPrUsers.length) {
+        try {
+          const extra = await ops.fetchRegistryForPoster(id)
+          if (extra && Array.isArray(extra.mpPrUsers) && extra.mpPrUsers.length) {
+            this._orderReg = { ...reg, mpPrUsers: extra.mpPrUsers }
+          }
+        } catch (_) {
+          /* poster slice optional */
+        }
+      }
+      appRegistrySync.reconcileApplicationsFromRegistry(reg)
+      const mp = ops.findMpOrderInRegistry(reg, id)
+      if (!mp) {
+        this.setData({ loading: false, err: '招募单不存在或已结束' })
+        return
+      }
+      const rawStatus = String(mp.status || '')
+      const isEnded =
+        rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'
+      const gate = contactGate.evaluate(mp, id)
+      if (gate.hasApplication && gate.applicant) {
+        const entry = appRegistrySync.applicationFromMpOrder(mp, gate.applicant)
+        if (entry) applicationsStore.upsertApplication(entry)
+      }
+      const account = auth.readAccount()
+      const isPrViewer = userProfile.readIdentity() === 'pr'
+      const isPrOwner = isPrViewer && prPublishedOrders.mpOrderOwnedByCurrentPr(mp, account)
+      const hasLocalApplication = applicationsStore.readApplications().some(
+        (a) => a && String(a.mpOrderId || '') === id,
+      )
+      const targetedInviteState = this.resolveTargetedInviteState(mp)
+      const hasTargetedInviteAccess =
+        !!targetedInviteState.targetedInviteStatus &&
+        targetedInviteState.targetedInviteStatus !== 'cancelled'
+      const canViewEnded = gate.hasApplication || isPrOwner || hasLocalApplication || hasTargetedInviteAccess
+      if (isEnded && !canViewEnded) {
+        this.setData({ loading: false, err: '该招募已结束' })
+        return
+      }
+      this._publisherDisplay = prRecruitQr.resolvePublisherDisplaySync(mp, this._orderReg, null)
+      if (!this._publisherDisplay || !this._publisherDisplay.displayName) {
+        ops
+          .fetchPublisherDisplayForOrder(id, mp, this._orderReg)
+          .then((hit) => {
+            if (hit && hit.displayName) this._publisherDisplay = hit
+          })
+          .catch(() => {})
+      }
+      applyTemplates.cacheApplyFormFromMpOrder(mp)
+      const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
+      const view = display.enrichMpOrder(mp, merchantOrder)
+      const isIce = !!view.isIce
+      const isEditIce = isIce && iceOrderDetect.isEditTeamIceMpOrder(mp)
+      const isPackIce = isIce && iceOrderDetect.isPackSlotIceOrder(mp)
+      const iceSlotsFull = isIce && iceOrderStats.isIceSlotsFull(mp, parseIceSlotTotalFromMp(mp))
+      let iceApplicantId = this.data.iceApplicantId
+      try {
+        const stored = wx.getStorageSync(iceOrderStats.iceApplicantStorageKey(id))
+        if (stored) iceApplicantId = String(stored)
+      } catch {
+        /* ignore */
+      }
+      if (isIce && !iceApplicantId) {
+        const localId = contactGate.localApplicantIdForOrder(id)
+        if (localId) iceApplicantId = localId
+      }
+      if (isIce && !iceApplicantId && gate.applicant && gate.applicant.id) {
+        iceApplicantId = String(gate.applicant.id)
+      }
+      if (isIce && iceApplicantId) {
+        try {
+          wx.setStorageSync(iceOrderStats.iceApplicantStorageKey(id), iceApplicantId)
+        } catch {
+          /* ignore */
+        }
+      }
+      let assignedVideoUrl = ''
+      let assignedVideoLabel = ''
+      let iceVerified = false
+      let icePendingConfirm = false
+      let iceRejected = false
+      let icePendingPrReview = false
+      let iceLinkRejected = false
+      let iceAiFailedNote = ''
+      let iceRejectReason = ''
+      const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+      let iceVerifyMode = iceOrderStats.getIceVerifyMode(mp)
+      let app = null
+      if (isIce) {
+        app =
+          iceApplicantId && (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
+        if (!app && gate.applicant) app = gate.applicant
+        if (app) {
+          assignedVideoUrl = app.assignedVideoDownloadUrl || ''
+          assignedVideoLabel = app.assignedVideoLabel || ''
+          iceVerified =
+            app.aiVerifyStatus === 'passed' ||
+            app.videoStatus === 'passed' ||
+            !!String(app.completedAt || '').trim()
+          icePendingConfirm =
+            app.taskStatus !== 'confirmed' &&
+            (app.taskStatus === 'pending_confirm' ||
+              app.taskStatus === 'applied' ||
+              (!app.taskStatus && !assignedVideoUrl && !isEditIce))
+          iceRejected = app.taskStatus === 'rejected'
+          icePendingPrReview =
+            iceVerifyMode === 'pr' && app.videoStatus === 'pending' && !iceVerified
+          iceLinkRejected = app.videoStatus === 'rejected'
+          iceRejectReason = String(app.videoRejectReason || '').trim()
+          iceAiFailedNote = app.aiVerifyStatus === 'failed' ? String(app.aiVerifyNote || 'AI核查不通过，视频与订单无关') : ''
+          if (app.douyinPublishUrl) {
+            this.setData({ douyinUrl: app.douyinPublishUrl })
+          }
+          if (!iceApplicantId && app.id) iceApplicantId = String(app.id)
+        }
+      }
+      const iceSubmitLabel = iceVerifyMode === 'pr' ? '提交链接 · PR 审核' : '提交链接 · AI 核查'
+      const iceStep3Hint =
+        iceVerifyMode === 'pr'
+          ? '发布抖音并回传链接，PR 审核通过后完成'
+          : '发布抖音并回传链接，AI 核查通过后自动完成'
+      let claimedSlotCount = 1
+      let editDeliverSubmittedCount = 0
+      let iceSlotTotal = 0
+      let orderClaimedSlots = 0
+      let iceConfirmed = false
+      let editGroupQrImage = ''
+      let deliverText = ''
+      if (isPackIce) {
+        iceSlotTotal = parseIceSlotTotalFromMp(mp)
+        const orderProgress = iceOrderStats.countIceClaimedSlots(mp, iceSlotTotal)
+        orderClaimedSlots = orderProgress.claimed
+      }
+      if (isIce && app) {
+        claimedSlotCount = Math.max(
+          1,
+          Number.parseInt(String(app.claimedSlotCount || app.assignedIceSlotIds?.length || 1), 10) || 1,
+        )
+        iceConfirmed = app.taskStatus === 'confirmed'
+        if (isEditIce && iceConfirmed) {
+          editGroupQrImage = iceGroupQr.resolveClaimGroupQr(reg, id, mp)
+        }
+        if (Array.isArray(app.editDeliverLinks) && app.editDeliverLinks.length) {
+          deliverText = app.editDeliverLinks.join('\n')
+          editDeliverSubmittedCount = app.editDeliverLinks.filter((u) => String(u || '').trim()).length
+        }
+      }
+      let iceStatusHint = ''
+      if (iceVerified) iceStatusHint = '已完成'
+      else if (isEditIce && iceConfirmed && !iceVerified) {
+        const submitted = Array.isArray(app && app.editDeliverLinks) ? app.editDeliverLinks.length : 0
+        iceStatusHint = `请回传 ${claimedSlotCount} 条成片链接（已提交 ${submitted} 条）`
+      } else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
+      else if (iceLinkRejected) iceStatusHint = iceRejectReason || '链接已驳回，请重新提交'
+      else if (iceAiFailedNote) iceStatusHint = iceAiFailedNote
+      const iceApplied = Boolean(iceApplicantId) || (isIce && gate.hasApplication)
+      const applyTemplateId = meta.applyFormTemplateId || ''
+      const prChatMeta = meta.prParticipantKey
+        ? {
+            prParticipantKey: meta.prParticipantKey,
+            prDisplayName: meta.prDisplayName || view.merchantName || '招募方',
+            prWxNickName: meta.prWxNickName || '',
+            prWxAvatarUrl: meta.prWxAvatarUrl || '',
+          }
+        : null
+      const canReclaimIce = isIce && iceRejected
+      const hasApplied =
+        (targetedInviteState.targetedInviteStatus === 'accepted' ||
+          this.data.applied ||
+          iceApplied ||
+          gate.hasApplication) &&
+        !canReclaimIce
+      let visitApplicantId = ''
+      let visitDisplayLabel = ''
+      let visitHint = ''
+      let showVisitConfirmBtn = false
+      let showAssignConfirmBtn = false
+      let showCheckInBtn = false
+      let checkInReady = false
+      let showEditVisitBtn = false
+      let editVisitMode = ''
+      let visitScheduleRevised = false
+      let visitPlanDate = visitScheduleRuntime.resolveDefaultTalentVisitPlanDate(mp)
+      const visitPlanStart = visitScheduleRuntime.defaultVisitPlanDate()
+      let visitStartTime = '09:00'
+      let visitEndTime = '12:00'
+      let hasLockedPlanDates = false
+      let visitPlanDateLabels = []
+      let visitPlanDateIdx = 0
+      let visitPlanSlotOptions = []
+      let visitPlanSlotIdx = 0
+      let visitScheduleSubmitted = false
+      let visitSubmittedText = ''
+      let canSubmitVisitPublishLink = false
+      let visitPublishPhase = ''
+      let visitPublishUrl = ''
+      let visitPublishPlaceholder = '粘贴平台作品分享链接'
+      let visitPublishHint = ''
+      let visitVideoUrl = ''
+      let canViewVideo = false
+      if (!isIce && hasApplied && gate.applicant) {
+        visitApplicantId = String(gate.applicant.id || '').trim()
+        const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, id, mp)
+        const visitDisplay = talentAppStatus.resolveApplicationDisplayStatus(mp, gate.applicant, id, {
+          selectionNotified: notifiedIds.has(visitApplicantId),
+          isIce: false,
+        })
+        visitDisplayLabel = visitDisplay.label || ''
+        visitHint = visitDisplay.visitHint || ''
+        showVisitConfirmBtn = !!visitDisplay.showConfirmBtn
+        showAssignConfirmBtn = !!visitDisplay.showAssignConfirmBtn
+        showCheckInBtn = !!visitDisplay.showCheckInBtn
+        checkInReady = !!visitDisplay.checkInReady
+        showEditVisitBtn = !!visitDisplay.showEditVisitBtn
+        editVisitMode = visitDisplay.editVisitMode || ''
+        visitScheduleRevised = !!visitDisplay.visitScheduleRevised
+        if (showVisitConfirmBtn || showEditVisitBtn) {
+          const assigned = String(gate.applicant.assignedVisitAt || gate.applicant.talentPreferredVisitAt || '').trim()
+          const parts = assigned.split(/\s+/)
+          let slotRaw = ''
+          if (parts.length >= 2) {
+            const d = parts[0].replace(/\//g, '-')
+            visitPlanDate = /^\d{4}-\d{1,2}-\d{1,2}$/.test(d) ? d : visitPlanDate
+            slotRaw = parts.slice(1).join(' ')
+          } else if (gate.applicant.visitTimeSlot) {
+            slotRaw = String(gate.applicant.visitTimeSlot)
+          }
+          const parsed = parseVisitTimeRange(slotRaw)
+          visitStartTime = parsed.start
+          visitEndTime = parsed.end
+        }
+        const planRows = visitScheduleRuntime.readVisitPlanDates(mp)
+        hasLockedPlanDates = visitScheduleRuntime.hasLockedVisitPlanDates(mp)
+        if (hasLockedPlanDates) {
+          visitPlanDateLabels = planRows.map((row) => row.date)
+          const prefDateKey = normalizeVisitDateKey(visitPlanDate)
+          const prefSlotKey = normalizeSlotCompareKey(
+            String(gate.applicant.visitTimeSlot || '').trim() ||
+              buildVisitTimeRange(visitStartTime, visitEndTime),
+          )
+          if (prefDateKey) {
+            const dIdx = planRows.findIndex((row) => normalizeVisitDateKey(row.date) === prefDateKey)
+            if (dIdx >= 0) visitPlanDateIdx = dIdx
+          }
+          visitPlanSlotOptions = planRows[visitPlanDateIdx]?.slots || []
+          if (prefSlotKey && visitPlanSlotOptions.length) {
+            const sIdx = visitPlanSlotOptions.findIndex(
+              (slot) => normalizeSlotCompareKey(slot) === prefSlotKey,
+            )
+            if (sIdx >= 0) visitPlanSlotIdx = sIdx
+          }
+          if (showVisitConfirmBtn || showEditVisitBtn) {
+            visitPlanDate = planRows[visitPlanDateIdx]?.date || visitPlanDate
+            const lockedSlot = visitPlanSlotOptions[visitPlanSlotIdx] || ''
+            const lockedParsed = parseVisitTimeRange(lockedSlot)
+            visitStartTime = lockedParsed.start
+            visitEndTime = lockedParsed.end
+          }
+        }
+        if (editVisitMode === 'preference') {
+          visitScheduleSubmitted = true
+          const dateText = String(visitPlanDate || '').replace(/-/g, '/')
+          const range = buildVisitTimeRange(visitStartTime, visitEndTime)
+          visitSubmittedText = dateText && range ? `${dateText} ${range}` : visitHint.replace(/^已提交[：:]\s*/, '')
+        }
+        canSubmitVisitPublishLink = talentAppStatus.canTalentSubmitVisitPublishLink(mp, gate.applicant, false)
+        visitPublishPhase = talentAppStatus.resolveVisitPublishPhase(gate.applicant) || ''
+        visitPublishUrl = String(gate.applicant.douyinPublishUrl || '').trim()
+        visitVideoUrl = String(gate.applicant.videoUrl || '').trim()
+        canViewVideo = !!visitVideoUrl
+        visitPublishPlaceholder = publishLinkUtil.publishLinkPlaceholder(view.platform || mp.platform)
+        if (visitPublishPhase === 'awaiting_link') {
+          visitPublishHint = '视频已通过 PR 审核，请发布作品并回传平台链接'
+        } else if (visitPublishPhase === 'link_failed') {
+          visitPublishHint = String(gate.applicant.videoRejectReason || gate.applicant.aiVerifyNote || '链接未通过，请重新提交')
+        } else if (visitPublishUrl) {
+          visitPublishHint = '发布链接已回传'
+        }
+      }
+      const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
+      const publishedMs = listFilters.resolvePublishedMs(mp)
+      const detailFields = buildDetailDisplayFields(view, mp, {
+        publishedMs,
+        deadlineMs: Number(view.deadlineMs) || 0,
+        isIce,
+      })
+      this.setData({
+        view,
+        loading: false,
+        mpOrder: mp,
+        deadlineMs: Number(view.deadlineMs) || 0,
+        publishedMs,
+        ...detailFields,
+        isFavorited: orderFavorites.isFavorite(id),
+        isPr: userProfile.readIdentity() === 'pr',
+        applyTemplateId,
+        chatEnabled: chat.canChat() && userProfile.readIdentity() === 'talent',
+        prChatMeta,
+        canContactPr: gate.canContact,
+        contactPrPending,
+        isIce,
+        iceApplicantId,
+        assignedVideoUrl,
+        assignedVideoLabel,
+        iceVerified,
+        icePendingConfirm,
+        iceRejected,
+        canReclaimIce,
+        iceVerifyMode,
+        icePendingPrReview,
+        iceLinkRejected,
+        iceAiFailedNote,
+        iceSubmitLabel,
+        iceStatusHint,
+        iceStep3Hint,
+        applied: hasApplied,
+        isOpenLoop: xingxuanRecruitLoop.isXingxuanOpenLoop(mp),
+        openLoop: (() => {
+          const st = talentAppStatus.resolveApplicationDisplayStatus(mp, gate.applicant, id, {
+            selectionNotified: talentAppStatus.isApplicantSelectionNotified(mp, gate.applicant),
+            isIce,
+          })
+          return st.openLoop || null
+        })(),
+        openLoopApplicantId: gate.applicant ? String(gate.applicant.id || '') : '',
+        ...settleFieldsFromApplicant(gate.applicant),
+        fromApply: !!this._fromApply,
+        applicationApproved: gate.reason === 'approved',
+        openLoopGroupQr:
+          this._fromApply && hasApplied && gate.reason === 'approved' && xingxuanRecruitLoop.isXingxuanOpenLoop(mp)
+            ? mpGroupQr.groupQrFromRegistry(reg, id) || mpGroupQr.groupQrFromMp(mp)
+            : '',
+        readOnlyEnded: isEnded && canViewEnded,
+        isEditIce,
+        isPackIce,
+        iceSlotTotal,
+        orderClaimedSlots,
+        claimedSlotCount,
+        editDeliverSubmittedCount,
+        iceConfirmed,
+        editGroupQrImage,
+        deliverText,
+        deliverParsedCount: deliverText
+          ? editDeliverLinks.parseBatchDeliverUrls(deliverText).length
+          : 0,
+        iceSlotsFull,
+        visitApplicantId,
+        visitDisplayLabel,
+        visitHint,
+        showVisitConfirmBtn,
+        showAssignConfirmBtn,
+        showCheckInBtn,
+        checkInReady,
+        showEditVisitBtn,
+        editVisitMode,
+        visitScheduleRevised,
+        visitPlanDate,
+        visitPlanStart,
+        hasLockedPlanDates,
+        visitPlanDateLabels,
+        visitPlanDateIdx,
+        visitPlanSlotOptions,
+        visitPlanSlotIdx,
+        visitStartTime,
+        visitEndTime,
+        visitScheduleSubmitted,
+        visitSubmittedText,
+        canSubmitVisitPublishLink,
+        visitPublishPhase,
+        visitPublishUrl,
+        visitVideoUrl,
+        canViewVideo,
+        visitPublishPlaceholder,
+        visitPublishHint,
+        ...targetedInviteState,
+        targetedInviteBusy: false,
+      })
+      this.syncSignupState()
+      this.startSignupCountdownTimer()
+      this.renderPrQrImage()
+      if (this._detailViewBumpId !== id) {
+        this._detailViewBumpId = id
+        ops.bumpMpRecruitmentEngagement(id, 'detail_view').catch(() => {})
+      }
+      try {
+        const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
+        const recruitShareCover = require('../../../utils/recruitShareCover.js')
+        const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+        recruitShareCover.preloadShareImageUrl(coverUrl).then((path) => {
+          if (path) this.setData({ shareCoverPath: path })
+        })
+      } catch (_) {
+        /* ignore preload */
+      }
+      this.maybeOpenPendingFormRelay()
+    } catch (e) {
+      const msg = String(e.message || e)
+      let hint = msg
+      if (/fail|reset|cronet|超时|timeout/i.test(msg)) {
+        hint = '暂时连不上，请检查网络后再试'
+      } else if (msg === '已使用本地缓存') {
+        hint = '暂时连不上，也没有这份任务的本地记录。请回到招募大厅刷新后再试'
+      }
+      this.setData({ loading: false, err: hint })
+    }
+  },
+  onDouyinField(e) {
+    this.setData({ douyinUrl: e.detail.value })
+  },
+  onVisitPublishField(e) {
+    this.setData({ visitPublishUrl: e.detail.value })
+  },
+  onViewUploadedVideo() {
+    videoUpload.previewUploadedVideo(this.data.visitVideoUrl)
+  },
+  onCopyVisitPublishUrl() {
+    const url = String(this.data.visitPublishUrl || '').trim()
+    if (!url) return
+    wx.setClipboardData({ data: url, success: () => wx.showToast({ title: '链接已复制', icon: 'success' }) })
+  },
+  onOpenMerchantLocationNav() {
+    const nav = this.data.merchantLocationNav
+    if (!nav) return
+    wx.openLocation({
+      latitude: nav.latitude,
+      longitude: nav.longitude,
+      name: nav.name || '商家位置',
+      address: nav.address || '',
+      scale: 16,
+    })
+  },
+  async submitVisitPublishLink() {
+    const url = String(this.data.visitPublishUrl || '').trim()
+    if (!url) {
+      wx.showToast({ title: '请填写发布链接', icon: 'none' })
+      return
+    }
+    const applicantId = String(this.data.visitApplicantId || '').trim()
+    if (!applicantId) {
+      wx.showToast({ title: '未找到报名记录', icon: 'none' })
+      return
+    }
+    this.setData({ visitPublishSubmitting: true })
+    try {
+      await publishLinkUtil.submitVisitPublishLink(this.data.id, applicantId, url)
+      wx.showToast({ title: '发布链接已提交', icon: 'success' })
+      const registryCache = require('../../../utils/registryCache.js')
+      registryCache.bust()
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      const msg = publishLinkUtil.formatErrorMessage(e, '提交失败')
+      wx.showModal({ title: '提交失败', content: msg.slice(0, 240), showCancel: false })
+    } finally {
+      this.setData({ visitPublishSubmitting: false })
+    }
+  },
+  onDeliverField(e) {
+    const max = Math.max(1, Number(this.data.claimedSlotCount) || 1)
+    let text = String(e.detail.value || '')
+    const clamped = editDeliverLinks.clampDeliverText(text, max)
+    if (clamped !== text) {
+      wx.showToast({ title: `最多 ${max} 条链接`, icon: 'none' })
+      text = clamped
+    }
+    const deliverParsedCount = editDeliverLinks.parseBatchDeliverUrls(text).length
+    this.setData({ deliverText: text, deliverParsedCount })
+  },
+  previewEditGroupQr() {
+    const url = String(this.data.editGroupQrImage || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  previewOpenLoopGroupQr() {
+    const url = String(this.data.openLoopGroupQr || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  async submitEditDeliver() {
+    const text = String(this.data.deliverText || '').trim()
+    const links = editDeliverLinks.parseBatchDeliverUrls(text)
+    const need = this.data.claimedSlotCount || 1
+    if (!links.length) {
+      wx.showToast({ title: '请粘贴 https 成片链接', icon: 'none' })
+      return
+    }
+    if (links.length > need) {
+      wx.showToast({ title: `不能超过认领 ${need} 条`, icon: 'none' })
+      return
+    }
+    if (links.length !== need) {
+      wx.showToast({ title: `需 ${need} 条，识别到 ${links.length} 条`, icon: 'none' })
+      return
+    }
+    if (!this.data.iceApplicantId) {
+      wx.showToast({ title: '请先认领任务', icon: 'none' })
+      return
+    }
+    this.setData({ editDeliverSubmitting: true })
+    try {
+      await ops.submitEditDeliverLinks(this.data.id, this.data.iceApplicantId, text)
+      wx.showToast({
+        title: this.data.iceVerifyMode === 'pr' ? '已提交，待 PR 审核' : '成片已提交',
+        icon: 'success',
+      })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ editDeliverSubmitting: false })
+    }
+  },
+  async openFormRelaySource() {
+    const view = this.data.view || {}
+    if (view.formRelayGroupQr) {
+      const formRelayGroupQrFeature = require('../../../utils/formRelayGroupQrFeature.js')
+      if (!formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled()) {
+        formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
+        return
+      }
+      const id = String(this.data.id || view.mpOrderId || '').trim()
+      if (!id) {
+        wx.showToast({ title: '招募单无效', icon: 'none' })
+        return
+      }
+      if (userProfile.readIdentity() !== 'pr') {
+        try {
+          await ops.bumpMpRecruitmentEngagement(id, 'form_relay_click')
+        } catch (_) {
+          /* 跳转不阻断 */
+        }
+      }
+      const title = encodeURIComponent(String(view.title || ''))
+      wx.navigateTo({
+        url: `/pages/subpack-pr/form-relay-group-qr/form-relay-group-qr?id=${encodeURIComponent(id)}&title=${title}`,
+      })
+      return
+    }
+    const url = String(view.formRelaySourceUrl || '').trim()
+    if (!url) {
+      wx.showToast({ title: '原表链接缺失', icon: 'none' })
+      return
+    }
+    const orderId = String(this.data.id || '').trim()
+    if (orderId && userProfile.readIdentity() !== 'pr') {
+      try {
+        const res = await ops.bumpMpRecruitmentEngagement(orderId, 'form_relay_click')
+        const nextCount = Number(res && res.applicantCount)
+        if (Number.isFinite(nextCount) && nextCount >= 0) {
+          const mpOrder = { ...(this.data.mpOrder || {}), applicantCount: nextCount }
+          const nextView = { ...view, applicantCount: nextCount }
+          const detailFields = buildDetailDisplayFields(nextView, mpOrder, {
+            publishedMs: Number(this.data.publishedMs) || 0,
+            deadlineMs: Number(this.data.deadlineMs) || 0,
+            isIce: !!this.data.isIce,
+          })
+          this.setData({ mpOrder, view: nextView, ...detailFields })
+        }
+      } catch (_) {
+        /* 跳转原表不阻断 */
+      }
+    }
+    const formRelaySourceMpLink = require('../../../utils/formRelaySourceMpLink.js')
+    const open = view.formRelaySourceOpen
+    if (open && open.openKind === 'miniProgram' && open.appId && open.path) {
+      formRelaySourceMpLink.openFormRelaySourceLink(open, url)
+      return
+    }
+    if (formRelaySourceMpLink.isQunbaoshuUrl(url)) {
+      this._openQunbaoshuFormRelay(url, open)
+      return
+    }
+    formRelaySourceMpLink.openFormRelaySourceLink(open, url)
+  },
+  _openQunbaoshuFormRelay(url, open) {
+    const formRelaySourceMpLink = require('../../../utils/formRelaySourceMpLink.js')
+    const sync = formRelaySourceMpLink.resolveQunbaoshuMiniProgramSync(url)
+    if (sync && sync.appId && sync.path) {
+      formRelaySourceMpLink.openFormRelaySourceLink(sync, url)
+      return
+    }
+    const formRelaySourceParse = require('../../../utils/formRelaySourceParse.js')
+    wx.showLoading({ title: '打开群报数…', mask: true })
+    formRelaySourceParse
+      .parseFormRelaySource(url, 'qunbaoshu')
+      .then((res) => {
+        wx.hideLoading()
+        if (res && res.sourceMpAppId && res.sourceMpPath) {
+          formRelaySourceMpLink.openFormRelaySourceLink(
+            {
+              openKind: 'miniProgram',
+              appId: res.sourceMpAppId,
+              path: res.sourceMpPath,
+              displayLink: res.sourceMpDisplayLink || '',
+              webUrl: url,
+              rawUrl: url,
+            },
+            url,
+          )
+          return
+        }
+        wx.showModal({
+          title: '打开原表报名',
+          content: '未能跳转群报数小程序，请确认链接有效或联系招募方。',
+          showCancel: false,
+        })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showModal({
+          title: '打开原表报名',
+          content: '未能跳转群报数小程序，请检查网络后重试。',
+          showCancel: false,
+        })
+      })
+  },
+  maybeOpenPendingFormRelay() {
+    if (!this._pendingOpenFormRelay) return
+    this._pendingOpenFormRelay = false
+    const view = this.data.view
+    if (!view || !view.isFormRelay) return
+    if (!auth.isLoggedIn()) return
+    if (this.data.isPr) return
+    const workId = userProfile.readIdentity()
+    const member = memberStore.readMember()
+    if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
+    setTimeout(() => this.openFormRelaySource(), 320)
+  },
+  copyDownloadUrl() {
+    const url = this.data.assignedVideoUrl
+    if (!url) return
+    const full = url.startsWith('http') ? url : `${api.base()}${url}`
+    wx.setClipboardData({
+      data: full,
+      success: () => wx.showToast({ title: '下载链接已复制', icon: 'success' }),
+    })
+  },
+  openDownload() {
+    const url = this.data.assignedVideoUrl
+    if (!url) {
+      wx.showToast({ title: '请先认领任务', icon: 'none' })
+      return
+    }
+    const full = url.startsWith('http') ? url : `${api.base()}${url}`
+    wx.setClipboardData({
+      data: full,
+      success: () =>
+        wx.showModal({
+          title: '下载成片',
+          content: '链接已复制，请在浏览器中打开下载后发布至抖音。',
+          showCancel: false,
+        }),
+    })
+  },
+  onVisitPlanDateChange(e) {
+    const value = String((e.detail && e.detail.value) || '').trim()
+    if (value) this.setData({ visitPlanDate: value })
+  },
+  onVisitPlanDateIdxChange(e) {
+    const idx = Number((e.detail && e.detail.value) || 0)
+    const planRows = visitScheduleRuntime.readVisitPlanDates(this.data.mpOrder)
+    const row = planRows[idx]
+    if (!row) return
+    this.setData({
+      visitPlanDateIdx: idx,
+      visitPlanDate: row.date,
+      visitPlanSlotOptions: row.slots || [],
+      visitPlanSlotIdx: 0,
+    })
+    const lockedSlot = (row.slots && row.slots[0]) || ''
+    const parsed = parseVisitTimeRange(lockedSlot)
+    this.setData({ visitStartTime: parsed.start, visitEndTime: parsed.end })
+  },
+  onVisitPlanSlotIdxChange(e) {
+    const idx = Number((e.detail && e.detail.value) || 0)
+    const slot = String((this.data.visitPlanSlotOptions || [])[idx] || '').trim()
+    if (!slot) return
+    const parsed = parseVisitTimeRange(slot)
+    this.setData({
+      visitPlanSlotIdx: idx,
+      visitStartTime: parsed.start,
+      visitEndTime: parsed.end,
+    })
+  },
+  onVisitStartTimeChange(e) {
+    const value = padTimeHm((e.detail && e.detail.value) || '')
+    if (!value) return
+    const end = padTimeHm(this.data.visitEndTime)
+    if (end && visitTimeMinutes(end) <= visitTimeMinutes(value)) {
+      wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+      return
+    }
+    this.setData({ visitStartTime: value })
+  },
+  onVisitEndTimeChange(e) {
+    const value = padTimeHm((e.detail && e.detail.value) || '')
+    if (!value) return
+    const start = padTimeHm(this.data.visitStartTime)
+    if (start && visitTimeMinutes(value) <= visitTimeMinutes(start)) {
+      wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+      return
+    }
+    this.setData({ visitEndTime: value })
+  },
+  buildVisitTimeSlotFromForm() {
+    if (this.data.hasLockedPlanDates) {
+      const slots = this.data.visitPlanSlotOptions || []
+      const idx = Number(this.data.visitPlanSlotIdx) || 0
+      return String(slots[idx] || '').trim()
+    }
+    const start = padTimeHm(this.data.visitStartTime)
+    const end = padTimeHm(this.data.visitEndTime)
+    if (!start || !end) return ''
+    if (visitTimeMinutes(end) <= visitTimeMinutes(start)) return ''
+    return buildVisitTimeRange(start, end)
+  },
+  resolveVisitDateForSubmit() {
+    if (this.data.hasLockedPlanDates) {
+      const labels = this.data.visitPlanDateLabels || []
+      const idx = Number(this.data.visitPlanDateIdx) || 0
+      return String(labels[idx] || this.data.visitPlanDate || '').trim()
+    }
+    return String(this.data.visitPlanDate || '').trim()
+  },
+  async confirmVisitSelection() {
+    if (!this.data.visitApplicantId || !this.data.id) return
+    const visitDate = this.resolveVisitDateForSubmit()
+    if (!visitDate) {
+      wx.showToast({ title: '请选择探店日期', icon: 'none' })
+      return
+    }
+    const visitTimeSlot = this.buildVisitTimeSlotFromForm()
+    if (!visitTimeSlot) {
+      wx.showToast({
+        title: this.data.hasLockedPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间',
+        icon: 'none',
+      })
+      return
+    }
+    this.setData({ visitBusy: true })
+    try {
+      await visitScheduleRuntime.confirmVisitScheduleWithConflictPrompt(
+        this.data.id,
+        this.data.visitApplicantId,
+        'accept_selection',
+        '',
+        { visitDate, visitTimeSlot },
+      )
+      wx.showToast({ title: '档期已提交', icon: 'success' })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      if (e && e.code === 'schedule_conflict_cancelled') return
+      wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ visitBusy: false })
+    }
+  },
+  async updateVisitPlanTap() {
+    if (!this.data.visitApplicantId || !this.data.id) return
+    const visitDate = this.resolveVisitDateForSubmit()
+    if (!visitDate) {
+      wx.showToast({ title: '请选择探店日期', icon: 'none' })
+      return
+    }
+    const visitTimeSlot = this.buildVisitTimeSlotFromForm()
+    if (!visitTimeSlot) {
+      wx.showToast({
+        title: this.data.hasLockedPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间',
+        icon: 'none',
+      })
+      return
+    }
+    const isPreferenceEdit = this.data.editVisitMode === 'preference'
+    this.setData({ visitBusy: true })
+    try {
+      if (isPreferenceEdit) {
+        await visitScheduleRuntime.confirmVisitScheduleWithConflictPrompt(
+          this.data.id,
+          this.data.visitApplicantId,
+          'accept_selection',
+          '',
+          { visitDate, visitTimeSlot },
+        )
+        wx.showToast({ title: isPreferenceEdit ? '档期已更新' : '排期已更新', icon: 'success' })
+      } else {
+        await visitScheduleRuntime.confirmVisitScheduleWithConflictPrompt(
+          this.data.id,
+          this.data.visitApplicantId,
+          'update_visit_plan',
+          '',
+          { visitDate, visitTimeSlot },
+        )
+        wx.showToast({ title: '排期已更新', icon: 'success' })
+      }
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      if (e && e.code === 'schedule_conflict_cancelled') return
+      wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ visitBusy: false })
+    }
+  },
+  async confirmVisitAssignment() {
+    if (!this.data.visitApplicantId || !this.data.id) return
+    this.setData({ visitBusy: true })
+    try {
+      await visitScheduleRuntime.confirmVisitScheduleWithConflictPrompt(
+        this.data.id,
+        this.data.visitApplicantId,
+        'confirm_assignment',
+      )
+      wx.showToast({ title: '已确认排期', icon: 'success' })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      if (e && e.code === 'schedule_conflict_cancelled') return
+      wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ visitBusy: false })
+    }
+  },
+  declineVisitAssignment() {
+    const that = this
+    wx.showModal({
+      title: '反馈档期冲突',
+      editable: true,
+      placeholderText: '选填原因',
+      success(res) {
+        if (!res.confirm) return
+        that.setData({ visitBusy: true })
+        visitScheduleRuntime
+          .confirmVisitSchedule(that.data.id, that.data.visitApplicantId, 'decline_assignment', res.content || '')
+          .then(() => {
+            wx.showToast({ title: '已反馈', icon: 'none' })
+            return that.loadOrder(that.data.id)
+          })
+          .catch((e) => wx.showToast({ title: String((e && e.message) || e).slice(0, 24), icon: 'none' }))
+          .finally(() => that.setData({ visitBusy: false }))
+      },
+    })
+  },
+  _saveOrderSettle(input) {
+    const mp = this.data.mpOrder
+    const applicantId = String(this.data.openLoopApplicantId || '').trim()
+    if (!mp || !applicantId || this.data.settleRemindBusy) return
+    const applicant = { id: applicantId, orderSettleCalendarEventId: '' }
+    const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
+    const found = applicants.find((row) => row && String(row.id || '') === applicantId)
+    if (found && found.orderSettleCalendarEventId) applicant.orderSettleCalendarEventId = found.orderSettleCalendarEventId
+    this.setData({ settleRemindBusy: true })
+    wx.showLoading({ title: '保存中', mask: true })
+    openLoopReminderSync
+      .saveOrderSettleRemind(mp, applicant, input)
+      .then(() => {
+        wx.hideLoading()
+        wx.showToast({ title: input && input.enabled ? '已写入商单日历' : '已关闭结算提醒', icon: 'none' })
+        return this.loadOrder(this.data.id)
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        this.setData(settleFieldsFromApplicant(found || null))
+        wx.showToast({ title: String((err && err.message) || '保存失败').slice(0, 24), icon: 'none' })
+      })
+  },
+  onOrderSettleRemindToggle(e) {
+    const enabled = !!(e.detail && e.detail.value)
+    this.setData({ settleRemindOn: enabled })
+    if (!enabled) this._saveOrderSettle({ enabled: false })
+  },
+  onOrderSettlePreset(e) {
+    const preset = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.preset) || '')
+    if (preset === 'custom') {
+      const openLoop = require('../../../utils/openLoopSettlement.js')
+      this.setData({
+        settleRemindPreset: 'custom',
+        settleRemindDate: this.data.settleRemindDate || openLoop.settlementDateKeyForPreset('7'),
+        settleRemindTime: this.data.settleRemindTime || '10:00',
+      })
+      return
+    }
+    if (preset !== '7' && preset !== '15' && preset !== '30') return
+    const openLoop = require('../../../utils/openLoopSettlement.js')
+    const dateKey = openLoop.settlementDateKeyForPreset(preset)
+    this.setData({ settleRemindPreset: preset, settleRemindDate: dateKey, settleRemindTime: '10:00' })
+    this._saveOrderSettle({ enabled: true, preset, dateKey, timeLabel: '10:00' })
+  },
+  onOrderSettleDate(e) {
+    this.setData({ settleRemindDate: String((e.detail && e.detail.value) || '') })
+  },
+  onOrderSettleTime(e) {
+    this.setData({ settleRemindTime: String((e.detail && e.detail.value) || '10:00') })
+  },
+  onOrderSettleSaveCustom() {
+    this._saveOrderSettle({
+      enabled: true,
+      preset: 'custom',
+      dateKey: this.data.settleRemindDate,
+      timeLabel: this.data.settleRemindTime || '10:00',
+    })
+  },
+  onOpenLoopAction(e) {
+    const action = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.action) || '').trim()
+    const mpOrderId = String(this.data.id || '').trim()
+    const applicantId = String(this.data.openLoopApplicantId || '').trim()
+    if (!action || !mpOrderId || !applicantId) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    const titles = {
+      delivered: '已记下交片，之后会提醒你跟结算',
+      still_working: '14 天后再问一次',
+      dropped: '已标记没做成',
+      settled: '已标记收到款项',
+      mute: '已暂停提醒',
+    }
+    const run = () => {
+      wx.showLoading({ title: '保存中', mask: true })
+      openLoopReminderSync
+        .submitAction(mpOrderId, applicantId, action)
+        .then(() => {
+          wx.hideLoading()
+          const registryCache = require('../../../utils/registryCache.js')
+          registryCache.bust()
+          wx.showToast({ title: titles[action] || '已保存', icon: 'none' })
+          return this.loadOrder(mpOrderId)
+        })
+        .catch((err) => {
+          wx.hideLoading()
+          wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+        })
+    }
+    if (action === 'dropped' || action === 'settled') {
+      wx.showModal({
+        title: action === 'dropped' ? '标记没做成？' : '确认已经收到款项？',
+        content: action === 'dropped' ? '标记后不再追问交片。如果后来交了片，还可以再点「我已交片」。' : '标记后停止未结算提醒。',
+        success: (res) => {
+          if (res.confirm) run()
+        },
+      })
+      return
+    }
+    run()
+  },
+  async visitCheckInTap() {
+    if (!this.data.visitApplicantId || !this.data.id || this.data.visitBusy) return
+    const privacy = require('../../../utils/mpPrivacyAuthorize.js')
+    let picked = null
+    try {
+      picked = await privacy.runChooseMedia(
+        {
+          count: 1,
+          mediaType: ['image'],
+          sourceType: ['camera'],
+          camera: 'back',
+        },
+        { purpose: '探店拍照签到', needCamera: true },
+      )
+    } catch (e) {
+      wx.showToast({ title: String((e && e.message) || '无法打开相机').slice(0, 20), icon: 'none' })
+      return
+    }
+    const path = picked && picked.tempFiles && picked.tempFiles[0] && picked.tempFiles[0].tempFilePath
+    if (!path) return
+    this.setData({ visitBusy: true })
+    wx.showLoading({ title: '签到中', mask: true })
+    try {
+      const imageOss = require('../../../utils/mpImageOssUpload.js')
+      const url = await imageOss.uploadImageFileToOss(path, {
+        purpose: 'image',
+        fileName: `checkin-${Date.now()}.jpg`,
+      })
+      await visitScheduleRuntime.visitCheckIn(this.data.id, this.data.visitApplicantId, 'photo', url)
+      wx.hideLoading()
+      wx.showToast({ title: '签到成功', icon: 'success' })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.hideLoading()
+      wx.showToast({ title: String((e && e.message) || e || '签到失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ visitBusy: false })
+    }
+  },
+  async confirmIceReceipt() {
+    if (!this.data.iceApplicantId) {
+      wx.showToast({ title: '请先认领任务', icon: 'none' })
+      return
+    }
+    this.setData({ iceConfirming: true })
+    try {
+      await ops.confirmIceTask(this.data.id, this.data.iceApplicantId, 'confirm')
+      const tip = this.data.isEditIce
+        ? '剪辑认领成功，请尽快加入微信群'
+        : '认领成功，请尽快完成后续步骤'
+      wx.showToast({ title: tip, icon: 'none', duration: 2800 })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ iceConfirming: false })
+    }
+  },
+  async rejectIceTask() {
+    if (!this.data.iceApplicantId) return
+    const that = this
+    wx.showModal({
+      title: '拒绝任务',
+      content: '拒绝后名额将释放，是否继续？',
+      success(res) {
+        if (!res.confirm) return
+        that.setData({ iceConfirming: true })
+        ops
+          .confirmIceTask(that.data.id, that.data.iceApplicantId, 'reject')
+          .then(() => {
+            try {
+              applicationsStore.removeApplication(that.data.id)
+              wx.removeStorageSync(iceOrderStats.iceApplicantStorageKey(that.data.id))
+            } catch {
+              /* ignore */
+            }
+            wx.showToast({ title: '已拒绝，可重新认领', icon: 'none' })
+            return that.loadOrder(that.data.id)
+          })
+          .catch((e) => wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' }))
+          .finally(() => that.setData({ iceConfirming: false }))
+      },
+    })
+  },
+  async submitIceDouyin() {
+    const url = String(this.data.douyinUrl || '').trim()
+    if (!url) {
+      wx.showToast({ title: '请填写抖音作品链接', icon: 'none' })
+      return
+    }
+    if (!this.data.iceApplicantId) {
+      wx.showToast({ title: '请先报名认领', icon: 'none' })
+      return
+    }
+    this.setData({ iceSubmitting: true })
+    try {
+      const res = await ops.submitIceDouyin(this.data.id, this.data.iceApplicantId, url)
+      const pending = this.data.iceVerifyMode === 'pr' && res && (res.aiVerifyStatus === 'pending' || res.status === 'pending')
+      wx.showToast({
+        title: pending ? '已提交，待 PR 审核' : this.data.iceVerifyMode === 'pr' ? '已提交' : 'AI 核查通过',
+        icon: 'success',
+      })
+      if (!pending) this.setData({ iceVerified: true })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ iceSubmitting: false })
+    }
+  },
+  goHome() {
+    wx.reLaunch({ url: '/pages/index/index' })
+  },
+  onContactPrPending() {
+    const gate = contactGate.evaluate(this.data.mpOrder, this.data.id)
+    wx.showModal({
+      title: '暂无法联系招募方',
+      content: gate.message || '请先报名并等待招募方 PR 审核通过',
+      showCancel: false,
+    })
+  },
+  async contactPr() {
+    const meta = this.data.prChatMeta
+    if (!meta || !meta.prParticipantKey) {
+      wx.showToast({ title: '该单暂不支持私信', icon: 'none' })
+      return
+    }
+    const gate = contactGate.evaluate(this.data.mpOrder, this.data.id)
+    if (!gate.canContact) {
+      wx.showModal({
+        title: '暂无法联系招募方',
+        content: gate.message || '请先报名并等待招募方 PR 审核通过',
+        showCancel: false,
+      })
+      return
+    }
+    if (!chat.canChat()) {
+      wx.showModal({
+        title: '暂时连不上',
+        content: '私信暂时连不上，请稍后再试。',
+        showCancel: false,
+      })
+      return
+    }
+    if (userProfile.readIdentity() !== 'talent') {
+      wx.showModal({
+        title: '请切换达人身份',
+        content: '达人身份可在商单详情联系招募方。',
+        showCancel: false,
+      })
+      return
+    }
+    this.setData({ contacting: true })
+    wx.showLoading({ title: '连接中' })
+    try {
+      await chat.syncProfile()
+      const sessionId = await chat.ensureSessionWithPr(meta)
+      wx.hideLoading()
+      wx.navigateTo({
+        url:
+          `/pages/subpack-pr/chat/chat?sessionId=${encodeURIComponent(sessionId)}` +
+          `&peerName=${encodeURIComponent(meta.prDisplayName || '招募方')}` +
+          `&peerAvatar=`,
+      })
+    } catch (e) {
+      wx.hideLoading()
+      const tip = chat.formatChatError(e)
+      wx.showModal({
+        title: '无法联系招募方',
+        content: tip,
+        showCancel: false,
+      })
+    } finally {
+      this.setData({ contacting: false })
+    }
+  },
+  offerClaimIdentitySwitch(verdict) {
+    if (!verdict) return
+    if (verdict.code === 'targeted_invite_only') {
+      wx.showModal({
+        title: '定向邀约',
+        content: verdict.message,
+        confirmText: '去邀约',
+        success(res) {
+          if (res.confirm) {
+            wx.navigateTo({ url: '/pages/subpack-mine/mine-targeted-invites/mine-targeted-invites' })
+          }
+        },
+      })
+      return
+    }
+    wx.showModal({
+      title: '当前版本不能报名',
+      content: verdict.message || '当前账号版本不能报名这条招募。身份在注册时已确定。',
+      showCancel: false,
+    })
+  },
+  goApply() {
+    if (this.data.showTargetedInviteActions) return
+    const v = this.data.view
+    if (v && v.isFormRelay) {
+    if (userProfile.readIdentity() === 'pr') {
+      this.offerClaimIdentitySwitch({ code: 'wrong_identity', message: '当前是 PR 版本，不能报名。身份在注册时已确定。' })
+      return
+    }
+    if (!auth.isLoggedIn()) {
+      const back = `/pages/subpack-core/detail/detail?id=${encodeURIComponent(this.data.id)}&openFormRelay=1`
+        guestRoutes.redirectToLogin(back)
+        return
+      }
+      const needRelay = recruitApplyGate.orderIdentity(this.data.mpOrder)
+      const workId = userProfile.readOwnedIdentities().includes(needRelay) ? needRelay : userProfile.readIdentity()
+      const member = memberStore.readMember()
+      if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
+      this.openFormRelaySource()
+      return
+    }
+    if (this.data.signupClosed) {
+      wx.showToast({ title: '报名已截止', icon: 'none' })
+      return
+    }
+    if (userProfile.readIdentity() === 'pr') {
+      const target = recruitApplyGate.recruitTargetFromMpOrder(this.data.mpOrder)
+      const code = this.data.isIce || target === 'edit' ? 'edit_only' : target === 'shoot' ? 'shoot_only' : 'talent_only'
+      const label = code === 'edit_only' ? '剪辑' : code === 'shoot_only' ? '拍摄' : '达人'
+      this.offerClaimIdentitySwitch({ code, message: `请切换为${label}身份后再报名` })
+      return
+    }
+    if (!auth.isLoggedIn()) {
+      const v0 = this.data.view
+      if (!v0 || !this.data.id) return
+      const q0 = [
+        `mpId=${encodeURIComponent(this.data.id)}`,
+        `merchantOrderNo=${encodeURIComponent(v0.merchantOrderNo || '')}`,
+        `platform=${encodeURIComponent(v0.platform || '抖音')}`,
+      ]
+      if (this.data.isIce) q0.push('ice=1')
+      if (this.data.applyTemplateId) {
+        q0.push(`templateId=${encodeURIComponent(this.data.applyTemplateId)}`)
+      }
+      guestRoutes.redirectToLogin(`/pages/apply/apply?${q0.join('&')}`)
+      return
+    }
+    const need = recruitApplyGate.orderIdentity(this.data.mpOrder)
+    const owned = userProfile.readOwnedIdentities()
+    const needLabel = recruitApplyGate.identityShortLabel(need)
+    if (!owned.includes(need)) {
+      const mpProfileNav = require('../../../utils/mpProfileNav.js')
+      wx.showModal({
+        title: '需要新增身份',
+        content: `这条是${needLabel}商单。请到我的信息点 + 新增${needLabel}后再报名。`,
+        confirmText: '去新增',
+        success(res) {
+          if (res.confirm) mpProfileNav.goMyProfile()
+        },
+      })
+      return
+    }
+    const member = memberStore.readMember()
+    if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, need)) return
+    if (userProfile.readIdentity() !== need) {
+      userProfile.writeIdentity(need)
+      try {
+        require('../../../utils/tabBar.js').refreshTabBar(this)
+      } catch (_) {}
+    }
+    const workId = need
+    const verdict = recruitApplyGate.validateRecruitmentClaim(this.data.mpOrder, workId)
+    if (!verdict.ok) {
+      if (verdict.code === 'slots_full') {
+        wx.showToast({ title: verdict.message, icon: 'none' })
+        return
+      }
+      this.offerClaimIdentitySwitch(verdict)
+      return
+    }
+    if (!v || !this.data.id) return
+    if (
+      !this.data.canReclaimIce &&
+      (this.data.applied ||
+        applicationsStore.hasAppliedToOrder(this.data.id) ||
+        (this.data.mpOrder && contactGate.evaluate(this.data.mpOrder, this.data.id).hasApplication))
+    ) {
+      wx.showToast({ title: '您已报名该招募', icon: 'none' })
+      return
+    }
+    if (this.data.mpOrder) applyTemplates.cacheApplyFormFromMpOrder(this.data.mpOrder)
+    const q = [
+      `mpId=${encodeURIComponent(this.data.id)}`,
+      `merchantOrderNo=${encodeURIComponent(v.merchantOrderNo || '')}`,
+      `platform=${encodeURIComponent(v.platform || '抖音')}`,
+    ]
+    if (this.data.isIce) q.push('ice=1')
+    if (this.data.applyTemplateId) {
+      q.push(`templateId=${encodeURIComponent(this.data.applyTemplateId)}`)
+    }
+    const applyUrl = `/pages/apply/apply?${q.join('&')}`
+    wx.navigateTo({ url: applyUrl })
+  },
+  async onAcceptTargetedInvite() {
+    await this.respondTargetedInvite('accept')
+  },
+  async onRejectTargetedInvite() {
+    const reason = await new Promise((resolve) => {
+      wx.showModal({
+        title: '拒绝邀约',
+        content: '确认拒绝该定向合作邀约？',
+        editable: true,
+        placeholderText: '可选：填写拒绝原因',
+        success: (r) => resolve(r.confirm ? String(r.content || '').trim() : null),
+      })
+    })
+    if (reason === null) return
+    await this.respondTargetedInvite('reject', reason)
+  },
+  async respondTargetedInvite(response, rejectReason) {
+    const mpOrderId = this.data.id
+    const talentMemberId = this.resolveTalentMemberId()
+    if (!mpOrderId || !talentMemberId) {
+      wx.showToast({ title: '请先登录达人账号', icon: 'none' })
+      return
+    }
+    if (this.data.targetedInviteBusy) return
+    this.setData({ targetedInviteBusy: true })
+    try {
+      await mpTargetedRecruitApi.respond(mpOrderId, talentMemberId, response, rejectReason)
+      wx.showToast({ title: response === 'accept' ? '已同意邀约' : '已拒绝邀约', icon: 'success' })
+      await this.loadOrder(mpOrderId)
+    } catch (err) {
+      wx.showToast({ title: String((err && err.message) || '操作失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ targetedInviteBusy: false })
+    }
+  },
+  copyOrderNo() {
+    const v = this.data.view
+    if (!v) return
+    wx.setClipboardData({
+      data: v.merchantOrderNo || '',
+      success: () => wx.showToast({ title: '已复制订单号', icon: 'success' }),
+    })
+  },
+})

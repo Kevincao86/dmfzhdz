@@ -2,7 +2,7 @@ import { getMpMiniProgramAccessToken, mpWechatAppId } from './mpWechatMiniProgra
 
 const MP_APP_ID = () => mpWechatAppId() || 'wxd3da81937eb72241'
 const MP_SHARE_APP_NAME = () =>
-  String(process.env.MP_SHARE_APP_NAME || '灵祺星选').trim() || '灵祺星选'
+  String(process.env.MP_SHARE_APP_NAME || '灵奇星选').trim() || '灵奇星选'
 
 /** 详情页 page_url（genwxashortlink / 明文 scheme 共用，不带前导 /） */
 export function buildRecruitmentDetailPageUrl(orderId: string): string {

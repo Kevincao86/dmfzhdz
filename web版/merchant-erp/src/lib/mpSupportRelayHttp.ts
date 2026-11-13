@@ -221,7 +221,7 @@ export async function sendMpSupportLine(input: {
     clientMsgId: input.clientMsgId,
     ts: Date.now(),
     customerId: input.customerId || '',
-    enterpriseName: input.enterpriseName || '灵祺星选·Web',
+    enterpriseName: input.enterpriseName || '灵奇星选·Web',
   })
 }
 

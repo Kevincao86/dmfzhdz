@@ -50,13 +50,13 @@ export async function isDemoShowcaseAuth(
 
 export const DEMO_SHOWCASE_CHAT = `这是演示账号的固定回复，不消耗积分，也不调用模型。
 
-门店：灵祺演示商家
+门店：灵奇演示商家
 1. 主推双人火锅套餐，售价 128 元，原价 168 元。
 2. 短视频用预设探店成片，15 秒内出示套餐和门店环境。
 3. 发布时段建议午市 11:30 和晚市 17:30。`
 
 export const DEMO_SHOWCASE_NARRATION =
-  '欢迎来到灵祺演示门店。今天推荐招牌双人火锅套餐，锅底、鲜切牛肉和时蔬，现在下单只要一百二十八元。'
+  '欢迎来到灵奇演示门店。今天推荐招牌双人火锅套餐，锅底、鲜切牛肉和时蔬，现在下单只要一百二十八元。'
 
 export function demoShowcaseChatBody(): Record<string, unknown> {
   return {
@@ -72,7 +72,7 @@ export function demoShowcaseChatBody(): Record<string, unknown> {
 export function demoShowcaseProductPlanBody(): Record<string, unknown> {
   const plan = {
     slotLabel: '双人套餐',
-    productName: '灵祺演示 · 双人火锅套餐',
+    productName: '灵奇演示 · 双人火锅套餐',
     suggestedPriceYuan: 128,
     originYuan: 168,
     description: '预设展示套餐：锅底、鲜切牛肉、时蔬拼盘、主食两份。仅供功能演示，不消耗 Token。',
@@ -108,9 +108,9 @@ export function demoShowcaseOpsPlanBody(): Record<string, unknown> {
     planEdition: 'simple',
     simplePlan: {
       hero: {
-        headline: '灵祺演示门店 · 双人火锅周',
+        headline: '灵奇演示门店 · 双人火锅周',
         summary: '用预设成片和固定套餐做功能展示，不消耗 Token。',
-        storeHint: '灵祺演示商家',
+        storeHint: '灵奇演示商家',
         periodHint: '本周',
         budgetHint: '演示预算 ¥3,000',
       },
@@ -189,7 +189,7 @@ export function demoShowcaseOpsPlanBody(): Record<string, unknown> {
       budgetYuan: 3000,
       periodStart: '',
       periodEnd: '',
-      storeName: '灵祺演示商家',
+      storeName: '灵奇演示商家',
       city: '',
       planEdition: 'simple',
     },
@@ -214,7 +214,7 @@ export function demoShowcaseDouyinLinkBody(): Record<string, unknown> {
     demoShowcase: true,
     normalizedUrl: 'https://www.douyin.com/video/demo-showcase',
     videoId: 'demo-showcase',
-    sourceTitle: '灵祺演示探店',
+    sourceTitle: '灵奇演示探店',
     script: DEMO_SHOWCASE_NARRATION,
     motionInstructions: '面向镜头微笑，双手示意套餐，再指向门店环境。',
     scriptSource: 'page',
@@ -226,7 +226,7 @@ export function demoShowcaseGoodsAssistPayload(
   body: Record<string, unknown>,
 ): Record<string, unknown> {
   const base = { ok: true, demoShowcase: true, pointsCharged: 0, ai_vendor_used: 'demo' }
-  const title = '灵祺演示 · 双人火锅套餐'
+  const title = '灵奇演示 · 双人火锅套餐'
   const desc = '预设展示：锅底、鲜切牛肉、时蔬拼盘与主食。到店可用，不消耗 Token。'
   if (action === 'image_generate' || action === 'image_enhance') {
     return {
@@ -278,7 +278,7 @@ export function demoShowcaseGoodsAssistPayload(
     action === 'geo_ai_consult_question'
       ? '附近有什么适合两个人的火锅套餐？'
       : action === 'operation_article'
-        ? '灵祺演示门店本周主推双人火锅套餐，锅底、鲜切牛肉和时蔬一次配齐。午市和晚市到店即可用。以上为预设文案，不消耗 Token。'
+        ? '灵奇演示门店本周主推双人火锅套餐，锅底、鲜切牛肉和时蔬一次配齐。午市和晚市到店即可用。以上为预设文案，不消耗 Token。'
         : desc
   return { ...base, description, title }
 }
@@ -358,7 +358,7 @@ export function demoShowcaseVideoPayload(
       prompts: ['【画面】演示门店火锅探店，热气与双人套餐特写，镜头平稳推进。'],
       narrationScript: DEMO_SHOWCASE_NARRATION,
       scriptSegments: [
-        { timeRange: '0-5s', visual: '门头与热气锅底特写', dialogue: '欢迎来到灵祺演示门店。' },
+        { timeRange: '0-5s', visual: '门头与热气锅底特写', dialogue: '欢迎来到灵奇演示门店。' },
         { timeRange: '5-10s', visual: '双人套餐摆盘', dialogue: '招牌双人火锅，一百二十八元。' },
         { timeRange: '10-15s', visual: '店员邀请入座', dialogue: '现在下单，到店就能吃。' },
       ],

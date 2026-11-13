@@ -50,7 +50,7 @@ export function buildRecruitmentOrderFromAgentBrief(
   },
 ): RegistryRecruitmentOrder {
   const tenant = buildErpRegistryTenant()
-  const customerName = tenant?.merchantName ?? '灵祺 ERP 商户'
+  const customerName = tenant?.merchantName ?? '灵奇 ERP 商户'
   const id = `RO-AI${Date.now()}`
   const platforms = params.intent.platforms?.length
     ? params.intent.platforms

@@ -1517,7 +1517,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         if (await isDemoShowcaseAuth(authHeader, env as Record<string, string>)) {
           json(res, 200, {
             ok: true,
-            suggestion: '感谢光临灵祺演示门店。双人火锅套餐 128 元，欢迎再来。此回复为预设展示，不消耗 Token。',
+            suggestion: '感谢光临灵奇演示门店。双人火锅套餐 128 元，欢迎再来。此回复为预设展示，不消耗 Token。',
             modelUsed: 'showcase',
             pointsCharged: 0,
             demoShowcase: true,

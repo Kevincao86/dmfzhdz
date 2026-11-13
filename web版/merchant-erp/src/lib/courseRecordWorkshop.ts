@@ -251,7 +251,7 @@ export function formatTimelineChecklist(
 
 /** 开场白总目录示例（与 html-讲义开场白对齐，可替换） */
 export const SAMPLE_OPENING_ORAL_SCRIPT = `### 第 1 页 · 封面
-家人们好。欢迎来到灵祺星选商家 ERP 月订阅课程。这一页是口播稿总目录的展示 PPT——开课前我们先把整包课的地图过一遍。
+家人们好。欢迎来到灵奇星选商家 ERP 月订阅课程。这一页是口播稿总目录的展示 PPT——开课前我们先把整包课的地图过一遍。
 
 ### 第 2 页 · 今天开场
 开课前不急着点功能。今天只要带走三件事：学什么、怎么学、怎么练。
@@ -294,7 +294,7 @@ export const SAMPLE_OPENING_ORAL_SCRIPT = `### 第 1 页 · 封面
 `
 
 export const VOICE_PREVIEW_FALLBACK =
-  '大家好，这是灵祺录播工坊的口播音色试听，请确认音量与语速是否合适。'
+  '大家好，这是灵奇录播工坊的口播音色试听，请确认音量与语速是否合适。'
 
 /** 从文件名解析页码：page-01 / p12 / 第3页 / 01 / slide_7 等 */
 export function extractPageNoFromImageName(fileName: string): number | null {

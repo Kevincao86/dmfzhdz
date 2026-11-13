@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# 将微信达人撮合小程序的「定向邀约 + 商单群聊」逻辑同步到灵祺星选抖音版（路径映射 subpack → 扁平 pages）
+# 将微信达人撮合小程序的「定向邀约 + 商单群聊」逻辑同步到灵奇星选抖音版（路径映射 subpack → 扁平 pages）
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/灵祺达人撮合小程序"
-DEST="$ROOT/灵祺星选小程序抖音版/灵祺星选"
+SRC="$ROOT/灵奇达人撮合小程序"
+DEST="$ROOT/灵奇星选小程序抖音版/灵奇星选"
 
 if [[ ! -d "$SRC" ]] || [[ ! -d "$DEST" ]]; then
   echo "缺少源或目标目录" >&2

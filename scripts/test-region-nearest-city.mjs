@@ -3,8 +3,8 @@
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const nearest = require('../灵祺达人撮合小程序/utils/chinaNearestCity.js')
-const china = require('../灵祺达人撮合小程序/utils/chinaRegion.js')
+const nearest = require('../灵奇达人撮合小程序/utils/chinaNearestCity.js')
+const china = require('../灵奇达人撮合小程序/utils/chinaRegion.js')
 
 const cases = [
   { lat: 29.8683, lng: 121.544, expectCity: '宁波市', expectProvince: '浙江省' },

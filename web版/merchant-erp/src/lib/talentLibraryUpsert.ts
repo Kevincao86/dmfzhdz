@@ -51,7 +51,7 @@ function findMemberForTalentPhone(
   return hits.find((m) => canonTalentId(m.lingqiTalentId)) || hits[0] || null
 }
 
-/** 达人库行必须有灵祺编号：沿用已有编号，否则按手机号认会员，再没有就新发一个。 */
+/** 达人库行必须有灵奇编号：沿用已有编号，否则按手机号认会员，再没有就新发一个。 */
 function ensureLibraryLingqiTalentId(
   data: RegistryFile,
   opts: {

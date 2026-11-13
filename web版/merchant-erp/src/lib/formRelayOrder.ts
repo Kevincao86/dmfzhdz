@@ -118,7 +118,7 @@ function defaultDeadlineText(): string {
   return d.toLocaleString('zh-CN', { hour12: false })
 }
 
-/** 由外部表单链接生成灵祺代收招募单（方案 A：我们侧收单，再导出回填客户表） */
+/** 由外部表单链接生成灵奇代收招募单（方案 A：我们侧收单，再导出回填客户表） */
 export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<string, unknown> {
   const nowMs = Date.now()
   const now = new Date(nowMs).toLocaleString('zh-CN', { hour12: false })
@@ -183,7 +183,7 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
           .filter(Boolean)
           .join('\n')
       : [
-          '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
+          '【转发代收】达人通过灵奇星选报名，报名数据可在管理台导出后回填原表。',
           `原表平台：${resolveFormRelayPlatformLabel(relay)}`,
           sourceUrl ? `原表链接：${mpLink.displayLink || sourceUrl}` : '',
           relay.titleNote ? `备注：${relay.titleNote}` : '',

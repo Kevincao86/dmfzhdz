@@ -14,7 +14,7 @@ export type AiAgentPlanProfile = {
 }
 
 const BASE_WELCOME =
-  '你好，我是灵祺 AI 助手。你可以像普通 AI 一样问我任何问题；若在 ERP 里涉及改商品、发招募单、报税、发布等操作，会先展示预览，**需您确认后**才会调用业务接口。'
+  '你好，我是灵奇 AI 助手。你可以像普通 AI 一样问我任何问题；若在 ERP 里涉及改商品、发招募单、报税、发布等操作，会先展示预览，**需您确认后**才会调用业务接口。'
 
 const PAID_AGENT_POINTS_HINT = `对话按实际 token 扣积分（短对话通常 1 积分；优先扣套餐月赠，不足再扣充值）`
 
@@ -22,7 +22,7 @@ const WELCOME_BY_PLAN: Record<MembershipPlan, string> = {
   free: `${BASE_WELCOME}\n\n当前为 **免费版**：可使用豆包/千问/MiniMax/DeepSeek 对话（每月直连调用 ${50} 次上限）。生图、生视频可浏览对应板块，点击使用需升级会员；报税管理、GEO、竞对分析亦需升级会员。`,
   member: `${BASE_WELCOME}\n\n当前为 **会员版**：可使用四厂商对话模型；${PAID_AGENT_POINTS_HINT}。每个平台可绑定 1 个账号。生图时若您选的是豆包等对话模型，系统会自动切换为对应文生图引擎优化出图。`,
   member_store: `${BASE_WELCOME}\n\n当前为 **进阶版**：可使用四厂商对话模型；${PAID_AGENT_POINTS_HINT}。每个平台可绑定 5 个账号。`,
-  member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（灵祺高阶版智能AI模型）；${PAID_AGENT_POINTS_HINT}。复杂任务与一键报税均已开放。`,
+  member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（灵奇高阶版智能AI模型）；${PAID_AGENT_POINTS_HINT}。复杂任务与一键报税均已开放。`,
 }
 
 function shortcutsForPlan(plan: MembershipPlan) {

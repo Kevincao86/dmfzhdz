@@ -1,0 +1,377 @@
+<page-meta page-style="{{lqPageStyle}}" background-color="{{lqPageBg}}" background-color-top="{{lqNavBg}}" background-color-bottom="{{lqPageBg}}" />
+<view class="{{lqAccentClass}} agent-page" style="{{lqPageStyle}}{{keyboardHeight ? 'bottom:' + keyboardHeight + 'px;' : ''}}">
+  <view class="agent-hero">
+    <view class="agent-hero-main">
+      <image class="agent-logo" src="{{logoSrc}}" mode="aspectFit" />
+      <view class="agent-hero-text">
+        <text class="agent-h1">灵奇助手</text>
+        <text class="agent-p">与电脑端 AI 智能体同源 · 写操作需确认后再执行</text>
+      </view>
+    </view>
+    <view class="agent-hero-actions">
+      <view class="agent-chip" bindtap="onNewChat">新对话</view>
+      <navigator url="/pages/shortvideo-ai/shortvideo-ai" class="agent-chip ghost" hover-class="none">短视频出片</navigator>
+    </view>
+  </view>
+
+  <scroll-view
+    wx:if="{{!hasChat}}"
+    scroll-y
+    class="agent-empty foot-col"
+    enhanced
+    show-scrollbar="{{false}}"
+    enable-flex
+  >
+    <text class="empty-title">今天要处理哪件事？</text>
+    <text class="empty-sub">点快捷任务或直接输入，规则与商家后台助手一致</text>
+    <view class="shortcut-fold" bindtap="onToggleShortcuts">
+      <text class="shortcut-fold-t">{{shortcutsCollapsed ? '快捷任务 · 展开' : '快捷任务 · 收起'}}</text>
+      <text class="shortcut-fold-n">{{shortcuts.length}}</text>
+    </view>
+    <view wx:if="{{!shortcutsCollapsed}}" class="shortcut-grid">
+      <view
+        wx:for="{{shortcuts}}"
+        wx:key="type"
+        class="shortcut"
+        data-prompt="{{item.prompt}}"
+        bindtap="onShortcut"
+      >
+        <text class="shortcut-t">{{item.label}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <scroll-view
+    wx:else
+    scroll-y
+    class="agent-chat foot-col"
+    enable-flex
+    scroll-into-view="{{scrollTo}}"
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}" class="msg-row {{item.role === 'user' ? 'is-user' : ''}}">
+      <image wx:if="{{item.role !== 'user'}}" class="ava" src="{{logoSrc}}" mode="aspectFit" />
+      <view class="bubble {{item.role === 'user' ? 'bubble-user' : ''}} {{item.role === 'task_preview' ? 'bubble-preview' : ''}}">
+        <text user-select class="bubble-text">{{item.content}}</text>
+        <image
+          wx:for="{{item.imageUrls || []}}"
+          wx:for-item="img"
+          wx:key="*this"
+          class="bubble-img"
+          src="{{img}}"
+          mode="aspectFit"
+          bindtap="onPreviewBubbleImage"
+          data-url="{{img}}"
+        />
+        <view wx:if="{{item.talentRoster && item.talentRoster.cards.length}}" class="recruit-card">
+          <view class="roster-head">
+            <text class="plan-name">推荐 {{item.talentRoster.cards.length}} 位达人</text>
+            <view class="btn-primary roster-publish" data-id="{{item.id}}" bindtap="onRosterPublish">{{item.talentRoster.publishing ? '正在发布…' : '定向招募'}}</view>
+          </view>
+          <text wx:if="{{item.talentRoster.publishError}}" class="plan-warn">{{item.talentRoster.publishError}}</text>
+          <view wx:for="{{item.talentRoster.cards}}" wx:for-item="card" wx:key="seatId" class="shoot-box">
+            <view class="talent-card-row">
+              <view wx:if="{{!card.empty}}" class="talent-avatar">
+                <image wx:if="{{card.avatarUrl}}" class="talent-avatar-img" src="{{card.avatarUrl}}" mode="aspectFill" />
+                <text wx:else>{{card.avatarInitial}}</text>
+              </view>
+              <view class="talent-card-text">
+                <text class="plan-name">{{card.nickname}}</text>
+                <text class="plan-desc">{{card.metaLine}}</text>
+                <text wx:if="{{card.subLine}}" class="plan-desc">{{card.subLine}}</text>
+                <text wx:if="{{card.profileLink}}" class="talent-home" data-link="{{card.profileLink}}" catchtap="onCopyTalentProfile">{{card.profileLabel}}</text>
+                <text wx:else class="plan-desc muted">主页未核到</text>
+              </view>
+            </view>
+            <view wx:if="{{!card.empty}}" class="btn-ghost" data-id="{{item.id}}" data-name="{{card.nickname}}" bindtap="onRosterReplace">{{item.talentRoster.replacingName === card.nickname ? '替换中…' : '替换'}}</view>
+          </view>
+          <view wx:if="{{item.talentRoster.notice}}" class="roster-notice">
+            <text class="plan-desc">{{item.talentRoster.notice}}</text>
+            <view wx:for="{{item.talentRoster.noticePeople}}" wx:for-item="person" wx:key="seatId" class="plan-desc">
+              <text>{{person.nickname}}</text>
+              <text wx:if="{{person.profileLink}}" class="talent-home" data-link="{{person.profileLink}}" catchtap="onCopyTalentProfile"> {{person.profileLabel}}</text>
+              <text wx:else class="muted"> 主页未核到</text>
+            </view>
+          </view>
+        </view>
+        <view wx:if="{{item.preview && item.preview.taskType === 'create_product' && item.preview.productPlans.length}}" class="plan-list">
+          <view wx:for="{{item.preview.productPlans}}" wx:for-item="plan" wx:key="slotKey" class="plan-card">
+            <block wx:if="{{plan.enrichStatus === 'loading'}}">
+              <text class="plan-desc">正在优化标题并生成团购主图…</text>
+              <text class="plan-foot">完成后将展示 C 端预览效果</text>
+            </block>
+            <block wx:else>
+              <text wx:if="{{plan.slotLabel}}" class="plan-slot">{{plan.slotLabel}}</text>
+              <text class="plan-caption">抖音来客团购 · C 端预览</text>
+              <image wx:if="{{plan.headUrl}}" class="plan-head" src="{{plan.headUrl}}" mode="aspectFill" />
+              <text class="plan-name">{{plan.productName || plan.slotLabel}}</text>
+              <text wx:if="{{plan.description}}" class="plan-desc">{{plan.description}}</text>
+              <view class="plan-price-row">
+                <text class="plan-price">{{plan.suggestedPriceYuan > 0 ? '¥' + plan.suggestedPriceYuan : '价格生成中'}}</text>
+                <text wx:if="{{plan.originYuan}}" class="plan-origin">¥{{plan.originYuan}}</text>
+              </view>
+              <text wx:if="{{plan.comboText}}" class="plan-desc">{{plan.comboText}}</text>
+              <text wx:if="{{plan.enrichError}}" class="plan-warn">{{plan.enrichError}}</text>
+              <text class="plan-foot">确认后将按此方案提交抖音来客审核；如需改价、换图或售后规则，可在提交前于创建页微调。</text>
+            </block>
+          </view>
+        </view>
+        <view wx:if="{{item.uploadSheets && item.uploadSheets.length && item.previewStatus === 'pending'}}" class="upload-sheets">
+          <text class="upload-h">请确认 · 抖音团购必填</text>
+          <text wx:if="{{item.uploadContext.categoryName}}" class="upload-ai">AI 已补充：{{item.uploadContext.categoryName}} · {{item.uploadContext.typeLabel}} · {{item.uploadContext.storeNames}}。其余必填（使用规则、退款、不可用日期、预约、投放渠道、券码、收款、到店核销、限购、商品名）由 AI 填写。</text>
+          <text wx:elif="{{item.uploadContext.message}}" class="upload-ai">{{item.uploadContext.message}}</text>
+          <view wx:for="{{item.uploadSheets}}" wx:for-item="sheet" wx:key="slotKey" class="sheet">
+            <text class="plan-name">{{sheet.productName}}</text>
+            <view class="field-row">
+              <text class="field-lab">原价</text>
+              <input class="field-inp" type="digit" value="{{sheet.form.originYuan}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="originYuan" bindinput="onUploadField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">实付价</text>
+              <input class="field-inp" type="digit" value="{{sheet.form.priceYuan}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="priceYuan" bindinput="onUploadField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">库存</text>
+              <input class="field-inp" type="number" value="{{sheet.form.stockQty}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="stockQty" bindinput="onUploadField" />
+            </view>
+            <text class="field-lab block">菜品搭配（美食团购必填，一行一项）</text>
+            <textarea class="field-area" value="{{sheet.form.comboText}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="comboText" bindinput="onUploadField" auto-height />
+            <view class="field-row">
+              <text class="field-lab">售卖开始</text>
+              <picker mode="date" value="{{sheet.form.saleStart}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="saleStart" bindchange="onUploadDate">
+                <text class="field-inp picker">{{sheet.form.saleStart}}</text>
+              </picker>
+            </view>
+            <view class="field-row">
+              <text class="field-lab">售卖结束</text>
+              <picker mode="date" value="{{sheet.form.saleEnd}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="saleEnd" bindchange="onUploadDate">
+                <text class="field-inp picker">{{sheet.form.saleEnd}}</text>
+              </picker>
+            </view>
+            <view class="field-row">
+              <text class="field-lab">可用天数</text>
+              <input class="field-inp" type="number" value="{{sheet.form.useDays}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="useDays" bindinput="onUploadField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">每日时段</text>
+              <view class="plat-chip {{sheet.form.useAllDay ? 'on' : ''}}" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" catchtap="onToggleUseAllDay">全天可用</view>
+            </view>
+            <view wx:if="{{!sheet.form.useAllDay}}" class="field-row">
+              <input class="field-inp" value="{{sheet.form.useTimeStart}}" placeholder="10:00" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="useTimeStart" bindinput="onUploadField" />
+              <input class="field-inp" value="{{sheet.form.useTimeEnd}}" placeholder="22:00" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-field="useTimeEnd" bindinput="onUploadField" />
+            </view>
+            <view class="head-row">
+              <image wx:if="{{sheet.form.headLocal || sheet.form.headUrl}}" class="head-img" src="{{sheet.form.headLocal || sheet.form.headUrl}}" mode="aspectFill" />
+              <view wx:else class="head-empty">封面图</view>
+              <view class="head-actions">
+                <view class="mini-btn" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" bindtap="onPickProductHead">相册</view>
+                <view class="mini-btn" data-id="{{item.id}}" data-slot="{{sheet.slotKey}}" data-name="{{sheet.productName}}" bindtap="onGenProductHead">AI 生成</view>
+              </view>
+            </view>
+          </view>
+        </view>
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType === 'create_product'}}" class="plat-row">
+          <view
+            wx:for="{{item.previewPlatforms}}"
+            wx:for-item="plat"
+            wx:key="id"
+            class="plat-chip {{plat.checked ? 'on' : ''}}"
+            data-id="{{item.id}}"
+            data-plat="{{plat.id}}"
+            catchtap="onToggleProductPlatform"
+          >{{plat.label}}</view>
+        </view>
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType === 'create_product'}}" class="preview-actions">
+          <view class="btn-ghost" data-id="{{item.id}}" data-mode="draft" bindtap="onConfirmPreview">保存至草稿</view>
+          <view class="btn-primary" data-id="{{item.id}}" data-mode="submit" bindtap="onConfirmPreview">提交至平台</view>
+        </view>
+        <view
+          wx:if="{{item.role === 'task_preview' && item.preview && item.preview.taskType === 'create_product'}}"
+          class="preview-link"
+          data-id="{{item.id}}"
+          bindtap="onOpenModule"
+        >去商品列表</view>
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType === 'recruit_influencer' && item.preview.recruitmentBrief}}" class="recruit-card">
+          <view wx:if="{{item.preview.recruitmentBrief.talentPath === 'pending' || item.preview.recruitmentBrief.talentPath === 'recommend'}}">
+            <view wx:if="{{item.preview.recruitmentBrief.talentPath === 'recommend'}}" class="roster-head">
+              <text class="plan-name">推荐 {{item.preview.recruitmentBrief.talentCards.length}} 位达人</text>
+              <text class="plan-back" data-id="{{item.id}}" bindtap="onTalentBack">返回选择</text>
+            </view>
+            <text class="plan-desc">{{item.preview.recruitmentBrief.talentPath === 'recommend' ? '已按方案人数推荐。确认后进入招募，不会自动发出去。' : (item.preview.recruitmentBrief.wizardBudget.headcount > 0 ? '按当前方案约 ' + item.preview.recruitmentBrief.wizardBudget.headcount + ' 人。先选一件事，系统不会自动发出去。' : '先选一件事，系统不会自动发出去。')}}</text>
+            <view wx:if="{{item.preview.recruitmentBrief.talentPath === 'pending'}}" class="preview-actions">
+              <view class="btn-primary" data-id="{{item.id}}" bindtap="onTalentRecommend">{{item.preview.recruitmentBrief.wizardBudget.headcount > 0 ? '给我推荐（' + item.preview.recruitmentBrief.wizardBudget.headcount + ' 人）' : '给我推荐'}}</view>
+              <view class="btn-ghost" data-id="{{item.id}}" bindtap="onTalentRecruit">我要招募</view>
+            </view>
+            <text wx:if="{{item.preview.recruitmentBrief.talentNote}}" class="plan-desc">{{item.preview.recruitmentBrief.talentNote}}</text>
+            <view wx:for="{{item.preview.recruitmentBrief.talentCards}}" wx:for-item="card" wx:key="seatId" class="shoot-box">
+              <view class="talent-card-row">
+                <view wx:if="{{!card.empty}}" class="talent-avatar">
+                  <image wx:if="{{card.avatarUrl}}" class="talent-avatar-img" src="{{card.avatarUrl}}" mode="aspectFill" />
+                  <text wx:else>{{card.avatarInitial}}</text>
+                </view>
+                <view class="talent-card-text">
+                  <block wx:if="{{card.empty}}">
+                    <text class="plan-name">{{card.tierLabel}}</text>
+                    <text class="plan-desc">{{card.reason}}</text>
+                  </block>
+                  <block wx:else>
+                    <text class="plan-name">{{card.nickname}}</text>
+                    <text class="plan-desc">{{card.planMeta}}</text>
+                    <text wx:if="{{card.planSub}}" class="plan-desc">{{card.planSub}}</text>
+                    <text wx:if="{{card.source === 'public' && card.reason}}" class="plan-desc">{{card.reason}}</text>
+                    <text wx:if="{{card.profileLink}}" class="talent-home" data-link="{{card.profileLink}}" catchtap="onCopyTalentProfile">{{card.profileLabel}}</text>
+                    <text wx:else class="plan-desc muted">主页未核到</text>
+                  </block>
+                </view>
+              </view>
+              <view wx:if="{{!card.empty}}" class="btn-ghost" data-id="{{item.id}}" data-talent="{{card.talentId}}" data-name="{{card.nickname}}" bindtap="onTalentReplace">替换</view>
+            </view>
+            <view wx:if="{{item.preview.recruitmentBrief.talentPath === 'recommend'}}" class="preview-actions">
+              <view class="btn-primary" data-id="{{item.id}}" bindtap="onTalentRecruit">确认达人</view>
+            </view>
+          </view>
+          <block wx:if="{{item.preview.recruitmentBrief.talentPath !== 'pending' && item.preview.recruitmentBrief.talentPath !== 'recommend'}}">
+          <view class="step-bar">
+            <view class="step-seg {{item.preview.recruitmentBrief.wizardStep >= 1 ? 'on' : ''}}"></view>
+            <view class="step-seg {{item.preview.recruitmentBrief.wizardStep >= 2 ? 'on' : ''}}"></view>
+            <view class="step-seg {{item.preview.recruitmentBrief.wizardStep >= 3 ? 'on' : ''}}"></view>
+            <view class="step-seg {{item.preview.recruitmentBrief.wizardStep >= 4 ? 'on' : ''}}"></view>
+          </view>
+          <view wx:if="{{item.preview.recruitmentBrief.wizardStep === 1}}">
+            <view class="field-row">
+              <text class="field-lab">主推套餐</text>
+              <input class="field-inp" value="{{item.preview.recruitmentBrief.wizardScope.mainProductName}}" data-id="{{item.id}}" data-field="mainProductName" bindinput="onRecruitField" />
+            </view>
+            <text class="field-lab block">目标平台</text>
+            <view class="plat-row">
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.platformDouyin ? 'on' : ''}}" data-id="{{item.id}}" data-plat="douyin" catchtap="onRecruitPlatform">抖音</view>
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.platformXhs ? 'on' : ''}}" data-id="{{item.id}}" data-plat="xhs" catchtap="onRecruitPlatform">小红书</view>
+            </view>
+            <view class="field-row">
+              <text class="field-lab">招募城市</text>
+              <input class="field-inp" placeholder="如 宁波，或全国" value="{{item.preview.recruitmentBrief.wizardScope.city}}" data-id="{{item.id}}" data-field="city" bindinput="onRecruitField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">门店</text>
+              <input class="field-inp" placeholder="可留空" value="{{item.preview.recruitmentBrief.wizardScope.storeName}}" data-id="{{item.id}}" data-field="storeName" bindinput="onRecruitField" />
+            </view>
+            <text class="field-lab block">内容形式</text>
+            <view class="plat-row">
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.contentForm === 'instore' ? 'on' : ''}}" data-id="{{item.id}}" data-form="instore" catchtap="onRecruitForm">到店探店</view>
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.contentForm === 'talk' ? 'on' : ''}}" data-id="{{item.id}}" data-form="talk" catchtap="onRecruitForm">不到店口播</view>
+              <view class="plat-chip {{item.preview.recruitmentBrief.wizardScope.contentForm === 'note' ? 'on' : ''}}" data-id="{{item.id}}" data-form="note" catchtap="onRecruitForm">图文笔记</view>
+            </view>
+          </view>
+          <view wx:if="{{item.preview.recruitmentBrief.wizardStep === 2}}">
+            <view class="field-row">
+              <text class="field-lab">总预算</text>
+              <input class="field-inp" type="number" value="{{item.preview.recruitmentBrief.wizardBudget.budgetYuan}}" data-id="{{item.id}}" data-bucket="budget" data-field="budgetYuan" bindinput="onRecruitField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">计划人数</text>
+              <input class="field-inp" type="number" value="{{item.preview.recruitmentBrief.wizardBudget.headcount}}" data-id="{{item.id}}" data-bucket="budget" data-field="headcount" bindinput="onRecruitField" />
+            </view>
+            <view class="field-row">
+              <text class="field-lab">佣金 %</text>
+              <input class="field-inp" type="number" value="{{item.preview.recruitmentBrief.wizardBudget.commissionPct}}" data-id="{{item.id}}" data-bucket="budget" data-field="commissionPct" bindinput="onRecruitField" />
+            </view>
+          </view>
+          <view wx:if="{{item.preview.recruitmentBrief.wizardStep === 3 || item.preview.recruitmentBrief.wizardStep === 4}}" class="shoot-box">
+            <text class="plan-desc">{{item.preview.recruitmentBrief.briefText}}</text>
+          </view>
+          <view class="preview-actions">
+            <view wx:if="{{item.preview.recruitmentBrief.wizardStep > 1}}" class="btn-ghost" data-id="{{item.id}}" bindtap="onRecruitBack">上一步</view>
+            <view wx:if="{{item.preview.recruitmentBrief.wizardStep < 4}}" class="btn-primary" data-id="{{item.id}}" bindtap="onRecruitNext">下一步</view>
+            <view wx:if="{{item.preview.recruitmentBrief.wizardStep === 4}}" class="btn-primary" data-id="{{item.id}}" bindtap="onConfirmPreview">确认发布</view>
+          </view>
+          </block>
+        </view>
+        <view wx:if="{{item.role === 'task_preview' && item.previewStatus === 'pending' && item.preview.taskType !== 'create_product' && item.preview.taskType !== 'recruit_influencer'}}" class="preview-actions">
+          <view class="btn-ghost" data-id="{{item.id}}" bindtap="onOpenModule">去对应模块</view>
+          <view class="btn-primary" data-id="{{item.id}}" bindtap="onConfirmPreview">确认执行</view>
+        </view>
+        <text wx:if="{{item.previewStatus === 'done'}}" class="preview-done">已确认</text>
+        <view
+          wx:if="{{item.role === 'user' || item.role === 'assistant'}}"
+          class="quote-btn"
+          data-id="{{item.id}}"
+          catchtap="onQuoteMessage"
+        >引用此条</view>
+      </view>
+      <view wx:if="{{item.role === 'user'}}" class="ava ava-me">我</view>
+    </view>
+    <view wx:if="{{sending}}" id="msg-thinking" class="msg-row">
+      <image class="ava" src="{{logoSrc}}" mode="aspectFit" />
+      <view class="bubble">
+        <text class="bubble-text muted">{{thinkingText}}</text>
+      </view>
+    </view>
+  </scroll-view>
+  <view class="wx-composer">
+    <view wx:if="{{pendingQuote}}" class="quote-chip">
+      <view class="quote-chip-main">
+        <text class="quote-chip-t">引用对话</text>
+        <text class="quote-chip-b">{{pendingQuote.who}}：{{pendingQuote.excerpt}}</text>
+      </view>
+      <text class="quote-chip-x" bindtap="onClearQuote">移除</text>
+    </view>
+    <scroll-view wx:if="{{attachments.length}}" class="attach-row" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="attach-chip" wx:for="{{attachments}}" wx:key="id">
+        <image wx:if="{{item.preview}}" class="attach-thumb" src="{{item.preview}}" mode="aspectFill" />
+        <view wx:else class="attach-file">
+          <text class="attach-file-t">{{item.kind === 'video' ? '视频' : '文件'}}</text>
+          <text class="attach-file-n">{{item.name}}</text>
+        </view>
+        <view class="attach-x" data-id="{{item.id}}" catchtap="onRemoveAttach">×</view>
+      </view>
+    </scroll-view>
+    <view class="wx-bar">
+      <view
+        class="wx-icon {{voiceMode ? 'wx-icon--kb' : 'wx-icon--mic'}}"
+        bindtap="onToggleVoiceMode"
+      ></view>
+      <input
+        wx:if="{{!voiceMode}}"
+        class="wx-input"
+        placeholder=""
+        value="{{input}}"
+        disabled="{{false}}"
+        bindinput="onInput"
+        bindfocus="onInputFocus"
+        bindblur="onInputBlur"
+        bindkeyboardheightchange="onKeyboardHeight"
+        confirm-type="send"
+        bindconfirm="onSend"
+        adjust-position="{{false}}"
+        cursor-spacing="0"
+      />
+      <view
+        wx:else
+        class="wx-hold {{recordingVoice ? 'on' : ''}}"
+        bindtouchstart="onVoiceTouchStart"
+        bindtouchend="onVoiceTouchEnd"
+        bindtouchcancel="onVoiceTouchEnd"
+      >{{recordingVoice ? '松开 结束' : '按住 说话'}}</view>
+      <view
+        wx:if="{{sending}}"
+        class="wx-send wx-stop"
+        bindtap="onStop"
+      >停止</view>
+      <view
+        wx:elif="{{!voiceMode && !showSendBtn}}"
+        class="wx-icon wx-icon--plus {{showPlusPanel ? 'on' : ''}}"
+        bindtap="onTogglePlus"
+      ></view>
+      <view wx:elif="{{!voiceMode && showSendBtn}}" class="wx-send" bindtap="onSend">发送</view>
+    </view>
+    <view wx:if="{{showPlusPanel && !voiceMode}}" class="wx-plus">
+      <view class="plus-grid">
+        <view class="plus-item" wx:for="{{plusActions}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlusAction">
+          <view class="plus-item-icon plus-icon {{item.iconClass}}"></view>
+          <text class="plus-item-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

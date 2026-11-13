@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /** 本地校验 PR 用户库名称映射（个人/机构）+ 海报注入 */
 const path = require('path')
-const prPub = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/prRegistryPublisherName.js'))
-const prRecruitQr = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/prRecruitQr.js'))
+const prPub = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/prRegistryPublisherName.js'))
+const prRecruitQr = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/prRecruitQr.js'))
 
 const order = {
   title: '餐饮门店第一视角视频剪辑整理',

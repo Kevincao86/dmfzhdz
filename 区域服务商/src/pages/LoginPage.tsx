@@ -34,7 +34,7 @@ export default function LoginPage() {
         onSubmit={(e) => void onSubmit(e)}
         className="w-full max-w-md rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-8 shadow-2xl shadow-black/30"
       >
-        <p className="font-[DM_Sans] text-2xl font-bold text-white">灵祺区域服务商</p>
+        <p className="font-[DM_Sans] text-2xl font-bold text-white">灵奇区域服务商</p>
         <p className="mt-2 text-sm text-[var(--muted)]">城市代理门户 · 账号由平台运营台开通</p>
         <label className="mt-8 block text-xs text-[var(--muted)]">手机号</label>
         <input

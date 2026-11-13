@@ -15,7 +15,7 @@ description: >-
 ## Hard rules
 
 1. 读上游只在 `$SEEDANCE_PRODUCT_VIDEO_HOME`（含 `SKILL.md`、`references/prompt-system.md`）。
-2. **禁止**改 `web版/`、`灵祺*/`、`api/`、`scripts/ecs-*` 来「方便出片」。
+2. **禁止**改 `web版/`、`灵奇*/`、`api/`、`scripts/ecs-*` 来「方便出片」。
 3. 产出是 **英文提示词**（可附中文说明）；成片在即梦 / Dreamina CLI / 商家 ERP 短视频台生成，不写进产品仓库。
 4. 口播/画面勿塞微信二维码、外链网址、虚假营收承诺。
 
@@ -33,7 +33,7 @@ test -f "${SEEDANCE_PRODUCT_VIDEO_HOME:-tools/Seedance-Product-Video}/SKILL.md" 
 3. 收集：产品名、核心卖点、是否有 Logo/界面垫图、要不要口播。
 4. 按上游模板输出 1000–2000 字符英文 prompt + 垫图占位说明。
 5. 可选：检测 `dreamina` CLI；未装则询问是否安装（勿擅自 `curl | bash`，须用户同意）。
-6. 灵祺 ERP 默认素材叙事：痛点（五处工具）→ AI 组品/招募/内容流水线 → 评论「试用」。
+6. 灵奇 ERP 默认素材叙事：痛点（五处工具）→ AI 组品/招募/内容流水线 → 评论「试用」。
 
 ## 与其它 skill 边界
 

@@ -207,7 +207,7 @@ export type RegistryMpRecruitmentApplicant = {
   taskStatus?: MpApplicantTaskStatus
 }
 
-/** 灵祺达人库（按平台+达人ID去重，报价等取最新报名） */
+/** 灵奇达人库（按平台+达人ID去重，报价等取最新报名） */
 export type RegistryTalentLibraryEntry = {
   id: string
   lingqiTalentId?: string
@@ -331,7 +331,7 @@ export type RegistryMpPrUser = {
   wxNickName?: string
   wxAvatarUrl?: string
   wxOpenId?: string
-  /** 登录平台账号：小程序=微信 openid，履约 Web=手机号；用于锁死灵祺 PRID */
+  /** 登录平台账号：小程序=微信 openid，履约 Web=手机号；用于锁死灵奇 PRID */
   platformAccount?: string
   /** mp=小程序微信登录；web=履约 Web 手机登录 */
   sourceChannel?: 'mp' | 'web'

@@ -60,7 +60,7 @@ deploy_web() {
   curl -sS -o /dev/null -w "cs index HTTP %{http_code}\n" \
     "http://127.0.0.1/" -H "Host: cs.mofangdianai.com" 2>/dev/null || true
 
-  FUL_DIST="$ROOT/灵祺达人履约管理后台/dist/index.html"
+  FUL_DIST="$ROOT/灵奇达人履约管理后台/dist/index.html"
   if [[ -f "$FUL_DIST" ]]; then
     echo ""
     echo "履约 dist 主 bundle:"

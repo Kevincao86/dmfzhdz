@@ -24,7 +24,7 @@ export function loadWechatOaConfig(): { ok: true; config: WechatOaConfig } | { o
   ).trim()
   const dmUnreadTemplateId = String(process.env.WX_OA_DM_UNREAD_TEMPLATE_ID || '').trim()
   const calendarReminderTemplateId = String(process.env.WX_OA_CALENDAR_REMINDER_TEMPLATE_ID || '').trim()
-  const displayName = String(process.env.WX_OA_DISPLAY_NAME || '灵祺星选').trim()
+  const displayName = String(process.env.WX_OA_DISPLAY_NAME || '灵奇星选').trim()
   const missing: string[] = []
   if (!appId) missing.push('WX_OA_APPID')
   if (!secret) missing.push('WX_OA_SECRET')

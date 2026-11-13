@@ -134,7 +134,7 @@ export default function LoginPage({ initialMode }: { initialMode?: 'login' | 're
                   letterSpacing: '0.06em',
                 }}
               >
-                灵祺
+                灵奇
                 <span className="mt-1.5 block text-[0.62em] tracking-[0.08em]" style={{ lineHeight: 1.25 }}>
                   AI智能ERP
                 </span>

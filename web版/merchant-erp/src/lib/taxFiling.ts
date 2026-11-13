@@ -366,7 +366,7 @@ export function buildTaxExportBlob(
     totalVerifyYuan: rows.reduce((s, r) => s + r.verifyAmountYuan, 0),
     totalCommissionYuan,
     note:
-      '本文件为灵祺 ERP 报税辅助导出；平台佣金率一律由各平台账单/分账 OpenAPI 实算（软件服务费÷分账基数），未绑定或接口无权限记 0，禁止本地行业表兜底。正式申报请以主管税务机关要求为准。',
+      '本文件为灵奇 ERP 报税辅助导出；平台佣金率一律由各平台账单/分账 OpenAPI 实算（软件服务费÷分账基数），未绑定或接口无权限记 0，禁止本地行业表兜底。正式申报请以主管税务机关要求为准。',
   }
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
 }

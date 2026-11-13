@@ -2,13 +2,13 @@
 # 将 canonical logo.png 同步到星选 / 商家 ERP / 运营后台 public（含 favicon）
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CANON="${ROOT}/灵祺达人履约管理后台/public/logo.png"
+CANON="${ROOT}/灵奇达人履约管理后台/public/logo.png"
 if [[ ! -f "$CANON" ]]; then
   echo "missing canonical logo: $CANON" >&2
   exit 1
 fi
 for dir in \
-  "${ROOT}/灵祺达人履约管理后台/public" \
+  "${ROOT}/灵奇达人履约管理后台/public" \
   "${ROOT}/web版/merchant-erp/public" \
   "${ROOT}/商家管理后台/public"; do
   mkdir -p "$dir"

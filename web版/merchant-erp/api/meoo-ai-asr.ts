@@ -85,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (isDemoShowcaseEmail(user.email)) {
     sendMerchantJson(res, 200, {
       ok: true,
-      text: '欢迎来到灵祺演示门店，今天推荐招牌双人套餐。',
+      text: '欢迎来到灵奇演示门店，今天推荐招牌双人套餐。',
       demoShowcase: true,
     })
     return

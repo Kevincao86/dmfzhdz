@@ -15,7 +15,7 @@ description: >-
 ## Hard rules
 
 1. **工作目录**必须是 `$OPENMONTAGE_HOME`（默认：仓库根下 `tools/OpenMontage`）。所有命令、`cd`、读写文件只在该目录内。
-2. **禁止修改** `web版/`、`灵祺*/`、`api/`、`scripts/ecs-*` 等产品代码来「方便出片」。
+2. **禁止修改** `web版/`、`灵奇*/`、`api/`、`scripts/ecs-*` 等产品代码来「方便出片」。
 3. 每次制片走 OpenMontage **pipeline**，先读其 `AGENT_GUIDE.md`，再读对应 `pipeline_defs/*.yaml` 与 `skills/pipelines/**`。
 4. OpenMontage 为 **AGPL-3.0**：仅本机 Cursor 使用；勿把其源码并入产品发版包或 SaaS 运行时。
 5. API Key 只写在 `$OPENMONTAGE_HOME/.env`，勿提交、勿拷进 ERP `.env`。
@@ -69,7 +69,7 @@ test -f "${OPENMONTAGE_HOME:-tools/OpenMontage}/AGENT_GUIDE.md" && echo OK
 | 多语言配音字幕 | localization |
 | 播客切片 | podcast-repurpose |
 
-灵祺相关示例提示词见 [prompts.md](prompts.md)。
+灵奇相关示例提示词见 [prompts.md](prompts.md)。
 
 ## 与产品能力边界
 

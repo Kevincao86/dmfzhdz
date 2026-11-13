@@ -4,7 +4,7 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
-const MP = path.join(ROOT, '灵祺达人撮合小程序')
+const MP = path.join(ROOT, '灵奇达人撮合小程序')
 const manifestPath = path.join(MP, 'utils/recruitCoverLibrary.manifest.js')
 const outPath = path.join(MP, 'packages/recruit-covers-mp/coverAssetRegistry.js')
 

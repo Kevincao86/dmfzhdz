@@ -10,8 +10,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIRS = [
-    ROOT / "灵祺达人撮合小程序/assets/recruit-covers",
-    ROOT / "灵祺达人履约管理后台/public/recruit-covers",
+    ROOT / "灵奇达人撮合小程序/assets/recruit-covers",
+    ROOT / "灵奇达人履约管理后台/public/recruit-covers",
 ]
 
 W, H = 750, 600
@@ -100,7 +100,7 @@ def draw_cover(path: Path, title: str, subtitle: str, colors, variant: int):
     font_s = load_font(28)
     draw.text((48, H - 180), title, fill=(255, 255, 255), font=font_l)
     draw.text((48, H - 110), subtitle, fill=(255, 255, 255), font=font_s)
-    draw.text((48, 40), "灵祺星选 · 招募", fill=(255, 255, 255), font=font_s)
+    draw.text((48, 40), "灵奇星选 · 招募", fill=(255, 255, 255), font=font_s)
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path, "PNG", optimize=True)
 
@@ -124,10 +124,10 @@ def build_manifest() -> dict:
 
 def write_manifest(manifest: dict) -> None:
     manifest_json = json.dumps(manifest, ensure_ascii=False, indent=2)
-    mp_manifest_js = ROOT / "灵祺达人撮合小程序/utils/recruitCoverLibrary.manifest.js"
+    mp_manifest_js = ROOT / "灵奇达人撮合小程序/utils/recruitCoverLibrary.manifest.js"
     mp_manifest_js.write_text(f"module.exports = {manifest_json}\n", encoding="utf-8")
-    (ROOT / "灵祺达人撮合小程序/utils/recruitCoverLibrary.manifest.json").write_text(manifest_json, encoding="utf-8")
-    fulfillment_manifest = ROOT / "灵祺达人履约管理后台/src/lib/mpSync/recruitCoverLibrary.manifest.json"
+    (ROOT / "灵奇达人撮合小程序/utils/recruitCoverLibrary.manifest.json").write_text(manifest_json, encoding="utf-8")
+    fulfillment_manifest = ROOT / "灵奇达人履约管理后台/src/lib/mpSync/recruitCoverLibrary.manifest.json"
     fulfillment_manifest.write_text(manifest_json, encoding="utf-8")
     print(f"OK: manifest -> {mp_manifest_js}")
 

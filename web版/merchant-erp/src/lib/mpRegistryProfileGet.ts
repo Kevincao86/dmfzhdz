@@ -138,7 +138,7 @@ function storedMembershipPlan(raw: string | null | undefined): string {
 }
 
 /**
- * 达人档位与运营台权限详情同一顺序：灵祺达人编号上的会员，否则达人库条目。
+ * 达人档位与运营台权限详情同一顺序：灵奇达人编号上的会员，否则达人库条目。
  * 登录会话按 registry_member_id 取档，不能再被「手机号不一致」滤成基础版。
  */
 export function resolveTalentMembershipForAccount(

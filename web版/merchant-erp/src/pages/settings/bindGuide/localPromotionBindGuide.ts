@@ -11,7 +11,7 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
   phases: [
     { id: 'ocean', label: '一、巨量引擎商业开放平台' },
     { id: 'oauth', label: '二、OAuth 授权换票' },
-    { id: 'erp', label: '三、灵祺 ERP 绑定' },
+    { id: 'erp', label: '三、灵奇 ERP 绑定' },
   ],
   steps: [
     {
@@ -58,9 +58,9 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
       ],
     },
   ],
-  erpPhaseLabel: '三、灵祺 ERP 绑定',
+  erpPhaseLabel: '三、灵奇 ERP 绑定',
   erpStep: {
-    title: '在灵祺 ERP 完成绑定',
+    title: '在灵奇 ERP 完成绑定',
     bullets: [
       '路径：系统设置 → 商业化后台 → 巨量本地推。',
       '填写：应用编号 App ID、应用密钥 App Secret（必填）。',

@@ -3,7 +3,7 @@
 # 用法: bash scripts/check-dr-affiliate-menu.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-FUL="$ROOT/灵祺达人履约管理后台"
+FUL="$ROOT/灵奇达人履约管理后台"
 INDEX="$FUL/dist/index.html"
 SRC="$FUL/src/pages/ProfilePage.tsx"
 

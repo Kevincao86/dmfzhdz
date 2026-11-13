@@ -488,7 +488,7 @@ export default function LoginAuthPanel({
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           {mode === 'login'
-            ? `使用${editionLabel()}账号进入灵祺AI智能ERP工作台`
+            ? `使用${editionLabel()}账号进入灵奇AI智能ERP工作台`
             : '填写信息完成注册，即可使用免费版'}
         </p>
       </div>
@@ -546,7 +546,7 @@ export default function LoginAuthPanel({
           <div className="min-w-0 flex-1 text-left">
             <p className="text-sm font-semibold leading-none text-slate-800">安全可信</p>
             <p className="mt-2 text-[13px] leading-5 text-slate-500">
-              短信由阿里云发送，邮箱验证码由灵祺发出。
+              短信由阿里云发送，邮箱验证码由灵奇发出。
             </p>
             <p className="mt-0.5 text-[13px] leading-5 text-slate-500">登录会话经加密存储。</p>
           </div>
@@ -839,7 +839,7 @@ export default function LoginAuthPanel({
               <input
                 id="meoo-reg-merchant"
                 className={inputClass}
-                placeholder="可输入汉字，如：灵祺咖啡"
+                placeholder="可输入汉字，如：灵奇咖啡"
                 value={merchantName}
                 onChange={(e) => setMerchantName(e.target.value.slice(0, 30))}
               />

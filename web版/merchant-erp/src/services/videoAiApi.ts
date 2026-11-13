@@ -93,7 +93,7 @@ function explainVideoAiUserErrorInner(msg: string): string {
   if (/field required:\s*input[_\.]?media/i.test(raw)) {
     return (
       '千问 wan2.7 图生视频需要公网参考图，已自动切换 wan2.6 等兼容模型。' +
-      '若仍失败请配置云剪 OSS 或改用灵祺视频模型2。' +
+      '若仍失败请配置云剪 OSS 或改用灵奇视频模型2。' +
       `原始信息：${raw}`
     )
   }
@@ -114,7 +114,7 @@ function explainVideoAiUserErrorInner(msg: string): string {
   if (/inappropriate content|content[_\s-]?filter|content policy|safety filter|blocked by safety|moderation|内容审核|敏感内容|不当内容/i.test(raw)) {
     return (
       '视频模型内容安全审核未通过（生成画面被判定可能含不当内容）。' +
-      '建议：简化分镜文案（减少真人录屏、网址、平台界面等描述）、更换分镜参考图，或切换灵祺视频模型1/2。' +
+      '建议：简化分镜文案（减少真人录屏、网址、平台界面等描述）、更换分镜参考图，或切换灵奇视频模型1/2。' +
       '系统会自动尝试其它模型；若仍失败请修改文案后重试。' +
       `原始信息：${raw}`
     )
@@ -287,7 +287,7 @@ export async function postShortVideoStartWithCrossFailover(opts: {
     }
   }
 
-  const summary = `${formatVideoAiUserError(first.message)}；已自动切换${engine === 'qwen' ? '灵祺视频模型2' : '灵祺视频模型1（千问）'}仍失败：${formatVideoAiUserError(second.message)}`
+  const summary = `${formatVideoAiUserError(first.message)}；已自动切换${engine === 'qwen' ? '灵奇视频模型2' : '灵奇视频模型1（千问）'}仍失败：${formatVideoAiUserError(second.message)}`
   return { ok: false, message: summary }
 }
 

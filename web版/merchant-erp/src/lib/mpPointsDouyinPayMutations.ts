@@ -92,7 +92,7 @@ export async function resumePointsDouyinPayFromSnapshot(
     return { ok: false, error: merchantCfgResult.error, status: 503 }
   }
   const merchantCfg = merchantCfgResult.config
-  const description = `灵祺星选积分充值${checkout.points.toLocaleString('zh-CN')}积分`
+  const description = `灵奇星选积分充值${checkout.points.toLocaleString('zh-CN')}积分`
   const attach = checkout.id.slice(0, 64)
   const outTradeNo = String(checkout.outTradeNo || '').trim()
   if (!outTradeNo) return { ok: false, error: 'missing_out_trade_no', status: 400 }

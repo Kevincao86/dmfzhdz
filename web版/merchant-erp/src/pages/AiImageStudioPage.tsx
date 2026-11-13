@@ -1262,7 +1262,7 @@ export default function AiImageStudioPage() {
             <Zap className="h-3.5 w-3.5" />
             本地生活 · AI 视觉
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">灵祺视觉工坊</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">灵奇视觉工坊</h1>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">
             从左到右：选渠道与玩法 → 编辑文案与参考图 → 右侧实时预览上屏效果
           </p>

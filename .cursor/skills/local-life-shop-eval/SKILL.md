@@ -1,7 +1,7 @@
 ---
 name: local-life-shop-eval
 description: >-
-  Analyzes a local-life store or chain the way 灵祺店铺分析 does: public-web
+  Analyzes a local-life store or chain the way 灵奇店铺分析 does: public-web
   six-dimension score, nearby rivals, and a lift plan. Use when the user asks
   for 店铺分析, 门店评估, 本地生活分析, 周边竞品, 国际版店铺分析, Google Maps
   store analysis, Google Business Profile, or local SEO for a restaurant, salon,

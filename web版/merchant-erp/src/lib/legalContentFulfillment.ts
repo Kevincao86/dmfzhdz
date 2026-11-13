@@ -7,19 +7,19 @@ import {
 
 export type LegalSection = { title: string; paragraphs: string[] }
 
-const PRODUCT = '灵祺星选'
+const PRODUCT = '灵奇星选'
 const COMPANY = LEGAL_COMPANY_NAME
 const PHONE = LEGAL_CONTACT_PHONE
 const ADDRESS = LEGAL_COMPANY_ADDRESS
 const EFFECTIVE = LEGAL_EFFECTIVE_DATE
 
-/** 灵祺星选 · 用户协议（Web 管理端 + 微信小程序） */
+/** 灵奇星选 · 用户协议（Web 管理端 + 微信小程序） */
 export function buildFulfillmentAupSections(): LegalSection[] {
   return [
     {
       title: '前言',
       paragraphs: [
-        `本《用户协议》（下称「本协议」）是您（下称「用户」）与${COMPANY}（简称「我们」或「墨典网络」）之间就使用${PRODUCT}所签署的协议。${PRODUCT}包括灵祺星选 Web 管理端（https://dr.mofangdianai.com/）及「灵祺星选」微信小程序（以下合称「本平台」）。`,
+        `本《用户协议》（下称「本协议」）是您（下称「用户」）与${COMPANY}（简称「我们」或「墨典网络」）之间就使用${PRODUCT}所签署的协议。${PRODUCT}包括灵奇星选 Web 管理端（https://dr.mofangdianai.com/）及「灵奇星选」微信小程序（以下合称「本平台」）。`,
         `用户指注册或使用本平台服务的自然人、法人或其他非法人组织，包括但不限于达人、PR、拍摄/剪辑从业者、招募方及运营管理人员。`,
         `请务必认真阅读和理解本协议中规定的所有权利和限制。除非您接受本协议条款，否则您无权下载、安装或使用本平台。`,
         `您一旦访问、注册、登录或以其它方式使用本平台，即视为对本协议的接受，表示您同意受本协议各项条款约束。若您不同意本协议任何条款，请停止使用本平台。`,
@@ -107,7 +107,7 @@ export function buildFulfillmentAupSections(): LegalSection[] {
     {
       title: '八、隐私保护',
       paragraphs: [
-        '我们非常重视用户隐私。用户在使用本平台时可能涉及隐私信息，请仔细阅读《灵祺星选隐私政策》。',
+        '我们非常重视用户隐私。用户在使用本平台时可能涉及隐私信息，请仔细阅读《灵奇星选隐私政策》。',
         '8.1 请勿在使用本平台中透露银行卡、信用卡、第三方支付账户及对应密码等重要财产信息；由此带来的损失由用户自行承担。',
         '8.2 账号、密码属于保密信息，我们会采取积极措施保护其安全。',
         '8.3 因非我们可控制的因素导致用户信息泄漏的，我们不承担责任。',
@@ -127,13 +127,13 @@ export function buildFulfillmentAupSections(): LegalSection[] {
   ]
 }
 
-/** 灵祺星选 · 隐私政策 */
+/** 灵奇星选 · 隐私政策 */
 export function buildFulfillmentPrivacySections(): LegalSection[] {
   return [
     {
       title: '引言',
       paragraphs: [
-        `本隐私政策（下称「本政策」）适用于${COMPANY}（下称「我们」）运营的${PRODUCT}，包括灵祺星选 Web 管理端及「灵祺星选」微信小程序。`,
+        `本隐私政策（下称「本政策」）适用于${COMPANY}（下称「我们」）运营的${PRODUCT}，包括灵奇星选 Web 管理端及「灵奇星选」微信小程序。`,
         `请您特别注意：本政策适用于用户注册及登录、招募发布、任务报名、达人/PR 身份管理、拍剪与云剪履约、消息沟通、AI 辅助、结算等全部环节及全过程。`,
         '我们努力以简明、清晰、易于理解的方式展现本政策。我们深知个人信息对您的重要性，并会尽全力保护您的个人信息安全可靠，遵循权责一致、目的明确、选择同意、最少够用、确保安全、主体参与、公开透明等原则。',
         '请在使用我们的产品前仔细阅读并了解本政策。除非法律、行政法规另有规定，您享有知情权和决定权，有权限制或拒绝我们或其他方对您的个人信息进行处理，并有权要求我们解释个人信息处理规则。',

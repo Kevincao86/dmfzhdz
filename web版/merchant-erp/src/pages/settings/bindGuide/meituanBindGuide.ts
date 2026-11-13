@@ -12,7 +12,7 @@ export const MEITUAN_BIND_GUIDE: BindGuideConfig = {
   phases: [
     { id: 'portal', label: '一、创建商家自研应用' },
     { id: 'auth', label: '二、开通能力与门店授权' },
-    { id: 'erp', label: '三、灵祺 ERP 绑定' },
+    { id: 'erp', label: '三、灵奇 ERP 绑定' },
   ],
   steps: [
     {
@@ -35,7 +35,7 @@ export const MEITUAN_BIND_GUIDE: BindGuideConfig = {
         '创建成功后进入应用详情，记录「AppID / developerId」与「App Secret / SignKey」（密钥仅展示一次，请妥善保存）。',
         '确认应用已上线或处于可调用状态，并完成平台要求的签约/备案流程。',
       ],
-      note: '灵祺 ERP 绑定弹窗中的「应用编号」「应用密钥」即对应此处信息。',
+      note: '灵奇 ERP 绑定弹窗中的「应用编号」「应用密钥」即对应此处信息。',
     },
     {
       id: 'scope',
@@ -56,12 +56,12 @@ export const MEITUAN_BIND_GUIDE: BindGuideConfig = {
         '授权成功后记录 appAuthToken（商户授权 Token）及目标门店 ID。',
         '在商家后台核对已授权门店列表是否与 ERP 需同步的门店一致。',
       ],
-      note: '灵祺本阶段不提供平台级 OAuth 代授权；须由商户在美团侧自行完成授权后再填入 ERP。',
+      note: '灵奇本阶段不提供平台级 OAuth 代授权；须由商户在美团侧自行完成授权后再填入 ERP。',
     },
   ],
-  erpPhaseLabel: '三、灵祺 ERP 绑定',
+  erpPhaseLabel: '三、灵奇 ERP 绑定',
   erpStep: {
-    title: '在灵祺 ERP 完成绑定',
+    title: '在灵奇 ERP 完成绑定',
     bullets: [
       '路径：系统设置 → 商家版后台 → 大众点评商家版（接入模式：商家自研）。',
       '点击「绑定说明书」可随时回看本流程；点击「绑定大众点评」填写应用编号、应用密钥。',

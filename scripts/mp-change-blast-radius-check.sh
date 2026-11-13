@@ -51,13 +51,13 @@ fi
 
 # 共享/基础设施：一动即可能误伤全站或多业务线
 SHARED_PATTERNS=(
-  '灵祺达人撮合小程序/utils/ecs.js'
-  '灵祺达人撮合小程序/utils/api.js'
-  '灵祺达人撮合小程序/utils/cloudEcs.js'
-  '灵祺达人撮合小程序/utils/auth.js'
-  '灵祺达人撮合小程序/utils/mpRuntime.js'
-  '灵祺达人撮合小程序/utils/hallRegistryParse.js'
-  '灵祺达人撮合小程序/cloudfunctions/mpErpProxy/'
+  '灵奇达人撮合小程序/utils/ecs.js'
+  '灵奇达人撮合小程序/utils/api.js'
+  '灵奇达人撮合小程序/utils/cloudEcs.js'
+  '灵奇达人撮合小程序/utils/auth.js'
+  '灵奇达人撮合小程序/utils/mpRuntime.js'
+  '灵奇达人撮合小程序/utils/hallRegistryParse.js'
+  '灵奇达人撮合小程序/cloudfunctions/mpErpProxy/'
   'web版/merchant-erp/scripts/ecs-auth-api-server.ts'
   'web版/merchant-erp/src/lib/registrySnapshotIo'
   '商家管理后台/src/ops/opsRegistryApi.ts'
@@ -122,7 +122,7 @@ for f in "${CHANGED[@]}"; do
   if match_any "$f" '商家管理后台/src/ops/' '商家管理后台/api/'; then
     add_domain ops_admin_ui
   fi
-  if match_any "$f" '灵祺达人履约管理后台/'; then
+  if match_any "$f" '灵奇达人履约管理后台/'; then
     add_domain fulfillment_web
   fi
   if match_any "$f" scripts/ecs- ecs-deploy ecs-pre-light; then

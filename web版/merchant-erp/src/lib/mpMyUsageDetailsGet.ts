@@ -78,7 +78,7 @@ function formatLedgerNote(row: RegistryMpAiPointsSpendEntry): string | undefined
   }
   if (note.startsWith('cloud_edit:')) {
     const tail = note.slice('cloud_edit:'.length).trim()
-    return tail ? `云剪 ${tail}` : '灵祺 AI 云剪'
+    return tail ? `云剪 ${tail}` : '灵奇 AI 云剪'
   }
   if (note.startsWith('cloud_edit_smart:')) {
     const tail = note.slice('cloud_edit_smart:'.length).trim()

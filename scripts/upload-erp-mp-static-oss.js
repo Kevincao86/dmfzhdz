@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * 上传 灵祺ERP小程序/images → OSS 前缀 erp-mp-static，并写入 erpMpStaticOssBase.js
+ * 上传 灵奇ERP小程序/images → OSS 前缀 erp-mp-static，并写入 erpMpStaticOssBase.js
  * 环境变量同 upload-mp-recruit-covers-oss.js
  */
 const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
-const MP = path.join(ROOT, '灵祺ERP小程序')
+const MP = path.join(ROOT, '灵奇ERP小程序')
 const SRC = path.join(MP, 'images')
 const OUT_BASE = path.join(MP, 'utils/erpMpStaticOssBase.js')
 const OSS_MODULE = path.join(ROOT, 'web版/merchant-erp/node_modules/ali-oss')

@@ -687,7 +687,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     if (anyBusy || mediaBusy) return
     if (!cfg?.localUploadEnabled) {
       setErr(
-        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀（格式如 https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/），保存后刷新本页。',
+        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵奇AI云剪」填写 OSS 成片 URL 前缀（格式如 https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/），保存后刷新本页。',
       )
       return
     }
@@ -699,7 +699,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
       if (!files?.length || videoUploading || imageUploading || anyBusy) return
       if (!cfg?.localUploadEnabled) {
         setErr(
-          '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
+          '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵奇AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
         )
         return
       }
@@ -782,7 +782,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
     if (anyBusy || mediaBusy) return
     if (!cfg?.localUploadEnabled) {
       setErr(
-        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
+        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵奇AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
       )
       return
     }
@@ -1868,7 +1868,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 via-rose-500 to-violet-600 text-white shadow-lg shadow-orange-300/40">
                 <Cloud className="h-5 w-5" />
               </span>
-              灵祺 AI 混剪
+              灵奇 AI 混剪
             </h2>
             <MpAddonPointsRateBadge kind="cloud_edit" className="mt-2" />
             {cfg?.smartBatchEnabled ? (
@@ -1983,7 +1983,7 @@ export function ShortVideoIceBatchPanel(_props: Props) {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950">
                   <p className="font-medium">本地上传未开启</p>
                   <p className="mt-1 text-amber-900/90">
-                    需在运营管理后台「AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。
+                    需在运营管理后台「AI模型 → 短视频 API → 灵奇AI云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。
                   </p>
                 </div>
               ) : null}
@@ -3323,7 +3323,7 @@ function ConfigFootnote({ cfg }: { cfg: AliyunIceCloudConfig | null }) {
   if (!cfg) return null
   return (
     <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-      灵祺AI混剪由智能媒体服务提供算力；凭据由运营在管控台维护。
+      灵奇AI混剪由智能媒体服务提供算力；凭据由运营在管控台维护。
       {cfg.regionId ? ` 地域 ${cfg.regionId}。` : ''}
       {cfg.localUploadEnabled ? (
         <span className="mt-1 block text-zinc-600">

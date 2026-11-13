@@ -15,10 +15,10 @@ export function helpManualEditionFromApp(): HelpManualEdition {
 }
 
 export function productNameForEdition(edition: HelpManualEdition): string {
-  if (edition === 'partner') return '灵祺AI智能ERP（服务商版）'
-  if (edition === 'fulfillment') return '灵祺星选平台'
-  if (edition === 'mp') return '灵祺星选小程序'
-  return '灵祺AI智能ERP'
+  if (edition === 'partner') return '灵奇AI智能ERP（服务商版）'
+  if (edition === 'fulfillment') return '灵奇星选平台'
+  if (edition === 'mp') return '灵奇星选小程序'
+  return '灵奇AI智能ERP'
 }
 
 export function resolveHelpEdition(raw?: string | null): HelpManualEdition {

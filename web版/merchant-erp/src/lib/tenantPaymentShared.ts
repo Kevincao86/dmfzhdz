@@ -60,9 +60,9 @@ export function makeTenantOutTradeNo(): string {
 
 export function tenantOrderDescription(kind: TenantOrderKind, amountCents: number): string {
   const yuan = (amountCents / 100).toFixed(amountCents % 100 === 0 ? 0 : 2)
-  if (kind === 'subscription') return `灵祺ERP会员订阅 ¥${yuan}`
-  if (kind === 'points_recharge') return `灵祺ERP积分充值 ¥${yuan}`
-  return `灵祺ERP账户充值 ¥${yuan}`
+  if (kind === 'subscription') return `灵奇ERP会员订阅 ¥${yuan}`
+  if (kind === 'points_recharge') return `灵奇ERP积分充值 ¥${yuan}`
+  return `灵奇ERP账户充值 ¥${yuan}`
 }
 
 export function resolvePointsRechargeFromCents(cents: number): number {

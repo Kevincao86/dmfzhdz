@@ -1,0 +1,1327 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import {
+  CalendarDays,
+  Bell,
+  CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  MapPin,
+  Plus,
+  Tag,
+  X,
+} from 'lucide-react'
+import { fetchMpRegistry } from '../lib/mpApi'
+import {
+  createCalendarReminder,
+  listCalendarReminders,
+  type MpCalendarReminderLeadPreset,
+} from '../lib/mpCalendarReminderApi'
+import {
+  deleteOrderCustomLabel,
+  labelsByOrderId,
+  listOrderCustomLabels,
+  ORDER_LABEL_PRESETS,
+  orderLabelBadgeClass,
+  upsertOrderCustomLabel,
+  type MpOrderCustomLabel,
+  type OrderLabelColor,
+} from '../lib/mpOrderCustomLabelApi'
+import {
+  deleteCalendarCustomEvent,
+  listCalendarCustomEvents,
+  saveCalendarCustomEvent,
+  type MpCalendarCustomEvent,
+} from '../lib/mpCalendarCustomEventApi'
+import { getAccount, getActiveRole } from '../lib/mpSession'
+import { getWorkIdentity } from '../lib/mpWorkIdentity'
+import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
+import { readApplications } from '../lib/mpSync/applicationsStore'
+
+function downloadPhoneCalendar(title: string, remindAtMs: number, storeName: string) {
+  const stamp = (ms: number) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  const esc = (value: string) => value.replace(/[\\,;]/g, (ch) => `\\${ch}`).replace(/\n/g, '\\n')
+  const body = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Lingqi Xingxuan//Order Calendar//CN',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${Date.now()}@lingqi-xingxuan`,
+    `DTSTAMP:${stamp(Date.now())}`,
+    `DTSTART:${stamp(remindAtMs)}`,
+    `DTEND:${stamp(remindAtMs + 60 * 60 * 1000)}`,
+    `SUMMARY:${esc(title || '商单提醒')}`,
+    `DESCRIPTION:${esc(storeName ? `${storeName} · 灵奇星选商单提醒` : '灵奇星选商单提醒')}`,
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:商单提醒',
+    'TRIGGER:PT0S',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+  const blob = new Blob([body], { type: 'text/calendar;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = '商单提醒.ics'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+import {
+  aggregatePrOrderCalendarEvents,
+  aggregateTalentOrderCalendarEvents,
+  buildMonthGrid,
+  buildUpcomingTodos,
+  buildWeekCells,
+  calendarPageSubtitleForWork,
+  countActiveTodos,
+  dayEventSummary,
+  eventTone,
+  formatTodoDateShort,
+  groupEventsByDate,
+  kindLabel,
+  parseVisitDayMs,
+  phaseStatusLabel,
+  resolveDayDotPhase,
+  resolveEventPhase,
+  weekdayLabelFromDateKey,
+  type OrderCalendarDayPhase,
+  type OrderCalendarEvent,
+  type OrderCalendarEventTone,
+} from '../lib/mpRecruitment/orderCalendarCore'
+
+const WEEK_LABELS = ['一', '二', '三', '四', '五', '六', '日']
+const CAL_FRESH_MS = 90 * 1000
+const CAL_POLL_MS = 3 * 60 * 1000
+
+type CalendarCache = {
+  key: string
+  at: number
+  events: OrderCalendarEvent[]
+  reminderIds: string[]
+  labels: MpOrderCustomLabel[]
+}
+
+let calendarCache: CalendarCache | null = null
+
+function calendarCacheKey(isPr: boolean): string {
+  const account = getAccount()
+  const id = String(account?.registryMemberId || account?.accountId || account?.loginName || '').trim()
+  return `${isPr ? 'pr' : getWorkIdentity()}:${id}`
+}
+
+const FEATURE_ITEMS = [
+  {
+    icon: CheckSquare,
+    tone: 'emerald' as const,
+    title: '近7天待办',
+    desc: '重要事项一目了然',
+  },
+  {
+    icon: Tag,
+    tone: 'orange' as const,
+    title: '自定义标签',
+    desc: '为商单打标，小程序同步',
+  },
+  {
+    icon: CalendarDays,
+    tone: 'violet' as const,
+    title: '日历视图',
+    desc: '整体进度清晰掌握',
+  },
+]
+
+function monthTitle(year: number, month: number): string {
+  return `${year}年${month + 1}月`
+}
+
+function manualEventFromRow(row: MpCalendarCustomEvent): OrderCalendarEvent | null {
+  const dateKey = String(row.eventDateKey || '').trim()
+  const dayMs = parseVisitDayMs(dateKey)
+  if (!dateKey || !dayMs) return null
+  return {
+    id: row.id,
+    dateKey,
+    dayMs,
+    kind: 'manual',
+    mpOrderId: '',
+    orderTitle: row.title,
+    storeName: '',
+    timeLabel: row.timeLabel,
+    statusLabel: '自己的行程',
+    note: row.note,
+  }
+}
+
+function eventLink(role: string, evt: OrderCalendarEvent): string {
+  if (evt.kind === 'manual') return ''
+  if (role === 'pr') {
+    if (evt.kind === 'visit') return `/orders/${encodeURIComponent(evt.mpOrderId)}/schedule`
+    if (evt.kind === 'plan_slot') return `/orders/${encodeURIComponent(evt.mpOrderId)}/schedule/dates`
+    return `/orders/${encodeURIComponent(evt.mpOrderId)}/applicants`
+  }
+  return `/recruitment/${encodeURIComponent(evt.mpOrderId)}`
+}
+
+function defaultRemindInput(dateKey: string, timeLabel?: string) {
+  const match = String(timeLabel || '').match(/(\d{1,2}):(\d{2})/)
+  const hh = match ? match[1].padStart(2, '0') : '09'
+  const mm = match ? match[2] : '00'
+  return `${dateKey}T${hh}:${mm}`
+}
+
+function remindInputToMs(value: string) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+  if (!match) return 0
+  const ms = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    0,
+  ).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
+function dotClass(phase: OrderCalendarDayPhase | null, selected: boolean): string {
+  if (selected) return 'bg-white'
+  if (phase === 'active') return 'bg-emerald-500'
+  if (phase === 'ended') return 'bg-red-500'
+  return 'bg-violet-400'
+}
+
+function toneBadgeClass(tone: OrderCalendarEventTone): string {
+  if (tone === 'green') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (tone === 'orange') return 'bg-orange-50 text-orange-700 border-orange-200'
+  if (tone === 'red') return 'bg-red-50 text-red-700 border-red-200'
+  return 'bg-violet-50 text-violet-700 border-violet-200'
+}
+
+function toneCardClass(tone: OrderCalendarEventTone, selected: boolean): string {
+  const base =
+    tone === 'green'
+      ? 'border-emerald-200 bg-emerald-50/60'
+      : tone === 'orange'
+        ? 'border-orange-200 bg-orange-50/60'
+        : tone === 'red'
+          ? 'border-red-200 bg-red-50/60'
+          : 'border-violet-200 bg-violet-50/60'
+  return selected ? `${base} ring-2 ring-violet-500 shadow-md` : base
+}
+
+function featureIconClass(tone: 'emerald' | 'orange' | 'violet'): string {
+  if (tone === 'emerald') return 'bg-emerald-100 text-emerald-600'
+  if (tone === 'orange') return 'bg-orange-100 text-orange-600'
+  return 'bg-violet-100 text-violet-600'
+}
+
+export default function OrderCalendarPage() {
+  const role = getActiveRole()
+  const isPr = role === 'pr'
+  const workId = isPr ? 'pr' : getWorkIdentity()
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth())
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
+  const [selectedDateKey, setSelectedDateKey] = useState('')
+  const [events, setEvents] = useState<OrderCalendarEvent[]>([])
+  const eventsLenRef = useRef(0)
+  eventsLenRef.current = events.length
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [err, setErr] = useState('')
+  const [pendingRemindEventIds, setPendingRemindEventIds] = useState<Set<string>>(new Set())
+  const [remindTarget, setRemindTarget] = useState<OrderCalendarEvent | null>(null)
+  const [remindAtInput, setRemindAtInput] = useState('')
+  const [remindBusy, setRemindBusy] = useState(false)
+  const [labelTarget, setLabelTarget] = useState<OrderCalendarEvent | null>(null)
+  const [labelBusy, setLabelBusy] = useState(false)
+  const [customLabelInput, setCustomLabelInput] = useState('')
+  const [orderLabels, setOrderLabels] = useState<MpOrderCustomLabel[]>([])
+  const [toast, setToast] = useState('')
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualBusy, setManualBusy] = useState(false)
+  const [manualForm, setManualForm] = useState({
+    id: '',
+    title: '',
+    dateKey: '',
+    timeLabel: '',
+    note: '',
+  })
+  const eventListRef = useRef<HTMLElement>(null)
+  const todoScrollRef = useRef<HTMLDivElement>(null)
+
+  const refreshReminders = useCallback(async () => {
+    try {
+      const rows = await listCalendarReminders()
+      const ids = new Set(
+        rows
+          .filter((r) => r.status === 'pending')
+          .map((r) => String(r.eventId || '').trim())
+          .filter(Boolean),
+      )
+      setPendingRemindEventIds(ids)
+    } catch {
+      setPendingRemindEventIds(new Set())
+    }
+  }, [])
+
+  const refreshLabels = useCallback(async () => {
+    try {
+      setOrderLabels(await listOrderCustomLabels())
+    } catch {
+      setOrderLabels([])
+    }
+  }, [])
+
+  const labelMap = useMemo(() => labelsByOrderId(orderLabels), [orderLabels])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = window.setTimeout(() => setToast(''), 3200)
+    return () => window.clearTimeout(t)
+  }, [toast])
+
+  const refreshCalendar = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const cached = calendarCache && calendarCache.key === calendarCacheKey(isPr) ? calendarCache : null
+      if (!opts?.silent && !cached && eventsLenRef.current === 0) setLoading(true)
+      setRefreshing(true)
+      setErr('')
+      try {
+        const reg = await fetchMpRegistry(
+          isPr ? { includePrOwned: true } : { includeLocalContext: true },
+        )
+        const orders = (reg?.mpRecruitmentOrders ?? []) as Array<Record<string, unknown>>
+        let list: OrderCalendarEvent[]
+        if (isPr) {
+          const account = getAccount()
+          const owned = orders.filter((o) => mpOrderOwnedByCurrentPr(o, account))
+          list = aggregatePrOrderCalendarEvents(owned)
+        } else {
+          const apps = readApplications()
+          const ids = new Set(
+            apps.map((a) => String(a.applicantId || '').trim()).filter(Boolean),
+          )
+          list = aggregateTalentOrderCalendarEvents(orders, ids)
+        }
+        let manual: OrderCalendarEvent[] = []
+        try {
+          const rows = await listCalendarCustomEvents()
+          manual = rows.map(manualEventFromRow).filter((row): row is OrderCalendarEvent => !!row)
+        } catch {
+          manual = []
+        }
+        const nextEvents = [...list, ...manual]
+        setEvents(nextEvents)
+        const rows = await listCalendarReminders().catch(() => [])
+        const ids = rows
+          .filter((r) => r.status === 'pending')
+          .map((r) => String(r.eventId || '').trim())
+          .filter(Boolean)
+        setPendingRemindEventIds(new Set(ids))
+        const labels = await listOrderCustomLabels().catch(() => [])
+        setOrderLabels(labels)
+        calendarCache = {
+          key: calendarCacheKey(isPr),
+          at: Date.now(),
+          events: nextEvents,
+          reminderIds: ids,
+          labels,
+        }
+      } catch (e) {
+        if (eventsLenRef.current === 0 && !cached) setErr(e instanceof Error ? e.message : '加载失败')
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+    },
+    [isPr],
+  )
+
+  useEffect(() => {
+    const key = calendarCacheKey(isPr)
+    const hit = calendarCache && calendarCache.key === key ? calendarCache : null
+    if (hit) {
+      setEvents(hit.events)
+      setPendingRemindEventIds(new Set(hit.reminderIds))
+      setOrderLabels(hit.labels)
+      setLoading(false)
+      if (Date.now() - hit.at > CAL_FRESH_MS) void refreshCalendar({ silent: true })
+    } else {
+      void refreshCalendar()
+    }
+    const timer = window.setInterval(() => {
+      void refreshCalendar({ silent: true })
+    }, CAL_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [refreshCalendar, isPr])
+
+  const byDate = useMemo(() => groupEventsByDate(events), [events])
+  const upcomingTodos = useMemo(() => buildUpcomingTodos(events), [events])
+  const activeTodoCount = useMemo(() => countActiveTodos(events), [events])
+
+  const grid = useMemo(() => {
+    if (viewMode === 'week') {
+      const anchor = selectedDateKey || todayKeyFromNow(now)
+      return buildWeekCells(anchor).map((cell) => ({ ...cell, inMonth: true }))
+    }
+    return buildMonthGrid(year, month)
+  }, [viewMode, year, month, selectedDateKey])
+
+  const todayKey = useMemo(() => todayKeyFromNow(now), [])
+
+  useEffect(() => {
+    setSelectedDateKey(todayKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const selectedEvents = selectedDateKey ? byDate[selectedDateKey] ?? [] : []
+
+  const scrollTodos = useCallback((dir: 1 | -1) => {
+    const el = todoScrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * 280, behavior: 'smooth' })
+  }, [])
+
+  function todayKeyFromNow(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  function onBackToday() {
+    const key = todayKeyFromNow(new Date())
+    const d = new Date()
+    setYear(d.getFullYear())
+    setMonth(d.getMonth())
+    setSelectedDateKey(key)
+  }
+
+  function prevPeriod() {
+    if (viewMode === 'week') {
+      const ms = parseDateKeyMs(selectedDateKey) - 7 * 86400000
+      const d = new Date(ms)
+      setSelectedDateKey(todayKeyFromNow(d))
+      setYear(d.getFullYear())
+      setMonth(d.getMonth())
+      return
+    }
+    if (month === 0) {
+      setYear((y) => y - 1)
+      setMonth(11)
+    } else setMonth((m) => m - 1)
+  }
+
+  function nextPeriod() {
+    if (viewMode === 'week') {
+      const ms = parseDateKeyMs(selectedDateKey) + 7 * 86400000
+      const d = new Date(ms)
+      setSelectedDateKey(todayKeyFromNow(d))
+      setYear(d.getFullYear())
+      setMonth(d.getMonth())
+      return
+    }
+    if (month === 11) {
+      setYear((y) => y + 1)
+      setMonth(0)
+    } else setMonth((m) => m + 1)
+  }
+
+  function parseDateKeyMs(key: string): number {
+    const [y, m, d] = key.split('-').map(Number)
+    return new Date(y, (m || 1) - 1, d || 1).getTime()
+  }
+
+  function onSelectDay(dateKey: string) {
+    setSelectedDateKey(dateKey)
+    const [y, m] = dateKey.split('-').map(Number)
+    if (y && m) {
+      setYear(y)
+      setMonth(m - 1)
+    }
+  }
+
+  function scrollToEventList() {
+    eventListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
+
+  function openLabelDialog(evt: OrderCalendarEvent) {
+    const existing = labelMap.get(evt.mpOrderId)
+    setCustomLabelInput(existing?.labelText ?? '')
+    setLabelTarget(evt)
+  }
+
+  async function onSaveLabelPreset(text: string, color: OrderLabelColor) {
+    const evt = labelTarget
+    if (!evt || labelBusy) return
+    setLabelBusy(true)
+    try {
+      await upsertOrderCustomLabel({
+        mpOrderId: evt.mpOrderId,
+        labelText: text,
+        color,
+      })
+      setToast('标签已保存，已与小程序同步')
+      setLabelTarget(null)
+      setCustomLabelInput('')
+      await refreshLabels()
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '保存失败')
+    } finally {
+      setLabelBusy(false)
+    }
+  }
+
+  async function onSaveCustomLabelInput() {
+    const text = customLabelInput.trim().slice(0, 16)
+    if (!text) {
+      setToast('请输入标签文字')
+      return
+    }
+    await onSaveLabelPreset(text, 'violet')
+  }
+
+  async function onClearLabel() {
+    const evt = labelTarget
+    if (!evt || labelBusy) return
+    setLabelBusy(true)
+    try {
+      await deleteOrderCustomLabel(evt.mpOrderId)
+      setToast('标签已清除')
+      setLabelTarget(null)
+      setCustomLabelInput('')
+      await refreshLabels()
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '清除失败')
+    } finally {
+      setLabelBusy(false)
+    }
+  }
+
+  function openReminder(evt: OrderCalendarEvent) {
+    setRemindTarget({ ...evt, mpOrderId: evt.mpOrderId || evt.id })
+    setRemindAtInput(defaultRemindInput(evt.dateKey, evt.timeLabel))
+  }
+
+  async function onConfirmReminder() {
+    const evt = remindTarget
+    if (!evt || remindBusy) return
+    const remindAtMs = remindInputToMs(remindAtInput)
+    if (!remindAtMs || remindAtMs <= Date.now()) {
+      setToast('请选择一个还没到的提醒时间')
+      return
+    }
+    setRemindBusy(true)
+    try {
+      await createCalendarReminder({
+        eventId: evt.id,
+        mpOrderId: evt.mpOrderId || evt.id,
+        eventKind: evt.kind,
+        eventDateKey: evt.dateKey,
+        eventTitle: evt.orderTitle,
+        storeName: evt.storeName,
+        leadPreset: 'at' as MpCalendarReminderLeadPreset,
+        remindAt: new Date(remindAtMs).toISOString(),
+        channels: ['subscribe', 'oa'],
+      })
+      downloadPhoneCalendar(evt.orderTitle, remindAtMs, evt.storeName)
+      setToast('提醒已设置，已下载日历文件。用手机打开即可写入系统日历')
+      setRemindTarget(null)
+      await refreshReminders()
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '设置失败')
+    } finally {
+      setRemindBusy(false)
+    }
+  }
+
+  function openManualDialog(evt?: OrderCalendarEvent) {
+    const dateKey = evt?.dateKey || selectedDateKey || todayKeyFromNow(now)
+    setManualForm({
+      id: evt?.kind === 'manual' ? evt.id : '',
+      title: evt?.kind === 'manual' ? evt.orderTitle : '',
+      dateKey,
+      timeLabel: evt?.kind === 'manual' ? evt.timeLabel || '' : '',
+      note: evt?.kind === 'manual' ? evt.note || '' : '',
+    })
+    setManualOpen(true)
+  }
+
+  async function onSaveManualEvent() {
+    const title = manualForm.title.trim().replace(/\s+/g, ' ').slice(0, 40)
+    const eventDateKey = manualForm.dateKey.trim()
+    if (!title) {
+      setToast('请填写行程标题')
+      return
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDateKey)) {
+      setToast('请选择有效日期')
+      return
+    }
+    const timeLabel = manualForm.timeLabel.trim()
+    if (timeLabel && !/^([01]\d|2[0-3]):[0-5]\d$/.test(timeLabel)) {
+      setToast('时间格式应为 HH:mm')
+      return
+    }
+    setManualBusy(true)
+    try {
+      await saveCalendarCustomEvent({
+        id: manualForm.id || undefined,
+        title,
+        eventDateKey,
+        timeLabel,
+        note: manualForm.note,
+      })
+      setManualOpen(false)
+      setSelectedDateKey(eventDateKey)
+      setToast('行程已保存，已与小程序同步')
+      await refreshCalendar({ silent: true })
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '保存失败')
+    } finally {
+      setManualBusy(false)
+    }
+  }
+
+  async function onDeleteManualEvent(id: string) {
+    const eventId = String(id || '').trim()
+    if (!eventId || manualBusy) return
+    if (!window.confirm('删除后电脑端和小程序都不再显示这条行程。')) return
+    setManualBusy(true)
+    try {
+      await deleteCalendarCustomEvent(eventId)
+      setManualOpen(false)
+      setToast('行程已删除')
+      await refreshCalendar({ silent: true })
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setManualBusy(false)
+    }
+  }
+
+  const navLabel = viewMode === 'week' ? '本周' : monthTitle(year, month)
+
+  return (
+    <div className="xx-cal-page min-h-full px-4 py-5 pb-10 lg:px-6 lg:py-6">
+      {toast ? (
+        <div className="fixed bottom-6 left-1/2 z-50 max-w-md -translate-x-1/2 rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-lg">
+          {toast}
+        </div>
+      ) : null}
+      <div className="xx-cal-desk mx-auto max-w-7xl">
+        {/* 左侧功能说明 */}
+        <aside className="xx-cal-desk__notes">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">近7天待办</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">
+            {calendarPageSubtitleForWork(workId)}。横向滑动查看近期事项，在日历中掌握整体进度。
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-violet-600/90">
+            自己添加的行程、到点提醒和自定义标签会与小程序商单日历同步；微信订阅推送需在小程序内授权一次。
+          </p>
+
+          <ul className="mt-6 space-y-4">
+            {FEATURE_ITEMS.map((item) => {
+              const Icon = item.icon
+              return (
+                <li key={item.title} className="flex items-start gap-3">
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${featureIconClass(item.tone)}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-sm font-semibold text-slate-800">{item.title}</p>
+                    <p className="text-xs text-slate-500">{item.desc}</p>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          <div className="mt-auto hidden pt-8 lg:block">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-100 to-fuchsia-50 px-5 py-6">
+              <div className="relative z-10">
+                <p className="text-sm font-semibold text-violet-800">商单日历</p>
+                <p className="mt-1 text-xs text-violet-600/80">探店 · 交片 · 排期一站掌握</p>
+              </div>
+              <svg
+                className="absolute -bottom-2 -right-2 h-28 w-28 text-violet-300/50"
+                viewBox="0 0 120 120"
+                fill="none"
+                aria-hidden
+              >
+                <rect x="20" y="24" width="72" height="64" rx="10" fill="currentColor" opacity="0.35" />
+                <rect x="28" y="16" width="8" height="16" rx="4" fill="currentColor" opacity="0.5" />
+                <rect x="84" y="16" width="8" height="16" rx="4" fill="currentColor" opacity="0.5" />
+                <circle cx="56" cy="58" r="18" fill="#22c55e" opacity="0.85" />
+                <path
+                  d="M48 58l6 6 12-14"
+                  stroke="white"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+          </div>
+        </aside>
+
+        {/* 右侧主内容 */}
+        <main className="xx-cal-desk__board">
+          {loading && events.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center gap-2 rounded-[20px] border border-violet-100 bg-white py-20 text-sm text-slate-500 shadow-sm">
+              <Loader2 className="h-4 w-4 animate-spin text-violet-500" />
+              加载商单进度…
+            </div>
+          ) : err && events.length === 0 ? (
+            <p className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {err}
+            </p>
+          ) : (
+            <>
+              {/* 近7天待办横滑 */}
+              <section className="xx-cal-desk__soon rounded-[20px] border border-violet-100/80 bg-white p-4 shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:p-5">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2 className="text-base font-semibold text-slate-900">近7天待办</h2>
+                  <button
+                    type="button"
+                    onClick={scrollToEventList}
+                    className="text-xs font-medium text-violet-600 transition hover:text-violet-700"
+                  >
+                    全部待办 ›
+                  </button>
+                </div>
+
+                {upcomingTodos.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-slate-400">近 7 天暂无待办事项</p>
+                ) : (
+                  <div className="relative">
+                    <div
+                      ref={todoScrollRef}
+                      className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    >
+                      {upcomingTodos.map((evt) => {
+                        const tone = eventTone(evt.kind)
+                        const phase = resolveEventPhase(evt)
+                        const selected = evt.dateKey === selectedDateKey
+                        const customLabel = labelMap.get(evt.mpOrderId)
+                        return (
+                          <Link
+                            key={evt.id}
+                            to={eventLink(role, evt) || '/orders/calendar'}
+                            onClick={(e) => {
+                              onSelectDay(evt.dateKey)
+                              if (evt.kind === 'manual') e.preventDefault()
+                            }}
+                            className={`flex w-[220px] shrink-0 flex-col rounded-2xl border p-3.5 transition hover:shadow-md sm:w-[240px] ${toneCardClass(tone, selected)}`}
+                          >
+                            <span
+                              className={`inline-flex w-fit rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                                selected
+                                  ? 'border-violet-400 bg-violet-50 text-violet-700'
+                                  : 'border-violet-200 text-violet-600'
+                              }`}
+                            >
+                              {formatTodoDateShort(evt.dateKey, todayKey)}
+                            </span>
+                            <span
+                              className={`mt-2 inline-flex w-fit rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${toneBadgeClass(tone)}`}
+                            >
+                              {kindLabel(evt.kind)}
+                            </span>
+                            {customLabel ? (
+                              <span
+                                className={`ml-1 inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${orderLabelBadgeClass(customLabel.color)}`}
+                              >
+                                {customLabel.labelText}
+                              </span>
+                            ) : null}
+                            <p className="mt-2 truncate text-sm font-semibold text-slate-900">
+                              {evt.orderTitle}
+                            </p>
+                            {evt.storeName && evt.storeName !== evt.orderTitle ? (
+                              <p className="mt-1 flex items-center gap-1 truncate text-xs text-slate-500">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                {evt.storeName}
+                              </p>
+                            ) : null}
+                            <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  phase === 'active'
+                                    ? 'bg-emerald-500'
+                                    : phase === 'pending'
+                                      ? 'bg-violet-400'
+                                      : 'bg-red-400'
+                                }`}
+                              />
+                              {phaseStatusLabel(phase)}
+                            </p>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                    {upcomingTodos.length > 2 ? (
+                      <button
+                        type="button"
+                        onClick={() => scrollTodos(1)}
+                        className="absolute -right-1 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-violet-100 bg-white text-violet-600 shadow-md transition hover:bg-violet-50 sm:flex"
+                        aria-label="向右滑动"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                )}
+                {activeTodoCount > 0 ? (
+                  <p className="mt-2 text-right text-xs text-slate-400">{activeTodoCount} 项待办</p>
+                ) : null}
+              </section>
+
+              {/* 日历区 */}
+              <section className="xx-cal-desk__month rounded-[20px] border border-violet-100/80 bg-white p-4 shadow-[0_4px_20px_rgba(15,23,42,0.05)] sm:p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('week')}
+                        className={`rounded-lg px-3 py-1.5 transition ${
+                          viewMode === 'week'
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        周视图
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('month')}
+                        className={`rounded-lg px-3 py-1.5 transition ${
+                          viewMode === 'month'
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        月视图
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onBackToday}
+                      className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-50"
+                    >
+                      今天
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void refreshCalendar({ silent: true })}
+                      className="rounded-lg border border-violet-200 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-50"
+                    >
+                      {refreshing ? '刷新中' : '刷新'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openManualDialog()}
+                      className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-violet-700"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      添加行程
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={prevPeriod}
+                      className="rounded-lg p-2 text-violet-600 transition hover:bg-violet-50"
+                      aria-label="上一段"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="min-w-[7rem] text-center text-sm font-semibold text-slate-800">
+                      {navLabel}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={nextPeriod}
+                      className="rounded-lg p-2 text-violet-600 transition hover:bg-violet-50"
+                      aria-label="下一段"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      进行中
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-violet-400" />
+                      待开始
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-red-500" />
+                      已结束
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-slate-100 bg-slate-100 text-center text-xs">
+                  {WEEK_LABELS.map((w, i) => (
+                    <div
+                      key={w}
+                      className={`bg-slate-50 py-2 font-medium ${i === 6 ? 'text-red-500' : 'text-slate-500'}`}
+                    >
+                      {w}
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  className={`mt-1 grid grid-cols-7 gap-1 ${viewMode === 'week' ? 'min-h-[5.5rem]' : ''}`}
+                >
+                  {grid.map((cell) => {
+                    const dayEvents = byDate[cell.dateKey] ?? []
+                    const dotPhase = resolveDayDotPhase(dayEvents)
+                    const summary = dayEventSummary(dayEvents)
+                    const selected = cell.dateKey === selectedDateKey
+                    const isToday = cell.dateKey === todayKey
+                    const weekday = weekdayLabelFromDateKey(cell.dateKey)
+                    return (
+                      <button
+                        key={cell.dateKey}
+                        type="button"
+                        onClick={() => onSelectDay(cell.dateKey)}
+                        className={`relative flex min-h-[4.5rem] flex-col items-center rounded-xl px-1 py-2 text-left transition sm:min-h-[5.25rem] ${
+                          !cell.inMonth && viewMode === 'month'
+                            ? 'text-slate-300'
+                            : 'text-slate-700'
+                        } ${
+                          selected
+                            ? 'bg-violet-600 text-white shadow-md'
+                            : 'hover:bg-violet-50/80'
+                        } ${isToday && !selected ? 'ring-2 ring-emerald-400/70 ring-offset-1' : ''}`}
+                      >
+                        <span
+                          className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
+                            isToday && !selected ? 'bg-emerald-500 text-white' : ''
+                          } ${selected ? 'text-white' : ''}`}
+                        >
+                          {cell.day}
+                        </span>
+                        {viewMode === 'week' ? (
+                          <span
+                            className={`mt-0.5 text-[10px] ${selected ? 'text-violet-100' : 'text-slate-400'}`}
+                          >
+                            {weekday.replace('周', '')}
+                          </span>
+                        ) : null}
+                        {summary ? (
+                          <span
+                            className={`mt-1 flex max-w-full items-center justify-center gap-0.5 truncate text-[9px] leading-tight sm:text-[10px] ${
+                              selected ? 'text-violet-100' : 'text-slate-500'
+                            }`}
+                          >
+                            <span
+                              className={`h-1 w-1 shrink-0 rounded-full ${dotClass(summary.phase, selected)}`}
+                            />
+                            <span className="truncate">{summary.label}</span>
+                          </span>
+                        ) : dotPhase ? (
+                          <span
+                            className={`mt-1.5 h-1.5 w-1.5 rounded-full ${dotClass(dotPhase, selected)}`}
+                          />
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+
+              {/* 选中日事件列表 */}
+              <section
+                ref={eventListRef}
+                className="xx-cal-desk__day"
+              >
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">当日事项</h2>
+                  <button
+                    type="button"
+                    onClick={() => openManualDialog()}
+                    className="text-xs font-medium text-violet-600 transition hover:text-violet-700"
+                  >
+                    添加行程
+                  </button>
+                </div>
+                <p className="xx-cal-desk__day-date">
+                  {selectedDateKey ? `${selectedDateKey.replace(/-/g, '/')} 的商单` : '选择日期'}
+                </p>
+                {selectedEvents.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-slate-400">该日暂无安排，可添加自己的行程</p>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {selectedEvents.map((evt) => {
+                      const tone = eventTone(evt.kind)
+                      const phase = resolveEventPhase(evt)
+                      const remindSet = pendingRemindEventIds.has(evt.id)
+                      const customLabel = labelMap.get(evt.mpOrderId)
+                      return (
+                        <li key={evt.id}>
+                          <div className="flex items-stretch gap-2 rounded-xl border border-slate-100 transition hover:border-violet-200 hover:bg-violet-50/40">
+                            <Link
+                              to={eventLink(role, evt) || '/orders/calendar'}
+                              onClick={(e) => {
+                                if (evt.kind !== 'manual') return
+                                e.preventDefault()
+                                openManualDialog(evt)
+                              }}
+                              className="block min-w-0 flex-1 px-3.5 py-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <span
+                                    className={`mr-2 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${toneBadgeClass(tone)}`}
+                                  >
+                                    {kindLabel(evt.kind)}
+                                  </span>
+                                  {customLabel ? (
+                                    <span
+                                      className={`mr-2 inline-block rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${orderLabelBadgeClass(customLabel.color)}`}
+                                    >
+                                      {customLabel.labelText}
+                                    </span>
+                                  ) : null}
+                                  <span className="font-medium text-slate-900">{evt.orderTitle}</span>
+                                  {evt.storeName && evt.storeName !== evt.orderTitle ? (
+                                    <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
+                                      <MapPin className="h-3 w-3 shrink-0" />
+                                      {evt.storeName}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <span className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
+                                  <span
+                                    className={`h-1.5 w-1.5 rounded-full ${
+                                      phase === 'active'
+                                        ? 'bg-emerald-500'
+                                        : phase === 'pending'
+                                          ? 'bg-violet-400'
+                                          : 'bg-red-400'
+                                    }`}
+                                  />
+                                  {evt.statusLabel}
+                                </span>
+                              </div>
+                              <div className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-slate-400">
+                                {evt.timeLabel ? <span>{evt.timeLabel}</span> : null}
+                                {evt.note ? <span>{evt.note}</span> : null}
+                                {evt.applicantName && isPr ? <span>达人：{evt.applicantName}</span> : null}
+                                {evt.platform ? <span>{evt.platform}</span> : null}
+                              </div>
+                            </Link>
+                            <div className="m-2 flex shrink-0 flex-col gap-1.5">
+                              {evt.kind === 'manual' ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openReminder(evt)}
+                                    className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
+                                      remindSet
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                                    }`}
+                                  >
+                                    <Bell className="h-3.5 w-3.5" />
+                                    {remindSet ? '已设提醒' : '设置提醒'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteManualEvent(evt.id)}
+                                    className="flex flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50"
+                                  >
+                                    删除
+                                  </button>
+                                </>
+                              ) : null}
+                              {evt.kind !== 'manual' ? (
+                              <>
+                              <button
+                                type="button"
+                                onClick={() => openLabelDialog(evt)}
+                                className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
+                                  customLabel
+                                    ? `${orderLabelBadgeClass(customLabel.color)} hover:opacity-90`
+                                    : 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                }`}
+                              >
+                                <Tag className="h-3.5 w-3.5" />
+                                {customLabel ? customLabel.labelText : '设标签'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openReminder(evt)}
+                                className={`flex flex-col items-center justify-center gap-0.5 rounded-lg border px-2.5 py-2 text-[11px] font-medium transition ${
+                                  remindSet
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                    : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'
+                                }`}
+                              >
+                                <Bell className="h-3.5 w-3.5" />
+                                {remindSet ? '已设提醒' : '设置提醒'}
+                              </button>
+                              </>
+                              ) : null}
+                            </div>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </section>
+            </>
+          )}
+        </main>
+      </div>
+
+      {remindTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="remind-dialog-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-violet-100 bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 id="remind-dialog-title" className="text-base font-semibold text-slate-900">
+                  设置到点提醒
+                </h3>
+                <p className="mt-1 truncate text-sm text-slate-500">{remindTarget.orderTitle}</p>
+                <p className="text-xs text-violet-600">{remindTarget.dateKey.replace(/-/g, '/')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !remindBusy && setRemindTarget(null)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <label className="block text-xs text-slate-500">
+              提醒时间
+              <input
+                type="datetime-local"
+                value={remindAtInput}
+                onChange={(e) => setRemindAtInput(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={remindBusy}
+              onClick={() => void onConfirmReminder()}
+              className="mt-4 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
+            >
+              {remindBusy ? '保存中…' : '确定'}
+            </button>
+            <p className="mt-3 text-center text-[11px] text-slate-400">
+              到点通过服务号或订阅消息推送。确认后会下载日历文件，用手机打开即可写入系统日历。小程序里确认提醒会直接写入手机日历。
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {labelTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="label-dialog-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-violet-100 bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 id="label-dialog-title" className="text-base font-semibold text-slate-900">
+                  设置商单标签
+                </h3>
+                <p className="mt-1 truncate text-sm text-slate-500">{labelTarget.orderTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !labelBusy && setLabelTarget(null)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ORDER_LABEL_PRESETS.map((preset) => (
+                <button
+                  key={`${preset.text}-${preset.color}`}
+                  type="button"
+                  disabled={labelBusy}
+                  onClick={() => onSaveLabelPreset(preset.text, preset.color)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition hover:opacity-90 disabled:opacity-60 ${orderLabelBadgeClass(preset.color)}`}
+                >
+                  {preset.text}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <input
+                type="text"
+                maxLength={16}
+                value={customLabelInput}
+                onChange={(e) => setCustomLabelInput(e.target.value)}
+                placeholder="自定义标签（最多16字）"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400"
+              />
+              <button
+                type="button"
+                disabled={labelBusy}
+                onClick={onSaveCustomLabelInput}
+                className="shrink-0 rounded-xl bg-violet-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
+              >
+                保存
+              </button>
+            </div>
+            {labelMap.has(labelTarget.mpOrderId) ? (
+              <button
+                type="button"
+                disabled={labelBusy}
+                onClick={onClearLabel}
+                className="mt-3 w-full rounded-xl border border-slate-200 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                清除标签
+              </button>
+            ) : null}
+            <p className="mt-3 text-center text-[11px] text-slate-400">
+              标签按当前身份保存，与小程序商单日历同步
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {manualOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="manual-event-title"
+        >
+          <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-violet-100 bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 id="manual-event-title" className="text-base font-semibold text-slate-900">
+                  {manualForm.id ? '编辑行程' : '添加行程'}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">只记在当前身份下，与小程序是同一份</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !manualBusy && setManualOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <label className="block text-xs text-slate-500">
+              标题
+              <input
+                type="text"
+                maxLength={40}
+                value={manualForm.title}
+                onChange={(e) => setManualForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="例如到店拍摄"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <label className="mt-3 block text-xs text-slate-500">
+              日期
+              <input
+                type="date"
+                value={manualForm.dateKey}
+                onChange={(e) => setManualForm((f) => ({ ...f, dateKey: e.target.value }))}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <label className="mt-3 block text-xs text-slate-500">
+              时间（可不填）
+              <input
+                type="time"
+                value={manualForm.timeLabel}
+                onChange={(e) => setManualForm((f) => ({ ...f, timeLabel: e.target.value }))}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            <label className="mt-3 block text-xs text-slate-500">
+              备注
+              <input
+                type="text"
+                maxLength={200}
+                value={manualForm.note}
+                onChange={(e) => setManualForm((f) => ({ ...f, note: e.target.value }))}
+                placeholder="选填"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-violet-400"
+              />
+            </label>
+            {manualForm.id ? (
+              <button
+                type="button"
+                onClick={() =>
+                  openReminder({
+                    id: manualForm.id,
+                    dateKey: manualForm.dateKey,
+                    dayMs: 0,
+                    kind: 'manual',
+                    mpOrderId: manualForm.id,
+                    orderTitle: manualForm.title.trim() || '自己的行程',
+                    storeName: '',
+                    timeLabel: manualForm.timeLabel,
+                    statusLabel: '自己的行程',
+                    note: manualForm.note,
+                  })
+                }
+                className="mt-4 w-full rounded-xl border border-violet-200 bg-violet-50 py-2.5 text-sm font-medium text-violet-700 transition hover:bg-violet-100"
+              >
+                设置提醒
+              </button>
+            ) : (
+              <p className="mt-3 text-[11px] text-slate-400">保存这条行程后，可以自己选择提醒时间。</p>
+            )}
+            <button
+              type="button"
+              disabled={manualBusy}
+              onClick={() => void onSaveManualEvent()}
+              className="mt-4 w-full rounded-xl bg-violet-600 py-2.5 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-60"
+            >
+              {manualBusy ? '保存中…' : '保存'}
+            </button>
+            {manualForm.id ? (
+              <button
+                type="button"
+                disabled={manualBusy}
+                onClick={() => void onDeleteManualEvent(manualForm.id)}
+                className="mt-2 w-full rounded-xl border border-slate-200 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                删除这条行程
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}

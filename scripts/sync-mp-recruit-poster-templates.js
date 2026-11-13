@@ -150,7 +150,7 @@ module.exports = {
 }
 `
   fs.writeFileSync(
-    path.join(ROOT, '灵祺达人撮合小程序/utils/recruitmentSharePosterTemplates.js'),
+    path.join(ROOT, '灵奇达人撮合小程序/utils/recruitmentSharePosterTemplates.js'),
     content,
   )
 }
@@ -220,11 +220,11 @@ export function getPosterTemplateById(id: string): PosterTemplate {
     webTs,
   )
   fs.copyFileSync(
-    path.join(ROOT, '灵祺达人履约管理后台/src/lib/mpSync/recruitmentPosterAssets.ts'),
+    path.join(ROOT, '灵奇达人履约管理后台/src/lib/mpSync/recruitmentPosterAssets.ts'),
     path.join(ROOT, 'web版/merchant-erp/src/lib/recruitmentPosterAssets.ts'),
   )
   fs.writeFileSync(
-    path.join(ROOT, '灵祺达人履约管理后台/src/lib/mpSync/recruitmentSharePosterTemplates.ts'),
+    path.join(ROOT, '灵奇达人履约管理后台/src/lib/mpSync/recruitmentSharePosterTemplates.ts'),
     webTs.replace(
       "import { posterAssetUrl } from './recruitmentPosterAssets.js'",
       "import { posterAssetUrl } from './recruitmentPosterAssets'",

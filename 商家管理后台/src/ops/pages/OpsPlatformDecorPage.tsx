@@ -239,8 +239,8 @@ function emptyItem(slotKey: string): RegistryPlatformDecorItem {
     enabled: true,
     title: isShareCardSlot(slotKey)
       ? slotKey === 'erp.mp.share.card'
-        ? '灵祺经营管理助手'
-        : '灵祺星选 | AI按城市品类匹配商单'
+        ? '灵奇经营管理助手'
+        : '灵奇星选 | AI按城市品类匹配商单'
       : PLATFORM_DECOR_SLOT_LABELS[slotKey] || slotKey,
     imageUrl: '',
     mediaType: 'image',

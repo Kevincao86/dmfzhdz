@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 run_sync() {
-  MP="$ROOT/灵祺达人撮合小程序"
+  MP="$ROOT/灵奇达人撮合小程序"
   STATIC_ROOT="/var/www/meoo-static/recruit-covers/share"
 
   for name in merchant-notify-talent-review.png merchant-notify-content-review.png; do

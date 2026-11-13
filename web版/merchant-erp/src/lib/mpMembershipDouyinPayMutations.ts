@@ -31,7 +31,7 @@ function membershipDescriptionFromCheckout(
   const versions = listMembershipPlanVersions(data, checkout.role as 'pr' | 'talent' | 'shoot' | 'edit')
   const plan = findMembershipPlanVersion(versions, checkout.planId)
   const billingLabel = checkout.billing === 'yearly' ? '年付' : '月付'
-  return `灵祺星选${plan?.name || checkout.planId}${billingLabel}`
+  return `灵奇星选${plan?.name || checkout.planId}${billingLabel}`
 }
 
 export async function createMembershipDouyinPrepayFromSnapshot(

@@ -3,7 +3,7 @@
 # 须在轻量执行：cd ~/app && bash scripts/ecs-sync-erp-mp-static.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/灵祺ERP小程序/images"
+SRC="$ROOT/灵奇ERP小程序/images"
 STATIC_ROOT="/var/www/meoo-static/erp-mp-static"
 NGINX_SITE="/etc/nginx/sites-available/meoo-api"
 

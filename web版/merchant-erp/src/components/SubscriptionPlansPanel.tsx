@@ -224,7 +224,7 @@ export default function SubscriptionPlansPanel({
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/90">
               <Sparkles className="h-4 w-4" />
-              灵祺 ERP 会员
+              灵奇 ERP 会员
             </p>
             <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
               升级解锁全功能 + AI 积分

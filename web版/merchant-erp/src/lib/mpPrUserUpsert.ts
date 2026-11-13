@@ -84,7 +84,7 @@ export function upsertMpPrUser(data: RegistryFile, user: RegistryMpPrUser): Regi
   return next
 }
 
-/** 同一微信 openid 仅保留一条 PR 用户，合并灵祺 PRID 避免重复建档 */
+/** 同一微信 openid 仅保留一条 PR 用户，合并灵奇 PRID 避免重复建档 */
 export function dedupeMpPrUsersByOpenId(
   data: RegistryFile,
   openId: string,

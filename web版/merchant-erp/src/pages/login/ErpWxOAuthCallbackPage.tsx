@@ -68,7 +68,7 @@ export default function ErpWxOAuthCallbackPage() {
       )}
     >
       <div className="mb-6 text-center">
-        <h1 className="text-lg font-bold text-slate-900">灵祺AI智能ERP</h1>
+        <h1 className="text-lg font-bold text-slate-900">灵奇AI智能ERP</h1>
         <p className="mt-1 text-sm text-slate-500">微信扫码登录</p>
       </div>
       <div className="w-full max-w-md rounded-2xl border border-white/80 bg-white/80 p-8 text-center shadow-lg backdrop-blur-xl">

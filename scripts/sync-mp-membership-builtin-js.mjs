@@ -261,8 +261,8 @@ module.exports = {
 `
 
 const targets = [
-  '灵祺达人撮合小程序/utils',
-  '灵祺星选小程序抖音版/灵祺星选/utils',
+  '灵奇达人撮合小程序/utils',
+  '灵奇星选小程序抖音版/灵奇星选/utils',
 ]
 
 for (const rel of targets) {

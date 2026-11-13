@@ -13,7 +13,7 @@ const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
 const MERCHANT_PUBLIC = path.join(ROOT, 'web版/merchant-erp/public')
-const DR_PUBLIC = path.join(ROOT, '灵祺达人履约管理后台/public')
+const DR_PUBLIC = path.join(ROOT, '灵奇达人履约管理后台/public')
 const OSS_MODULE = path.join(ROOT, 'web版/merchant-erp/node_modules/ali-oss')
 
 const MEDIA_RE = /\.(png|jpe?g|webp|gif|svg|mp4|webm|mp3|wav|m4a)$/i

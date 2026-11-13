@@ -31,7 +31,7 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 const DEFAULT_BOT: ChatMessage = {
   id: 'm0',
   role: 'bot',
-  text: '您好，我是灵祺智能助手。我会先回答您的问题；如需人工，请在 9:00–22:00 点击「进入人工客服」。',
+  text: '您好，我是灵奇智能助手。我会先回答您的问题；如需人工，请在 9:00–22:00 点击「进入人工客服」。',
   at: '',
   ts: 0,
 }
@@ -78,7 +78,7 @@ function parseSupportCfg(text: string): SupportAiCfg | null {
   }
 }
 
-const SUPPORT_PROJECT_BRIEF = `你是灵祺在线客服。灵祺是本地生活商家 ERP，网页与商家小程序互通，主要能力包括：商品与团购、门店菜单与经营类目、达人招募、评价处理、本地推/投流、短视频与视觉工坊、会员与在线客服。
+const SUPPORT_PROJECT_BRIEF = `你是灵奇在线客服。灵奇是本地生活商家 ERP，网页与商家小程序互通，主要能力包括：商品与团购、门店菜单与经营类目、达人招募、评价处理、本地推/投流、短视频与视觉工坊、会员与在线客服。
 用简体中文直接回答，先给结论。不知道的功能说明去商家后台或小程序哪个菜单查看，不要编造订单、退款或已处理结果。
 人工客服时段为 9:00–22:00，时段内可点「进入人工客服」；人多时会排队。`
 
@@ -204,7 +204,7 @@ export default function FloatingOnlineSupport({
             text,
             clientMsgId: id,
             customerId: customerIdRef.current.trim(),
-            enterpriseName: enterpriseNameRef.current.trim() || '灵祺星选·Web',
+            enterpriseName: enterpriseNameRef.current.trim() || '灵奇星选·Web',
           })
           return { ok: true }
         } catch (e) {

@@ -1,8 +1,8 @@
 /** 商户短视频页 · 对外展示名（与运营后台厂商配置解耦） */
 /** 火山方舟 Seedance 1.5 Pro */
 
-export const VIDEO_ENGINE_LABEL_KLING = '灵祺视频模型1'
-export const VIDEO_ENGINE_LABEL_SEEDANCE = '灵祺视频'
+export const VIDEO_ENGINE_LABEL_KLING = '灵奇视频模型1'
+export const VIDEO_ENGINE_LABEL_SEEDANCE = '灵奇视频'
 export const VIDEO_ENGINE_HINT_SEEDANCE = '文案口播 · 音画一体'
 export const VIDEO_ENGINE_HINT_SEEDANCE_FRAMES = '分镜参考图成片'
 export const VIDEO_ENGINE_HINT_MOTION_IMITATE = '动作模仿 · 点名换人'

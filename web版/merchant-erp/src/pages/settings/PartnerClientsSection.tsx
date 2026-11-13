@@ -372,7 +372,7 @@ export default function PartnerClientsSection() {
               </p>
               <ul className="mt-2 list-inside list-disc space-y-1 text-xs leading-relaxed text-gray-600">
                 <li>
-                  走「邀请开通」时，即使商家此前已给服务商授过权，仍需点一次本链接，才能把商家账号写回灵祺。
+                  走「邀请开通」时，即使商家此前已给服务商授过权，仍需点一次本链接，才能把商家账号写回灵奇。
                 </li>
                 <li>
                   若已有商家账户 ID，可切到「手工录入」，不必再发授权链接；代运营合作确认仍可能要商家在来客点一次。

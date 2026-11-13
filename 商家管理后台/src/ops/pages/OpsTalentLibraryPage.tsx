@@ -476,7 +476,7 @@ export default function OpsTalentLibraryPage() {
                     />
                   ) : null}
                 </th>
-                <th className="px-3 py-3">灵祺达人 ID</th>
+                <th className="px-3 py-3">灵奇达人 ID</th>
                 <th className="px-3 py-3">平台账号</th>
                 <th className="px-3 py-3">昵称</th>
                 <th className="px-3 py-3">性别</th>

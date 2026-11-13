@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /** MP-RO-178099398735：registryPrId → PR 库「文长」，模拟 API 失败时本地兜底 */
 const path = require('path')
-const prRecruitQr = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/prRecruitQr.js'))
-const ops = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/opsRegistryTalentMp.js'))
-const core = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/recruitmentSharePosterCore.js'))
+const prRecruitQr = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/prRecruitQr.js'))
+const ops = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/opsRegistryTalentMp.js'))
+const core = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/recruitmentSharePosterCore.js'))
 
 const ORDER_ID = 'MP-RO-178099398735'
 const PR_USER = {

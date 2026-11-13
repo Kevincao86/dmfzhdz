@@ -33,7 +33,7 @@ export function handleWechatOaEventInSnapshot(
   const oaOpenId = String(evt.fromUserName || '').trim()
   const bindResult = completeWechatOaBindInSnapshot(data, ticket, oaOpenId)
   const cfg = loadWechatOaConfig()
-  const name = cfg.ok ? cfg.config.displayName : '灵祺星选'
+  const name = cfg.ok ? cfg.config.displayName : '灵奇星选'
 
   if (!bindResult.ok) {
     return {

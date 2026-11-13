@@ -36,7 +36,7 @@ export function toUserFacingError(raw: unknown, action = '操作'): string {
     /not_found|page could not be found|404\b|cannot find|route not found/.test(lower) ||
     /\bNOT_FOUND\b/.test(s)
   ) {
-    return '相关功能接口暂未开通或正在部署中，请稍后再试；若持续出现，请联系灵祺客服协助检查线上环境。'
+    return '相关功能接口暂未开通或正在部署中，请稍后再试；若持续出现，请联系灵奇客服协助检查线上环境。'
   }
 
   if (/502|503|504|bad gateway|service unavailable|gateway timeout/.test(lower)) {
@@ -69,7 +69,7 @@ export function toUserFacingError(raw: unknown, action = '操作'): string {
       return '本地推授权已失效或权限不足，请前往系统设置重新绑定并确认开放平台已开通线索权限。'
     }
     if (isAuthFlowAction(action)) {
-      return `${action}失败，请稍后重试；若问题持续，请联系灵祺客服。`
+      return `${action}失败，请稍后重试；若问题持续，请联系灵奇客服。`
     }
     return `${action}失败，请检查账号授权或稍后重试。`
   }
@@ -81,7 +81,7 @@ export function toUserFacingError(raw: unknown, action = '操作'): string {
   }
 
   if (!/[\u4e00-\u9fff]/.test(s)) {
-    return `${action}失败，请稍后重试；若问题持续，请联系灵祺客服。`
+    return `${action}失败，请稍后重试；若问题持续，请联系灵奇客服。`
   }
 
   return cleanChineseMessage(s)

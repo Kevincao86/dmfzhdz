@@ -209,7 +209,7 @@ function parseOpeningSec(brief: string, total: number): number {
 }
 
 const META_CAPTION_RE =
-  /剪辑文案|文案指令|云剪|灵祺|整体定位|镜头与节奏|字幕与包装|关键帧|输出参数|BGM|背景音乐|画面特效|画幅|每张分配/i
+  /剪辑文案|文案指令|云剪|灵奇|整体定位|镜头与节奏|字幕与包装|关键帧|输出参数|BGM|背景音乐|画面特效|画幅|每张分配/i
 
 function isMetaCaptionText(text: string): boolean {
   const t = text.replace(/\s+/g, ' ').trim()

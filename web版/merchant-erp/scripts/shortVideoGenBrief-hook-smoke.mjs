@@ -17,12 +17,12 @@ const screenshotRows = [
   {
     timeRange: '5-10秒',
     visual: '切入 ERP 多平台看板 + 助手对话框卡片，界面特写、轻推进',
-    dialogue: '灵祺商家 ERP：数据一屏清，助手帮你出方案。',
+    dialogue: '灵奇商家 ERP：数据一屏清，助手帮你出方案。',
   },
   {
     timeRange: '10-15秒',
     visual: '老板低头微笑着向屏幕，界面定格，镜头缓缓推远',
-    dialogue: '少切 App，多做生意——今天就用灵祺。',
+    dialogue: '少切 App，多做生意——今天就用灵奇。',
   },
 ]
 

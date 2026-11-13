@@ -270,7 +270,7 @@ export function buildTalentLibraryPlanPromptBlock(params: {
   const midTailLines = midTailEntries.slice(0, perBand).map(formatTalentLibrarySampleLine)
 
   return [
-    '【灵祺星选达人库 · 达人方案必须基于本段，禁止凭空编造档位人数与报价】',
+    '【灵奇星选达人库 · 达人方案必须基于本段，禁止凭空编造档位人数与报价】',
     `数据来源：${insight.sourceLabel}；平台 ${insight.platform}。`,
     insight.tierAvgSummary,
     `【头部达人 · 销售等级 5 级及以上（对应库内 V5 / V5+）】共 ${insight.headCount} 人` +

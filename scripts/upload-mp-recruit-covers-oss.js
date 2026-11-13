@@ -12,7 +12,7 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
-const MP = path.join(ROOT, '灵祺达人撮合小程序')
+const MP = path.join(ROOT, '灵奇达人撮合小程序')
 const SRC = path.join(MP, 'packages/recruit-covers-mp')
 const OUT_BASE = path.join(MP, 'utils/recruitCoverOssBase.js')
 const OSS_MODULE = path.join(ROOT, 'web版/merchant-erp/node_modules/ali-oss')

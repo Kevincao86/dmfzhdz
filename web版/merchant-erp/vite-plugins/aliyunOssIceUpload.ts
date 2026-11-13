@@ -1,5 +1,5 @@
 /**
- * 灵祺AI云剪 — 本地上传至 OSS（运行时动态加载 ali-oss，避免 Vite 配置阶段加载）。
+ * 灵奇AI云剪 — 本地上传至 OSS（运行时动态加载 ali-oss，避免 Vite 配置阶段加载）。
  */
 /// <reference path="./ali-oss.d.ts" />
 import path from 'node:path'

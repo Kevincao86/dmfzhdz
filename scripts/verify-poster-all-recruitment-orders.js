@@ -3,9 +3,9 @@
  * 每个招募单场景 × 10 轮：分享海报发单方名称（含 PR 名与订单标题相同）
  */
 const path = require('path')
-const prRecruitQr = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/prRecruitQr.js'))
-const ops = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/opsRegistryTalentMp.js'))
-const core = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/recruitmentSharePosterCore.js'))
+const prRecruitQr = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/prRecruitQr.js'))
+const ops = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/opsRegistryTalentMp.js'))
+const core = require(path.join(__dirname, '../灵奇达人撮合小程序/utils/recruitmentSharePosterCore.js'))
 
 const ROUNDS = 10
 
@@ -140,7 +140,7 @@ for (const fixture of ORDER_FIXTURES) {
       assert(name === fixture.expectName, `inviter ${name}`)
       const fields = core.extractPosterFieldsFromOrder(injected)
       assert(fields.inviterName === fixture.expectName, `fields ${fields.inviterName}`)
-      assert(!fields.inviterName.includes('灵祺星选'), 'placeholder')
+      assert(!fields.inviterName.includes('灵奇星选'), 'placeholder')
     })
   }
 

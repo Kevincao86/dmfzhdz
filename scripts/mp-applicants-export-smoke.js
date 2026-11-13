@@ -4,7 +4,7 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
-const modPath = path.join(ROOT, '灵祺达人撮合小程序/utils/mpApplicantsExport.js')
+const modPath = path.join(ROOT, '灵奇达人撮合小程序/utils/mpApplicantsExport.js')
 
 // eslint-disable-next-line import/no-dynamic-require, global-require
 const mod = require(modPath)
@@ -46,7 +46,7 @@ fs.writeFileSync(out, Buffer.from(buf))
 
 let XLSX
 try {
-  XLSX = require(path.join(ROOT, '灵祺达人履约管理后台/node_modules/xlsx'))
+  XLSX = require(path.join(ROOT, '灵奇达人履约管理后台/node_modules/xlsx'))
 } catch {
   console.error('SKIP: xlsx package not installed, PK header OK only', out)
   process.exit(0)

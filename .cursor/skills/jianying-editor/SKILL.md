@@ -17,7 +17,7 @@ description: >-
 ## Hard rules
 
 1. **Skill 根目录**必须是 `$JIANYING_SKILL_HOME`（默认：仓库根下 `tools/jianying-editor-skill`）。读上游 `SKILL.md` / `rules/*` / `docs/*` 只在该目录。
-2. **剪辑作业脚本**只写在 `tools/jianying-jobs/`（可建子目录）。**禁止**写进仓库根 `scripts/`（那是部署/运维脚本）、`web版/`、`灵祺*/`、`api/`。
+2. **剪辑作业脚本**只写在 `tools/jianying-jobs/`（可建子目录）。**禁止**写进仓库根 `scripts/`（那是部署/运维脚本）、`web版/`、`灵奇*/`、`api/`。
 3. **禁止修改**产品代码来「方便剪辑」。成片/草稿只落剪映草稿目录或 `tools/jianying-jobs/` 产出。
 4. 本机是 **macOS**：可生成/改草稿；**自动导出不支持**，须在剪映里手动导出。推荐环境仍是 Windows + 剪映 ≤5.9。
 5. **只支持国内剪映专业版**；CapCut 国际版 / 手机端不支持。

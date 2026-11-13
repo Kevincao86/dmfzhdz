@@ -3,7 +3,7 @@
 # 须在轻量 ECS 执行：cd ~/app && bash scripts/ecs-sync-mp-recruit-covers-static.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MP="$ROOT/灵祺达人撮合小程序"
+MP="$ROOT/灵奇达人撮合小程序"
 COVERS_SRC="$MP/packages/recruit-covers-mp"
 STATIC_ROOT="/var/www/meoo-static/recruit-covers"
 NGINX_SITE="/etc/nginx/sites-available/meoo-api"
@@ -49,8 +49,8 @@ shopt -u nullglob
 for f in hero-talent.png hero-talent-v2-search.png hero-shoot.png hero-edit.png home-banner-clouds.png poster-default.jpg kpi-recruit.jpg kpi-urgent.jpg kpi-today.jpg; do
   if [[ -f "$MP/images/home/$f" ]]; then
     sudo cp -f "$MP/images/home/$f" "$STATIC_ROOT/home/$f"
-  elif [[ -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/home/$f" ]]; then
-    sudo cp -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/home/$f" "$STATIC_ROOT/home/$f"
+  elif [[ -f "$ROOT/灵奇达人履约管理后台/public/recruit-covers/home/$f" ]]; then
+    sudo cp -f "$ROOT/灵奇达人履约管理后台/public/recruit-covers/home/$f" "$STATIC_ROOT/home/$f"
   fi
 done
 
@@ -81,8 +81,8 @@ if [[ -d "$MP/images/auth" ]]; then
   sudo cp -f "$MP/images/auth"/*.{jpg,jpeg,png} "$STATIC_ROOT/auth/" 2>/dev/null || true
 fi
 for f in welcome-hero-bg.jpg welcome-bottom-deco.png login-hero-bg.jpg login-orbit-deco.jpg; do
-  if [[ ! -f "$STATIC_ROOT/auth/$f" && -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/auth/$f" ]]; then
-    sudo cp -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/auth/$f" "$STATIC_ROOT/auth/$f"
+  if [[ ! -f "$STATIC_ROOT/auth/$f" && -f "$ROOT/灵奇达人履约管理后台/public/recruit-covers/auth/$f" ]]; then
+    sudo cp -f "$ROOT/灵奇达人履约管理后台/public/recruit-covers/auth/$f" "$STATIC_ROOT/auth/$f"
   fi
 done
 if [[ -d "$MP/images/login-orbit" ]]; then
@@ -91,8 +91,8 @@ fi
 if [[ -d "$MP/images/identity" ]]; then
   sudo cp -f "$MP/images/identity"/*.png "$STATIC_ROOT/identity/" 2>/dev/null || true
 fi
-if [[ -d "$ROOT/灵祺达人履约管理后台/public/recruit-covers/identity" ]]; then
-  sudo cp -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/identity"/*.png "$STATIC_ROOT/identity/" 2>/dev/null || true
+if [[ -d "$ROOT/灵奇达人履约管理后台/public/recruit-covers/identity" ]]; then
+  sudo cp -f "$ROOT/灵奇达人履约管理后台/public/recruit-covers/identity"/*.png "$STATIC_ROOT/identity/" 2>/dev/null || true
 fi
 
 if [[ -d "$MP/images/membership" ]]; then

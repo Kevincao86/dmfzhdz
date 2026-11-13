@@ -27,7 +27,7 @@ scripts/local/
 
 # 小程序本地 Supabase / 云端密钥覆盖（复制自 config.local.example.js）
 灵祺商家小程序/utils/config.local.js
-灵祺达人撮合小程序/utils/config.local.js
+灵奇达人撮合小程序/utils/config.local.js
 .vercel
 .env*
 # 误提交会导致 git 极慢、推送卡住（勿跟踪）
@@ -40,7 +40,7 @@ web版/merchant-erp/.dh-avatar-staging-raw/
 *.tsbuildinfo
 
 # 商家 ERP 小程序本地配置
-灵祺ERP小程序/utils/config.local.js
+灵奇ERP小程序/utils/config.local.js
 
 # OpenMontage（AGPL）本机克隆，仅 Cursor 本地制片，勿提交
 tools/OpenMontage/

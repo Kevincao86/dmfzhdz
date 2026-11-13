@@ -49,7 +49,7 @@ export default function PartnerXingxuanPlatformSection() {
     <div className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50/90 to-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h4 className="text-lg font-semibold text-slate-900">灵祺星选平台（PR 工作台）</h4>
+          <h4 className="text-lg font-semibold text-slate-900">灵奇星选平台（PR 工作台）</h4>
           <p className="mt-1 text-sm leading-relaxed text-slate-600">
             服务商版自动以 ERP 登录手机号开通/关联星选 PR 账号，用于「运营 → 星选达人招募」内嵌页与招募发单。
             当前 ERP 手机号：<strong className="font-medium text-slate-800">{phoneLabel}</strong>

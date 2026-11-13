@@ -17,7 +17,7 @@ description: >-
 
 1. 读上游只在 `$SEEDANCE2_CREATIVE_HOME`。
 2. **禁止**把 API Key 写进产品 `.env` 或提交 git；密钥仅本机环境变量 / 上游本地配置。
-3. **禁止**改 `web版/`、`灵祺*/`、部署脚本。
+3. **禁止**改 `web版/`、`灵奇*/`、部署脚本。
 4. 调 API 前先确认用户有火山/Seedance 密钥且同意扣费。
 
 ## Bootstrap

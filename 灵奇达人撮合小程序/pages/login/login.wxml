@@ -1,0 +1,362 @@
+<page-meta page-style="{{lqPageStyle}}" background-color="#f7f3ec" background-color-top="#f7f3ec" background-color-bottom="#f7f3ec" />
+<view class="{{lqAccentClass}} login-page {{lqThemeClass}}" style="{{lqPageStyle}}">
+  <launch-splash />
+  <view class="login-hero" style="{{navBandStyle}}">
+    <view class="login-hero__inner">
+      <view class="login-hero__brand">
+        <image class="login-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+        <text class="login-hero__title">灵奇星选</text>
+        <view class="login-hero__sub">本地生活达人合作</view>
+      </view>
+    </view>
+  </view>
+  <view class="login-rule" />
+
+  <view class="login-body">
+  <view class="login-stack">
+    <view class="login-shell">
+      <view class="login-main">
+        <view class="login-tabs">
+          <view
+            class="login-tab {{tab==='wx'?'login-tab--on':''}}"
+            bindtap="onTabWx"
+          >
+            快捷登录
+          </view>
+          <view
+            class="login-tab {{tab==='pwd'?'login-tab--on':''}}"
+            bindtap="onTabPwd"
+          >
+            账号登录
+          </view>
+          <view
+            class="login-tab {{tab==='sms'?'login-tab--on':''}}"
+            bindtap="onTabSms"
+          >
+            验证码
+          </view>
+          <view
+            class="login-tab"
+            bindtap="onGoSignup"
+          >
+            注册
+          </view>
+        </view>
+
+        <block wx:if="{{tab==='wx'}}">
+          <button
+            class="login-btn login-btn--wx"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+            bindtap="onWxLogin"
+          >
+            <text>微信一键登录</text>
+          </button>
+          <button
+            wx:if="{{!legalAgreed}}"
+            class="login-btn login-btn--ghost"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+            bindtap="onPhoneQuickTap"
+          >
+            <text>手机号登录</text>
+          </button>
+          <button
+            wx:elif="{{wxPrivacyPending}}"
+            id="mp-privacy-agree-btn"
+            class="login-btn login-btn--ghost"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+            open-type="agreePrivacyAuthorization"
+            bindagreeprivacyauthorization="onWxPrivacyAgreeThenPhone"
+          >
+            <text>同意隐私保护指引</text>
+          </button>
+          <button
+            wx:else
+            class="login-btn login-btn--ghost"
+            loading="{{loading}}"
+            disabled="{{loading}}"
+            open-type="getPhoneNumber"
+            bindgetphonenumber="onGetPhoneNumber"
+          >
+            <text>手机号登录</text>
+          </button>
+          <text class="login-hint">微信登录认微信，手机号登录认手机号。要两种都能用，登录后在账号绑定里补上另一个。</text>
+          <text class="login-err" wx:if="{{err}}">{{err}}</text>
+          <text class="login-hint" wx:if="{{wxPhoneDebug}}">{{wxPhoneDebug}}</text>
+          <button class="login-btn login-btn--quiet" bindtap="onGuestMode">暂不登录</button>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+            </view>
+            <text class="login-legal-txt">我已阅读并同意</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+            <text class="login-legal-txt">和</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+          </view>
+        </block>
+
+        <block wx:elif="{{tab==='pwd'}}">
+          <view class="login-field">
+            <text class="login-field-label">账号</text>
+            <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
+              class="login-input"
+              type="text"
+              maxlength="64"
+              placeholder="手机号、邮箱或账号"
+              value="{{loginName}}"
+              bindinput="onLoginName"
+            />
+          </view>
+          <view class="login-field">
+            <text class="login-field-label">密码</text>
+            <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
+              class="login-input"
+              password
+              placeholder="至少 6 位"
+              value="{{password}}"
+              bindinput="onPassword"
+            />
+          </view>
+          <text class="login-forgot" bindtap="onForgotPassword">忘记密码？切换验证码登录 ›</text>
+          <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onPwdLogin">登录</button>
+          <button class="login-btn login-btn--quiet" bindtap="onGuestMode">暂不登录</button>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+            </view>
+            <text class="login-legal-txt">我已阅读并同意</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+            <text class="login-legal-txt">和</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+          </view>
+        </block>
+
+        <block wx:elif="{{tab==='sms'}}">
+          <view class="login-code-switch">
+            <text
+              class="login-code-switch__item {{codeChannel==='phone'?'login-code-switch__item--on':''}}"
+              data-channel="phone"
+              bindtap="onCodeChannel"
+            >手机验证码</text>
+            <text
+              class="login-code-switch__item {{codeChannel==='email'?'login-code-switch__item--on':''}}"
+              data-channel="email"
+              bindtap="onCodeChannel"
+            >邮箱验证码</text>
+          </view>
+          <block wx:if="{{codeChannel==='email'}}">
+            <view class="login-field">
+              <text class="login-field-label">邮箱</text>
+              <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
+                class="login-input"
+                type="text"
+                maxlength="80"
+                placeholder="注册时绑定的邮箱"
+                value="{{emailAddr}}"
+                bindinput="onEmailAddr"
+              />
+            </view>
+            <view class="login-field login-field--row">
+              <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
+                class="login-input login-input--flex"
+                type="number"
+                maxlength="6"
+                placeholder="6 位验证码"
+                value="{{emailLoginCode}}"
+                bindinput="onEmailLoginCode"
+              />
+              <button
+                class="login-sms-btn"
+                loading="{{emailSending}}"
+                disabled="{{emailSending || emailCooldown > 0}}"
+                bindtap="onSendEmailLoginCode"
+              >{{emailCooldown > 0 ? emailCooldown + 's' : '获取验证码'}}</button>
+            </view>
+          </block>
+          <block wx:else>
+          <view class="login-field">
+            <text class="login-field-label">手机号</text>
+            <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
+              class="login-input"
+              type="number"
+              maxlength="11"
+              placeholder="已注册的 11 位手机号"
+              value="{{smsPhone}}"
+              bindinput="onSmsPhone"
+            />
+          </view>
+          <view class="login-field login-field--row">
+            <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
+              class="login-input login-input--flex"
+              type="number"
+              maxlength="6"
+              placeholder="6 位验证码"
+              value="{{smsLoginCode}}"
+              bindinput="onSmsLoginCode"
+            />
+            <button
+              class="login-sms-btn"
+              loading="{{smsSending}}"
+              disabled="{{smsSending || smsCooldown > 0}}"
+              bindtap="onSendSmsLoginCode"
+            >{{smsCooldown > 0 ? smsCooldown + 's' : '获取验证码'}}</button>
+          </view>
+          </block>
+          <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onSmsLogin">验证码登录</button>
+          <button class="login-btn login-btn--quiet" bindtap="onGuestMode">暂不登录</button>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+            </view>
+            <text class="login-legal-txt">我已阅读并同意</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+            <text class="login-legal-txt">和</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+          </view>
+        </block>
+
+        <text class="login-err" wx:if="{{err && tab !== 'wx'}}">{{err}}</text>
+      </view>
+
+    </view>
+  </view>
+
+  <view class="login-foot">
+    <view class="login-back-link" bindtap="onBack">‹ 返回</view>
+    <view class="login-legal-foot">
+      <text class="login-legal-copy">© 2026 宁波墨典网络科技有限公司 Copyright. All Rights Reserved.</text>
+      <view class="login-icp-row">
+        <text class="login-icp-text">{{icpFiling}}</text>
+        <view class="login-icp-psb">
+          <image class="login-icp-badge" src="/images/beian-ghs.png" mode="aspectFit" />
+          <text class="login-icp-text">{{psbFiling}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
+  </view>
+
+  <view
+    class="login-id-sheet-mask login-id-sheet-mask--center login-legal-mask"
+    wx:if="{{showLegalPrompt}}"
+    catchtouchmove="noopSheetTap"
+  >
+    <view class="login-legal-modal" catchtap="noopSheetTap">
+      <text class="login-legal-modal-title">请先阅读并同意协议</text>
+      <text class="login-legal-modal-content">{{legalPromptText}}</text>
+      <view class="login-legal-modal-actions">
+        <button class="login-legal-modal-btn login-legal-modal-btn--decline" bindtap="onLegalDecline">不同意</button>
+        <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onLegalAgreeLogin">{{legalPromptAgreeLabel}}</button>
+      </view>
+    </view>
+  </view>
+
+  <view
+    class="login-id-sheet-mask {{wxAuthStep === 'nick' ? 'login-id-sheet-mask--center' : ''}}"
+    wx:if="{{showWxAuthSheet}}"
+    catchtouchmove="noopSheetTap"
+    bindtap="onCloseWxAuthSheet"
+  >
+    <view class="login-id-sheet {{wxAuthStep === 'nick' ? 'login-id-sheet--center' : ''}}" catchtap="noopSheetTap">
+      <view class="login-id-sheet-head">
+        <text class="login-id-sheet-title">{{wxAuthStep === 'privacy' ? '隐私保护指引' : (wxAuthStep === 'avatar' ? '获取微信头像' : '获取微信昵称')}}</text>
+        <text class="login-id-sheet-close" bindtap="onCloseWxAuthSheet">×</text>
+      </view>
+      <block wx:if="{{wxAuthStep === 'privacy'}}">
+        <text class="login-id-sheet-hint">使用微信头像前，需阅读并同意《用户隐私保护指引》</text>
+        <view class="login-wx-auth-step login-wx-auth-step--privacy">
+          <button
+            id="mp-privacy-agree-btn"
+            class="login-btn login-btn--wx login-btn--sheet"
+            open-type="agreePrivacyAuthorization"
+            bindagreeprivacyauthorization="onPrivacyAuthorizeAgree"
+          >同意隐私协议并继续</button>
+          <text class="login-privacy-contract-link" bindtap="onOpenPrivacyContract">查看《隐私保护指引》</text>
+          <button class="login-btn login-btn--ghost login-btn--sheet" bindtap="onCloseWxAuthSheet">取消</button>
+        </view>
+      </block>
+      <block wx:elif="{{wxAuthStep === 'avatar'}}">
+        <text class="login-id-sheet-hint">请点击下方头像按钮，授权您的微信头像</text>
+        <view class="login-wx-auth-step">
+          <button
+            id="login-wx-avatar-btn"
+            class="login-wx-avatar-btn login-wx-avatar-btn--lg"
+            hover-class="none"
+            open-type="chooseAvatar"
+            bindchooseavatar="onWxChooseAvatar"
+            catchtap="noopSheetTap"
+          >
+            <image
+              class="login-wx-avatar login-wx-avatar--lg {{wxAvatarUrl ? '' : 'login-wx-avatar--ph-img'}}"
+              src="{{wxAvatarUrl || wxAvatarPlaceholder}}"
+              mode="aspectFill"
+            />
+          </button>
+          <text class="login-wx-avatar-tip" wx:if="{{!wxAvatarUrl}}">点击授权头像</text>
+          <button class="login-btn login-btn--ghost login-btn--sheet" bindtap="onCloseWxAuthSheet">取消</button>
+        </view>
+      </block>
+      <block wx:else>
+        <text class="login-id-sheet-hint">请点击输入框，选用您的微信昵称</text>
+        <view class="login-wx-auth-step login-wx-auth-step--nick">
+        <image class="login-wx-avatar login-wx-avatar--sm" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+        <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
+          wx:if="{{wxNickInputVisible}}"
+          id="login-wx-nick-input"
+          class="login-wx-nick login-wx-nick--sheet"
+          type="nickname"
+          placeholder="点击选用微信昵称"
+          value="{{wxNickName}}"
+          confirm-type="done"
+          adjust-position="{{true}}"
+          hold-keyboard="{{false}}"
+          bindfocus="onWxNicknameFocus"
+          bindinput="onWxNicknameInput"
+          bindblur="onWxNicknameBlur"
+          bindconfirm="onWxNicknameConfirm"
+          bindnicknamereview="onWxNicknameReview"
+          focus="{{wxNickInputFocus}}"
+        />
+        <view wx:else class="login-wx-nick-display login-wx-nick--sheet" bindtap="onReEditWxNick">
+          <text class="login-wx-nick-display__text">{{wxNickName}}</text>
+          <text class="login-wx-nick-display__edit">更换</text>
+        </view>
+        <button class="login-btn login-btn--wx login-btn--sheet" loading="{{loading}}" bindtap="onConfirmWxNickStep">完成登录</button>
+        <button class="login-btn login-btn--ghost login-btn--sheet" bindtap="onCloseWxAuthSheet">取消</button>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view
+    class="login-id-sheet-mask login-id-sheet-mask--center"
+    wx:if="{{showPhoneBindSheet}}"
+    catchtouchmove="noopSheetTap"
+  >
+    <view class="login-id-sheet login-id-sheet--center" catchtap="noopSheetTap">
+      <view class="login-id-sheet-head">
+        <text class="login-id-sheet-title">绑定手机号</text>
+        <text class="login-id-sheet-close" bindtap="onSkipPhoneBind">×</text>
+      </view>
+      <text class="login-id-sheet-hint">绑定后各端可共用同一账号。也可以先去看看，稍后在「我的 - 账号绑定」里补充。</text>
+      <view class="login-field">
+        <text class="login-field-label">手机号</text>
+        <input style="{{lqInputStyle}}" placeholder-style="{{lqPhStyle}}"
+          class="login-input"
+          type="number"
+          maxlength="11"
+          placeholder="11 位大陆手机号"
+          value="{{bindPhone}}"
+          bindinput="onBindPhone"
+        />
+      </view>
+      <button class="login-btn login-btn--wx login-btn--sheet" loading="{{loading}}" disabled="{{loading}}" bindtap="onConfirmPhoneBind">确认绑定</button>
+      <button class="login-btn login-btn--ghost login-btn--sheet" bindtap="onSkipPhoneBind">取消，先去看看</button>
+      <text class="login-err" wx:if="{{err}}">{{err}}</text>
+    </view>
+  </view>
+
+</view>

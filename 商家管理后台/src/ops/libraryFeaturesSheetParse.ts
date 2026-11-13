@@ -46,7 +46,7 @@ function parseBoolCell(raw: string): boolean | undefined {
 }
 
 /**
- * 解析 PR/达人库功能开通表：首列灵祺 ID，可选「增值服务」「推荐大厅」列。
+ * 解析 PR/达人库功能开通表：首列灵奇 ID，可选「增值服务」「推荐大厅」列。
  */
 export function parseLibraryFeaturesSheet(
   buf: ArrayBuffer,
@@ -68,14 +68,14 @@ export function parseLibraryFeaturesSheet(
 
   const idKeys =
     kind === 'pr'
-      ? ['灵祺PRID', 'PRID', '灵祺PR ID', 'LQ-P', 'id', 'ID']
-      : ['灵祺达人ID', '达人ID', '灵祺达人 ID', 'LQ-D', 'id', 'ID']
+      ? ['灵奇PRID', 'PRID', '灵奇PR ID', 'LQ-P', 'id', 'ID']
+      : ['灵奇达人ID', '达人ID', '灵奇达人 ID', 'LQ-D', 'id', 'ID']
 
   const rows: LibraryFeatureImportRow[] = []
   rawRows.forEach((row, idx) => {
     const id = pickCol(row, idKeys)
     if (!id) {
-      errors.push(`第 ${idx + 2} 行：缺少灵祺 ID`)
+      errors.push(`第 ${idx + 2} 行：缺少灵奇 ID`)
       return
     }
     const addons = parseBoolCell(pickCol(row, ['增值服务', 'addon', 'addons', '增值']))

@@ -18,7 +18,7 @@ description: >-
 1. 读上游 `SKILL.md` + `references/manifest.json`，再按类目打开对应 json。
 2. **禁止**改产品代码；生成图用即梦 Seedream / Cursor GenerateImage / 外部工具。
 3. 推荐 prompt 时尽量带样例图路径（`sourceMedia`）；无样例则跳过该条。
-4. 灵祺物料：优先 `product-marketing`、`poster-flyer`、`social-media-post`、`youtube-thumbnail`；品牌色可参考紫白 `#7c83ff`，但勿抄竞品 Logo。
+4. 灵奇物料：优先 `product-marketing`、`poster-flyer`、`social-media-post`、`youtube-thumbnail`；品牌色可参考紫白 `#7c83ff`，但勿抄竞品 Logo。
 
 ## Bootstrap
 
@@ -34,6 +34,6 @@ test -f "${AI_IMAGE_PROMPTS_HOME:-tools/ai-image-prompts-skill}/references/manif
 
 1. 确认 `references/` 存在。
 2. 读上游 SKILL 的检索/推荐步骤。
-3. 用户说清用途（抖音封面 / 直播背景 / 公众号头图 / 投流静帧）→ 从对应类目挑 2–4 条 → 按灵祺产品改写主体文案与色调。
+3. 用户说清用途（抖音封面 / 直播背景 / 公众号头图 / 投流静帧）→ 从对应类目挑 2–4 条 → 按灵奇产品改写主体文案与色调。
 4. 交付：可复制的英文/中英 prompt + 建议比例（9:16 / 1:1 / 16:9）+ 建议模型（Seedream / 即梦）。
 5. 若用户要「直接出图」：用 Cursor `GenerateImage` 或引导去即梦；本 skill 本身不替代生图 API。

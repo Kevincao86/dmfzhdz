@@ -342,7 +342,7 @@ export default function OpsMpAnnouncementsPage() {
 
           <input
             className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-slate-500"
-            placeholder="搜索昵称 / 灵祺ID / 地区"
+            placeholder="搜索昵称 / 灵奇ID / 地区"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
           />

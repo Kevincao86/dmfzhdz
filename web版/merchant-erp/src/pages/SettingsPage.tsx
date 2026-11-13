@@ -294,7 +294,7 @@ export default function SettingsPage() {
 
       <TenantPayModal
         open={subModalOpen}
-        title="订阅灵祺 ERP"
+        title="订阅灵奇 ERP"
         mode="subscription"
         initialTierIndex={subTierIndex}
         walletBalanceCents={billingSummary?.walletBalanceCents}

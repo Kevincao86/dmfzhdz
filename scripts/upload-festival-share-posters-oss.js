@@ -7,7 +7,7 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
-const SRC = path.join(ROOT, '灵祺达人撮合小程序/assets/recruit-poster-bg/festivals')
+const SRC = path.join(ROOT, '灵奇达人撮合小程序/assets/recruit-poster-bg/festivals')
 const OSS_MODULE = path.join(ROOT, 'web版/merchant-erp/node_modules/ali-oss')
 
 function loadEnvFile(filePath) {

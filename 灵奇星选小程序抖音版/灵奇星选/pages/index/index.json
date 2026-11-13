@@ -1,0 +1,7 @@
+{
+  "navigationStyle": "custom",
+  "navigationBarTitleText": "灵奇星选平台",
+  "disableScroll": true,
+  "enablePullDownRefresh": true,
+  "usingComponents": {}
+}

@@ -66,13 +66,13 @@ const MERCHANT_MARKETING: Record<LandingEditionKey, LandingHeroMarketing> = {
   merchant: {
     headline: '智能经营',
     sub: '多平台门店一体管 · AI 智能体辅助决策',
-    cta: '开店经营就上灵祺商家平台',
+    cta: '开店经营就上灵奇商家平台',
     accentEn: 'Smart Growth',
   },
   partner: {
     headline: '代运营增长',
     sub: '多客户商家协同 · 服务商身份一站绑定',
-    cta: '承接客户就上灵祺服务商平台',
+    cta: '承接客户就上灵奇服务商平台',
     accentEn: 'Partner Scale',
   },
 }
@@ -81,13 +81,13 @@ const PARTNER_MARKETING: Record<LandingEditionKey, LandingHeroMarketing> = {
   merchant: {
     headline: '商家工作台',
     sub: '从服务商入口快捷了解商家版能力',
-    cta: '前往灵祺商家版登录',
+    cta: '前往灵奇商家版登录',
     accentEn: 'Merchant ERP',
   },
   partner: {
     headline: '服务商工作台',
     sub: '绑定客户商家 · 多平台商品与招募代运营',
-    cta: '代运营就上灵祺服务商平台',
+    cta: '代运营就上灵奇服务商平台',
     accentEn: 'Partner OS',
   },
 }
@@ -100,7 +100,7 @@ function buildConfig(edition: LandingEditionKey): LandingConfig {
     edition,
     assetBase: isPartner ? '/landing-partner' : '/landing-merchant',
     brandTagline: isPartner ? 'LingQi · Partner OS' : 'LingQi · Local Life OS',
-    productTitle: isPartner ? '灵祺AI智能ERP · 服务商版' : '灵祺AI智能ERP · 商家版',
+    productTitle: isPartner ? '灵奇AI智能ERP · 服务商版' : '灵奇AI智能ERP · 商家版',
     heroFrames: [
       asset(edition, 'hero-1.png'),
       asset(edition, 'hero-2.png'),
@@ -231,7 +231,7 @@ function buildConfig(edition: LandingEditionKey): LandingConfig {
             glow: 'rgba(45, 212, 191, 0.35)',
           },
         ],
-    section4Title: isPartner ? '灵祺服务商平台' : '灵祺商家平台',
+    section4Title: isPartner ? '灵奇服务商平台' : '灵奇商家平台',
     section4TitleAccent: '助推经营增长',
     section4Steps: [
       { n: '01', title: isPartner ? '注册服务商租户' : '注册商家租户', active: true },

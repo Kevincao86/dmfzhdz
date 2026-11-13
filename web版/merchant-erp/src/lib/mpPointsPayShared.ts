@@ -162,7 +162,7 @@ export function buildPointsCheckoutBase(
     payMode,
   }
 
-  const description = `灵祺星选积分充值${points.toLocaleString('zh-CN')}积分`
+  const description = `灵奇星选积分充值${points.toLocaleString('zh-CN')}积分`
   const prev = data.mpPointsCheckoutRequests ?? []
   data.mpPointsCheckoutRequests = [checkout, ...prev].slice(0, 500)
 

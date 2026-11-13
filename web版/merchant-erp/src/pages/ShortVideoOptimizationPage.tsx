@@ -2584,7 +2584,7 @@ export default function ShortVideoOptimizationPage({ embed = false }: { embed?: 
         <div className="surface-card rounded-xl border border-amber-200 bg-amber-50/80 p-6 text-sm text-amber-950">
           <p className="font-medium">短视频 AI 处理尚未开通</p>
           <p className="mt-2 text-amber-900/80">
-            该增值能力需由灵祺运营在后台开通「短视频 AI 处理」或「灵祺 AI 云剪」后方可使用。如有合作意向请联系灵祺运营。
+            该增值能力需由灵奇运营在后台开通「短视频 AI 处理」或「灵奇 AI 云剪」后方可使用。如有合作意向请联系灵奇运营。
           </p>
         </div>
       ) : (

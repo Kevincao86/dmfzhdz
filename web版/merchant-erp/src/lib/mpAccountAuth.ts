@@ -68,7 +68,7 @@ import {
 
 export type MpAccountRole = 'talent' | 'pr'
 
-const WX_PLACEHOLDER_NICKS = new Set(['', '微信用户', '用户', '灵祺用户'])
+const WX_PLACEHOLDER_NICKS = new Set(['', '微信用户', '用户', '灵奇用户'])
 
 function mergeWxNick(incoming: string, existing?: string | null): string {
   const inc = String(incoming || '').trim()
@@ -698,7 +698,7 @@ function memberPhoneKey(m: RegistryMpTalentMember): string {
     .slice(-11)
 }
 
-/** 微信/手机号登录：分配灵祺 ID 并在注册表占位 */
+/** 微信/手机号登录：分配灵奇 ID 并在注册表占位 */
 async function provisionRegistryForAccount(
   supabaseUrl: string,
   serviceRole: string,
@@ -871,7 +871,7 @@ async function syncRegistryMember(
   return saved
 }
 
-/** 小程序保存达人资料：绑定登录账号，复用同一 openid 的灵祺达人 ID */
+/** 小程序保存达人资料：绑定登录账号，复用同一 openid 的灵奇达人 ID */
 export async function registerMpTalentMember(
   supabaseUrl: string,
   serviceRole: string,

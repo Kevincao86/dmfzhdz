@@ -24,7 +24,7 @@ const rows = [
   },
   {
     timeRange: '2-5秒',
-    dialogue: '灵祺商家ERP，听懂需求帮你组出方案。',
+    dialogue: '灵奇商家ERP，听懂需求帮你组出方案。',
   },
   {
     timeRange: '5-10秒',
@@ -68,7 +68,7 @@ assert(short.includes('少切App，多做生意。'), `短句应整行保留:\n$
 
 // 按提示词自动板式
 assert(
-  pickShortVideoSubtitleStyleFromPrompt('老板握着手机切 App，界面特写，灵祺商家ERP') === 'bottom-safe',
+  pickShortVideoSubtitleStyleFromPrompt('老板握着手机切 App，界面特写，灵奇商家ERP') === 'bottom-safe',
   'SaaS/手机应选安全区',
 )
 assert(

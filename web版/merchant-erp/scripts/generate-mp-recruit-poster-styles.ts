@@ -17,7 +17,7 @@ import { runAgentFreeformTextToImage } from '../vite-plugins/merchantAiUpstream.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '../..')
-const OUT_DIR = path.join(ROOT, '灵祺达人撮合小程序/assets/recruit-poster-bg')
+const OUT_DIR = path.join(ROOT, '灵奇达人撮合小程序/assets/recruit-poster-bg')
 
 type StyleSpec = {
   id: string

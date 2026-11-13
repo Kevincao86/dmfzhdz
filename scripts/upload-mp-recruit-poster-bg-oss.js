@@ -3,7 +3,7 @@
  * 上传招募分享海报背景图至 OSS（mp-recruit-covers/posters/）
  *
  * 源目录（需先放入 AI 设计导出的 png/webp）：
- *   灵祺达人撮合小程序/assets/recruit-poster-bg/
+ *   灵奇达人撮合小程序/assets/recruit-poster-bg/
  *     style-sunset-v1.png
  *     qr-frame-sunset-v1.png
  *     …（共 6 套 × 头图 + QR 框）
@@ -17,7 +17,7 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
-const SRC = path.join(ROOT, '灵祺达人撮合小程序/assets/recruit-poster-bg')
+const SRC = path.join(ROOT, '灵奇达人撮合小程序/assets/recruit-poster-bg')
 const OSS_MODULE = path.join(ROOT, 'web版/merchant-erp/node_modules/ali-oss')
 
 function loadEnvFile(filePath) {

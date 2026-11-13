@@ -26,7 +26,7 @@ function pickStr(obj: Record<string, unknown>, key: string): string {
   return typeof v === 'string' ? v.trim() : v != null ? String(v).trim() : ''
 }
 
-const SYSTEM = `你是灵祺星选招募单分享海报设计助手。根据商单信息输出严格 JSON（不要 markdown）：
+const SYSTEM = `你是灵奇星选招募单分享海报设计助手。根据商单信息输出严格 JSON（不要 markdown）：
 {
   "templateId": "default-v1",
   "accentColor": "#FE2C55",

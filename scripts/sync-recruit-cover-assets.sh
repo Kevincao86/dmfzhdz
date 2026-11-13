@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${1:-$ROOT/.recruit-covers-staging}"
-WEB="$ROOT/灵祺达人履约管理后台/public/recruit-covers"
+WEB="$ROOT/灵奇达人履约管理后台/public/recruit-covers"
 MERCHANT_PUBLIC="$ROOT/web版/merchant-erp/public/recruit-covers"
 ASSETS="${CURSOR_ASSETS:-$HOME/.cursor/projects/Volumes-OS-Data-Users-damowangOS-AI-ERP/assets}"
 
@@ -69,7 +69,7 @@ print(f"processed {count} images -> JPEG q={JPEG_QUALITY}")
 PY
 
 python3 "$ROOT/scripts/generate-recruit-cover-library.py" --manifest-only
-node -e "require('$ROOT/灵祺达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')"
+node -e "require('$ROOT/灵奇达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')"
 bash "$ROOT/scripts/sync-mp-recruit-covers.sh" "$WEB"
 
 echo "OK: web platforms=$(ls "$WEB/platforms"/*.jpg 2>/dev/null | wc -l | tr -d ' ') tags=$(ls "$WEB/tags"/*.jpg 2>/dev/null | wc -l | tr -d ' ') merchant=$(ls "$MERCHANT_PUBLIC/platforms"/*.jpg 2>/dev/null | wc -l | tr -d ' ')"

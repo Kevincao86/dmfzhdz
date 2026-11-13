@@ -16,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const DEFAULT_SRC = path.resolve(
   ROOT,
-  '../../灵祺达人履约管理后台/dist/digital-human/avatars',
+  '../../灵奇达人履约管理后台/dist/digital-human/avatars',
 )
 const OUT_DIR = path.join(ROOT, 'public/digital-human/avatars')
 

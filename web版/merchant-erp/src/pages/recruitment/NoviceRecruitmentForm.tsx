@@ -419,7 +419,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
 
     const kolPct = isDouyin ? parseKolCommissionPctFromDraft(kolCommissionInput) : 0
     const tenant = buildErpRegistryTenant()
-    const customerName = tenant?.merchantName ?? '灵祺 ERP 商户'
+    const customerName = tenant?.merchantName ?? '灵奇 ERP 商户'
     const storeName = selectedStores.map((s) => s.name).join('、') || citySummary
     const storeAddress =
       selectedStores.map((s) => (s.address?.trim() ? `${s.name}（${s.address.trim()}）` : s.name)).join('；') ||

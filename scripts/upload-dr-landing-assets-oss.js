@@ -9,7 +9,7 @@ const fs = require('fs')
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
-const PUBLIC = path.join(ROOT, '灵祺达人履约管理后台/public')
+const PUBLIC = path.join(ROOT, '灵奇达人履约管理后台/public')
 const LANDING = path.join(PUBLIC, 'landing')
 const OSS_MODULE = path.join(ROOT, 'web版/merchant-erp/node_modules/ali-oss')
 const OSS_SUBDIR = String(process.env.DR_LANDING_OSS_SUBDIR || 'dr-landing').replace(/^\/+|\/+$/g, '')

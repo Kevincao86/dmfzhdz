@@ -42,7 +42,7 @@ export const OPS_PAGE_HERO: Record<OpsPageHeroKey, OpsPageHeroMeta> = {
   },
   'talent-library': {
     image: '/ops-hero/talent-library.png',
-    title: '灵祺达人库',
+    title: '灵奇达人库',
     description:
       '达人填写平台资料或报名后按平台账号去重入库；按平台、粉丝档位、带货等级筛选，可批量调整星选达人版会员权限。',
     accent: '#8b5cf6',
@@ -86,7 +86,7 @@ export const OPS_PAGE_HERO: Record<OpsPageHeroKey, OpsPageHeroMeta> = {
     image: '/ops-hero/announcements.png',
     title: '商家 ERP 公告',
     description:
-      '向灵祺 ERP 注册用户推送站内公告，商户在 ERP 右上角铃铛查看；支持套餐到期预警与平台改动通知。',
+      '向灵奇 ERP 注册用户推送站内公告，商户在 ERP 右上角铃铛查看；支持套餐到期预警与平台改动通知。',
     accent: '#3b82f6',
   },
   'mp-announcements': {

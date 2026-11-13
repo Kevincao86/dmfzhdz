@@ -21,7 +21,7 @@ function pickStr(obj: Record<string, unknown>, key: string): string {
   return typeof v === 'string' ? v.trim() : v != null ? String(v).trim() : ''
 }
 
-const SYSTEM = `你是灵祺 ERP「转发代收」助手。用户粘贴了外部报名表/派单表链接，服务端已抓取页面文本（可能不完整）。
+const SYSTEM = `你是灵奇 ERP「转发代收」助手。用户粘贴了外部报名表/派单表链接，服务端已抓取页面文本（可能不完整）。
 请从文本中提炼可用于达人招募的关键信息，输出严格 JSON（不要 markdown）：
 {
   "titleHint": "商家或活动简称，20字内",

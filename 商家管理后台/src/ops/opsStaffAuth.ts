@@ -44,7 +44,7 @@ export const OPS_PERMISSION_MODULES = [
   { key: 'regional_partners', label: '区域服务商', pathPrefix: '/regional-partners' },
   { key: 'recruitment_orders', label: '商家达人招募订单', pathPrefix: '/recruitment-orders' },
   { key: 'mp_recruitment_orders', label: '小程序达人招募订单', pathPrefix: '/mp-recruitment-orders' },
-  { key: 'talent_library', label: '灵祺达人库', pathPrefix: '/talent-library' },
+  { key: 'talent_library', label: '灵奇达人库', pathPrefix: '/talent-library' },
   { key: 'shoot_team_library', label: '拍摄团队库', pathPrefix: '/shoot-team-library' },
   { key: 'edit_team_library', label: '剪辑团队库', pathPrefix: '/edit-team-library' },
   { key: 'pr_library', label: 'PR 用户库（增值/推荐大厅开通）', pathPrefix: '/pr-library' },

@@ -172,7 +172,7 @@ export default function DeskPage() {
       <header className="flex flex-wrap items-center gap-3 border-b border-[var(--line)] bg-black/20 px-4 py-3">
         <MessageCircle className="h-5 w-5 text-[var(--accent)]" />
         <div className="min-w-0 flex-1">
-          <h1 className="text-base font-semibold">灵祺在线客服</h1>
+          <h1 className="text-base font-semibold">灵奇在线客服</h1>
           <p className="text-xs text-[var(--muted)]">Web 台与飞书双通道 · 同一 support_relay</p>
         </div>
         <div className="flex items-center gap-2 text-xs">

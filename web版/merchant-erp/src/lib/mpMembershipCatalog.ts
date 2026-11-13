@@ -455,7 +455,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'review_ai_batch', label: '审片页 AI 检核（单条/批量）', group: '履约闭环', kind: 'boolean' },
     { key: 'talent_library', label: 'PR 全部达人库 + 智能荐达人', group: '达人库', kind: 'boolean' },
     { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: '灵奇 AI 云剪', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_visual_studio', label: 'AI 视觉工坊', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_drama', label: 'AI短剧', group: 'AI 内容', kind: 'boolean' },
@@ -486,7 +486,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     },
     { key: 'publish_link_check', label: '发布链接 AI 核查', group: 'AI 审核', kind: 'boolean' },
     { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: '灵奇 AI 云剪', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_visual_studio', label: 'AI 视觉工坊', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_drama', label: 'AI短剧', group: 'AI 内容', kind: 'boolean' },
@@ -504,7 +504,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
     { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: '灵奇 AI 云剪', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_visual_studio', label: 'AI 视觉工坊', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_drama', label: 'AI短剧', group: 'AI 内容', kind: 'boolean' },
@@ -525,7 +525,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'addon_ai_video_review', label: 'AI短视频审核（2 积分/秒）', group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_ai_script_review', label: 'AI文稿审核（2 积分/次）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（8 积分/篇）', group: 'AI 增值', kind: 'boolean' },
-    { key: 'cloud_edit', label: '灵祺 AI 云剪闭环', group: 'AI 增值', kind: 'boolean' },
+    { key: 'cloud_edit', label: '灵奇 AI 云剪闭环', group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多席位 / 优先客服', group: '团队', kind: 'boolean' },
   ],
@@ -849,24 +849,24 @@ export const MP_PLAN_PAGE_META: Record<
   { title: string; subtitle: string; footerNote: string }
 > = {
   pr: {
-    title: '灵祺星选 · PR 版',
+    title: '灵奇星选 · PR 版',
     subtitle: '品牌 PR · MCN · 代运营 — 发单、反选、审片、荐达人',
     footerNote:
       '结算与资金由 PR 与达人线下完成，星选不代管资金。AI 检核按积分结算：视频 2 积分/秒、文稿 2 积分/次、Brief 8 积分/篇；超额可充值（¥1=40 积分）。',
   },
   talent: {
-    title: '灵祺星选 · 达人版',
+    title: '灵奇星选 · 达人版',
     subtitle: '探店达人 · 种草博主 · 找商单 · 交片前 AI 自检',
     footerNote:
       '结算查询音视频/抖音，星选不代资金结算。AI 检核按积分结算；超额可充值。新注册送100积分。',
   },
   shoot: {
-    title: '灵祺星选 · 拍摄团队版',
+    title: '灵奇星选 · 拍摄团队版',
     subtitle: '摄影师 · 跟拍团队 · 接拍摄商单 · 交片前 AI 自检',
     footerNote: '拍摄团队结算线下完成。AI 检核按积分结算；超额可充值。',
   },
   edit: {
-    title: '灵祺星选 · 剪辑团队版',
+    title: '灵奇星选 · 剪辑团队版',
     subtitle: '剪辑师 · 后期工作室 · 云剪接单 · 交片前 AI 自检',
     footerNote: '剪辑团队结算线下完成。AI 检核按积分结算；超额可充值。',
   },

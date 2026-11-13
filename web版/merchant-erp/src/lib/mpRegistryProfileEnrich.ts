@@ -146,7 +146,7 @@ function libraryEntryToLooseProfile(e: RegistryTalentLibraryEntry): LooseProfile
   }
 }
 
-/** 灵祺达人库 + 同手机号其他注册会员 → 可回填的平台资料 */
+/** 灵奇达人库 + 同手机号其他注册会员 → 可回填的平台资料 */
 export function findTalentLibraryEntriesForAccount(
   data: RegistryFile,
   account: MpAccountRow,
@@ -208,7 +208,7 @@ function mergeScalarFields(
 }
 
 /**
- * 将运营台「灵祺达人库」与同手机号会员的平台资料合并到当前登录绑定的 mpTalentMember。
+ * 将运营台「灵奇达人库」与同手机号会员的平台资料合并到当前登录绑定的 mpTalentMember。
  * 解决 LQ-D-000009 空壳、资料落在 LQ-D-000001 / talentLibraryEntries 的情况。
  */
 export function enrichMemberFromRegistrySources(

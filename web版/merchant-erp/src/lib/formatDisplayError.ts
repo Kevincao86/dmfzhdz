@@ -34,9 +34,9 @@ const TENANT_PAY_ERROR_ZH: Record<string, string> = {
   wechat_pay_not_configured: '微信支付未在服务器配置，请联系管理员',
   erp_wx_not_configured: '商家 ERP 小程序微信未配置（ERP_MP_WECHAT_APPID），请联系管理员',
   wechat_appid_openid_mismatch:
-    '微信 AppID 与用户 openid 不匹配，请确认商户号已关联灵祺ERP小程序后重试',
+    '微信 AppID 与用户 openid 不匹配，请确认商户号已关联灵奇ERP小程序后重试',
   wechat_appid_mch_mismatch:
-    '商户号未关联灵祺ERP小程序。请登录 pay.weixin.qq.com → 产品中心 → AppID账号管理 → 关联 AppID：wxdf5f53fb6b14ace9，并在小程序后台确认后重试',
+    '商户号未关联灵奇ERP小程序。请登录 pay.weixin.qq.com → 产品中心 → AppID账号管理 → 关联 AppID：wxdf5f53fb6b14ace9，并在小程序后台确认后重试',
   alipay_not_configured: '支付宝未在服务器配置，请联系管理员',
   douyinpay_not_configured: '抖音支付未在服务器配置，请联系管理员',
   douyin_pay_not_configured: '抖音支付未在服务器配置，请联系管理员',

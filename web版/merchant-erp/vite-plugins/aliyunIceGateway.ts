@@ -220,7 +220,7 @@ export async function handleAliyunIceRoutes(input: {
       smartBatchTemplateIds: parseSmartBatchTemplateIds(reg.iceSmartBatchTemplateIds),
       urlUploadRequiresVod: Boolean(cfg?.vodStorageLocation?.trim()),
       credentialNote:
-        '灵祺AI云剪：本地上传写入运营台「OSS 成片 URL 前缀」对应 Bucket（须 IMS 媒资库已绑定 + RAM 含 oss:PutObject）；StorageLocation（outin-*）用于成片输出与 RegisterMediaInfo；RAM 还须 AliyunICEFullAccess。',
+        '灵奇AI云剪：本地上传写入运营台「OSS 成片 URL 前缀」对应 Bucket（须 IMS 媒资库已绑定 + RAM 含 oss:PutObject）；StorageLocation（outin-*）用于成片输出与 RegisterMediaInfo；RAM 还须 AliyunICEFullAccess。',
       docsUrl:
         'https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-overview',
     })
@@ -656,7 +656,7 @@ export async function handleAliyunIceRoutes(input: {
       return true
     }
     if (!cfg) {
-      json(res, 503, { ok: false, message: '灵祺AI云剪未配置' })
+      json(res, 503, { ok: false, message: '灵奇AI云剪未配置' })
       return true
     }
     const inline = searchParams.get('inline') === '1'

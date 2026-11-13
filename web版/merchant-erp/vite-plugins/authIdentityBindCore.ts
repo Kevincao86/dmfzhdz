@@ -462,7 +462,7 @@ async function sendViaFeishuMail(
       body: JSON.stringify({
         subject,
         to: [{ mail_address: to }],
-        head_from: { name: '灵祺' },
+        head_from: { name: '灵奇' },
         body_plain_text: text,
       }),
     })
@@ -550,7 +550,7 @@ async function sendSmtpMail(to: string, subject: string, text: string): Promise<
         await smtpCommand(socket, `RCPT TO:<${to}>`)
         await smtpCommand(socket, 'DATA')
         const payload =
-          `From: 灵祺 <${from}>\r\nTo: ${to}\r\nSubject: ${encodedSubject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n${text}\r\n.\r\n`
+          `From: 灵奇 <${from}>\r\nTo: ${to}\r\nSubject: ${encodedSubject}\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n${text}\r\n.\r\n`
         await smtpCommand(socket, payload)
         await smtpCommand(socket, 'QUIT')
         socket.end()
@@ -575,8 +575,8 @@ export async function sendAuthEmailCode(emailRaw: string): Promise<
   if (!email) return { ok: false, error: 'invalid_email', message: '请输入有效邮箱' }
   const code = String(randomInt(100000, 999999))
   emailOtpStore.set(email, { code, exp: Date.now() + EMAIL_OTP_TTL_MS })
-  const text = `您的灵祺ERP验证码是 ${code}，5 分钟内有效。如非本人操作请忽略。`
-  const subject = '灵祺ERP邮箱验证码'
+  const text = `您的灵奇ERP验证码是 ${code}，5 分钟内有效。如非本人操作请忽略。`
+  const subject = '灵奇ERP邮箱验证码'
   if (smtpConfigured()) {
     const sent = await sendSmtpMail(email, subject, text)
     if (!sent.ok) return { ok: false, error: 'email_send_failed', message: sent.message }
@@ -595,7 +595,7 @@ export async function sendAuthEmailCode(emailRaw: string): Promise<
     }
   }
   if (allowDevEmailCode()) {
-    return { ok: true, message: '开发环境验证码已生成（发件箱 灵祺）', devCode: code }
+    return { ok: true, message: '开发环境验证码已生成（发件箱 灵奇）', devCode: code }
   }
   return {
     ok: false,

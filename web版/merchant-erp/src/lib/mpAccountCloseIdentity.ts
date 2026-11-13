@@ -45,7 +45,7 @@ function libraryPhone(row: { contact?: string; wechatId?: string }): string {
 
 /**
  * 注销账号时清掉这个人在注册表里的达人、PR、拍摄、剪辑身份。
- * 只按本账号的手机号、微信/抖音 openid 和已绑定的灵祺编号匹配，其他用户的资料保留。
+ * 只按本账号的手机号、微信/抖音 openid 和已绑定的灵奇编号匹配，其他用户的资料保留。
  */
 export function purgeClosedAccountIdentities(
   data: RegistryFile,

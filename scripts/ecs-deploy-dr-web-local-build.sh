@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 新 ECS（2G 内存）履约 DR 发版：本机构建 灵祺达人履约管理后台 dist → rsync → 远程 SKIP_BUILD
+# 新 ECS（2G 内存）履约 DR 发版：本机构建 灵奇达人履约管理后台 dist → rsync → 远程 SKIP_BUILD
 #
 # DR 通过 @merchant 嵌入商家 CS 同源页面（AI 视觉工坊 / 数字人口播等），发版须带上最新 merchant-erp。
 #
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-FUL="$ROOT/灵祺达人履约管理后台"
+FUL="$ROOT/灵奇达人履约管理后台"
 ERP="$ROOT/web版/merchant-erp"
 ENV_PROD="$FUL/.env.production"
 CS_HOST="${CS_HOST:-admin@8.160.173.236}"
@@ -63,14 +63,14 @@ if [[ -f scripts/ecs-git-pull-gitee.sh ]]; then
   bash scripts/ecs-git-pull-gitee.sh
 fi
 echo "HEAD: $(git log -1 --oneline)"
-mkdir -p ~/app/灵祺达人履约管理后台/dist
+mkdir -p ~/app/灵奇达人履约管理后台/dist
 REMOTE
 
 echo "== 2) 上传本机 dist 到新 ECS（rsync，覆盖仓库内陈旧 dist）=="
 rsync -az --delete \
   -e "ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new" \
   "$FUL/dist/" \
-  "$CS_HOST:~/app/灵祺达人履约管理后台/dist/"
+  "$CS_HOST:~/app/灵奇达人履约管理后台/dist/"
 echo "OK: dist 已同步到 $CS_HOST"
 
 LOCAL_IDX="$(grep -oE 'assets/index-[^"]+\.js' "$FUL/dist/index.html" | head -1 | sed 's|^assets/||')"
@@ -82,8 +82,8 @@ ssh -o ConnectTimeout=25 -o StrictHostKeyChecking=accept-new "$CS_HOST" \
   bash -s <<'REMOTE'
 set -euo pipefail
 cd ~/app
-idx="$(grep -oE 'assets/index-[^"]+\.js' 灵祺达人履约管理后台/dist/index.html | head -1 | sed 's|^assets/||')"
-if [[ -z "$idx" || ! -f "灵祺达人履约管理后台/dist/assets/$idx" ]]; then
+idx="$(grep -oE 'assets/index-[^"]+\.js' 灵奇达人履约管理后台/dist/index.html | head -1 | sed 's|^assets/||')"
+if [[ -z "$idx" || ! -f "灵奇达人履约管理后台/dist/assets/$idx" ]]; then
   echo "FATAL: 上传后 dist 不完整，拒绝 SKIP_BUILD"
   exit 1
 fi

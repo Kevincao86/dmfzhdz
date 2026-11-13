@@ -1,4 +1,4 @@
-/** 灵祺星选 Web 平台（dr）— 与 ERP / 小程序共用运营注册表 */
+/** 灵奇星选 Web 平台（dr）— 与 ERP / 小程序共用运营注册表 */
 
 export function xingxuanWebOrigin(): string {
   const fromEnv = (import.meta.env.VITE_XINGXUAN_WEB_URL as string | undefined)?.trim()

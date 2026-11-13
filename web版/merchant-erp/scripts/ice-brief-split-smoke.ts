@@ -30,8 +30,8 @@ if (!plan.bgmClip?.mediaUrl?.includes('ice-document-materials.oss-cn-shanghai.al
   process.exit(1)
 }
 
-const noisy = sanitizeIceEditBriefBrandNoise('灵祺AI云剪推荐「招牌面」')
-if (noisy.includes('灵祺') || noisy.includes('云剪')) {
+const noisy = sanitizeIceEditBriefBrandNoise('灵奇AI云剪推荐「招牌面」')
+if (noisy.includes('灵奇') || noisy.includes('云剪')) {
   console.error('FAIL: brand noise sanitize', noisy)
   process.exit(1)
 }

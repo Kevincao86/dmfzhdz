@@ -119,7 +119,7 @@ export function upsertMpTalentMember(
   return upsertSupplierTeamLibraryFromMember(data, next)
 }
 
-/** 同一微信 openid 仅保留一条达人会员，合并灵祺 ID 避免重复建档 */
+/** 同一微信 openid 仅保留一条达人会员，合并灵奇 ID 避免重复建档 */
 export function dedupeMpTalentMembersByOpenId(
   data: RegistryFile,
   openId: string,

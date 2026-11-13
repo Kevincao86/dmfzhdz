@@ -233,7 +233,7 @@ function financeRowToExportCells(row: MpMembershipFinanceRow): Record<string, st
     创建时间: row.createdAt,
     支付时间: row.paidAt || '',
     用户: row.displayName || '',
-    灵祺ID: row.lingqiId || '',
+    灵奇ID: row.lingqiId || '',
     账号ID: row.accountId,
     身份: mpMembershipRoleLabel(row.role),
     档位: mpMembershipPlanLabel(row.planId),

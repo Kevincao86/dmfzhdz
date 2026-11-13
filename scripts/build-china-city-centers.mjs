@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const china = require('../灵祺达人撮合小程序/utils/chinaRegion.js')
+const china = require('../灵奇达人撮合小程序/utils/chinaRegion.js')
 const src = process.argv[2] || '/tmp/xzqh_coords.json'
 const raw = JSON.parse(fs.readFileSync(src, 'utf8'))
 
@@ -70,7 +70,7 @@ for (const c of centers) {
   uniq.push(c)
 }
 
-const outPath = new URL('../灵祺达人撮合小程序/utils/chinaCityCenters.js', import.meta.url)
+const outPath = new URL('../灵奇达人撮合小程序/utils/chinaCityCenters.js', import.meta.url)
 fs.writeFileSync(
   outPath,
   `/** 地级市中心坐标 GCJ-02（cn-pcas-geo / 高德区划中心均值） */\nmodule.exports = ${JSON.stringify(uniq, null, 2)}\n`,

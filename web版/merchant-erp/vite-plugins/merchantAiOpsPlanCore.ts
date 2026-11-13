@@ -342,7 +342,7 @@ const SYSTEM_PROMPT = `你是资深本地生活/餐饮多平台运营总监。�
 硬性要求：
 1. 只基于用户提供的菜单价目/已上架套餐/毛利/类目/竞品/预算/平台/门店范围；无菜单时用「已上架套餐」清单组品，勿编造菜名。多门店时方案须覆盖所选门店（或注明分店差异）。
 2. marketingBudget.totalBudget 必须等于用户填写的预算，禁止改成别的数；channels 合计必须等于该预算；须含 roiSummary + roiAnalysis（含投入/预计GMV/订单/ROI/回本天数）。
-3. 【达人写死】talentBudget 必须基于用户消息中的「灵祺星选达人库」段：先按门店城市取同城；无同城则已注入全国本地生活行情。必须读清并写明：头部（销售等级5级及以上 / V5·V5+）人数与样本、腰尾部（3–4级 / V3·V4）人数与样本；budgetLines 至少覆盖「短视频达人（头部/腰部/尾部分行）」「短视频本地推」「直播达人」「直播投流」；tier 与库分层对齐；人数/单价禁止脱离库数据；无同城时 note 注明「按全国本地生活达人行情」；subtotalYuan=人数×单价+投流；talentRows≥6。
+3. 【达人写死】talentBudget 必须基于用户消息中的「灵奇星选达人库」段：先按门店城市取同城；无同城则已注入全国本地生活行情。必须读清并写明：头部（销售等级5级及以上 / V5·V5+）人数与样本、腰尾部（3–4级 / V3·V4）人数与样本；budgetLines 至少覆盖「短视频达人（头部/腰部/尾部分行）」「短视频本地推」「直播达人」「直播投流」；tier 与库分层对齐；人数/单价禁止脱离库数据；无同城时 note 注明「按全国本地生活达人行情」；subtotalYuan=人数×单价+投流；talentRows≥6。
 4. calendar.milestones 日期落在周期内，≥12 条；除必选 kind（collab_confirm→live_go）外，另给 other：确认货盘、造话题#、预热物料、直播彩排、数据战报等；video_publish/live_* 带 HH:mm。缺项服务端会补全。
 5. platformStrategy 仅用户勾选平台；examples 须像爆款钩子文案；detail≤120字且含 POI/挂链或投流之一。
 6. 组品 3～5 个，优先真实菜单名或已上架套餐名；sellingPoint 写清券面/让利卖点。
@@ -1014,7 +1014,7 @@ export async function runAiOpsPlanCore(
       }
     } else {
       talentLibraryBlock =
-        '【灵祺星选达人库】当前库内暂无达人条目；talentBudget 须按本地生活探店常规档位保守估算，并在 note 标明「达人库暂空」。'
+        '【灵奇星选达人库】当前库内暂无达人条目；talentBudget 须按本地生活探店常规档位保守估算，并在 note 标明「达人库暂空」。'
     }
   } catch (e) {
     console.warn(
@@ -1022,7 +1022,7 @@ export async function runAiOpsPlanCore(
       e instanceof Error ? e.message.slice(0, 160) : e,
     )
     talentLibraryBlock =
-      '【灵祺星选达人库】读取失败；talentBudget 须保守估算并在 note 标明「达人库暂不可用」。'
+      '【灵奇星选达人库】读取失败；talentBudget 须保守估算并在 note 标明「达人库暂不可用」。'
   }
 
   const userPrompt = [
@@ -1046,7 +1046,7 @@ export async function runAiOpsPlanCore(
     body.goalsNote ? `商家补充目标：${body.goalsNote}` : '',
     talentLibraryBlock,
     buildAiOpsRoiLookupForPrompt(platforms, body.industryPath),
-    '请生成完整六块方案 JSON（紧凑、可一次解析完）；roiAnalysis 按【转化率查询结果】写 GMV/订单/ROI（客单×单量且覆盖毛利盈亏线）；goalsDetail 对齐；须含 budgetLines 且严格依据【灵祺达人库】；Detail/howTo 短而可执行；日历≥8 条带 kind；hourlySchedule 仅直播。',
+    '请生成完整六块方案 JSON（紧凑、可一次解析完）；roiAnalysis 按【转化率查询结果】写 GMV/订单/ROI（客单×单量且覆盖毛利盈亏线）；goalsDetail 对齐；须含 budgetLines 且严格依据【灵奇达人库】；Detail/howTo 短而可执行；日历≥8 条带 kind；hourlySchedule 仅直播。',
   ]
     .filter(Boolean)
     .join('\n\n')

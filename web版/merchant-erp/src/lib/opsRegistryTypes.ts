@@ -188,7 +188,7 @@ export type CpsTalentSettlement = {
   commissionPct: number
 }
 
-/** 服务商版 / PR 星选：灵祺招募单 ↔ 抖音林客 CPS 定向计划联动 */
+/** 服务商版 / PR 星选：灵奇招募单 ↔ 抖音林客 CPS 定向计划联动 */
 export type RecruitmentCpsLinkage = {
   provider: 'douyin'
   planType: 'video_oriented'
@@ -448,7 +448,7 @@ export type MpFulfillmentTimelineEvent = {
 
 export type RegistryTalentLibraryEntry = {
   id: string
-  /** 灵祺固定达人身份 ID（LQ-D-xxxxxx） */
+  /** 灵奇固定达人身份 ID（LQ-D-xxxxxx） */
   lingqiTalentId?: string
   platform: '抖音' | '小红书' | '大众点评' | '快手' | '微信视频号'
   platformAccount: string
@@ -560,10 +560,10 @@ export type RegistryMpTalentPlatformReferenceQuote = {
   syncedAt?: string
 }
 
-/** 达人招募小程序 · 灵祺达人会员 */
+/** 达人招募小程序 · 灵奇达人会员 */
 export type RegistryMpTalentMember = {
   id: string
-  /** 灵祺固定达人身份 ID（LQ-D-xxxxxx），填写平台资料后分配 */
+  /** 灵奇固定达人身份 ID（LQ-D-xxxxxx），填写平台资料后分配 */
   lingqiTalentId?: string
   memberType: 'douyin' | 'xiaohongshu' | 'both'
   wxNickName: string
@@ -650,7 +650,7 @@ export type RegistrySupplierTeamLibraryEntry = {
 /** 达人招募小程序 · PR 用户（机构/个人发单方） */
 export type RegistryMpPrUser = {
   id: string
-  /** 灵祺固定 PR 身份 ID（LQ-P-xxxxxx） */
+  /** 灵奇固定 PR 身份 ID（LQ-P-xxxxxx） */
   lingqiPrId: string
   accountType: 'company' | 'personal'
   companyName?: string
@@ -666,7 +666,7 @@ export type RegistryMpPrUser = {
   wxNickName?: string
   wxAvatarUrl?: string
   wxOpenId?: string
-  /** 登录平台账号：小程序=微信 openid，履约 Web=手机号；用于锁死灵祺 PRID */
+  /** 登录平台账号：小程序=微信 openid，履约 Web=手机号；用于锁死灵奇 PRID */
   platformAccount?: string
   /** mp=小程序微信登录；web=履约 Web 手机登录 */
   sourceChannel?: 'mp' | 'web'

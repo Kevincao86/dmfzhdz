@@ -2,8 +2,8 @@
 # 小程序专用封面分包（高压缩 JPEG，与星选 Web public/recruit-covers 分离）
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="${1:-$ROOT/灵祺达人履约管理后台/public/recruit-covers}"
-OUT="$ROOT/灵祺达人撮合小程序/packages/recruit-covers-mp"
+SRC="${1:-$ROOT/灵奇达人履约管理后台/public/recruit-covers}"
+OUT="$ROOT/灵奇达人撮合小程序/packages/recruit-covers-mp"
 
 if [[ ! -d "$SRC/platforms" ]]; then
   echo "用法: bash scripts/sync-mp-recruit-covers.sh [web/public/recruit-covers 目录]"
@@ -55,4 +55,4 @@ if [[ "${UPLOAD_OSS:-}" == "1" ]]; then
   node "$ROOT/scripts/upload-mp-recruit-covers-oss.js"
 fi
 
-node -e "require('$ROOT/灵祺达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')"
+node -e "require('$ROOT/灵奇达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')"

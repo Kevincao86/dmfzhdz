@@ -93,7 +93,7 @@ export async function resumePointsAlipayPayFromSnapshot(
     return { ok: false, error: cfgResult.error, status: 503 }
   }
   const cfg = cfgResult.config
-  const description = `灵祺星选积分充值${checkout.points.toLocaleString('zh-CN')}积分`
+  const description = `灵奇星选积分充值${checkout.points.toLocaleString('zh-CN')}积分`
   const attach = JSON.stringify({ rid: checkout.id, role: checkout.role, kind: 'points' })
   const outTradeNo = String(checkout.outTradeNo || '').trim()
   if (!outTradeNo) return { ok: false, error: 'missing_out_trade_no', status: 400 }

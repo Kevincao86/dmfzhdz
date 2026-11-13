@@ -4,7 +4,7 @@
 # 用法：cd ~/app && git pull gitee main && bash scripts/ecs-sync-mp-share-cover.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/灵祺达人撮合小程序/images/share/share-cover-ai-match.jpg"
+SRC="$ROOT/灵奇达人撮合小程序/images/share/share-cover-ai-match.jpg"
 NGINX_SITE="/etc/nginx/sites-available/meoo-api"
 STATIC_ROOT="/var/www/meoo-static"
 STATIC_FILE="$STATIC_ROOT/recruit-covers/share/share-cover-ai-match.jpg"
@@ -26,7 +26,7 @@ fi
 # 备份：dist / fulfillment public（可选，本地调试用）
 for dir in \
   "$ROOT/web版/merchant-erp/dist/recruit-covers/share" \
-  "$ROOT/灵祺达人履约管理后台/public/recruit-covers/share"; do
+  "$ROOT/灵奇达人履约管理后台/public/recruit-covers/share"; do
   mkdir -p "$dir"
   cp -f "$SRC" "$dir/share-cover-ai-match.jpg"
   chmod 644 "$dir/share-cover-ai-match.jpg" 2>/dev/null || true

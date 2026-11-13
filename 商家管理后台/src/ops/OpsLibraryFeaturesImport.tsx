@@ -63,7 +63,7 @@ export default function OpsLibraryFeaturesImport({ kind, onDone }: Props) {
             <h3 className="text-base font-semibold text-white">表格批量开通 / 关闭</h3>
             <p className="mt-2 text-xs leading-relaxed text-slate-400">
               上传 .xlsx，首列填写
-              {kind === 'pr' ? '灵祺 PRID（LQ-P-xxxxxx）' : '灵祺达人 ID（LQ-D-xxxxxx）'}，可选列：
+              {kind === 'pr' ? '灵奇 PRID（LQ-P-xxxxxx）' : '灵奇达人 ID（LQ-D-xxxxxx）'}，可选列：
               <strong className="text-slate-300">增值服务</strong>、
               <strong className="text-slate-300">推荐大厅</strong>。填「开通/关闭」「是/否」「1/0」均可。
             </p>

@@ -20,7 +20,7 @@ export const DOUYIN_PARTNER_BIND_GUIDE: BindGuideConfig = {
       title: '开放平台创建并配置「服务商应用」',
       bullets: [
         '在抖音开放平台创建「服务商应用」（不要选「生活服务商家应用」）。',
-        '开通业务所需解决方案能力，并配置服务器 IP 白名单（与灵祺出口一致）。',
+        '开通业务所需解决方案能力，并配置服务器 IP 白名单（与灵奇出口一致）。',
         '准备好 AppID、App Secret、服务商根账户 ID（非客户商家账户 ID）。',
       ],
       note: '服务商应用凭证只代表「你这家服务商」的身份，不能直接代替某个客户商家发门店/商品请求。',
@@ -28,7 +28,7 @@ export const DOUYIN_PARTNER_BIND_GUIDE: BindGuideConfig = {
     {
       id: 'sp-erp',
       phase: 'sp',
-      title: '在灵祺「服务商平台」保存 SP 凭证',
+      title: '在灵奇「服务商平台」保存 SP 凭证',
       bullets: [
         '路径：系统设置 → 服务商平台 → 抖音林客。',
         '点击「绑定抖音林客」，填写 AppID、App Secret、服务商账户 ID 并确认。',
@@ -54,7 +54,7 @@ export const DOUYIN_PARTNER_BIND_GUIDE: BindGuideConfig = {
       phase: 'client',
       title: '「应用能力授权」与「代运营确认」要分开看',
       bullets: [
-        '应用能力授权（auth_with_bind）：把商家 account_id 授权给本服务商应用，并回写到灵祺「客户商家」列表。',
+        '应用能力授权（auth_with_bind）：把商家 account_id 授权给本服务商应用，并回写到灵奇「客户商家」列表。',
         '代运营合作确认：授权成功后由系统发起合作单，商家还须在来客 App 点一次确认，合作才真正生效。',
         '第二步不是重复做应用授权，而是抖音要求的代运营确认。',
       ],
@@ -64,12 +64,12 @@ export const DOUYIN_PARTNER_BIND_GUIDE: BindGuideConfig = {
       phase: 'faq',
       title: '商家已经授权过服务商，还要再授权吗？',
       bullets: [
-        '走「邀请开通」：仍需点一次官方授权链接。即使抖音侧此前已授过权，也要通过本链接把 account_id 与开通任务写回灵祺；来客里可能更快确认，但产品流程不能跳过。',
+        '走「邀请开通」：仍需点一次官方授权链接。即使抖音侧此前已授过权，也要通过本链接把 account_id 与开通任务写回灵奇；来客里可能更快确认，但产品流程不能跳过。',
         '若开放平台已开通「代运营合作」，可直接「从抖音拉取已合作商家」。',
         '若你已掌握客户商家账户 ID / 凭证：可改用「手工录入」，不必再发授权链接。',
         '无论邀请开通还是手工录入后发起合作：代运营合作确认仍可能需要商家在来客 App 再点一次。',
       ],
-      note: '「已经授权过」≠「灵祺客户商家列表已有该账号」≠「代运营合作已确认」。',
+      note: '「已经授权过」≠「灵奇客户商家列表已有该账号」≠「代运营合作已确认」。',
     },
     {
       id: 'manual',
@@ -93,7 +93,7 @@ export const DOUYIN_PARTNER_BIND_GUIDE: BindGuideConfig = {
   ],
   erpPhaseLabel: '四、操作路径速查',
   erpStep: {
-    title: '在灵祺服务商版完成绑定',
+    title: '在灵奇服务商版完成绑定',
     bullets: [
       '服务商应用：系统设置 → 服务商平台 → 绑定抖音林客。',
       '客户商家：系统设置 → 客户商家 → 邀请开通 / 拉取已合作商家 / 手工录入。',

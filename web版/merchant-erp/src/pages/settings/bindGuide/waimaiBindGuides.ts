@@ -9,7 +9,7 @@ export const ELEME_BIND_GUIDE_STEPS = [
   },
   {
     title: '3. 在本系统绑定',
-    body: '将 AppKey、AppSecret 填入灵祺 ERP「商家版后台 → 外卖平台 → 淘宝闪购」并保存（接入模式：商家自研）。',
+    body: '将 AppKey、AppSecret 填入灵奇 ERP「商家版后台 → 外卖平台 → 淘宝闪购」并保存（接入模式：商家自研）。',
   },
   {
     title: '4. 配置服务端环境变量（可选）',
@@ -27,7 +27,7 @@ export const MEITUAN_WAIMAI_BIND_GUIDE_STEPS = [
     body: '记录 App Key、App Secret，以及外卖侧商户/开发者 ID；按文档完成门店授权，如有 appAuthToken 一并保存。',
   },
   {
-    title: '3. 绑定灵祺 ERP',
+    title: '3. 绑定灵奇 ERP',
     body: '在「商家版后台 → 外卖平台 → 美团外卖」填写凭据并绑定（接入模式：商家自研）。正式 OpenAPI 已配置时将做连通性探测。',
   },
   {
@@ -46,7 +46,7 @@ export const JD_WAIMAI_BIND_GUIDE_STEPS = [
     body: '确保应用已开通门店、商品、订单、评价、营销等相关 API 权限。',
   },
   {
-    title: '3. 绑定灵祺 ERP',
+    title: '3. 绑定灵奇 ERP',
     body: '在「商家版后台 → 外卖平台 → 京东外卖」完成绑定（接入模式：商家自研）。',
   },
   {

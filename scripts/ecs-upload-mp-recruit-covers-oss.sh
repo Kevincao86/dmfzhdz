@@ -7,8 +7,8 @@ cd "$ROOT"
 # 勿 source ~/stack/auth-api.env（Secret 含 +/= 等特殊字符时 bash 会报 line N: xxx: No such file）
 if [[ -d "$ROOT/.recruit-covers-staging/platforms" ]]; then
   bash "$ROOT/scripts/sync-mp-recruit-covers.sh" "$ROOT/.recruit-covers-staging" || true
-elif [[ -d "$ROOT/灵祺达人履约管理后台/public/recruit-covers/platforms" ]]; then
-  bash "$ROOT/scripts/sync-mp-recruit-covers.sh" "$ROOT/灵祺达人履约管理后台/public/recruit-covers" || true
+elif [[ -d "$ROOT/灵奇达人履约管理后台/public/recruit-covers/platforms" ]]; then
+  bash "$ROOT/scripts/sync-mp-recruit-covers.sh" "$ROOT/灵奇达人履约管理后台/public/recruit-covers" || true
 else
   echo "跳过 sync（使用 Git 内 packages/recruit-covers-mp 现成 JPEG）"
 fi

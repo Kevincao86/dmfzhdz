@@ -622,7 +622,7 @@ export function TalentChatRoster({
       const order: RegistryRecruitmentOrder = {
         id: `RO-AI${Date.now()}`,
         ...tenantMeta,
-        customerName: tenant?.merchantName || storeName || '灵祺 ERP 商户',
+        customerName: tenant?.merchantName || storeName || '灵奇 ERP 商户',
         storeName: storeName || city || '门店',
         talentId: '—',
         talentName: names.slice(0, 80) || '定向达人',

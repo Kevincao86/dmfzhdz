@@ -1,0 +1,161 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/login/login",
+    "pages/recommend/recommend",
+    "pages/publish/publish",
+    "pages/messages/messages",
+    "pages/mine/mine",
+    "pages/register/register",
+    "pages/apply/apply",
+    "pages/web-link/web-link"
+  ],
+  "subPackages": [
+    {
+      "root": "pages/subpack-signup",
+      "name": "subpackSignup",
+      "pages": [
+        "signup/signup",
+        "legal/legal"
+      ]
+    },
+    {
+      "root": "pages/subpack-core",
+      "name": "subpackCore",
+      "pages": [
+        "detail/detail"
+      ]
+    },
+    {
+      "root": "pages/subpack-pr",
+      "name": "subpackPr",
+      "pages": [
+        "mine-pr-profile/mine-pr-profile",
+        "mine-pr-linke/mine-pr-linke",
+        "mine-pr-orders/mine-pr-orders",
+        "mine-pr-recruit-share/mine-pr-recruit-share",
+        "mine-pr-order-applicants/mine-pr-order-applicants",
+        "mine-pr-order-schedule/mine-pr-order-schedule",
+        "mine-pr-order-schedule-success/mine-pr-order-schedule-success",
+        "mine-form-relay/mine-form-relay",
+        "form-relay-group-qr/form-relay-group-qr",
+        "mine-pr-order-video-review/mine-pr-order-video-review",
+        "video-review-share/video-review-share",
+        "applicant-pick-share/applicant-pick-share",
+        "mine-pr-order-script-review/mine-pr-order-script-review",
+        "mine-pr-quotes/mine-pr-quotes",
+        "chat/chat",
+        "mine-pr-talent-check/mine-pr-talent-check",
+        "mine-pr-addons/mine-pr-addons",
+        "mine-pr-addon-shortvideo/mine-pr-addon-shortvideo",
+        "mine-pr-addon-ai-content/mine-pr-addon-ai-content",
+        "mine-pr-addon-digital-human/mine-pr-addon-digital-human",
+        "mine-pr-addon-visual-studio/mine-pr-addon-visual-studio",
+        "mine-pr-addon-image-clarify/mine-pr-addon-image-clarify",
+        "mine-pr-addon-short-drama/mine-pr-addon-short-drama",
+        "mine-pr-addon-ai-video-review/mine-pr-addon-ai-video-review",
+        "mine-pr-addon-ai-review/mine-pr-addon-ai-review",
+        "mine-pr-addon-video-rule-links/mine-pr-addon-video-rule-links",
+        "mine-pr-addon-script-rule-links/mine-pr-addon-script-rule-links",
+        "mine-pr-targeted-pick/mine-pr-targeted-pick",
+        "mine-pr-targeted-manage/mine-pr-targeted-manage",
+        "order-group-chat/order-group-chat"
+      ]
+    },
+    {
+      "root": "pages/subpack-mine",
+      "name": "subpackMine",
+      "pages": [
+        "mine-applications/mine-applications",
+        "mine-order-calendar/mine-order-calendar",
+        "mine-favorites/mine-favorites",
+        "mine-templates/mine-templates",
+        "mine-template-edit/mine-template-edit",
+        "mine-notifications/mine-notifications",
+        "mine-notification-detail/mine-notification-detail",
+        "mine-analytics/mine-analytics",
+        "mine-subscriptions/mine-subscriptions",
+        "mine-talent-credit/mine-talent-credit",
+        "mine-cooperation/mine-cooperation",
+        "mine-talent-watchlist/mine-talent-watchlist",
+        "mine-brief-templates/mine-brief-templates",
+        "mine-funnel/mine-funnel",
+        "mine-xingxuan-membership/mine-xingxuan-membership",
+        "mine-wallet/mine-wallet",
+        "mine-xingxuan-points-recharge/mine-xingxuan-points-recharge",
+        "mine-my-orders/mine-my-orders",
+        "mine-support/mine-support",
+        "mine-manual/mine-manual",
+        "mine-local-life-eval/mine-local-life-eval",
+        "mine-support-chat/mine-support-chat",
+        "mine-targeted-invites/mine-targeted-invites",
+        "mine-wechat-oa-bind/mine-wechat-oa-bind",
+        "mine-account-bind/mine-account-bind",
+        "mine-affiliate-apply/mine-affiliate-apply",
+        "mine-training/mine-training",
+        "mine-training-detail/mine-training-detail",
+        "mine-training-post/mine-training-post",
+        "mine-training-account/mine-training-account",
+        "mine-training-settle/mine-training-settle",
+        "mine-affiliate-portal/mine-affiliate-portal"
+      ]
+    }
+  ],
+  "window": {
+    "navigationBarTitleText": "灵奇星选平台",
+    "navigationBarBackgroundColor": "#f7f3ec",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F7F3EC",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#94a3b8",
+    "selectedColor": "#7c4dff",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/recommend/recommend", "text": "推荐" },
+      { "pagePath": "pages/publish/publish", "text": "发招募" },
+      { "pagePath": "pages/messages/messages", "text": "消息" },
+      { "pagePath": "pages/mine/mine", "text": "我的" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "networkTimeout": {
+    "request": 120000,
+    "downloadFile": 120000,
+    "connectSocket": 60000
+  },
+  "navigateToMiniProgramAppIdList": [
+    "wxfaa08012777a431e",
+    "wxfc4ef6d539d03373"
+  ],
+  "requiredPrivateInfos": [
+    "chooseLocation",
+    "getFuzzyLocation"
+  ],
+  "permission": {
+    "scope.album": {
+      "desc": "用于从相册选择封面、探店视频、群二维码等素材并上传"
+    },
+    "scope.camera": {
+      "desc": "用于拍摄照片和视频，以便聊天发送，以及上传头像、封面和作品"
+    },
+    "scope.writePhotosAlbum": {
+      "desc": "用于将 AI 生成视频保存到相册"
+    },
+    "scope.userLocation": {
+      "desc": "用于发招募时通过地图选择商家位置"
+    },
+    "scope.userFuzzyLocation": {
+      "desc": "用于招募大厅与推荐大厅自动定位到当前城市"
+    }
+  },
+  "usingComponents": {
+    "site-icp-footer": "/components/site-icp-footer/index",
+    "mp-privacy-gate": "/components/mp-privacy-gate/index",
+    "order-expand": "/components/order-expand/index"
+  },
+  "__usePrivacyCheck__": true
+}

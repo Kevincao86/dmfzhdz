@@ -321,7 +321,7 @@ export default function MeooLayout() {
                     setHeaderSearchQuery('')
                   }
                 }}
-                placeholder="问灵祺…"
+                placeholder="问灵奇…"
                 className="w-full rounded-md border border-white/25 bg-white/15 py-1.5 pl-8 pr-3 text-sm text-white placeholder:text-white/60 focus:border-white/50 focus:outline-none focus:ring-2 focus:ring-white/25"
               />
             </div>

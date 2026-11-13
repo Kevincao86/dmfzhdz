@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# 将灵祺达人撮合小程序（微信）同步到灵祺星选抖音版（仅覆盖抖音目录，不改微信源）
+# 将灵奇达人撮合小程序（微信）同步到灵奇星选抖音版（仅覆盖抖音目录，不改微信源）
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/灵祺达人撮合小程序"
-DEST="$ROOT/灵祺星选小程序抖音版/灵祺星选"
+SRC="$ROOT/灵奇达人撮合小程序"
+DEST="$ROOT/灵奇星选小程序抖音版/灵奇星选"
 DY_APPID="tt9f05e9b8016199c301"
 
 if [[ ! -d "$SRC" ]]; then
@@ -32,7 +32,7 @@ rsync -a --delete \
 
 # 恢复 / 写入抖音专属
 if [[ -f "$TMP/config.release.js" ]]; then cp -f "$TMP/config.release.js" "$DEST/utils/config.release.js"
-else cp -f "$ROOT/灵祺星选小程序抖音版/灵祺星选/utils/config.release.js" "$DEST/utils/" 2>/dev/null || true
+else cp -f "$ROOT/灵奇星选小程序抖音版/灵奇星选/utils/config.release.js" "$DEST/utils/" 2>/dev/null || true
 fi
 if [[ -f "$TMP/wxAdapter.js" ]]; then cp -f "$TMP/wxAdapter.js" "$DEST/utils/wxAdapter.js"
 fi
@@ -61,7 +61,7 @@ cat > "$DEST/project.config.json" <<EOF
         "nativeCompile": true
     },
     "appid": "$DY_APPID",
-    "projectname": "灵祺星选",
+    "projectname": "灵奇星选",
     "douyinProjectType": "native",
     "miniprogramRoot": "./",
     "compileType": "miniprogram"
@@ -124,7 +124,7 @@ for (const rel of pages) {
     j.navigationBarTextStyle = 'white';
   }
   if (rel === 'pages/welcome/welcome.json') {
-    j.navigationBarTitleText = '灵祺星选';
+    j.navigationBarTitleText = '灵奇星选';
     j.navigationBarBackgroundColor = '#9b87f5';
     j.navigationBarTextStyle = 'white';
   }

@@ -179,7 +179,7 @@ function buildDrSharePageUrl(mpOrderId: string, token: string): string {
 
 /** 小程序 #小程序:// 短链，与 dr 共用同一 token */
 function buildMpSharePageUrl(token: string): string {
-  const appName = String(process.env.MP_SHARE_APP_NAME || '灵祺星选').trim() || '灵祺星选'
+  const appName = String(process.env.MP_SHARE_APP_NAME || '灵奇星选').trim() || '灵奇星选'
   const t = encodeURIComponent(String(token || '').trim())
   return `#小程序://${appName}/pages/video-review-share/video-review-share?token=${t}`
 }

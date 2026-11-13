@@ -2,8 +2,8 @@
 
 ## 不可随意改动的文件
 
-- `灵祺达人履约管理后台/src/lib/mpRecruitment/recommendAllTalentsPool.ts`
-- `灵祺达人撮合小程序/utils/recommendAllTalentsPool.js`
+- `灵奇达人履约管理后台/src/lib/mpRecruitment/recommendAllTalentsPool.ts`
+- `灵奇达人撮合小程序/utils/recommendAllTalentsPool.js`
 - Web `fetchMpRegistry({ includeRecommendPool: true })` 的缓存键须含 `:rec`，且不得用无达人库的 hall 缓存顶替
 
 ## 行为契约（权威数据源 = 商家管理后台只读库）
@@ -18,7 +18,7 @@
 
 ```bash
 bash scripts/verify-recommend-pool-parity.sh
-cd 灵祺达人撮合小程序 && node -e "
+cd 灵奇达人撮合小程序 && node -e "
 const fs=require('fs');const p=require('./utils/recommendAllTalentsPool.js');
 const r=JSON.parse(fs.readFileSync('/tmp/reg.json','utf8'));
 const o=p.buildAllTalentsPool(r);

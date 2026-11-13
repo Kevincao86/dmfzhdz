@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         const order = await createDouyinPayNativeOrder({
           cfg: cfg.config,
           outTradeNo,
-          description: '灵祺探活',
+          description: '灵奇探活',
           amountCents: 1,
         })
         base.nativeProbe = {
