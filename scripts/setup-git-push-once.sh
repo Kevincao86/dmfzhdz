@@ -2,7 +2,7 @@
 # 一次性配置：让 Cursor Agent 能自动 git push 到 GitHub + Gitee（无需每次手动操作）
 #
 # 用法（在本机 Mac 终端执行一次）:
-#   cd "/Volumes/大魔王的OS/Users/damowangOS/灵祺AI智能ERP_迁移/灵祺/项目"
+#   cd "/Volumes/大魔王的OS/Users/damowangOS/灵奇AI智能ERP_迁移/灵奇/项目"
 #   bash scripts/setup-git-push-once.sh
 
 set -euo pipefail

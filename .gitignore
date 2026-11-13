@@ -26,7 +26,7 @@ web版/merchant-erp/public/ffmpeg/
 scripts/local/
 
 # 小程序本地 Supabase / 云端密钥覆盖（复制自 config.local.example.js）
-灵祺商家小程序/utils/config.local.js
+灵奇商家小程序/utils/config.local.js
 灵奇达人撮合小程序/utils/config.local.js
 .vercel
 .env*

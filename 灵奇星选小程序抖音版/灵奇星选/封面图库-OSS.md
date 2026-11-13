@@ -59,7 +59,7 @@ OSS_ENDPOINT=oss-cn-shanghai.aliyuncs.com
 必须先进入项目目录（否则会报 `Cannot find module .../Users/damowang/scripts/...`）：
 
 ```bash
-cd "/Volumes/大魔王的OS - Data/Users/damowangOS/灵祺AI智能ERP_迁移/灵祺/项目"
+cd "/Volumes/大魔王的OS - Data/Users/damowangOS/灵奇AI智能ERP_迁移/灵奇/项目"
 bash scripts/upload-mp-recruit-covers-oss-local.sh
 ```
 

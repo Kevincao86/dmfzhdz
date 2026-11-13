@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DECK="$ROOT/docs/灵祺商家ERP"
+DECK="$ROOT/docs/灵奇商家ERP"
 PORT="${SYSC_DECK_PREVIEW_PORT:-8765}"
 
 if [[ ! -f "$DECK/index.html" ]]; then

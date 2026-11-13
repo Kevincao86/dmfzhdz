@@ -16,7 +16,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=ecs-resolve-admin-home.sh
 source "$ROOT/scripts/ecs-resolve-admin-home.sh"
 
-DECK_SRC="$ROOT/docs/灵祺商家ERP"
+DECK_SRC="$ROOT/docs/灵奇商家ERP"
 DECK_DST="${SYSC_DECK_DIST:-/var/www/meoo-sysc-product-deck}"
 SYSC_DOMAIN="${SYSC_DOMAIN:-sysc.mofangdianai.com}"
 NGINX_TEMPLATE="$ROOT/scripts/ecs-nginx-sysc-product-deck.conf"

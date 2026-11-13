@@ -42,7 +42,7 @@ const PRODUCTS = [
     fullName: '灵奇商家小程序软件',
     shortName: '灵奇商家小程序',
     version: 'V1.0',
-    dirs: ['灵祺商家小程序'],
+    dirs: ['灵奇商家小程序'],
     extensions: ['.js', '.wxml', '.wxss', '.json'],
   },
   {
